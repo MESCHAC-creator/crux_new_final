@@ -2,14 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import '../models/meeting_model.dart';
 import '../services/meeting_service.dart';
-import '../services/error_handler_service.dart';
 
 class MeetingProvider extends ChangeNotifier {
   final MeetingService _meetingService = MeetingService();
   final _logger = Logger();
-  final _errorHandler = ErrorHandlerService(); // used in error handling callbacks
 
-  List<MeetingModel> _meetings = [];
+  final List<MeetingModel> _meetings = [];
   MeetingModel? _currentMeeting;
   bool _isLoading = false;
   String? _error;

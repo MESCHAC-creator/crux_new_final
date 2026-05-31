@@ -8,10 +8,10 @@ class MeetingScreen extends StatefulWidget {
   final String meetingName;
 
   const MeetingScreen({
-    Key? key,
+    super.key,
     required this.meetingId,
     required this.meetingName,
-  }) : super(key: key);
+  });
 
   @override
   State<MeetingScreen> createState() => _MeetingScreenState();
@@ -23,7 +23,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
   bool _isCameraOn = true;
   bool _isSpeakerOn = true;
   bool _isRecording = false;
-  int _participantCount = 1;
+  final int _participantCount = 1;
   late Stopwatch _stopwatch;
 
   @override
@@ -144,7 +144,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.videocam_off,
                       color: AppColors.textTertiary,
                       size: 100,

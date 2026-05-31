@@ -5,7 +5,7 @@ import '../services/auth_service.dart';
 import '../services/error_handler_service.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -284,7 +284,7 @@ class _LoginScreenState extends State<LoginScreen> {
 class SignUpDialog extends StatefulWidget {
   final Function(String email, String password, String name) onSignUp;
 
-  const SignUpDialog({Key? key, required this.onSignUp}) : super(key: key);
+  const SignUpDialog({super.key, required this.onSignUp});
 
   @override
   State<SignUpDialog> createState() => _SignUpDialogState();

@@ -8,7 +8,7 @@ import '../services/error_handler_service.dart';
 class HomeScreen extends StatefulWidget {
   final UserModel user;
 
-  const HomeScreen({Key? key, required this.user}) : super(key: key);
+  const HomeScreen({super.key, required this.user});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -251,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Column(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.history,
                     color: AppColors.textTertiary,
                     size: 48,
