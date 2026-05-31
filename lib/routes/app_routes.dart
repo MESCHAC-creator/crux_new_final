@@ -13,8 +13,8 @@ class AppRoutes {
   static const String meeting = '/meeting';
   static const String settings = '/settings';
 
-  static Route<dynamic> generateRoute(RouteSettings settings) {
-    switch (settings.name) {
+  static Route<dynamic> generateRoute(RouteSettings routeSettings) {
+    switch (routeSettings.name) {
       case splash:
         return MaterialPageRoute(builder: (_) => const SplashScreen());
 
@@ -22,7 +22,7 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const LoginScreen());
 
       case home:
-        final user = settings.arguments as UserModel?;
+        final user = routeSettings.arguments as UserModel?;
         return MaterialPageRoute(
           builder: (_) => HomeScreen(user: user ?? UserModel(
             uid: '',
@@ -32,7 +32,7 @@ class AppRoutes {
         );
 
       case meeting:
-        final args = settings.arguments as Map<String, dynamic>?;
+        final args = routeSettings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
           builder: (_) => MeetingScreen(
             meetingId: args?['meetingId'] ?? '',

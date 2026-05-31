@@ -1,7 +1,6 @@
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
-import '../config/agora_config.dart';
 import 'error_handler_service.dart';
 
 class AgoraService {
@@ -84,10 +83,7 @@ class AgoraService {
         onTokenPrivilegeWillExpire: (connection, token) {
           _logger.w('⚠️ Token expirera bientôt');
         },
-        onAudioMuted: (connection, remoteUid, muted) {
-          _logger.i(muted ? '🔇 Audio muted: $remoteUid' : '🎤 Audio unmuted: $remoteUid');
-        },
-        onVideoStateChanged: (connection, remoteUid, state, reason, elapsed) {
+        onRemoteVideoStateChanged: (connection, remoteUid, state, reason, elapsed) {
           _logger.i('📹 État vidéo changé: $remoteUid - State: $state');
         },
       ),

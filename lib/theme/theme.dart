@@ -135,7 +135,7 @@ class AppTheme {
         }),
       ),
 
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.whiteBg,
         elevation: 2,
         shadowColor: Colors.black12,
@@ -206,7 +206,7 @@ class AppTheme {
         ),
         iconTheme: const IconThemeData(color: Colors.white, size: 24),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: const Color(0xFF1A1A1A),
         elevation: 2,
         shadowColor: Colors.black54,

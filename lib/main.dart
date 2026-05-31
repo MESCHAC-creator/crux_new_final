@@ -8,7 +8,6 @@ import 'services/agora_service.dart';
 import 'services/error_handler_service.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
-import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'models/user_model.dart';
 import 'theme/colors.dart';

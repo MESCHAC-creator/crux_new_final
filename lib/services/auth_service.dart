@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import '../models/user_model.dart';
 import 'error_handler_service.dart';
