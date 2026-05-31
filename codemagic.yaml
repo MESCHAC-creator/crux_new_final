@@ -17,6 +17,15 @@ workflows:
         script: |
           echo "flutter.sdk=$HOME/sdks/flutter" > android/local.properties
 
+      - name: Patch Flutter Gradle plugin for AGP 9+ compatibility
+        script: |
+          GRADLE_SRC="$HOME/sdks/flutter/packages/flutter_tools/gradle/src/main/kotlin"
+          # Replace all XxxProject.afterEvaluate { with XxxProject.gradle.projectsEvaluated {
+          find "$GRADLE_SRC" -name "*.kt" -exec \
+            sed -i 's/\.afterEvaluate {/.gradle.projectsEvaluated {/g' {} \;
+          echo "Patched files:"
+          grep -rl "projectsEvaluated" "$GRADLE_SRC" --include="*.kt" || true
+
       - name: Get Flutter packages
         script: flutter pub get
 
