@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'config/app_config.dart';
 import 'config/agora_config.dart';
 import 'services/agora_service.dart';
@@ -27,6 +28,9 @@ final errorHandlerService = ErrorHandlerService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  await dotenv.load(fileName: '.env');
 
   try {
     // Initialize Firebase

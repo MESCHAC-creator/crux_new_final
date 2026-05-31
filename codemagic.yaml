@@ -10,22 +10,17 @@ workflows:
         - crux_keystore
       vars:
         CM_KEY_ALIAS: crux_key
-        AGORA_APP_ID: 729bb936e5084d53897e43c58ee8e946
-        AGORA_APP_CERTIFICATE: 93fb3c3df2d840bd94da85a24115ac43
-        AGORA_TOKEN_URL: http://localhost:8081/rtc
-        FIREBASE_PROJECT_ID: crux-8aa85
-        ENVIRONMENT: production
     scripts:
       - name: Set up environment
         script: |
           echo "flutter.sdk=$HOME/sdks/flutter" > android/local.properties
           cat > .env << 'EOF'
-          AGORA_APP_ID=$AGORA_APP_ID
-          AGORA_APP_CERTIFICATE=$AGORA_APP_CERTIFICATE
-          AGORA_TOKEN_URL=$AGORA_TOKEN_URL
-          FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID
-          ENVIRONMENT=$ENVIRONMENT
-          EOF
+AGORA_APP_ID=729bb936e5084d53897e43c58ee8e946
+AGORA_APP_CERTIFICATE=93fb3c3df2d840bd94da85a24115ac43
+AGORA_TOKEN_URL=http://localhost:8081/rtc
+FIREBASE_PROJECT_ID=crux-8aa85
+ENVIRONMENT=production
+EOF
 
       - name: Get Flutter packages
         script: flutter pub get
