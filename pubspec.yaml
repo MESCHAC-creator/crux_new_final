@@ -33,6 +33,7 @@ dependencies:
 
   # HTTP & Utilities
   http: ^1.2.2
+  dio: ^5.4.0
   uuid: ^4.2.1
   logger: ^2.1.0
 
