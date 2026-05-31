@@ -183,21 +183,23 @@ class AgoraService {
 
   Future<void> setVideoQuality(String quality) async {
     try {
-      Map qualitySettings = {
-        'low': AgoraVideoQuality.lowQuality,
-        'medium': AgoraVideoQuality.mediumQuality,
-        'high': AgoraVideoQuality.highQuality,
-        'ultra': AgoraVideoQuality.ultraHighQuality,
-      }[quality] ?? AgoraVideoQuality.highQuality;
+      const Map<String, Map<String, int>> qualities = {
+        'low': {'width': 320, 'height': 240, 'frameRate': 15, 'bitrate': 200},
+        'medium': {'width': 640, 'height': 480, 'frameRate': 24, 'bitrate': 800},
+        'high': {'width': 1280, 'height': 720, 'frameRate': 30, 'bitrate': 2500},
+        'ultra': {'width': 1920, 'height': 1080, 'frameRate': 30, 'bitrate': 5000},
+      };
+
+      final settings = qualities[quality] ?? qualities['high']!;
 
       await _engine.setVideoEncoderConfiguration(
         VideoEncoderConfiguration(
           dimensions: VideoDimensions(
-            width: qualitySettings['width'],
-            height: qualitySettings['height'],
+            width: settings['width']!,
+            height: settings['height']!,
           ),
-          frameRate: qualitySettings['frameRate'],
-          bitrate: qualitySettings['bitrate'],
+          frameRate: settings['frameRate']!,
+          bitrate: settings['bitrate']!,
         ),
       );
 

@@ -175,7 +175,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withOpacity(0.8),
+                      Colors.black.withValues(alpha: 0.8),
                       Colors.transparent,
                     ],
                   ),
@@ -219,7 +219,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -254,7 +254,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      Colors.black.withOpacity(0.95),
+                      Colors.black.withValues(alpha: 0.95),
                       Colors.transparent,
                     ],
                   ),
@@ -356,7 +356,7 @@ class _ControlButton extends StatelessWidget {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.3),
+              color: color.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(30),
               border: Border.all(color: color, width: 2),
             ),
