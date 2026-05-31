@@ -135,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: const [
                   BoxShadow(
-                    color: Colors.black15,
+                    color: Color.fromRGBO(0, 0, 0, 0.15),
                     blurRadius: 12,
                     offset: Offset(0, 4),
                   ),
@@ -298,7 +298,7 @@ class _QuickActionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
           boxShadow: const [
-            BoxShadow(color: Colors.black08, blurRadius: 8),
+            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.08), blurRadius: 8),
           ],
         ),
         child: Column(
