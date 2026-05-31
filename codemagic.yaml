@@ -15,22 +15,25 @@ workflows:
     scripts:
       - name: Set up local.properties
         script: |
-          echo "flutter.sdk=$HOME/sdks/flutter" > android/local.properties
+          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
+          echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
+          echo "Flutter SDK path: $FLUTTER_SDK"
 
       - name: Patch Flutter Gradle plugin and clear ALL caches
         script: |
-          FLUTTER_SDK="$HOME/sdks/flutter"
+          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
           GRADLE_SRC="$FLUTTER_SDK/packages/flutter_tools/gradle/src/main/kotlin"
 
           echo "=== Step 1: Verify Flutter SDK path ==="
+          echo "Using Flutter SDK at: $FLUTTER_SDK"
           ls "$FLUTTER_SDK/packages/flutter_tools/gradle/" || { echo "ERROR: Flutter SDK not found at $FLUTTER_SDK"; exit 1; }
 
           echo "=== Step 2: Clear ALL Gradle caches (prevents stale compiled plugin) ==="
           rm -rf ~/.gradle/caches/
           rm -rf ~/.gradle/wrapper/
           rm -rf android/.gradle/
-          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/"
-          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/"
+          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/" 2>/dev/null || true
+          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/" 2>/dev/null || true
           echo "All caches cleared."
 
           echo "=== Step 3: Patch afterEvaluate -> gradle.projectsEvaluated ==="
