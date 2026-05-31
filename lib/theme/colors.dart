@@ -95,7 +95,7 @@ class AppColorsPalette {
   // Theme Sombre (Nuit)
   static const Map<String, Color> darkTheme = {
     'primary': Color(0xFFF8706E),
-    'secondary': Color(0xBB8FCE),
+    'secondary': Color(0xFFBB8FCE),
     'background': Color(0xFF0F0F0F),
     'surface': Color(0xFF1A1A1A),
     'text': Color(0xFFFFFFFF),

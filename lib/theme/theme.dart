@@ -227,11 +227,11 @@ class AppStyles {
   ];
 
   static const List<BoxShadow> shadowMedium = [
-    BoxShadow(color: Colors.black15, blurRadius: 8, offset: Offset(0, 4)),
+    BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.15), blurRadius: 8, offset: Offset(0, 4)),
   ];
 
   static const List<BoxShadow> shadowLarge = [
-    BoxShadow(color: Colors.black2, blurRadius: 16, offset: Offset(0, 8)),
+    BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.08), blurRadius: 16, offset: Offset(0, 8)),
   ];
 
   // Radius standards
