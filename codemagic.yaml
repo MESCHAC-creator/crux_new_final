@@ -17,35 +17,43 @@ workflows:
         script: |
           echo "flutter.sdk=$HOME/sdks/flutter" > android/local.properties
 
-      - name: Patch Flutter Gradle plugin (fix afterEvaluate for AGP 8.11+)
+      - name: Patch Flutter Gradle plugin and clear ALL caches
         script: |
-          GRADLE_SRC="$HOME/sdks/flutter/packages/flutter_tools/gradle/src/main/kotlin"
-          echo "Flutter SDK path: $HOME/sdks/flutter"
-          echo "Gradle source path: $GRADLE_SRC"
+          FLUTTER_SDK="$HOME/sdks/flutter"
+          GRADLE_SRC="$FLUTTER_SDK/packages/flutter_tools/gradle/src/main/kotlin"
 
-          # Verify source files exist
-          echo "Source files found:"
-          find "$GRADLE_SRC" -name "*.kt" -not -path "*/test/*" | sort
+          echo "=== Step 1: Verify Flutter SDK path ==="
+          ls "$FLUTTER_SDK/packages/flutter_tools/gradle/" || { echo "ERROR: Flutter SDK not found at $FLUTTER_SDK"; exit 1; }
 
-          # Patch: replace afterEvaluate with projectsEvaluated
-          # projectsEvaluated is safe to call even after project evaluation
-          find "$GRADLE_SRC" -name "*.kt" -not -path "*/test/*" | while read f; do
-            count=$(grep -c "\.afterEvaluate {" "$f" 2>/dev/null || true)
-            if [ "$count" -gt "0" ]; then
+          echo "=== Step 2: Clear ALL Gradle caches (prevents stale compiled plugin) ==="
+          rm -rf ~/.gradle/caches/
+          rm -rf ~/.gradle/wrapper/
+          rm -rf android/.gradle/
+          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/"
+          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/"
+          echo "All caches cleared."
+
+          echo "=== Step 3: Patch afterEvaluate -> gradle.projectsEvaluated ==="
+          MAIN_KT=$(find "$GRADLE_SRC" -name "*.kt" -not -path "*/test/*" | sort)
+          echo "Files to check: $(echo "$MAIN_KT" | wc -l)"
+
+          for f in $MAIN_KT; do
+            before=$(grep -c "\.afterEvaluate {" "$f" 2>/dev/null || echo 0)
+            if [ "$before" -gt "0" ]; then
               sed -i 's/\.afterEvaluate {/.gradle.projectsEvaluated {/g' "$f"
-              echo "Patched $count afterEvaluate(s) in: $(basename $f)"
+              after=$(grep -c "\.afterEvaluate {" "$f" 2>/dev/null || echo 0)
+              echo "  PATCHED $(basename $f): $before -> $after afterEvaluate calls"
             fi
           done
 
-          echo "Remaining afterEvaluate calls in main sources:"
-          grep -rn "afterEvaluate" "$GRADLE_SRC" --include="*.kt" \
-            | grep -v "/test/" || echo "None - patch successful"
-
-          # Clear Gradle caches to force recompilation of patched plugin
-          echo "Clearing Gradle caches..."
-          rm -rf ~/.gradle/caches/
-          rm -rf android/.gradle/
-          echo "Cache cleared - plugin will recompile from patched sources"
+          echo "=== Step 4: Verify patch success ==="
+          REMAINING=$(grep -rn "\.afterEvaluate {" "$GRADLE_SRC" --include="*.kt" | grep -v "/test/" | wc -l)
+          if [ "$REMAINING" -gt "0" ]; then
+            echo "ERROR: $REMAINING afterEvaluate calls remain:"
+            grep -rn "\.afterEvaluate {" "$GRADLE_SRC" --include="*.kt" | grep -v "/test/"
+            exit 1
+          fi
+          echo "SUCCESS: 0 afterEvaluate calls remaining in Flutter Gradle plugin"
 
       - name: Get Flutter packages
         script: flutter pub get
