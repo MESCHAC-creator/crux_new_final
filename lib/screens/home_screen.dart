@@ -297,8 +297,8 @@ class _QuickActionCard extends StatelessWidget {
           color: AppColors.whiteBg,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
-          boxShadow: const [
-            BoxShadow(color: Colors.black08, blurRadius: 8),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8),
           ],
         ),
         child: Column(
