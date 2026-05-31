@@ -24,7 +24,6 @@ class _MeetingScreenState extends State<MeetingScreen> {
   bool _isSpeakerOn = true;
   bool _isRecording = false;
   int _participantCount = 1;
-  Duration _meetingDuration = Duration.zero;
   late Stopwatch _stopwatch;
 
   @override

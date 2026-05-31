@@ -41,13 +41,15 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      _errorHandler.showSuccessSnackBar(context, '✅ Connexion réussie!');
       if (mounted) {
+        _errorHandler.showSuccessSnackBar(context, '✅ Connexion réussie!');
         Navigator.of(context).pushReplacementNamed('/home');
       }
     } catch (e) {
-      _errorHandler.showErrorDialog(context, '❌ Erreur de connexion',
-          e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        _errorHandler.showErrorDialog(context, '❌ Erreur de connexion',
+            e.toString().replaceFirst('Exception: ', ''));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -64,12 +66,16 @@ class _LoginScreenState extends State<LoginScreen> {
               password: password,
               name: name,
             );
-            _errorHandler.showSuccessSnackBar(context, '✅ Inscription réussie!');
-            Navigator.pop(ctx);
+            if (ctx.mounted) {
+              _errorHandler.showSuccessSnackBar(ctx, '✅ Inscription réussie!');
+              Navigator.pop(ctx);
+            }
             _emailController.text = email;
           } catch (e) {
-            _errorHandler.showErrorDialog(ctx, '❌ Erreur',
-                e.toString().replaceFirst('Exception: ', ''));
+            if (ctx.mounted) {
+              _errorHandler.showErrorDialog(ctx, '❌ Erreur',
+                  e.toString().replaceFirst('Exception: ', ''));
+            }
           }
         },
       ),

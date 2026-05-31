@@ -13,9 +13,8 @@ class AppTheme {
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
         secondary: AppColors.secondary,
-        surface: AppColors.lightBg,
+        surface: AppColors.whiteBg,
         error: AppColors.error,
-        background: AppColors.whiteBg,
       ),
 
       appBarTheme: AppBarTheme(
@@ -127,8 +126,8 @@ class AppTheme {
           color: AppColors.error,
           fontSize: 12,
         ),
-        prefixIconColor: MaterialStateColor.resolveWith((states) {
-          if (states.contains(MaterialState.focused)) {
+        prefixIconColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.focused)) {
             return AppColors.primary;
           }
           return AppColors.textSecondary;

@@ -7,7 +7,7 @@ import '../services/error_handler_service.dart';
 class MeetingProvider extends ChangeNotifier {
   final MeetingService _meetingService = MeetingService();
   final _logger = Logger();
-  final _errorHandler = ErrorHandlerService();
+  final _errorHandler = ErrorHandlerService(); // used in error handling callbacks
 
   List<MeetingModel> _meetings = [];
   MeetingModel? _currentMeeting;

@@ -68,8 +68,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.of(context).pushReplacementNamed('/login');
                 }
               } catch (e) {
-                _errorHandler.showErrorDialog(context, '❌ Erreur',
-                    e.toString());
+                if (mounted) {
+                  _errorHandler.showErrorDialog(context, '❌ Erreur', e.toString());
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),

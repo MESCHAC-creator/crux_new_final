@@ -242,7 +242,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         trailing: Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: AppColors.primary,
+          activeThumbColor: AppColors.primary,
+          activeTrackColor: AppColors.primaryLight,
         ),
       ),
     );
@@ -288,23 +289,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Qualité vidéo',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['Basse', 'Moyenne', 'Haute', 'Très haute']
-              .map((quality) => RadioListTile<String>(
-            title: Text(quality),
-            value: quality,
-            groupValue: _videoQuality,
-            onChanged: (value) {
-              setState(() => _videoQuality = value!);
+        content: RadioGroup<String>(
+          groupValue: _videoQuality,
+          onChanged: (value) {
+            if (value != null) {
+              setState(() => _videoQuality = value);
               Navigator.pop(ctx);
               _errorHandler.showSuccessSnackBar(
                 context,
                 '✅ Qualité vidéo: $value',
               );
-            },
-          ))
-              .toList(),
+            }
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: ['Basse', 'Moyenne', 'Haute', 'Très haute']
+                .map((quality) => RadioListTile<String>(
+              title: Text(quality),
+              value: quality,
+            ))
+                .toList(),
+          ),
         ),
       ),
     );
@@ -319,23 +324,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Langue',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['Français', 'English', 'Español', 'Deutsch']
-              .map((lang) => RadioListTile<String>(
-            title: Text(lang),
-            value: lang,
-            groupValue: _selectedLanguage,
-            onChanged: (value) {
-              setState(() => _selectedLanguage = value!);
+        content: RadioGroup<String>(
+          groupValue: _selectedLanguage,
+          onChanged: (value) {
+            if (value != null) {
+              setState(() => _selectedLanguage = value);
               Navigator.pop(ctx);
               _errorHandler.showSuccessSnackBar(
                 context,
                 '✅ Langue: $value',
               );
-            },
-          ))
-              .toList(),
+            }
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: ['Français', 'English', 'Español', 'Deutsch']
+                .map((lang) => RadioListTile<String>(
+              title: Text(lang),
+              value: lang,
+            ))
+                .toList(),
+          ),
         ),
       ),
     );
