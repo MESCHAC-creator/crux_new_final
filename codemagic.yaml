@@ -1,7 +1,7 @@
 workflows:
   android-release:
     name: Android Release
-    instance_type: mac_mini
+    instance_type: linux
     max_build_duration: 120
     environment:
       flutter: stable
