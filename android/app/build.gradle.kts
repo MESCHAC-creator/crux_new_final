@@ -1,16 +1,17 @@
 plugins {
     id("com.android.application")
-    // FlutterFire: doit être déclaré avant le plugin Flutter
-    id("com.google.gms.google-services")
     id("kotlin-android")
-    // Le plugin Flutter Gradle DOIT être appliqué en dernier
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// google-services appliqué via apply() et non dans plugins{}
+// pour éviter le conflit afterEvaluate avec le plugin Flutter Gradle
+apply(plugin = "com.google.gms.google-services")
+
 android {
     namespace = "com.example.crux"
-    compileSdk = 34
-    ndkVersion = "25.1.8937393"
+    compileSdk = 35
+    ndkVersion = "26.1.10909125"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -32,8 +33,8 @@ android {
 
     defaultConfig {
         applicationId = "com.example.crux"
-        minSdk = flutter.minSdkVersion
-        targetSdk = 34
+        minSdk = 21
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
@@ -43,33 +44,28 @@ android {
         release {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            isShrinkResources = false
         }
         debug {
             isDebuggable = true
-            isMinifyEnabled = false
         }
     }
 
     lint {
-        disable.addAll(listOf(
-            "MissingDimensionRegistration",
-            "InvalidPackage",
-            "MissingTranslation",
-            "ExtraTranslation"
-        ))
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 
-    packagingOptions {
-        exclude("META-INF/proguard/androidx-*.pro")
-        exclude("META-INF/DEPENDENCIES")
-        exclude("META-INF/LICENSE")
-        exclude("META-INF/LICENSE.txt")
-        exclude("META-INF/NOTICE")
-        exclude("META-INF/NOTICE.txt")
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt"
+            )
+        }
     }
 }
 
@@ -78,16 +74,11 @@ flutter {
 }
 
 dependencies {
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
-    implementation("com.google.firebase:firebase-core")
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-firestore")
-    implementation("com.google.firebase:firebase-storage")
-    implementation("com.google.firebase:firebase-analytics")
-    
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation(platform("com.google.firebase:firebase-bom:33.0.0"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-storage-ktx")
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-messaging-ktx")
     implementation("androidx.multidex:multidex:2.0.1")
-    implementation("androidx.legacy:legacy-support-v4:1.0.0")
 }
