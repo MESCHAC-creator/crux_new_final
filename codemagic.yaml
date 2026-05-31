@@ -17,17 +17,27 @@ workflows:
         script: |
           echo "flutter.sdk=$HOME/sdks/flutter" > android/local.properties
 
-      - name: Patch Flutter Gradle plugin for AGP 9+ compatibility
+      - name: Patch Flutter Gradle plugin and clear Gradle cache
         script: |
           GRADLE_SRC="$HOME/sdks/flutter/packages/flutter_tools/gradle/src/main/kotlin"
-          # Replace all XxxProject.afterEvaluate { with XxxProject.gradle.projectsEvaluated {
-          # projectsEvaluated is safe to call even when projects are already evaluated
-          find "$GRADLE_SRC" -name "*.kt" -exec \
-            sed -i 's/\.afterEvaluate {/.gradle.projectsEvaluated {/g' {} \;
-          echo "--- Patched files ---"
-          grep -rl "projectsEvaluated" "$GRADLE_SRC" --include="*.kt" || true
-          echo "--- Verify no afterEvaluate remaining ---"
-          grep -rl "afterEvaluate" "$GRADLE_SRC" --include="*.kt" || echo "None remaining - patch successful"
+
+          echo "=== Patching Flutter Gradle plugin source ==="
+          find "$GRADLE_SRC" -name "*.kt" -print | while read f; do
+            before=$(grep -c "afterEvaluate" "$f" 2>/dev/null || echo 0)
+            sed -i 's/\.afterEvaluate {/.gradle.projectsEvaluated {/g' "$f"
+            after=$(grep -c "afterEvaluate" "$f" 2>/dev/null || echo 0)
+            if [ "$before" != "$after" ]; then
+              echo "Patched: $f (was $before, now $after)"
+            fi
+          done
+
+          echo "=== Remaining afterEvaluate calls ==="
+          grep -rn "afterEvaluate" "$GRADLE_SRC" --include="*.kt" || echo "None - patch successful"
+
+          echo "=== Clearing Gradle cache to force recompilation ==="
+          rm -rf ~/.gradle/caches/
+          rm -rf ~/.gradle/wrapper/dists/
+          echo "Cache cleared"
 
       - name: Get Flutter packages
         script: flutter pub get
