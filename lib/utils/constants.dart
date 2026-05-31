@@ -15,9 +15,9 @@ class AppConstants {
   static const Duration longAnimationDuration = Duration(milliseconds: 800);
 
   // UI Constants
-  static const double defaultPadding = 16.0;
-  static const double defaultBorderRadius = 12.0;
-  static const double defaultElevation = 4.0;
+  static const double defaultPadding = 16;
+  static const double defaultBorderRadius = 12;
+  static const double defaultElevation = 4;
 
   // Validation Rules
   static const int minNameLength = 2;

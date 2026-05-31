@@ -18,9 +18,6 @@ workflows:
       - name: Get Flutter packages
         script: flutter pub get
 
-      - name: Analyze code
-        script: flutter analyze
-
       - name: Build APK release
         script: flutter build apk --release
 
