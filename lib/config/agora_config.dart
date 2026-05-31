@@ -1,9 +1,9 @@
 class AgoraConfig {
-  // ✅ VOS INFOS AGORA
   static const String appId = '729bb936e5084d53897e43c58ee8e946';
 
   static const String appCertificate = '93fb3c3df2d840bd94da85a24115ac43';
 
+  // À remplacer par l'URL de votre serveur de tokens en production
   static const String tokenServerUrl = 'http://localhost:8081';
 
   static const int defaultVideoWidth = 1280;

@@ -3,7 +3,7 @@ import '../screens/splash_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/meeting_screen.dart';
-import '../screens/settings_screen.dart';
+import '../screens/setting_screen.dart';
 import '../models/user_model.dart';
 
 class AppRoutes {
