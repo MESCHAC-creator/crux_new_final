@@ -19,18 +19,27 @@ android {
         jvmTarget = "11"
     }
 
+    signingConfigs {
+        create("release") {
+            keyAlias = System.getenv("CM_KEY_ALIAS") ?: "crux_key"
+            keyPassword = System.getenv("CM_KEY_PASSWORD") ?: ""
+            storeFile = System.getenv("CM_KEYSTORE_PATH")?.let { file(it) }
+            storePassword = System.getenv("CM_KEYSTORE_PASSWORD") ?: ""
+        }
+    }
+
     defaultConfig {
         applicationId = "com.example.crux"
         minSdk = flutter.minSdkVersion
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
         multiDexEnabled = true
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
