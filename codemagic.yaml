@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 120
 
     environment:
-      flutter: 3.32.4
+      flutter: stable
       java: 17
       android_signing:
         - crux_keystore
@@ -21,10 +21,13 @@ workflows:
         script: |
           GRADLE_SRC="$HOME/sdks/flutter/packages/flutter_tools/gradle/src/main/kotlin"
           # Replace all XxxProject.afterEvaluate { with XxxProject.gradle.projectsEvaluated {
+          # projectsEvaluated is safe to call even when projects are already evaluated
           find "$GRADLE_SRC" -name "*.kt" -exec \
             sed -i 's/\.afterEvaluate {/.gradle.projectsEvaluated {/g' {} \;
-          echo "Patched files:"
+          echo "--- Patched files ---"
           grep -rl "projectsEvaluated" "$GRADLE_SRC" --include="*.kt" || true
+          echo "--- Verify no afterEvaluate remaining ---"
+          grep -rl "afterEvaluate" "$GRADLE_SRC" --include="*.kt" || echo "None remaining - patch successful"
 
       - name: Get Flutter packages
         script: flutter pub get
