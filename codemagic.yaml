@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 120
 
     environment:
-      flutter: 3.44.0
+      flutter: master
       java: 17
       android_signing:
         - crux_keystore
@@ -19,6 +19,111 @@ workflows:
           echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
           echo "Flutter SDK: $FLUTTER_SDK"
           flutter --version
+
+      - name: Fix Flutter Gradle plugin for AGP 9 compatibility
+        script: |
+          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
+          GRADLE_SRC="$FLUTTER_SDK/packages/flutter_tools/gradle/src/main/kotlin"
+
+          echo "=== Reset any previous patches ==="
+          git -C "$FLUTTER_SDK" checkout -- packages/flutter_tools/gradle/src/ 2>/dev/null \
+            && echo "Reset OK" \
+            || echo "git reset skipped (not a git repo or already clean)"
+
+          echo "=== Check for afterEvaluate calls ==="
+          COUNT=$(grep -rn "\.afterEvaluate {" "$GRADLE_SRC" --include="*.kt" | grep -v "/test/" | wc -l)
+          echo "Found $COUNT afterEvaluate call(s)"
+
+          if [ "$COUNT" -eq "0" ]; then
+            echo "No patch needed - Flutter SDK already uses projectsEvaluated"
+          else
+            echo "=== Applying safe patch via Python ==="
+            cat > /tmp/patch_flutter.py << 'PYEOF'
+import re, sys, glob, os
+
+flutter_sdk = sys.argv[1]
+gradle_src = os.path.join(flutter_sdk, "packages/flutter_tools/gradle/src/main/kotlin")
+
+def find_matching_brace(content, start):
+    """Find position after the closing } matching the { at content[start-1]."""
+    depth = 1
+    j = start
+    in_str = False
+    in_line_comment = False
+    while j < len(content) and depth > 0:
+        c = content[j]
+        if in_line_comment:
+            if c == '\n':
+                in_line_comment = False
+        elif in_str:
+            if c == '\\':
+                j += 1
+            elif c == '"':
+                in_str = False
+        else:
+            if j + 1 < len(content) and content[j:j+2] == '//':
+                in_line_comment = True
+                j += 1
+            elif c == '"':
+                in_str = True
+            elif c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+        j += 1
+    return j  # position after the matching }
+
+def patch_file(filepath):
+    with open(filepath) as f:
+        content = f.read()
+    # Pattern: word.afterEvaluate {
+    pattern = re.compile(r'(\b\w+)\.afterEvaluate \{')
+    if not pattern.search(content):
+        return False
+    result = []
+    i = 0
+    while i < len(content):
+        m = pattern.search(content, i)
+        if not m:
+            result.append(content[i:])
+            break
+        varname = m.group(1)
+        result.append(content[i:m.start()])
+        # Find matching closing brace
+        j = find_matching_brace(content, m.end())
+        inner_body = content[m.end():j-1]
+        # Replace: varname.afterEvaluate { BODY }
+        # With:    varname.gradle.projectsEvaluated { with(varname!!) { BODY } }
+        # This preserves 'this' as Project inside the lambda body.
+        result.append(
+            varname + '.gradle.projectsEvaluated { with(' + varname + '!!) {' + inner_body + '} }'
+        )
+        i = j
+    new_content = ''.join(result)
+    if new_content != content:
+        with open(filepath, 'w') as f:
+            f.write(new_content)
+        print("PATCHED: " + os.path.basename(filepath))
+        return True
+    return False
+
+total = 0
+for f in sorted(glob.glob(gradle_src + '/**/*.kt', recursive=True)):
+    if '/test/' not in f and patch_file(f):
+        total += 1
+print("Total files patched: " + str(total))
+PYEOF
+            python3 /tmp/patch_flutter.py "$FLUTTER_SDK"
+            echo "=== Verify: remaining afterEvaluate calls ==="
+            REMAIN=$(grep -rn "\.afterEvaluate {" "$GRADLE_SRC" --include="*.kt" | grep -v "/test/" | wc -l)
+            echo "$REMAIN afterEvaluate calls remaining"
+          fi
+
+          echo "=== Clear compiled caches ==="
+          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/"
+          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/"
+          rm -rf ~/.gradle/caches/
+          echo "Done"
 
       - name: Get Flutter packages
         script: flutter pub get
