@@ -22,7 +22,7 @@ dependencies:
   agora_rtc_engine: ^6.6.3
 
   # Permissions & Localization
-  permission_handler: ^11.4.0
+  permission_handler: ^12.0.0
   intl: ^0.20.2
   flutter_localizations:
     sdk: flutter
@@ -41,7 +41,7 @@ dependencies:
   firebase_messaging: ^16.2.2
 
   # UI & Animation
-  google_fonts: ^6.2.1
+  google_fonts: ^8.1.0
 
   # Local Storage
   hive: ^2.2.3
