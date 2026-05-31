@@ -28,7 +28,7 @@ workflows:
           echo "=== Reset any previous patches ==="
           git -C "$FLUTTER_SDK" checkout -- packages/flutter_tools/gradle/src/ 2>/dev/null \
             && echo "Reset OK" \
-            || echo "git reset skipped (not a git repo or already clean)"
+            || echo "git reset skipped"
 
           echo "=== Check for afterEvaluate calls ==="
           COUNT=$(grep -rn "\.afterEvaluate {" "$GRADLE_SRC" --include="*.kt" | grep -v "/test/" | wc -l)
@@ -37,86 +37,9 @@ workflows:
           if [ "$COUNT" -eq "0" ]; then
             echo "No patch needed - Flutter SDK already uses projectsEvaluated"
           else
-            echo "=== Applying safe patch via Python ==="
-            cat > /tmp/patch_flutter.py << 'PYEOF'
-import re, sys, glob, os
-
-flutter_sdk = sys.argv[1]
-gradle_src = os.path.join(flutter_sdk, "packages/flutter_tools/gradle/src/main/kotlin")
-
-def find_matching_brace(content, start):
-    """Find position after the closing } matching the { at content[start-1]."""
-    depth = 1
-    j = start
-    in_str = False
-    in_line_comment = False
-    while j < len(content) and depth > 0:
-        c = content[j]
-        if in_line_comment:
-            if c == '\n':
-                in_line_comment = False
-        elif in_str:
-            if c == '\\':
-                j += 1
-            elif c == '"':
-                in_str = False
-        else:
-            if j + 1 < len(content) and content[j:j+2] == '//':
-                in_line_comment = True
-                j += 1
-            elif c == '"':
-                in_str = True
-            elif c == '{':
-                depth += 1
-            elif c == '}':
-                depth -= 1
-        j += 1
-    return j  # position after the matching }
-
-def patch_file(filepath):
-    with open(filepath) as f:
-        content = f.read()
-    # Pattern: word.afterEvaluate {
-    pattern = re.compile(r'(\b\w+)\.afterEvaluate \{')
-    if not pattern.search(content):
-        return False
-    result = []
-    i = 0
-    while i < len(content):
-        m = pattern.search(content, i)
-        if not m:
-            result.append(content[i:])
-            break
-        varname = m.group(1)
-        result.append(content[i:m.start()])
-        # Find matching closing brace
-        j = find_matching_brace(content, m.end())
-        inner_body = content[m.end():j-1]
-        # Replace: varname.afterEvaluate { BODY }
-        # With:    varname.gradle.projectsEvaluated { with(varname!!) { BODY } }
-        # This preserves 'this' as Project inside the lambda body.
-        result.append(
-            varname + '.gradle.projectsEvaluated { with(' + varname + '!!) {' + inner_body + '} }'
-        )
-        i = j
-    new_content = ''.join(result)
-    if new_content != content:
-        with open(filepath, 'w') as f:
-            f.write(new_content)
-        print("PATCHED: " + os.path.basename(filepath))
-        return True
-    return False
-
-total = 0
-for f in sorted(glob.glob(gradle_src + '/**/*.kt', recursive=True)):
-    if '/test/' not in f and patch_file(f):
-        total += 1
-print("Total files patched: " + str(total))
-PYEOF
+            echo "=== Applying safe patch ==="
+            echo "aW1wb3J0IHJlLCBzeXMsIGdsb2IsIG9zCgpmbHV0dGVyX3NkayA9IHN5cy5hcmd2WzFdCmdyYWRsZV9zcmMgPSBvcy5wYXRoLmpvaW4oZmx1dHRlcl9zZGssICJwYWNrYWdlcy9mbHV0dGVyX3Rvb2xzL2dyYWRsZS9zcmMvbWFpbi9rb3RsaW4iKQoKZGVmIGZpbmRfbWF0Y2hpbmdfYnJhY2UoY29udGVudCwgc3RhcnQpOgogICAgZGVwdGggPSAxCiAgICBqID0gc3RhcnQKICAgIGluX3N0ciA9IEZhbHNlCiAgICBpbl9saW5lX2NvbW1lbnQgPSBGYWxzZQogICAgd2hpbGUgaiA8IGxlbihjb250ZW50KSBhbmQgZGVwdGggPiAwOgogICAgICAgIGMgPSBjb250ZW50W2pdCiAgICAgICAgaWYgaW5fbGluZV9jb21tZW50OgogICAgICAgICAgICBpZiBjID09ICdcbic6CiAgICAgICAgICAgICAgICBpbl9saW5lX2NvbW1lbnQgPSBGYWxzZQogICAgICAgIGVsaWYgaW5fc3RyOgogICAgICAgICAgICBpZiBjID09ICdcXCc6CiAgICAgICAgICAgICAgICBqICs9IDEKICAgICAgICAgICAgZWxpZiBjID09ICciJzoKICAgICAgICAgICAgICAgIGluX3N0ciA9IEZhbHNlCiAgICAgICAgZWxzZToKICAgICAgICAgICAgaWYgaiArIDEgPCBsZW4oY29udGVudCkgYW5kIGNvbnRlbnRbajpqKzJdID09ICcvLyc6CiAgICAgICAgICAgICAgICBpbl9saW5lX2NvbW1lbnQgPSBUcnVlCiAgICAgICAgICAgICAgICBqICs9IDEKICAgICAgICAgICAgZWxpZiBjID09ICciJzoKICAgICAgICAgICAgICAgIGluX3N0ciA9IFRydWUKICAgICAgICAgICAgZWxpZiBjID09ICd7JzoKICAgICAgICAgICAgICAgIGRlcHRoICs9IDEKICAgICAgICAgICAgZWxpZiBjID09ICd9JzoKICAgICAgICAgICAgICAgIGRlcHRoIC09IDEKICAgICAgICBqICs9IDEKICAgIHJldHVybiBqCgpkZWYgcGF0Y2hfZmlsZShmaWxlcGF0aCk6CiAgICB3aXRoIG9wZW4oZmlsZXBhdGgpIGFzIGY6CiAgICAgICAgY29udGVudCA9IGYucmVhZCgpCiAgICBwYXR0ZXJuID0gcmUuY29tcGlsZShyJyhcYlx3KylcLmFmdGVyRXZhbHVhdGUgXHsnKQogICAgaWYgbm90IHBhdHRlcm4uc2VhcmNoKGNvbnRlbnQpOgogICAgICAgIHJldHVybiBGYWxzZQogICAgcmVzdWx0ID0gW10KICAgIGkgPSAwCiAgICB3aGlsZSBpIDwgbGVuKGNvbnRlbnQpOgogICAgICAgIG0gPSBwYXR0ZXJuLnNlYXJjaChjb250ZW50LCBpKQogICAgICAgIGlmIG5vdCBtOgogICAgICAgICAgICByZXN1bHQuYXBwZW5kKGNvbnRlbnRbaTpdKQogICAgICAgICAgICBicmVhawogICAgICAgIHZhcm5hbWUgPSBtLmdyb3VwKDEpCiAgICAgICAgcmVzdWx0LmFwcGVuZChjb250ZW50W2k6bS5zdGFydCgpXSkKICAgICAgICBqID0gZmluZF9tYXRjaGluZ19icmFjZShjb250ZW50LCBtLmVuZCgpKQogICAgICAgIGlubmVyX2JvZHkgPSBjb250ZW50W20uZW5kKCk6ai0xXQogICAgICAgIHJlc3VsdC5hcHBlbmQodmFybmFtZSArICcuZ3JhZGxlLnByb2plY3RzRXZhbHVhdGVkIHsgd2l0aCgnICsgdmFybmFtZSArICchISkgeycgKyBpbm5lcl9ib2R5ICsgJ30gfScpCiAgICAgICAgaSA9IGoKICAgIG5ld19jb250ZW50ID0gJycuam9pbihyZXN1bHQpCiAgICBpZiBuZXdfY29udGVudCAhPSBjb250ZW50OgogICAgICAgIHdpdGggb3BlbihmaWxlcGF0aCwgJ3cnKSBhcyBmOgogICAgICAgICAgICBmLndyaXRlKG5ld19jb250ZW50KQogICAgICAgIHByaW50KCJQQVRDSEVEOiAiICsgb3MucGF0aC5iYXNlbmFtZShmaWxlcGF0aCkpCiAgICAgICAgcmV0dXJuIFRydWUKICAgIHJldHVybiBGYWxzZQoKdG90YWwgPSAwCmZvciBmIGluIHNvcnRlZChnbG9iLmdsb2IoZ3JhZGxlX3NyYyArICcvKiovKi5rdCcsIHJlY3Vyc2l2ZT1UcnVlKSk6CiAgICBpZiAnL3Rlc3QvJyBub3QgaW4gZiBhbmQgcGF0Y2hfZmlsZShmKToKICAgICAgICB0b3RhbCArPSAxCnByaW50KCJGaWxlcyBwYXRjaGVkOiAiICsgc3RyKHRvdGFsKSkK" | base64 -d > /tmp/patch_flutter.py
             python3 /tmp/patch_flutter.py "$FLUTTER_SDK"
-            echo "=== Verify: remaining afterEvaluate calls ==="
-            REMAIN=$(grep -rn "\.afterEvaluate {" "$GRADLE_SRC" --include="*.kt" | grep -v "/test/" | wc -l)
-            echo "$REMAIN afterEvaluate calls remaining"
           fi
 
           echo "=== Clear compiled caches ==="
