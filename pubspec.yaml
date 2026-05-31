@@ -3,7 +3,7 @@ description: "APPLICATION DE VISIOCONFÉRENCE"
 publish_to: 'none'
 
 environment:
-  sdk: '^3.12.0'
+  sdk: '>=3.0.0 <4.0.0'
 
 version: 1.0.0+1
 
@@ -50,7 +50,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
