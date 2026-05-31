@@ -1,8 +1,10 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    id("dev.flutter.flutter-gradle-plugin")
+    // FlutterFire: doit être déclaré avant le plugin Flutter
     id("com.google.gms.google-services")
+    id("kotlin-android")
+    // Le plugin Flutter Gradle DOIT être appliqué en dernier
+    id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
