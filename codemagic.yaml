@@ -1,0 +1,142 @@
+definitions:
+  environment:
+    flutter: stable
+    java: 17
+    node: 18.0.0
+
+  env_vars:
+    FIREBASE_PROJECT_ID: crux-8aa85
+
+workflows:
+  # Build Android Release
+  android-build:
+    name: Android Build
+    instance_type: mac_mini
+    max_build_duration: 120
+    environment:
+      android_signing:
+        - keystore_reference
+      groups:
+        - google_play
+        - firebase_config
+    scripts:
+      - name: Set up local.properties
+        script: |
+          echo "flutter.sdk=$HOME/sdks/flutter" > android/local.properties
+
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Build APK
+        script: flutter build apk --release
+
+      - name: Build AAB
+        script: flutter build appbundle --release
+
+    artifacts:
+      - build/app/outputs/apk/release/app-release.apk
+      - build/app/outputs/bundle/release/app-release.aab
+
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+
+  # Build iOS Release
+  ios-build:
+    name: iOS Build
+    instance_type: mac_mini
+    max_build_duration: 120
+    environment:
+      groups:
+        - apple_credentials
+        - firebase_config
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Install pods
+        script: |
+          cd ios
+          pod install --repo-update
+          cd ..
+
+      - name: Build iOS
+        script: flutter build ios --release
+
+      - name: Build IPA
+        script: |
+          xcodebuild -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -derivedDataPath ios/build \
+            -archivePath ios/build/Runner.xcarchive \
+            archive
+          
+          xcodebuild -exportArchive \
+            -archivePath ios/build/Runner.xcarchive \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -exportPath ios/build
+
+    artifacts:
+      - ios/build/*.ipa
+      - build/ios/iphoneos/*.app
+
+  # Web Deploy
+  web-build:
+    name: Web Deploy
+    instance_type: mac_mini
+    max_build_duration: 30
+    environment:
+      groups:
+        - web_deploy
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Build web
+        script: flutter build web --release
+
+      - name: Deploy to Firebase
+        script: |
+          npm install -g firebase-tools
+          firebase deploy --project=$FIREBASE_PROJECT_ID
+
+    artifacts:
+      - build/web/**
+
+  # Test & Analysis
+  analyze:
+    name: Code Analysis
+    instance_type: mac_mini
+    max_build_duration: 30
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Run analyzer
+        script: flutter analyze
+
+      - name: Format check
+        script: dart format --set-exit-if-changed lib/
+
+  # Continuous Integration
+  continuous-integration:
+    name: CI
+    instance_type: mac_mini
+    max_build_duration: 60
+    environment:
+      groups:
+        - firebase_config
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Run tests
+        script: flutter test
+
+      - name: Analyze code
+        script: flutter analyze
+
+      - name: Build APK
+        script: flutter build apk --debug

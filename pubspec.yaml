@@ -1,0 +1,79 @@
+name: crux
+description: "APPLICATION DE VISIOCONFÉRENCE"
+publish_to: 'none'
+
+environment:
+  sdk: '^3.12.0'
+
+version: 1.0.0+1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase - VERSIONS LES PLUS RÉCENTES
+  firebase_core: ^4.9.0
+  firebase_auth: ^6.5.1
+  cloud_firestore: ^6.4.1
+  firebase_storage: ^13.4.1
+  firebase_analytics: ^12.4.1
+
+  # Agora - VIDEO CONFERENCING
+  agora_rtc_engine: ^6.6.3
+
+  # Permissions & Localization
+  permission_handler: ^11.4.0
+  intl: ^0.20.2
+  flutter_localizations:
+    sdk: flutter
+
+  # State & Storage
+  provider: ^6.1.2
+  shared_preferences: ^2.2.3
+
+  # HTTP & Utilities
+  http: ^1.2.2
+  uuid: ^4.2.1
+  logger: ^2.1.0
+
+  # UI & Animation
+  lottie: ^3.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/animations/
+    - assets/sounds/
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Poppins-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Poppins-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/Poppins-Black.ttf
+          weight: 900
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700

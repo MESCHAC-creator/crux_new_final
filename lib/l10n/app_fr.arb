@@ -1,0 +1,69 @@
+{
+  "appName": "CRUX",
+  "appTitle": "CRUX - Vidéoconférence Premium",
+
+  "login": "Connexion",
+  "signup": "Inscription",
+  "logout": "Déconnexion",
+  "email": "Email",
+  "password": "Mot de passe",
+  "name": "Nom",
+  "rememberMe": "Se souvenir de moi",
+  "forgotPassword": "Mot de passe oublié?",
+  "createAccount": "Créer un compte",
+  "alreadyHaveAccount": "Vous avez déjà un compte?",
+  "dontHaveAccount": "Pas de compte?",
+
+  "welcome": "Bienvenue",
+  "welcomeBack": "Bienvenue à nouveau",
+  "home": "Accueil",
+  "meetings": "Réunions",
+  "settings": "Paramètres",
+  "profile": "Profil",
+
+  "startMeeting": "Commencer une réunion",
+  "joinMeeting": "Rejoindre une réunion",
+  "meetingName": "Nom de la réunion",
+  "meetingDescription": "Description",
+  "meetingDuration": "Durée",
+  "participants": "Participants",
+
+  "mic": "Microphone",
+  "camera": "Caméra",
+  "speaker": "Haut-parleur",
+  "record": "Enregistrer",
+  "share": "Partager",
+  "settings_menu": "Paramètres",
+
+  "endMeeting": "Terminer la réunion",
+  "leaveMeeting": "Quitter la réunion",
+  "leaveConfirm": "Êtes-vous sûr de vouloir quitter?",
+
+  "error": "Erreur",
+  "success": "Succès",
+  "warning": "Avertissement",
+  "info": "Information",
+
+  "fillAllFields": "Veuillez remplir tous les champs",
+  "invalidEmail": "Email invalide",
+  "passwordTooShort": "Mot de passe trop court (min 6 caractères)",
+  "passwordsDontMatch": "Les mots de passe ne correspondent pas",
+
+  "loginSuccess": "✅ Connexion réussie",
+  "signupSuccess": "✅ Inscription réussie",
+  "logoutSuccess": "✅ Déconnexion réussie",
+  "meetingCreated": "✅ Réunion créée avec succès",
+
+  "networkError": "Erreur réseau - Vérifiez votre connexion Internet",
+  "timeoutError": "Délai d'attente dépassé",
+  "unknownError": "Une erreur inconnue s'est produite",
+
+  "loading": "Chargement...",
+  "cancel": "Annuler",
+  "ok": "OK",
+  "save": "Enregistrer",
+  "delete": "Supprimer",
+  "edit": "Modifier",
+  "close": "Fermer",
+  "submit": "Envoyer"
+}

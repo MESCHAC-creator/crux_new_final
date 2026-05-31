@@ -1,0 +1,69 @@
+{
+  "appName": "CRUX",
+  "appTitle": "CRUX - Premium Video Conference",
+
+  "login": "Login",
+  "signup": "Sign Up",
+  "logout": "Logout",
+  "email": "Email",
+  "password": "Password",
+  "name": "Name",
+  "rememberMe": "Remember me",
+  "forgotPassword": "Forgot password?",
+  "createAccount": "Create an account",
+  "alreadyHaveAccount": "Already have an account?",
+  "dontHaveAccount": "Don't have an account?",
+
+  "welcome": "Welcome",
+  "welcomeBack": "Welcome back",
+  "home": "Home",
+  "meetings": "Meetings",
+  "settings": "Settings",
+  "profile": "Profile",
+
+  "startMeeting": "Start a Meeting",
+  "joinMeeting": "Join a Meeting",
+  "meetingName": "Meeting Name",
+  "meetingDescription": "Description",
+  "meetingDuration": "Duration",
+  "participants": "Participants",
+
+  "mic": "Microphone",
+  "camera": "Camera",
+  "speaker": "Speaker",
+  "record": "Record",
+  "share": "Share",
+  "settings_menu": "Settings",
+
+  "endMeeting": "End Meeting",
+  "leaveMeeting": "Leave Meeting",
+  "leaveConfirm": "Are you sure you want to leave?",
+
+  "error": "Error",
+  "success": "Success",
+  "warning": "Warning",
+  "info": "Information",
+
+  "fillAllFields": "Please fill all fields",
+  "invalidEmail": "Invalid email",
+  "passwordTooShort": "Password too short (min 6 characters)",
+  "passwordsDontMatch": "Passwords don't match",
+
+  "loginSuccess": "✅ Login successful",
+  "signupSuccess": "✅ Sign up successful",
+  "logoutSuccess": "✅ Logout successful",
+  "meetingCreated": "✅ Meeting created successfully",
+
+  "networkError": "Network error - Check your internet connection",
+  "timeoutError": "Request timeout",
+  "unknownError": "An unknown error occurred",
+
+  "loading": "Loading...",
+  "cancel": "Cancel",
+  "ok": "OK",
+  "save": "Save",
+  "delete": "Delete",
+  "edit": "Edit",
+  "close": "Close",
+  "submit": "Submit"
+}
