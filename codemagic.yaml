@@ -45,14 +45,20 @@ workflows:
         script: dart run flutter_launcher_icons
 
       - name: Build APK release
-        script: flutter build apk --release --android-skip-build-dependency-validation
+        script: |
+          flutter build apk --release --android-skip-build-dependency-validation
+          echo "=== APK output ==="
+          find build/app/outputs -name "*.apk" 2>/dev/null || true
 
       - name: Build AAB release
-        script: flutter build appbundle --release --android-skip-build-dependency-validation
+        script: |
+          flutter build appbundle --release --android-skip-build-dependency-validation
+          echo "=== AAB output ==="
+          find build/app/outputs -name "*.aab" 2>/dev/null || true
 
     artifacts:
-      - build/app/outputs/apk/release/app-release.apk
-      - build/app/outputs/bundle/release/app-release.aab
+      - build/app/outputs/**/*.apk
+      - build/app/outputs/**/*.aab
 
     publishing:
       email:
