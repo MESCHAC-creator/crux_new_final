@@ -77,11 +77,11 @@ class PremiumColors {
 
   // Opacity variants
   static Color flamePrimaryWithOpacity(double opacity) =>
-      flamePrimary.withValues(alpha: opacity);
+      flamePrimary.withOpacity(opacity);
   static Color icePrimaryWithOpacity(double opacity) =>
-      icePrimary.withValues(alpha: opacity);
+      icePrimary.withOpacity(opacity);
   static Color textPrimaryWithOpacity(double opacity) =>
-      textPrimary.withValues(alpha: opacity);
+      textPrimary.withOpacity(opacity);
 
   // Shadow Colors
   static const Color shadowDark = Color.fromRGBO(0, 0, 0, 0.25);

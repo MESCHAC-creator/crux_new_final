@@ -61,19 +61,19 @@ class _PremiumButtonState extends State<PremiumButton> {
           decoration: BoxDecoration(
             gradient: _isPressed
                 ? LinearGradient(
-              colors: [bgColor.withValues(alpha: 0.8), bgColor],
+              colors: [bgColor.withOpacity(0.8), bgColor],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             )
                 : LinearGradient(
-              colors: [bgColor, bgColor.withValues(alpha: 0.9)],
+              colors: [bgColor, bgColor.withOpacity(0.9)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: bgColor.withValues(alpha: 0.3),
+                color: bgColor.withOpacity(0.3),
                 blurRadius: _isPressed ? 12 : 20,
                 offset: Offset(0, _isPressed ? 4 : 8),
               ),

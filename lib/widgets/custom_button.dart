@@ -54,14 +54,14 @@ class _CustomButtonState extends State<CustomButton> {
           ),
           decoration: BoxDecoration(
             color: widget.isLoading
-                ? bgColor.withValues(alpha: 0.6)
+                ? bgColor.withOpacity(0.6)
                 : _isPressed
-                ? bgColor.withValues(alpha: 0.8)
+                ? bgColor.withOpacity(0.8)
                 : bgColor,
             borderRadius: BorderRadius.circular(borderRadius),
             boxShadow: [
               BoxShadow(
-                color: bgColor.withValues(alpha: _isPressed ? 0.2 : 0.3),
+                color: bgColor.withOpacity(_isPressed ? 0.2 : 0.3),
                 blurRadius: _isPressed ? 8 : 12,
                 offset: Offset(0, _isPressed ? 2 : 4),
               ),
