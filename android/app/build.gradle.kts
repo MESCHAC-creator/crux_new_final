@@ -23,9 +23,9 @@ android {
     defaultConfig {
         applicationId = "com.example.crux"
         minSdk = 24
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0.0"
         multiDexEnabled = true
     }
 

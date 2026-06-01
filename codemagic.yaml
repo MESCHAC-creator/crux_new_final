@@ -53,7 +53,7 @@ workflows:
           # Gradle output:   android/app/build/outputs/apk/
           find . -name "*.apk" 2>/dev/null | grep -v ".pub-cache" || echo "(none found)"
 
-          APK=$(find . -name "*.apk" ! -name "*unsigned*" 2>/dev/null \
+          APK=$(find . -type f -name "*.apk" ! -name "*unsigned*" 2>/dev/null \
                 | grep -v ".pub-cache" | xargs ls -t 2>/dev/null | head -1)
 
           if [ -n "$APK" ]; then
@@ -68,7 +68,7 @@ workflows:
           # --- AAB ---
           flutter build appbundle --release --android-skip-build-dependency-validation || true
 
-          AAB=$(find . -name "*.aab" 2>/dev/null \
+          AAB=$(find . -type f -name "*.aab" 2>/dev/null \
                 | grep -v ".pub-cache" | xargs ls -t 2>/dev/null | head -1)
 
           if [ -n "$AAB" ]; then
