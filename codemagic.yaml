@@ -20,33 +20,34 @@ workflows:
           echo "Flutter SDK: $FLUTTER_SDK"
           flutter --version
 
-      - name: Fix Flutter Gradle plugin for AGP 9 compatibility
+      - name: Reset Flutter Gradle plugin to original state
         script: |
           FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
           GRADLE_SRC="$FLUTTER_SDK/packages/flutter_tools/gradle/src/main/kotlin"
 
-          echo "=== Reset any previous patches ==="
+          echo "=== Undoing any previous patches (projectsEvaluated -> afterEvaluate) ==="
+          find "$GRADLE_SRC" -name "*.kt" | while IFS= read -r f; do
+            if grep -q "gradle\.projectsEvaluated { with(" "$f" 2>/dev/null; then
+              sed -i 's/\(\w\+\)\.gradle\.projectsEvaluated { with(\w\+!!) {/\1.afterEvaluate {/g' "$f"
+              # Fix double closing braces added by previous patch
+              sed -i 's/} }\s*$/}/g' "$f"
+              echo "  RESTORED: $(basename "$f")"
+            fi
+          done
+
+          echo "=== Trying git reset as additional safety ==="
           git -C "$FLUTTER_SDK" checkout -- packages/flutter_tools/gradle/src/ 2>/dev/null \
-            && echo "Reset OK" \
-            || echo "git reset skipped"
+            && echo "  git reset OK" || echo "  git reset skipped (not a git repo)"
 
-          echo "=== Check for afterEvaluate calls ==="
-          COUNT=$(grep -rn "\.afterEvaluate {" "$GRADLE_SRC" --include="*.kt" | grep -v "/test/" | wc -l)
-          echo "Found $COUNT afterEvaluate call(s)"
+          echo "=== Verify: afterEvaluate calls present (expected with Flutter 3.29.0) ==="
+          COUNT=$(grep -rn "\.afterEvaluate {" "$GRADLE_SRC" --include="*.kt" | grep -v "/test/" | wc -l 2>/dev/null || echo 0)
+          echo "  $COUNT afterEvaluate call(s) found (will be handled by android.newDsl=false)"
 
-          if [ "$COUNT" -eq "0" ]; then
-            echo "No patch needed - Flutter SDK already uses projectsEvaluated"
-          else
-            echo "=== Applying safe patch ==="
-            echo "aW1wb3J0IHJlLCBzeXMsIGdsb2IsIG9zCgpmbHV0dGVyX3NkayA9IHN5cy5hcmd2WzFdCmdyYWRsZV9zcmMgPSBvcy5wYXRoLmpvaW4oZmx1dHRlcl9zZGssICJwYWNrYWdlcy9mbHV0dGVyX3Rvb2xzL2dyYWRsZS9zcmMvbWFpbi9rb3RsaW4iKQoKZGVmIGZpbmRfbWF0Y2hpbmdfYnJhY2UoY29udGVudCwgc3RhcnQpOgogICAgZGVwdGggPSAxCiAgICBqID0gc3RhcnQKICAgIGluX3N0ciA9IEZhbHNlCiAgICBpbl9saW5lX2NvbW1lbnQgPSBGYWxzZQogICAgd2hpbGUgaiA8IGxlbihjb250ZW50KSBhbmQgZGVwdGggPiAwOgogICAgICAgIGMgPSBjb250ZW50W2pdCiAgICAgICAgaWYgaW5fbGluZV9jb21tZW50OgogICAgICAgICAgICBpZiBjID09ICdcbic6CiAgICAgICAgICAgICAgICBpbl9saW5lX2NvbW1lbnQgPSBGYWxzZQogICAgICAgIGVsaWYgaW5fc3RyOgogICAgICAgICAgICBpZiBjID09ICdcXCc6CiAgICAgICAgICAgICAgICBqICs9IDEKICAgICAgICAgICAgZWxpZiBjID09ICciJzoKICAgICAgICAgICAgICAgIGluX3N0ciA9IEZhbHNlCiAgICAgICAgZWxzZToKICAgICAgICAgICAgaWYgaiArIDEgPCBsZW4oY29udGVudCkgYW5kIGNvbnRlbnRbajpqKzJdID09ICcvLyc6CiAgICAgICAgICAgICAgICBpbl9saW5lX2NvbW1lbnQgPSBUcnVlCiAgICAgICAgICAgICAgICBqICs9IDEKICAgICAgICAgICAgZWxpZiBjID09ICciJzoKICAgICAgICAgICAgICAgIGluX3N0ciA9IFRydWUKICAgICAgICAgICAgZWxpZiBjID09ICd7JzoKICAgICAgICAgICAgICAgIGRlcHRoICs9IDEKICAgICAgICAgICAgZWxpZiBjID09ICd9JzoKICAgICAgICAgICAgICAgIGRlcHRoIC09IDEKICAgICAgICBqICs9IDEKICAgIHJldHVybiBqCgpkZWYgcGF0Y2hfZmlsZShmaWxlcGF0aCk6CiAgICB3aXRoIG9wZW4oZmlsZXBhdGgpIGFzIGY6CiAgICAgICAgY29udGVudCA9IGYucmVhZCgpCiAgICBwYXR0ZXJuID0gcmUuY29tcGlsZShyJyhcYlx3KylcLmFmdGVyRXZhbHVhdGUgXHsnKQogICAgaWYgbm90IHBhdHRlcm4uc2VhcmNoKGNvbnRlbnQpOgogICAgICAgIHJldHVybiBGYWxzZQogICAgcmVzdWx0ID0gW10KICAgIGkgPSAwCiAgICB3aGlsZSBpIDwgbGVuKGNvbnRlbnQpOgogICAgICAgIG0gPSBwYXR0ZXJuLnNlYXJjaChjb250ZW50LCBpKQogICAgICAgIGlmIG5vdCBtOgogICAgICAgICAgICByZXN1bHQuYXBwZW5kKGNvbnRlbnRbaTpdKQogICAgICAgICAgICBicmVhawogICAgICAgIHZhcm5hbWUgPSBtLmdyb3VwKDEpCiAgICAgICAgcmVzdWx0LmFwcGVuZChjb250ZW50W2k6bS5zdGFydCgpXSkKICAgICAgICBqID0gZmluZF9tYXRjaGluZ19icmFjZShjb250ZW50LCBtLmVuZCgpKQogICAgICAgIGlubmVyX2JvZHkgPSBjb250ZW50W20uZW5kKCk6ai0xXQogICAgICAgIHJlc3VsdC5hcHBlbmQodmFybmFtZSArICcuZ3JhZGxlLnByb2plY3RzRXZhbHVhdGVkIHsgd2l0aCgnICsgdmFybmFtZSArICchISkgeycgKyBpbm5lcl9ib2R5ICsgJ30gfScpCiAgICAgICAgaSA9IGoKICAgIG5ld19jb250ZW50ID0gJycuam9pbihyZXN1bHQpCiAgICBpZiBuZXdfY29udGVudCAhPSBjb250ZW50OgogICAgICAgIHdpdGggb3BlbihmaWxlcGF0aCwgJ3cnKSBhcyBmOgogICAgICAgICAgICBmLndyaXRlKG5ld19jb250ZW50KQogICAgICAgIHByaW50KCJQQVRDSEVEOiAiICsgb3MucGF0aC5iYXNlbmFtZShmaWxlcGF0aCkpCiAgICAgICAgcmV0dXJuIFRydWUKICAgIHJldHVybiBGYWxzZQoKdG90YWwgPSAwCmZvciBmIGluIHNvcnRlZChnbG9iLmdsb2IoZ3JhZGxlX3NyYyArICcvKiovKi5rdCcsIHJlY3Vyc2l2ZT1UcnVlKSk6CiAgICBpZiAnL3Rlc3QvJyBub3QgaW4gZiBhbmQgcGF0Y2hfZmlsZShmKToKICAgICAgICB0b3RhbCArPSAxCnByaW50KCJGaWxlcyBwYXRjaGVkOiAiICsgc3RyKHRvdGFsKSkK" | base64 -d > /tmp/patch_flutter.py
-            python3 /tmp/patch_flutter.py "$FLUTTER_SDK"
-          fi
-
-          echo "=== Clear compiled caches ==="
-          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/"
-          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/"
-          rm -rf ~/.gradle/caches/
-          echo "Done"
+          echo "=== Clear all compiled Gradle caches ==="
+          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/" 2>/dev/null || true
+          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/" 2>/dev/null || true
+          rm -rf ~/.gradle/caches/ 2>/dev/null || true
+          echo "Done - AGP 8.7.0 + android.newDsl=false handles afterEvaluate natively"
 
       - name: Get Flutter packages
         script: flutter pub get
