@@ -34,14 +34,11 @@ dependencies:
 
   # HTTP & Utilities
   http: ^1.2.2
-  dio: ^5.4.0
   uuid: ^4.2.1
   logger: ^2.1.0
-  flutter_dotenv: ^5.1.0
-  flutter_secure_storage: ^9.0.0
+  flutter_secure_storage: ^8.0.0
 
   # UI & Animation
-  lottie: ^3.2.0
   google_fonts: ^6.2.1
 
   # Local Storage
@@ -49,7 +46,7 @@ dependencies:
   hive_flutter: ^1.1.0
 
   # Premium UI
-  flutter_animate: ^4.5.0
+  flutter_animate: ^4.2.0
 
 dev_dependencies:
   flutter_test:
@@ -67,3 +64,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/animation/
