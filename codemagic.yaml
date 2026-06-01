@@ -11,6 +11,8 @@ workflows:
     environment:
       flutter: 3.24.5
       java: 17
+      groups:
+        - firebase_deploy   # contient FIREBASE_TOKEN (optionnel - déploie les règles Firestore)
 
     scripts:
       - name: Set up local.properties
@@ -34,6 +36,19 @@ workflows:
           rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/" 2>/dev/null || true
           rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/" 2>/dev/null || true
           echo "Patch done"
+
+      - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
+        script: |
+          if [ -n "$FIREBASE_TOKEN" ]; then
+            npm install -g firebase-tools --silent
+            firebase deploy --only firestore:rules \
+              --project crux-8aa85 \
+              --token "$FIREBASE_TOKEN" \
+              --non-interactive
+            echo "✅ Règles Firestore déployées"
+          else
+            echo "⏭️  FIREBASE_TOKEN non défini — règles non déployées (OK pour le build)"
+          fi
 
       - name: Generate app icons
         script: dart run flutter_launcher_icons -f flutter_launcher_icons_android.yaml
@@ -99,12 +114,12 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.example.crux
       groups:
-        - firebase_ios  # groupe contenant GOOGLE_SERVICE_INFO_PLIST
+        - firebase_ios    # groupe contenant GOOGLE_SERVICE_INFO_PLIST
+        - firebase_deploy # contient FIREBASE_TOKEN (même groupe, optionnel)
 
     scripts:
       - name: Generate iOS project files
         script: |
-          # Crée le dossier ios/ s'il est absent (projet Flutter sans iOS initialisé)
           if [ ! -d "ios" ]; then
             flutter create --platforms ios --org com.example --project-name crux .
             echo "✅ iOS folder generated"
@@ -114,7 +129,6 @@ workflows:
 
       - name: Inject GoogleService-Info.plist
         script: |
-          # Décode le fichier Firebase iOS depuis la variable d'environnement
           if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
             echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
             echo "✅ GoogleService-Info.plist injecté"
@@ -125,19 +139,27 @@ workflows:
       - name: Patch Info.plist permissions
         script: |
           PLIST="ios/Runner/Info.plist"
-          # Caméra
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'CRUX a besoin de la caméra pour les vidéoconférences'" "$PLIST" 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 'CRUX a besoin de la caméra pour les vidéoconférences'" "$PLIST"
-          # Micro
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'CRUX a besoin du microphone pour les appels'" "$PLIST" 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Set :NSMicrophoneUsageDescription 'CRUX a besoin du microphone pour les appels'" "$PLIST"
-          # URL schemes pour url_launcher
-          /usr/libexec/PlistBuddy -c "Add :LSApplicationQueriesSchemes array" "$PLIST" 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :LSApplicationQueriesSchemes:0 string 'https'" "$PLIST" 2>/dev/null || true
           echo "✅ Info.plist patché"
 
       - name: Get Flutter packages
         script: flutter pub get
+
+      - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
+        script: |
+          if [ -n "$FIREBASE_TOKEN" ]; then
+            npm install -g firebase-tools --silent
+            firebase deploy --only firestore:rules \
+              --project crux-8aa85 \
+              --token "$FIREBASE_TOKEN" \
+              --non-interactive
+            echo "✅ Règles Firestore déployées"
+          else
+            echo "⏭️  FIREBASE_TOKEN non défini — règles non déployées (OK pour le build)"
+          fi
 
       - name: Generate app icons
         script: dart run flutter_launcher_icons -f flutter_launcher_icons_ios.yaml
