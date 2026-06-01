@@ -51,3 +51,4 @@ key.properties
 
 # Build error logs
 build_error.txt
+.claude/
