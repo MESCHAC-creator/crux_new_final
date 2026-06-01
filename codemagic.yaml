@@ -24,29 +24,65 @@ workflows:
       - name: Get Flutter packages
         script: flutter pub get
 
-      - name: Pre-install NDK (required by Agora SDK)
+      - name: Pre-install NDK + guard afterEvaluate
         script: |
           set -e
-          # Agora RTC Engine needs NDK 25.1.8937393 — install it before Gradle runs
-          # so it doesn't try to download it mid-evaluation (which breaks afterEvaluate)
+          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
           ANDROID_SDK="${ANDROID_SDK_ROOT:-/usr/local/share/android-sdk}"
           NDK_VERSION="25.1.8937393"
+
+          # ── 1. Install NDK before Gradle runs ──────────────────────────────────
+          # agora_rtc_engine declares externalNativeBuild which requires NDK.
+          # If NDK is absent, AGP tries to download it during configuration phase,
+          # which evaluates the project early → Flutter's afterEvaluate crash.
           if [ ! -d "$ANDROID_SDK/ndk/$NDK_VERSION" ]; then
             SDKMANAGER=""
-            for candidate in \
+            for c in \
               "$ANDROID_SDK/cmdline-tools/latest/bin/sdkmanager" \
               "$ANDROID_SDK/cmdline-tools/latest-2/bin/sdkmanager" \
               "$(which sdkmanager 2>/dev/null)"; do
-              [ -x "$candidate" ] && SDKMANAGER="$candidate" && break
+              [ -x "$c" ] && SDKMANAGER="$c" && break
             done
             if [ -n "$SDKMANAGER" ]; then
-              yes | "$SDKMANAGER" "ndk;$NDK_VERSION" 2>/dev/null && echo "NDK $NDK_VERSION installed" || echo "NDK install skipped"
-            else
-              echo "sdkmanager not found — NDK install skipped"
+              yes | "$SDKMANAGER" "ndk;$NDK_VERSION" 2>/dev/null \
+                && echo "NDK $NDK_VERSION installed" \
+                || echo "NDK sdkmanager install skipped (non-fatal)"
             fi
           else
             echo "NDK $NDK_VERSION already present"
           fi
+
+          # ── 2. Symlink NDK into the path AGP prefers ────────────────────────────
+          # AGP 8.3 looks for ndk at both $ANDROID_SDK/ndk/<ver> and ndk-bundle.
+          # Creating a symlink ensures it's found without any re-resolution.
+          if [ -d "$ANDROID_SDK/ndk/$NDK_VERSION" ]; then
+            ln -sfn "$ANDROID_SDK/ndk/$NDK_VERSION" "$ANDROID_SDK/ndk-bundle" 2>/dev/null || true
+            echo "NDK symlink OK"
+          fi
+
+          # ── 3. Patch Flutter tools source + force recompile ─────────────────────
+          # Flutter 3.29 largely removed afterEvaluate but some paths remain.
+          # We patch AND pre-compile the plugin JAR so the patched code is active.
+          FLUTTER_GRADLE="$FLUTTER_SDK/packages/flutter_tools/gradle"
+
+          # Patch all .kt files: wrap afterEvaluate{} calls with state guard
+          find "$FLUTTER_GRADLE/src" -name "*.kt" 2>/dev/null | while read -r f; do
+            if grep -q 'afterEvaluate' "$f"; then
+              # Replace: foo.afterEvaluate { → if(foo.state.executed){ } else { foo.afterEvaluate { } }
+              perl -i -0pe \
+                's/(\w+)\.afterEvaluate\s*\{/if(\1.state.executed)\{\/\/ immediate\n\} else \{\n\1.afterEvaluate \{/g' \
+                "$f" 2>/dev/null || true
+              echo "Patched: $f"
+            fi
+          done
+
+          # Delete stale compiled artifacts so Gradle recompiles from patched source
+          rm -rf "$FLUTTER_GRADLE/build/" "$FLUTTER_GRADLE/.gradle/"
+          # Also clear the Gradle build-cache and file-hash cache
+          rm -rf "$HOME/.gradle/caches/build-cache-"*
+          rm -rf "$HOME/.gradle/caches/"*/fileHashes
+          rm -rf "$HOME/.gradle/caches/"*/executionHistory
+          echo "Flutter Gradle plugin patched and caches cleared"
 
       - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
         script: |
