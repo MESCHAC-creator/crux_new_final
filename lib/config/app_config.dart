@@ -6,5 +6,5 @@ class Config {
 
   // Agora App ID — obtenu sur console.agora.io (gratuit, 10 000 min/mois)
   // Désactive "App Certificate" dans la console Agora pour le mode sans token
-  static const String agoraAppId = 'REMPLACE_PAR_TON_AGORA_APP_ID';
+  static const String agoraAppId = '729bb936e5084d53897e43c58ee8e946';
 }
