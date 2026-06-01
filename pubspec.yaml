@@ -3,7 +3,7 @@ description: "APPLICATION DE VISIOCONFÉRENCE"
 publish_to: 'none'
 
 environment:
-  sdk: '^3.12.0'
+  sdk: '>=3.5.0 <4.0.0'
 
 version: 1.0.0+1
 
