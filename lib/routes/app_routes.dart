@@ -4,11 +4,13 @@ import '../screens/login_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/meeting_screen.dart';
 import '../screens/setting_screen.dart';
+import '../screens/signup_screen.dart';
 import '../models/user_model.dart';
 
 class AppRoutes {
   static const String splash = '/';
   static const String login = '/login';
+  static const String signup = '/signup';
   static const String home = '/home';
   static const String meeting = '/meeting';
   static const String settings = '/settings';
@@ -20,6 +22,9 @@ class AppRoutes {
 
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
+
+      case signup:
+        return MaterialPageRoute(builder: (_) => const SignUpScreen());
 
       case home:
         final user = routeSettings.arguments as UserModel?;
