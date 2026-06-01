@@ -283,32 +283,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showQualityDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.whiteBg,
-        title: Text(
-          'Qualité vidéo',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-        ),
-        content: RadioGroup<String>(
-          groupValue: _videoQuality,
-          onChanged: (value) {
-            if (value != null) {
-              setState(() => _videoQuality = value);
-              Navigator.pop(ctx);
-              _errorHandler.showSuccessSnackBar(
-                context,
-                '✅ Qualité vidéo: $value',
-              );
-            }
-          },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: ['Basse', 'Moyenne', 'Haute', 'Très haute']
-                .map((quality) => RadioListTile<String>(
-              title: Text(quality),
-              value: quality,
-            ))
-                .toList(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.whiteBg,
+          title: Text('Qualité vidéo', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+          content: RadioGroup<String>(
+            groupValue: _videoQuality,
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _videoQuality = value);
+                setDialogState(() {});
+                Navigator.pop(ctx);
+                _errorHandler.showSuccessSnackBar(context, '✅ Qualité vidéo: $value');
+              }
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: ['Basse', 'Moyenne', 'Haute', 'Très haute']
+                  .map((q) => RadioListTile<String>(
+                        title: Text(q, style: GoogleFonts.poppins()),
+                        value: q,
+                      ))
+                  .toList(),
+            ),
           ),
         ),
       ),
@@ -318,32 +315,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showLanguageDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.whiteBg,
-        title: Text(
-          'Langue',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-        ),
-        content: RadioGroup<String>(
-          groupValue: _selectedLanguage,
-          onChanged: (value) {
-            if (value != null) {
-              setState(() => _selectedLanguage = value);
-              Navigator.pop(ctx);
-              _errorHandler.showSuccessSnackBar(
-                context,
-                '✅ Langue: $value',
-              );
-            }
-          },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: ['Français', 'English', 'Español', 'Deutsch']
-                .map((lang) => RadioListTile<String>(
-              title: Text(lang),
-              value: lang,
-            ))
-                .toList(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.whiteBg,
+          title: Text('Langue', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+          content: RadioGroup<String>(
+            groupValue: _selectedLanguage,
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _selectedLanguage = value);
+                setDialogState(() {});
+                Navigator.pop(ctx);
+                _errorHandler.showSuccessSnackBar(context, '✅ Langue: $value');
+              }
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: ['Français', 'English', 'Español', 'Deutsch']
+                  .map((lang) => RadioListTile<String>(
+                        title: Text(lang, style: GoogleFonts.poppins()),
+                        value: lang,
+                      ))
+                  .toList(),
+            ),
           ),
         ),
       ),

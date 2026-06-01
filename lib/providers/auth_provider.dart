@@ -3,7 +3,7 @@ import 'package:logger/logger.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 
-class AuthProvider extends ChangeNotifier {
+class CruxAuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   final _logger = Logger();
 
@@ -19,7 +19,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoggedIn => _isLoggedIn;
 
   // Constructeur
-  AuthProvider() {
+  CruxAuthProvider() {
     _checkAuthState();
   }
 

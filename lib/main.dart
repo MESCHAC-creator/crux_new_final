@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'services/error_handler_service.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'models/user_model.dart';
+import 'providers/auth_provider.dart' show CruxAuthProvider;
+import 'providers/meeting_provider.dart';
+import 'routes/app_routes.dart';
 import 'theme/colors.dart';
 import 'theme/theme.dart';
 
@@ -17,7 +21,6 @@ final errorHandlerService = ErrorHandlerService();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Firebase
   try {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     logger.i('✅ Firebase initialisé');
@@ -28,25 +31,31 @@ void main() async {
   runApp(const MyApp());
 }
 
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CRUX - Premium Video Conference',
-      debugShowCheckedModeBanner: false,
-      supportedLocales: const [Locale('fr'), Locale('en')],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => CruxAuthProvider()),
+        ChangeNotifierProvider(create: (_) => MeetingProvider()),
       ],
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.light,
-      home: const AuthWrapper(),
+      child: MaterialApp(
+        title: 'CRUX - Premium Video Conference',
+        debugShowCheckedModeBanner: false,
+        supportedLocales: const [Locale('fr'), Locale('en')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.light,
+        onGenerateRoute: AppRoutes.generateRoute,
+        home: const AuthWrapper(),
+      ),
     );
   }
 }
