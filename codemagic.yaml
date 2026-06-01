@@ -40,61 +40,40 @@ workflows:
       - name: Generate app icons
         script: dart run flutter_launcher_icons
 
-      - name: Build APK release
+      - name: Build APK and AAB
         script: |
           set -e
+          mkdir -p build/outputs
 
-          # Step 1: compile Dart → kernel + assets (no Gradle)
+          # --- APK ---
           flutter build apk --release --android-skip-build-dependency-validation || true
 
-          # Step 2: the Flutter CLI may lie about failure; find APK wherever Gradle put it
-          DEST="build/outputs/crux-release.apk"
-          mkdir -p build/outputs
+          echo "=== Searching for APK in ALL possible locations ==="
+          # Flutter output:  build/app/outputs/flutter-apk/
+          # Gradle output:   android/app/build/outputs/apk/
+          find . -name "*.apk" 2>/dev/null | grep -v ".pub-cache" || echo "(none found)"
 
-          APK_PATH=$(find build/app/outputs -name "*.apk" ! -name "*unsigned*" -printf '%T@ %p\n' 2>/dev/null \
-                     | sort -rn | head -1 | awk '{print $2}')
+          APK=$(find . -name "*.apk" ! -name "*unsigned*" 2>/dev/null \
+                | grep -v ".pub-cache" | xargs ls -t 2>/dev/null | head -1)
 
-          if [ -z "$APK_PATH" ]; then
-            # last-resort: full tree search
-            APK_PATH=$(find build -name "*.apk" ! -name "*unsigned*" 2>/dev/null | head -1)
-          fi
-
-          if [ -n "$APK_PATH" ]; then
-            cp "$APK_PATH" "$DEST"
-            echo "✅ APK found at: $APK_PATH"
-            echo "✅ Copied to:    $DEST"
-            ls -lh "$DEST"
+          if [ -n "$APK" ]; then
+            cp "$APK" build/outputs/crux-release.apk
+            echo "✅ APK $(du -sh "$APK" | cut -f1) → build/outputs/crux-release.apk"
           else
-            echo "❌ No APK produced. Gradle output tree:"
-            find build -name "*.apk" 2>/dev/null || echo "(none)"
+            echo "❌ APK not found anywhere. Full build tree:"
+            find . -type f -name "*.apk" -o -name "*.aab" 2>/dev/null | grep -v ".pub-cache"
             exit 1
           fi
 
-      - name: Build AAB release
-        script: |
-          set -e
-
+          # --- AAB ---
           flutter build appbundle --release --android-skip-build-dependency-validation || true
 
-          DEST="build/outputs/crux-release.aab"
-          mkdir -p build/outputs
+          AAB=$(find . -name "*.aab" 2>/dev/null \
+                | grep -v ".pub-cache" | xargs ls -t 2>/dev/null | head -1)
 
-          AAB_PATH=$(find build/app/outputs -name "*.aab" -printf '%T@ %p\n' 2>/dev/null \
-                     | sort -rn | head -1 | awk '{print $2}')
-
-          if [ -z "$AAB_PATH" ]; then
-            AAB_PATH=$(find build -name "*.aab" 2>/dev/null | head -1)
-          fi
-
-          if [ -n "$AAB_PATH" ]; then
-            cp "$AAB_PATH" "$DEST"
-            echo "✅ AAB found at: $AAB_PATH"
-            echo "✅ Copied to:    $DEST"
-            ls -lh "$DEST"
-          else
-            echo "❌ No AAB produced. Gradle output tree:"
-            find build -name "*.aab" 2>/dev/null || echo "(none)"
-            exit 1
+          if [ -n "$AAB" ]; then
+            cp "$AAB" build/outputs/crux-release.aab
+            echo "✅ AAB $(du -sh "$AAB" | cut -f1) → build/outputs/crux-release.aab"
           fi
 
     artifacts:
