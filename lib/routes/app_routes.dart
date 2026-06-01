@@ -4,25 +4,30 @@ import '../screens/login_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/meeting_screen.dart';
 import '../screens/setting_screen.dart';
+import '../screens/signup_screen.dart';
 import '../models/user_model.dart';
 
 class AppRoutes {
   static const String splash = '/';
   static const String login = '/login';
+  static const String signup = '/signup';
   static const String home = '/home';
   static const String meeting = '/meeting';
   static const String settings = '/settings';
 
-  static Route<dynamic> generateRoute(RouteSettings settings) {
-    switch (settings.name) {
+  static Route<dynamic> generateRoute(RouteSettings routeSettings) {
+    switch (routeSettings.name) {
       case splash:
         return MaterialPageRoute(builder: (_) => const SplashScreen());
 
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
 
+      case signup:
+        return MaterialPageRoute(builder: (_) => const SignUpScreen());
+
       case home:
-        final user = settings.arguments as UserModel?;
+        final user = routeSettings.arguments as UserModel?;
         return MaterialPageRoute(
           builder: (_) => HomeScreen(user: user ?? UserModel(
             uid: '',
@@ -32,11 +37,15 @@ class AppRoutes {
         );
 
       case meeting:
-        final args = settings.arguments as Map<String, dynamic>?;
+        final args = routeSettings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
           builder: (_) => MeetingScreen(
             meetingId: args?['meetingId'] ?? '',
             meetingName: args?['meetingName'] ?? 'Réunion',
+            userId: args?['userId'] ?? '',
+            userName: args?['userName'] ?? 'Utilisateur',
+            userEmail: args?['userEmail'],
+            isHost: args?['isHost'] ?? false,
           ),
         );
 

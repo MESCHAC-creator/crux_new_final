@@ -1,0 +1,604 @@
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../theme/colors.dart';
+import '../services/auth_service.dart';
+import '../services/error_handler_service.dart';
+
+class SignUpScreen extends StatefulWidget {
+  const SignUpScreen({super.key});
+
+  @override
+  State<SignUpScreen> createState() => _SignUpScreenState();
+}
+
+class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMixin {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _authService = AuthService();
+  final _errorHandler = ErrorHandlerService();
+
+  bool _isLoading = false;
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
+
+  late AnimationController _bgController;
+  late AnimationController _contentController;
+  late AnimationController _pulseController;
+  late AnimationController _buttonController;
+  late AnimationController _particleController;
+
+  late Animation<double> _headerFade;
+  late Animation<double> _headerScale;
+  late Animation<Offset> _nameSlide;
+  late Animation<double> _nameFade;
+  late Animation<Offset> _emailSlide;
+  late Animation<double> _emailFade;
+  late Animation<Offset> _passSlide;
+  late Animation<double> _passFade;
+  late Animation<Offset> _confirmSlide;
+  late Animation<double> _confirmFade;
+  late Animation<Offset> _buttonSlide;
+  late Animation<double> _buttonFade;
+  late Animation<Offset> _footerSlide;
+  late Animation<double> _footerFade;
+
+  late Animation<double> _pulseAnim;
+  late Animation<double> _buttonScale;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _bgController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..repeat();
+
+    _contentController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    );
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+
+    _buttonController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+    );
+
+    _particleController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 6),
+    )..repeat();
+
+    _headerFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.0, 0.3, curve: Curves.easeOut)),
+    );
+    _headerScale = Tween<double>(begin: 0.6, end: 1.0).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.0, 0.35, curve: Curves.easeOutBack)),
+    );
+
+    _nameSlide = Tween<Offset>(begin: const Offset(-0.6, 0), end: Offset.zero).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.2, 0.45, curve: Curves.easeOutCubic)),
+    );
+    _nameFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.2, 0.45, curve: Curves.easeOut)),
+    );
+
+    _emailSlide = Tween<Offset>(begin: const Offset(0.6, 0), end: Offset.zero).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.3, 0.55, curve: Curves.easeOutCubic)),
+    );
+    _emailFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.3, 0.55, curve: Curves.easeOut)),
+    );
+
+    _passSlide = Tween<Offset>(begin: const Offset(-0.6, 0), end: Offset.zero).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.4, 0.65, curve: Curves.easeOutCubic)),
+    );
+    _passFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.4, 0.65, curve: Curves.easeOut)),
+    );
+
+    _confirmSlide = Tween<Offset>(begin: const Offset(0.6, 0), end: Offset.zero).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.5, 0.75, curve: Curves.easeOutCubic)),
+    );
+    _confirmFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.5, 0.75, curve: Curves.easeOut)),
+    );
+
+    _buttonSlide = Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.6, 0.85, curve: Curves.easeOutBack)),
+    );
+    _buttonFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.6, 0.85, curve: Curves.easeOut)),
+    );
+
+    _footerSlide = Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.75, 1.0, curve: Curves.easeOut)),
+    );
+    _footerFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.75, 1.0, curve: Curves.easeOut)),
+    );
+
+    _pulseAnim = Tween<double>(begin: 0.95, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _buttonScale = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _buttonController, curve: Curves.easeIn),
+    );
+
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) _contentController.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _bgController.dispose();
+    _contentController.dispose();
+    _pulseController.dispose();
+    _buttonController.dispose();
+    _particleController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signUp() async {
+    if (_nameController.text.trim().isEmpty ||
+        _emailController.text.trim().isEmpty ||
+        _passwordController.text.isEmpty) {
+      _errorHandler.showError(context, 'Veuillez remplir tous les champs.');
+      return;
+    }
+    if (_passwordController.text != _confirmPasswordController.text) {
+      _errorHandler.showError(context, 'Les mots de passe ne correspondent pas.');
+      return;
+    }
+    if (_passwordController.text.length < 6) {
+      _errorHandler.showError(context, 'Mot de passe trop court (min. 6 caractères).');
+      return;
+    }
+
+    await _buttonController.forward();
+    await _buttonController.reverse();
+
+    setState(() => _isLoading = true);
+    try {
+      final user = await _authService.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        name: _nameController.text.trim(),
+      );
+      if (mounted && user != null) {
+        Navigator.of(context).pushReplacementNamed('/home', arguments: user);
+      }
+    } catch (e) {
+      if (mounted) _errorHandler.showError(context, e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: AnimatedBuilder(
+        animation: _bgController,
+        builder: (_, __) {
+          final t = _bgController.value;
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment(
+                  math.cos(t * 2 * math.pi) * 0.8,
+                  math.sin(t * 2 * math.pi) * 0.8,
+                ),
+                end: Alignment(
+                  math.cos(t * 2 * math.pi + math.pi) * 0.8,
+                  math.sin(t * 2 * math.pi + math.pi) * 0.8,
+                ),
+                colors: const [
+                  Color(0xFF1A0030),
+                  Color(0xFF6B003B),
+                  Color(0xFFCC0033),
+                  Color(0xFF3D0070),
+                ],
+                stops: const [0.0, 0.35, 0.65, 1.0],
+              ),
+            ),
+            child: Stack(
+              children: [
+                // Floating decorative particles
+                for (int i = 0; i < 6; i++)
+                  _FloatingParticle(index: i, controller: _particleController),
+
+                // Main content
+                SafeArea(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    child: Column(
+                      children: [
+                        // Back button
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: FadeTransition(
+                            opacity: _headerFade,
+                            child: GestureDetector(
+                              onTap: () => Navigator.of(context).pop(),
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                                ),
+                                child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Header
+                        FadeTransition(
+                          opacity: _headerFade,
+                          child: ScaleTransition(
+                            scale: _headerScale,
+                            child: _buildHeader(),
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+
+                        // Form card
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 30,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              // Name field
+                              SlideTransition(position: _nameSlide,
+                                child: FadeTransition(opacity: _nameFade,
+                                  child: _GlassTextField(
+                                    controller: _nameController,
+                                    label: 'Nom complet',
+                                    hint: 'Jean Dupont',
+                                    icon: Icons.person_outline,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Email field
+                              SlideTransition(position: _emailSlide,
+                                child: FadeTransition(opacity: _emailFade,
+                                  child: _GlassTextField(
+                                    controller: _emailController,
+                                    label: 'Adresse e-mail',
+                                    hint: 'email@exemple.com',
+                                    icon: Icons.email_outlined,
+                                    keyboardType: TextInputType.emailAddress,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Password field
+                              SlideTransition(position: _passSlide,
+                                child: FadeTransition(opacity: _passFade,
+                                  child: _GlassTextField(
+                                    controller: _passwordController,
+                                    label: 'Mot de passe',
+                                    hint: '••••••••',
+                                    icon: Icons.lock_outline,
+                                    obscureText: !_showPassword,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _showPassword ? Icons.visibility_off : Icons.visibility,
+                                        color: Colors.white70,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => setState(() => _showPassword = !_showPassword),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Confirm password field
+                              SlideTransition(position: _confirmSlide,
+                                child: FadeTransition(opacity: _confirmFade,
+                                  child: _GlassTextField(
+                                    controller: _confirmPasswordController,
+                                    label: 'Confirmer le mot de passe',
+                                    hint: '••••••••',
+                                    icon: Icons.lock_outline,
+                                    obscureText: !_showConfirmPassword,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _showConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                                        color: Colors.white70,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 28),
+
+                              // Sign up button
+                              SlideTransition(
+                                position: _buttonSlide,
+                                child: FadeTransition(
+                                  opacity: _buttonFade,
+                                  child: ScaleTransition(
+                                    scale: _buttonScale,
+                                    child: _buildSignUpButton(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Footer
+                        SlideTransition(
+                          position: _footerSlide,
+                          child: FadeTransition(
+                            opacity: _footerFade,
+                            child: _buildFooter(),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Column(
+      children: [
+        ScaleTransition(
+          scale: _pulseAnim,
+          child: Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFF4081), Color(0xFFAA00FF)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF4081).withValues(alpha: 0.5),
+                  blurRadius: 20,
+                  spreadRadius: 4,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.person_add_rounded, color: Colors.white, size: 40),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Créer un compte',
+          style: GoogleFonts.poppins(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Rejoignez CRUX dès maintenant',
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            color: Colors.white70,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSignUpButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFF4081), Color(0xFFAA00FF)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFF4081).withValues(alpha: 0.5),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ElevatedButton(
+          onPressed: _isLoading ? null : _signUp,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 24, height: 24,
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                )
+              : Text(
+                  "S'inscrire",
+                  style: GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFooter() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          'Déjà un compte ? ',
+          style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
+        ),
+        GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: Text(
+            'Se connecter',
+            style: GoogleFonts.poppins(
+              color: const Color(0xFFFF4081),
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              decoration: TextDecoration.underline,
+              decorationColor: const Color(0xFFFF4081),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// Floating animated particle for background
+class _FloatingParticle extends StatelessWidget {
+  final int index;
+  final AnimationController controller;
+
+  const _FloatingParticle({required this.index, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final rng = math.Random(index * 31 + 7);
+    final startX = rng.nextDouble() * size.width;
+    final startY = rng.nextDouble() * size.height;
+    final radius = 18.0 + rng.nextDouble() * 40;
+    final speed = 0.15 + rng.nextDouble() * 0.25;
+    final phase = rng.nextDouble();
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, __) {
+        final t = (controller.value + phase) % 1.0;
+        final dy = -size.height * 0.4 * t;
+        final dx = math.sin(t * math.pi * 2 * speed) * 60;
+        return Positioned(
+          left: startX + dx,
+          top: startY + dy,
+          child: Opacity(
+            opacity: (0.06 + rng.nextDouble() * 0.08) * (1 - t),
+            child: Container(
+              width: radius,
+              height: radius,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(colors: [
+                  index.isEven ? const Color(0xFFFF4081) : const Color(0xFFAA00FF),
+                  Colors.transparent,
+                ]),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Reusable glass text field
+class _GlassTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final String hint;
+  final IconData icon;
+  final bool obscureText;
+  final TextInputType? keyboardType;
+  final Widget? suffixIcon;
+
+  const _GlassTextField({
+    required this.controller,
+    required this.label,
+    required this.hint,
+    required this.icon,
+    this.obscureText = false,
+    this.keyboardType,
+    this.suffixIcon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
+        hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 14),
+        prefixIcon: Icon(icon, color: Colors.white70, size: 20),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFFF4081), width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      ),
+    );
+  }
+}

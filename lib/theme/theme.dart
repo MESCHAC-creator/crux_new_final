@@ -13,9 +13,8 @@ class AppTheme {
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
         secondary: AppColors.secondary,
-        surface: AppColors.lightBg,
+        surface: AppColors.whiteBg,
         error: AppColors.error,
-        background: AppColors.whiteBg,
       ),
 
       appBarTheme: AppBarTheme(
@@ -71,7 +70,7 @@ class AppTheme {
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           elevation: 4,
-          shadowColor: AppColors.primary.withOpacity(0.4),
+          shadowColor: AppColors.primary.withValues(alpha: 0.4),
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -127,15 +126,15 @@ class AppTheme {
           color: AppColors.error,
           fontSize: 12,
         ),
-        prefixIconColor: MaterialStateColor.resolveWith((states) {
-          if (states.contains(MaterialState.focused)) {
+        prefixIconColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.focused)) {
             return AppColors.primary;
           }
           return AppColors.textSecondary;
         }),
       ),
 
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.whiteBg,
         elevation: 2,
         shadowColor: Colors.black12,
@@ -181,7 +180,7 @@ class AppTheme {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 4,
-        splashColor: AppColors.primaryDark.withOpacity(0.5),
+        splashColor: AppColors.primaryDark.withValues(alpha: 0.5),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -206,13 +205,13 @@ class AppTheme {
         ),
         iconTheme: const IconThemeData(color: Colors.white, size: 24),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: const Color(0xFF1A1A1A),
         elevation: 2,
         shadowColor: Colors.black54,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 1),
         ),
       ),
     );
@@ -231,7 +230,7 @@ class AppStyles {
   ];
 
   static const List<BoxShadow> shadowLarge = [
-    BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.08), blurRadius: 16, offset: Offset(0, 8)),
+    BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.2), blurRadius: 16, offset: Offset(0, 8)),
   ];
 
   // Radius standards

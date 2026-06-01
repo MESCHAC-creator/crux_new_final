@@ -1,4 +1,4 @@
-package com.example.crux_new_final
+package com.example.crux
 
 import io.flutter.embedding.android.FlutterActivity
 

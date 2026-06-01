@@ -169,22 +169,4 @@ class ErrorHandlerService {
     }
   }
 
-  String getAgoraErrorMessage(int errorCode) {
-    switch (errorCode) {
-      case 101:
-        return '❌ App ID Agora invalide';
-      case 103:
-        return '❌ Token invalide ou expiré';
-      case 109:
-        return '❌ Impossible de rejoindre le canal';
-      case 119:
-        return '⏱️ Délai d\'attente dépassé';
-      case 160:
-        return '📷 Permission caméra requise';
-      case 161:
-        return '🎤 Permission microphone requise';
-      default:
-        return '❌ Erreur Agora: $errorCode';
-    }
-  }
 }

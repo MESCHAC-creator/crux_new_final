@@ -14,7 +14,7 @@ class CustomButton extends StatefulWidget {
   final double? borderRadius;
 
   const CustomButton({
-    Key? key,
+    super.key,
     required this.label,
     required this.onPressed,
     this.backgroundColor,
@@ -24,7 +24,7 @@ class CustomButton extends StatefulWidget {
     this.isFullWidth = true,
     this.padding,
     this.borderRadius,
-  }) : super(key: key);
+  });
 
   @override
   State<CustomButton> createState() => _CustomButtonState();

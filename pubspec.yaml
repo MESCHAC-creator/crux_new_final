@@ -3,7 +3,7 @@ description: "APPLICATION DE VISIOCONFÉRENCE"
 publish_to: 'none'
 
 environment:
-  sdk: '^3.12.0'
+  sdk: '>=3.5.0 <4.0.0'
 
 version: 1.0.0+1
 
@@ -17,11 +17,13 @@ dependencies:
   cloud_firestore: ^6.4.1
   firebase_storage: ^13.4.1
   firebase_analytics: ^12.4.1
-  firebase_messaging: ^13.0.0
-  firebase_remote_config: ^4.3.0
+  firebase_messaging: ^16.2.2
 
   # Agora - VIDEO CONFERENCING
   agora_rtc_engine: ^6.6.3
+
+  # URL Launcher
+  url_launcher: ^6.3.0
 
   # Permissions & Localization
   permission_handler: ^11.4.0
@@ -55,19 +57,16 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.0
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/logo.png"
+  min_sdk_android: 24
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    - .env
-  fonts:
-    - family: Poppins
-      fonts:
-        - asset: assets/fonts/poppins-regular.ttf
-          weight: 400
-        - asset: assets/fonts/poppins-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/poppins-bold.ttf
-          weight: 700

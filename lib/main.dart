@@ -2,92 +2,56 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'config/app_config.dart';
-import 'services/agora_service.dart';
+import 'package:logger/logger.dart';
 import 'services/error_handler_service.dart';
-import 'services/localization_service.dart';
 import 'firebase_options.dart';
-import 'screens/login_screen_new.dart';
-import 'screens/home_screen_new.dart';
+import 'screens/splash_screen.dart';
+import 'screens/home_screen.dart';
 import 'models/user_model.dart';
-import 'theme/theme.dart';
-import 'theme/premium_colors.dart';
-import 'providers/auth_provider.dart';
+import 'providers/auth_provider.dart' show CruxAuthProvider;
 import 'providers/meeting_provider.dart';
+import 'providers/theme_provider.dart';
+import 'providers/locale_provider.dart';
+import 'routes/app_routes.dart';
+import 'theme/colors.dart';
+import 'theme/theme.dart';
 
 final logger = Logger();
 final errorHandlerService = ErrorHandlerService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Load environment variables
-  await dotenv.load(fileName: '.env');
-
   try {
-    // Initialize Firebase
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     logger.i('✅ Firebase initialisé');
-
-    // Initialize Localization
-    final localizationService = LocalizationService();
-    await localizationService.initialize();
-    logger.i('✅ Localization initialisée: ${localizationService.currentLanguage}');
-
-    // Initialize Agora
-    final agoraService = AgoraService();
-    await agoraService.initialize(Config.agoraAppId);
-    logger.i('✅ Agora initialisé');
   } catch (e) {
-    logger.e('❌ Erreur lors de l\'initialisation: $e');
-    errorHandlerService.logError('Main', 'Initialization: $e');
+    logger.e('❌ Firebase init: $e');
   }
-
   runApp(const MyApp());
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  late LocalizationService _localizationService;
-
-  @override
-  void initState() {
-    super.initState();
-    _localizationService = LocalizationService();
-  }
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => CruxAuthProvider()),
         ChangeNotifierProvider(create: (_) => MeetingProvider()),
-        ChangeNotifierProvider(create: (_) => LocaleChangeNotifier()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => LocaleProvider()),
       ],
-      child: Consumer<LocaleChangeNotifier>(
-        builder: (context, localeNotifier, _) {
+      child: Consumer2<ThemeProvider, LocaleProvider>(
+        builder: (context, themeProvider, localeProvider, _) {
           return MaterialApp(
             title: 'CRUX - Premium Video Conference',
             debugShowCheckedModeBanner: false,
-            locale: localeNotifier.locale,
             supportedLocales: const [
-              Locale('en'),
-              Locale('fr'),
-              Locale('es'),
-              Locale('ru'),
-              Locale('de'),
+              Locale('fr'), Locale('en'), Locale('es'), Locale('de'),
             ],
+            locale: localeProvider.locale,
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
@@ -95,13 +59,9 @@ class _MyAppState extends State<MyApp> {
             ],
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.light,
+            themeMode: themeProvider.themeMode,
+            onGenerateRoute: AppRoutes.generateRoute,
             home: const AuthWrapper(),
-            routes: {
-              '/login': (_) => const LoginScreenNew(),
-              '/home': (_) => const HomeScreenNew(),
-              '/settings': (_) => const SettingsScreenPlaceholder(),
-            },
           );
         },
       ),
@@ -118,62 +78,24 @@ class AuthWrapper extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            backgroundColor: PremiumColors.cloudWhite,
+          return const Scaffold(
+            backgroundColor: AppColors.whiteBg,
             body: Center(
-              child: CircularProgressIndicator(
-                color: PremiumColors.flamePrimary,
-                strokeWidth: 3,
-              ),
+              child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
             ),
           );
         }
-
         if (snapshot.hasData && snapshot.data != null) {
           final firebaseUser = snapshot.data!;
           final user = UserModel(
             uid: firebaseUser.uid,
-            name: firebaseUser.displayName ??
-                firebaseUser.email?.split('@')[0] ??
-                'User',
+            name: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'Utilisateur',
             email: firebaseUser.email ?? '',
           );
-          return HomeScreenNew(user: user);
+          return HomeScreen(user: user);
         }
-
-        return const LoginScreenNew();
+        return const SplashScreen();
       },
-    );
-  }
-}
-
-class LocaleChangeNotifier extends ChangeNotifier {
-  late Locale _locale;
-  late LocalizationService _localizationService;
-
-  LocaleChangeNotifier() {
-    _localizationService = LocalizationService();
-    _locale = _localizationService.locale;
-  }
-
-  Locale get locale => _locale;
-
-  Future<void> setLocale(String languageCode) async {
-    await _localizationService.setLanguage(languageCode);
-    _locale = Locale(languageCode);
-    notifyListeners();
-  }
-}
-
-// Placeholder for Settings (to be replaced with SettingsScreenNew)
-class SettingsScreenPlaceholder extends StatelessWidget {
-  const SettingsScreenPlaceholder({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: const Center(child: Text('Settings Coming Soon')),
     );
   }
 }

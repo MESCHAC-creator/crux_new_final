@@ -10,11 +10,11 @@ class MeetingCard extends StatelessWidget {
   final VoidCallback? onDelete;
 
   const MeetingCard({
-    Key? key,
+    super.key,
     required this.meeting,
     required this.onTap,
     this.onDelete,
-  }) : super(key: key);
+  });
 
   Color _getStatusColor(MeetingStatus status) {
     switch (status) {
@@ -102,7 +102,7 @@ class MeetingCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Icon(Icons.person, size: 12, color: AppColors.textTertiary),
+                        const Icon(Icons.person, size: 12, color: AppColors.textTertiary),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
@@ -116,7 +116,7 @@ class MeetingCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Icon(Icons.access_time, size: 12, color: AppColors.textTertiary),
+                        const Icon(Icons.access_time, size: 12, color: AppColors.textTertiary),
                         const SizedBox(width: 4),
                         Text(
                           _formatTime(meeting.startTime),

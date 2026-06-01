@@ -14,7 +14,7 @@ extension StringExtensions on String {
   /// Vérifier si c'est un numéro de téléphone valide
   bool get isValidPhoneNumber {
     final phoneRegex = RegExp(r'^[0-9]{10,}$');
-    return phoneRegex.hasMatch(this.replaceAll(RegExp(r'\D'), ''));
+    return phoneRegex.hasMatch(replaceAll(RegExp(r'\D'), ''));
   }
 
   /// Capitaliser le premier caractère

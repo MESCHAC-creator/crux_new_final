@@ -37,49 +37,6 @@
             {
               "client_id": "667181830171-cj4rpd0hgv7p5jpvaodo8q7f3hqdpsoi.apps.googleusercontent.com",
               "client_type": 3
-            },
-            {
-              "client_id": "667181830171-asleevbu19cm1hvij8t0vl47mf3g44l2.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.example.cruxNew"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:667181830171:android:1884204e84f816fec4e8be",
-        "android_client_info": {
-          "package_name": "come.example.crux"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "667181830171-cj4rpd0hgv7p5jpvaodo8q7f3hqdpsoi.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDfVNAL2cV47g9WHPtXsaE8_4pWFpy3-Ls"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "667181830171-cj4rpd0hgv7p5jpvaodo8q7f3hqdpsoi.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "667181830171-asleevbu19cm1hvij8t0vl47mf3g44l2.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.example.cruxNew"
-              }
             }
           ]
         }

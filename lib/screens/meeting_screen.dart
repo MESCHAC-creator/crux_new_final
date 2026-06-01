@@ -1,382 +1,290 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
-import '../services/error_handler_service.dart';
+import '../services/meeting_launch_service.dart';
+import '../services/meeting_service.dart';
+import '../models/meeting_model.dart';
 
 class MeetingScreen extends StatefulWidget {
   final String meetingId;
   final String meetingName;
+  final String userId;
+  final String userName;
+  final String? userEmail;
+  final bool isHost;
 
   const MeetingScreen({
-    Key? key,
+    super.key,
     required this.meetingId,
     required this.meetingName,
-  }) : super(key: key);
+    required this.userId,
+    required this.userName,
+    this.userEmail,
+    this.isHost = false,
+  });
 
   @override
   State<MeetingScreen> createState() => _MeetingScreenState();
 }
 
 class _MeetingScreenState extends State<MeetingScreen> {
-  final _errorHandler = ErrorHandlerService();
-  bool _isMicOn = true;
-  bool _isCameraOn = true;
-  bool _isSpeakerOn = true;
-  bool _isRecording = false;
-  int _participantCount = 1;
-  Duration _meetingDuration = Duration.zero;
-  late Stopwatch _stopwatch;
+  final _launchService = MeetingLaunchService();
+  final _meetingService = MeetingService();
+  bool _isLaunching = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _stopwatch = Stopwatch()..start();
+    _prepare();
   }
 
-  @override
-  void dispose() {
-    _stopwatch.stop();
-    super.dispose();
+  Future<void> _prepare() async {
+    try {
+      await _meetingService.addParticipant(widget.meetingId, widget.userId);
+      if (widget.isHost) {
+        await _meetingService.updateMeetingStatus(widget.meetingId, MeetingStatus.ongoing);
+      }
+    } catch (_) {
+      // Firestore errors don't block the video call
+    }
   }
 
-  void _toggleMic() {
-    setState(() => _isMicOn = !_isMicOn);
-    _errorHandler.showSuccessSnackBar(
-      context,
-      _isMicOn ? '🎤 Microphone activé' : '🔇 Microphone désactivé',
-    );
+  Future<void> _launchMeeting() async {
+    setState(() { _isLaunching = true; _error = null; });
+    try {
+      await _launchService.joinMeeting(
+        meetingId: widget.meetingId,
+        displayName: widget.userName,
+        email: widget.userEmail,
+      );
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isLaunching = false);
+    }
   }
 
-  void _toggleCamera() {
-    setState(() => _isCameraOn = !_isCameraOn);
-    _errorHandler.showSuccessSnackBar(
-      context,
-      _isCameraOn ? '📹 Caméra activée' : '❌ Caméra désactivée',
-    );
-  }
-
-  void _toggleSpeaker() {
-    setState(() => _isSpeakerOn = !_isSpeakerOn);
-    _errorHandler.showSuccessSnackBar(
-      context,
-      _isSpeakerOn ? '🔊 Haut-parleur activé' : '🔇 Haut-parleur désactivé',
-    );
-  }
-
-  void _toggleRecording() {
-    setState(() => _isRecording = !_isRecording);
-    _errorHandler.showSuccessSnackBar(
-      context,
-      _isRecording ? '🔴 Enregistrement démarré' : '⏹️ Enregistrement arrêté',
-    );
-  }
-
-  void _endCall() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.whiteBg,
-        title: Text(
-          'Quitter la réunion?',
-          style: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        content: Text(
-          'Vous allez quitter la réunion ${widget.meetingName}',
-          style: GoogleFonts.poppins(color: AppColors.textSecondary),
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Annuler',
-              style: GoogleFonts.poppins(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
-            child: Text(
-              'Quitter',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
+  void _copyId() {
+    Clipboard.setData(ClipboardData(text: widget.meetingId));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('ID copié !', style: GoogleFonts.poppins()),
+        backgroundColor: AppColors.success,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    if (duration.inHours == 0) {
-      return '$twoDigitMinutes:$twoDigitSeconds';
+  void _endMeeting() {
+    _meetingService.removeParticipant(widget.meetingId, widget.userId);
+    if (widget.isHost) {
+      _meetingService.updateMeetingStatus(widget.meetingId, MeetingStatus.ended);
     }
-    return '${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds';
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Vidéo principale
-            Container(
-              color: Colors.black,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A1A2E), Color(0xFF16213E), Color(0xFF0F3460)],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                // Header
+                Row(
                   children: [
-                    Icon(
-                      Icons.videocam_off,
-                      color: AppColors.textTertiary,
-                      size: 100,
+                    IconButton(
+                      onPressed: _endMeeting,
+                      icon: const Icon(Icons.arrow_back_ios, color: Colors.white70),
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Caméra désactivée',
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Header avec infos
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.8),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.meetingName,
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          StreamBuilder(
-                            stream: Stream.periodic(const Duration(seconds: 1)),
-                            builder: (context, snapshot) {
-                              return Text(
-                                _formatDuration(_stopwatch.elapsed),
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: Colors.grey[400],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                      child: Text(
+                        widget.meetingName,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.people, color: Colors.white, size: 16),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$_participantCount',
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
+                    if (widget.isHost)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.primary, width: 1),
+                        ),
+                        child: Text(
+                          'HÔTE',
+                          style: GoogleFonts.poppins(
+                            color: AppColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                           ),
-                        ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
-              ),
-            ),
+                const Spacer(),
 
-            // Controls au bas
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.95),
-                      Colors.transparent,
-                    ],
+                // Main card
+                Container(
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
                   ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Contrôles principaux
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _ControlButton(
-                          icon: _isMicOn ? Icons.mic : Icons.mic_off,
-                          isActive: _isMicOn,
-                          onTap: _toggleMic,
-                          label: 'Micro',
-                          color: _isMicOn ? AppColors.primary : Colors.grey,
+                  child: Column(
+                    children: [
+                      // Avatar
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          gradient: AppColors.primaryGradient,
+                          borderRadius: BorderRadius.circular(45),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.4),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
-                        _ControlButton(
-                          icon: _isCameraOn ? Icons.videocam : Icons.videocam_off,
-                          isActive: _isCameraOn,
-                          onTap: _toggleCamera,
-                          label: 'Caméra',
-                          color: _isCameraOn ? AppColors.primary : Colors.grey,
+                        child: const Icon(Icons.videocam, color: Colors.white, size: 44),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Réunion prête',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
                         ),
-                        _ControlButton(
-                          icon: _isSpeakerOn ? Icons.volume_up : Icons.volume_off,
-                          isActive: _isSpeakerOn,
-                          onTap: _toggleSpeaker,
-                          label: 'Son',
-                          color: _isSpeakerOn ? AppColors.primary : Colors.grey,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Appuyez sur "Rejoindre" pour ouvrir la visioconférence dans votre navigateur.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white60,
+                          fontSize: 13,
+                          height: 1.5,
                         ),
-                        _ControlButton(
-                          icon: _isRecording ? Icons.stop_circle : Icons.circle,
-                          isActive: _isRecording,
-                          onTap: _toggleRecording,
-                          label: 'Enregistr',
-                          color: _isRecording ? AppColors.error : Colors.grey,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Meeting ID box
+                      GestureDetector(
+                        onTap: _copyId,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.tag, color: Colors.white54, size: 16),
+                              const SizedBox(width: 8),
+                              Text(
+                                widget.meetingId.length > 16
+                                    ? widget.meetingId.substring(0, 16)
+                                    : widget.meetingId,
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.copy, color: Colors.white38, size: 14),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      if (_error != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(color: AppColors.error, fontSize: 12),
+                          ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 20),
-                    // Bouton quitter
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton.icon(
-                        onPressed: _endCall,
-                        icon: const Icon(Icons.call_end),
-                        label: Text(
-                          'Quitter la réunion',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.error,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+
+                const Spacer(),
+
+                // Join button
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLaunching ? null : _launchMeeting,
+                    icon: _isLaunching
+                        ? const SizedBox(
+                            width: 20, height: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.open_in_browser, size: 22),
+                    label: Text(
+                      _isLaunching ? 'Ouverture...' : 'Rejoindre la réunion',
+                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 8,
+                      shadowColor: AppColors.primary.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: _endMeeting,
+                  icon: const Icon(Icons.exit_to_app, color: Colors.white38, size: 18),
+                  label: Text(
+                    'Quitter sans rejoindre',
+                    style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
-          ],
+          ),
         ),
       ),
-    );
-  }
-}
-
-class _ControlButton extends StatelessWidget {
-  final IconData icon;
-  final bool isActive;
-  final VoidCallback onTap;
-  final String label;
-  final Color color;
-
-  const _ControlButton({
-    required this.icon,
-    required this.isActive,
-    required this.onTap,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: color, width: 2),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 28,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 11,
-            color: Colors.white,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 }

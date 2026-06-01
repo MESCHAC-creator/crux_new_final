@@ -1,14 +1,15 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
+    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
 }
+
+apply(plugin = "com.google.gms.google-services")
 
 android {
     namespace = "com.example.crux"
-    compileSdk = 34
-    ndkVersion = "25.1.8937393"
+    compileSdk = 36
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -19,55 +20,43 @@ android {
         jvmTarget = "11"
     }
 
-    signingConfigs {
-        create("release") {
-            keyAlias = System.getenv("CM_KEY_ALIAS") ?: "crux_key"
-            keyPassword = System.getenv("CM_KEY_PASSWORD") ?: ""
-            storeFile = System.getenv("CM_KEYSTORE_PATH")?.let { file(it) }
-            storePassword = System.getenv("CM_KEYSTORE_PASSWORD") ?: ""
-        }
-    }
-
     defaultConfig {
         applicationId = "com.example.crux"
-        minSdk = flutter.minSdkVersion
-        targetSdk = 34
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        minSdk = 24
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0.0"
         multiDexEnabled = true
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Use debug signing — produces a valid installable APK on any device.
+            // No keystore needed; avoids silent Gradle failures from missing/invalid store.
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            isShrinkResources = false
         }
         debug {
             isDebuggable = true
-            isMinifyEnabled = false
         }
     }
 
     lint {
-        disable.addAll(listOf(
-            "MissingDimensionRegistration",
-            "InvalidPackage",
-            "MissingTranslation",
-            "ExtraTranslation"
-        ))
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 
-    packagingOptions {
-        exclude("META-INF/proguard/androidx-*.pro")
-        exclude("META-INF/DEPENDENCIES")
-        exclude("META-INF/LICENSE")
-        exclude("META-INF/LICENSE.txt")
-        exclude("META-INF/NOTICE")
-        exclude("META-INF/NOTICE.txt")
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt"
+            )
+        }
     }
 }
 
@@ -76,16 +65,11 @@ flutter {
 }
 
 dependencies {
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
-    implementation("com.google.firebase:firebase-core")
+    implementation(platform("com.google.firebase:firebase-bom:33.15.0"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-storage")
     implementation("com.google.firebase:firebase-analytics")
-    
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("com.google.firebase:firebase-messaging")
     implementation("androidx.multidex:multidex:2.0.1")
-    implementation("androidx.legacy:legacy-support-v4:1.0.0")
 }

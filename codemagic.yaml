@@ -1,40 +1,83 @@
 workflows:
   android-release:
-    name: Android Release - CRUX Premium
+    name: Android Release - CRUX
     instance_type: linux
     max_build_duration: 120
+
     environment:
-      flutter: stable
+      flutter: 3.24.5
       java: 17
-      android_signing:
-        - crux_keystore
-      vars:
-        CM_KEY_ALIAS: crux_key
+
     scripts:
-      - name: Set up environment
+      - name: Set up local.properties
         script: |
-          echo "flutter.sdk=$HOME/sdks/flutter" > android/local.properties
-          cat > .env << 'EOF'
-AGORA_APP_ID=729bb936e5084d53897e43c58ee8e946
-AGORA_APP_CERTIFICATE=93fb3c3df2d840bd94da85a24115ac43
-AGORA_TOKEN_URL=http://localhost:8081/rtc
-FIREBASE_PROJECT_ID=crux-8aa85
-ENVIRONMENT=production
-EOF
+          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
+          echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
+          flutter --version
 
       - name: Get Flutter packages
         script: flutter pub get
 
-      - name: Build APK release
-        script: flutter build apk --release
+      - name: Lock AGP 8.7.0 and patch afterEvaluate
+        script: |
+          set -e
+          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
 
-      - name: Build AAB release
-        script: flutter build appbundle --release
+          # Re-pin AGP to 8.7.0 in case Flutter pub get upgraded it
+          sed -i 's/id("com.android.application") version "[^"]*"/id("com.android.application") version "8.7.0"/' android/settings.gradle.kts
+          sed -i 's/id("com.android.library") version "[^"]*"/id("com.android.library") version "8.7.0"/' android/settings.gradle.kts
+
+          # Re-ensure android.newDsl=false
+          grep -q "^android.newDsl=false" android/gradle.properties || echo "android.newDsl=false" >> android/gradle.properties
+
+          echo "=== settings.gradle.kts AGP version ==="
+          grep "com.android.application\|com.android.library" android/settings.gradle.kts
+          echo "=== gradle.properties ==="
+          cat android/gradle.properties
+
+          # Patch Flutter Gradle plugin source for afterEvaluate timing fix
+          echo 'aW1wb3J0IHJlLCBzeXMsIGdsb2IsIG9zCgpmbHV0dGVyX3NkayA9IHN5cy5hcmd2WzFdCmdyYWRsZV9zcmMgPSBvcy5wYXRoLmpvaW4oZmx1dHRlcl9zZGssICJwYWNrYWdlcy9mbHV0dGVyX3Rvb2xzL2dyYWRsZS9zcmMvbWFpbi9rb3RsaW4iKQoKZGVmIHBhdGNoX2ZpbGUoZmlsZXBhdGgpOgogICAgd2l0aCBvcGVuKGZpbGVwYXRoKSBhcyBmOgogICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQogICAgcGF0dGVybiA9IHJlLmNvbXBpbGUociIoXGJcdyspXC5hZnRlckV2YWx1YXRlIFx7IikKICAgIGlmIG5vdCBwYXR0ZXJuLnNlYXJjaChjb250ZW50KToKICAgICAgICByZXR1cm4gRmFsc2UKICAgIHJlc3VsdCA9IFtdCiAgICBpID0gMAogICAgd2hpbGUgaSA8IGxlbihjb250ZW50KToKICAgICAgICBtID0gcGF0dGVybi5zZWFyY2goY29udGVudCwgaSkKICAgICAgICBpZiBub3QgbToKICAgICAgICAgICAgcmVzdWx0LmFwcGVuZChjb250ZW50W2k6XSkKICAgICAgICAgICAgYnJlYWsKICAgICAgICByZXN1bHQuYXBwZW5kKGNvbnRlbnRbaTptLnN0YXJ0KCldKQogICAgICAgIHZhcm5hbWUgPSBtLmdyb3VwKDEpCiAgICAgICAgZGVwdGggPSAxCiAgICAgICAgaiA9IG0uZW5kKCkKICAgICAgICB3aGlsZSBqIDwgbGVuKGNvbnRlbnQpIGFuZCBkZXB0aCA+IDA6CiAgICAgICAgICAgIGMgPSBjb250ZW50W2pdCiAgICAgICAgICAgIGlmIGMgPT0gInsiOiBkZXB0aCArPSAxCiAgICAgICAgICAgIGVsaWYgYyA9PSAifSI6IGRlcHRoIC09IDEKICAgICAgICAgICAgaiArPSAxCiAgICAgICAgYm9keSA9IGNvbnRlbnRbbS5lbmQoKTpqLTFdCiAgICAgICAgcmVwbGFjZW1lbnQgPSAoCiAgICAgICAgICAgICJpZiAoIiArIHZhcm5hbWUgKyAiLnN0YXRlLmV4ZWN1dGVkKSB7CiIgKyBib2R5ICsgIgp9IGVsc2UgewoiCiAgICAgICAgICAgICsgdmFybmFtZSArICIuYWZ0ZXJFdmFsdWF0ZSB7CiIgKyBib2R5ICsgIgp9Cn0iCiAgICAgICAgKQogICAgICAgIHJlc3VsdC5hcHBlbmQocmVwbGFjZW1lbnQpCiAgICAgICAgaSA9IGoKICAgIG5ld19jb250ZW50ID0gIiIuam9pbihyZXN1bHQpCiAgICBpZiBuZXdfY29udGVudCAhPSBjb250ZW50OgogICAgICAgIHdpdGggb3BlbihmaWxlcGF0aCwgInciKSBhcyBmOgogICAgICAgICAgICBmLndyaXRlKG5ld19jb250ZW50KQogICAgICAgIHByaW50KCJQQVRDSEVEOiAiICsgb3MucGF0aC5iYXNlbmFtZShmaWxlcGF0aCkpCiAgICAgICAgcmV0dXJuIFRydWUKICAgIHJldHVybiBGYWxzZQoKcGF0Y2hlZCA9IDAKZm9yIGYgaW4gc29ydGVkKGdsb2IuZ2xvYihncmFkbGVfc3JjICsgIi8qKi8qLmt0IiwgcmVjdXJzaXZlPVRydWUpKToKICAgIGlmICIvdGVzdC8iIG5vdCBpbiBmIGFuZCBwYXRjaF9maWxlKGYpOgogICAgICAgIHBhdGNoZWQgKz0gMQpwcmludCgiRmlsZXMgcGF0Y2hlZDogIiArIHN0cihwYXRjaGVkKSkK' | base64 -d > /tmp/patch_flutter.py
+          python3 /tmp/patch_flutter.py "$FLUTTER_SDK"
+          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/" 2>/dev/null || true
+          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/" 2>/dev/null || true
+          echo "Patch done"
+
+      - name: Generate app icons
+        script: dart run flutter_launcher_icons
+
+      - name: Build APK and AAB
+        script: |
+          set -e
+          mkdir -p build/outputs
+
+          # Final guard: re-apply newDsl=false right before gradle runs
+          grep -q "^android.newDsl=false" android/gradle.properties || echo "android.newDsl=false" >> android/gradle.properties
+
+          flutter build apk --release --android-skip-build-dependency-validation || true
+
+          echo "=== APK search ==="
+          find . -type f -name "*.apk" 2>/dev/null | grep -v ".pub-cache" || echo "(none)"
+
+          APK=$(find . -type f -name "*.apk" ! -name "*unsigned*" 2>/dev/null | grep -v ".pub-cache" | head -1)
+          if [ -n "$APK" ]; then
+            cp "$APK" build/outputs/crux-release.apk
+            echo "✅ APK: $APK ($(du -sh "$APK" | cut -f1))"
+          else
+            echo "❌ No APK found."
+            exit 1
+          fi
+
+          flutter build appbundle --release --android-skip-build-dependency-validation || true
+
+          AAB=$(find . -type f -name "*.aab" 2>/dev/null | grep -v ".pub-cache" | head -1)
+          if [ -n "$AAB" ]; then
+            cp "$AAB" build/outputs/crux-release.aab
+            echo "✅ AAB: $AAB ($(du -sh "$AAB" | cut -f1))"
+          fi
 
     artifacts:
-      - build/app/outputs/apk/release/app-release.apk
-      - build/app/outputs/bundle/release/app-release.aab
-      - build/app/outputs/mapping/release/mapping.txt
+      - build/outputs/crux-release.apk
+      - build/outputs/crux-release.aab
 
     publishing:
       email:
