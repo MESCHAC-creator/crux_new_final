@@ -66,6 +66,34 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _joinById(String id) async {
+    setState(() => _isCreating = true);
+    try {
+      // Fetch real meeting title from Firestore
+      String meetingName = 'Réunion';
+      _meetingService.getMeeting(id).first.then((meeting) {
+        if (meeting != null) meetingName = meeting.title;
+      }).ignore();
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MeetingScreen(
+            meetingId: id,
+            meetingName: meetingName,
+            userId: widget.user.uid,
+            isHost: false,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) _errorHandler.showErrorDialog(context, '❌ Erreur', 'Réunion introuvable ou accès refusé.');
+    } finally {
+      if (mounted) setState(() => _isCreating = false);
+    }
+  }
+
   void _showJoinDialog() {
     _joinIdController.clear();
     showDialog(
@@ -92,21 +120,11 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text('Annuler', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final id = _joinIdController.text.trim();
               if (id.isEmpty) return;
               Navigator.pop(ctx);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => MeetingScreen(
-                    meetingId: id,
-                    meetingName: 'Réunion',
-                    userId: widget.user.uid,
-                    isHost: false,
-                  ),
-                ),
-              );
+              await _joinById(id);
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
             child: Text(

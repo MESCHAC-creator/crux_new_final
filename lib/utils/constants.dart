@@ -1,15 +1,13 @@
 class AppConstants {
-  // API Endpoints
-  static const String agoraTokenUrl = 'http://localhost:8081/rtc';
   static const String firebaseProjectId = 'crux-8aa85';
 
-  // Agora Config
-  static const int agoraDefaultUid = 0;
-  static const int agoraMaxParticipants = 20;
-  static const Duration tokenExpireDuration = Duration(hours: 1);
+  // WebRTC Config
+  static const int maxParticipants = 20;
+  static const Duration meetingTokenExpiry = Duration(hours: 1);
 
-  // Duration & Timeout
+  // Timeouts & Animations
   static const Duration requestTimeout = Duration(seconds: 30);
+  static const Duration webrtcConnectTimeout = Duration(seconds: 30);
   static const Duration shortAnimationDuration = Duration(milliseconds: 300);
   static const Duration normalAnimationDuration = Duration(milliseconds: 500);
   static const Duration longAnimationDuration = Duration(milliseconds: 800);
@@ -46,15 +44,6 @@ class AppConstants {
   static const String loginSuccessMessage = '✅ Connexion réussie';
   static const String logoutSuccessMessage = '✅ Déconnexion réussie';
   static const String meetingCreatedMessage = '✅ Réunion créée avec succès';
-}
-
-// Routes
-class AppRoutes {
-  static const String splash = '/splash';
-  static const String login = '/login';
-  static const String home = '/home';
-  static const String meeting = '/meeting';
-  static const String settings = '/settings';
 }
 
 // Preferences Keys

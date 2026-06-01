@@ -32,6 +32,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
   bool _isCameraOn = true;
   bool _isSpeakerOn = true;
   bool _isJoining = true;
+  String? _joinError;
   late Stopwatch _stopwatch;
 
   @override
@@ -39,23 +40,51 @@ class _MeetingScreenState extends State<MeetingScreen> {
     super.initState();
     _stopwatch = Stopwatch()..start();
     _join();
+
+    _webrtc.connectionError.addListener(_onConnectionError);
+  }
+
+  void _onConnectionError() {
+    final err = _webrtc.connectionError.value;
+    if (err != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(err, style: GoogleFonts.poppins()),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   Future<void> _join() async {
-    await _webrtc.initialize();
-    await _webrtc.joinMeeting(
-      meetingId: widget.meetingId,
-      userId: widget.userId,
-      isHost: widget.isHost,
-    );
-    await _meetingService.addParticipant(widget.meetingId, widget.userId);
-    await _meetingService.updateMeetingStatus(widget.meetingId, MeetingStatus.ongoing);
-    if (mounted) setState(() => _isJoining = false);
+    try {
+      await _webrtc.initialize();
+      await _webrtc.joinMeeting(
+        meetingId: widget.meetingId,
+        userId: widget.userId,
+        isHost: widget.isHost,
+      );
+      await _meetingService.addParticipant(widget.meetingId, widget.userId);
+      if (widget.isHost) {
+        await _meetingService.updateMeetingStatus(widget.meetingId, MeetingStatus.ongoing);
+      }
+      if (mounted) setState(() => _isJoining = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isJoining = false;
+          _joinError = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
     _stopwatch.stop();
+    _webrtc.connectionError.removeListener(_onConnectionError);
+    // Fire-and-forget: can't await in dispose
     _webrtc.leaveMeeting(widget.meetingId);
     _meetingService.removeParticipant(widget.meetingId, widget.userId);
     super.dispose();
@@ -74,8 +103,9 @@ class _MeetingScreenState extends State<MeetingScreen> {
   }
 
   Future<void> _toggleSpeaker() async {
-    setState(() => _isSpeakerOn = !_isSpeakerOn);
-    await _webrtc.enableSpeakerphone(_isSpeakerOn);
+    final next = !_isSpeakerOn;
+    await _webrtc.enableSpeakerphone(next);
+    setState(() => _isSpeakerOn = next);
   }
 
   void _endCall() {
@@ -85,11 +115,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
         backgroundColor: AppColors.whiteBg,
         title: Text(
           'Quitter la réunion?',
-          style: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
         ),
         content: Text(
           'Vous allez quitter ${widget.meetingName}',
@@ -99,13 +125,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Annuler',
-              style: GoogleFonts.poppins(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: Text('Annuler', style: GoogleFonts.poppins(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -116,13 +136,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: Text(
-              'Quitter',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
+            child: Text('Quitter', style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: Colors.white)),
           ),
         ],
       ),
@@ -140,68 +154,90 @@ class _MeetingScreenState extends State<MeetingScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: _isJoining
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(color: AppColors.primary),
-                    SizedBox(height: 16),
-                    Text(
-                      'Connexion en cours...',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                  ],
-                ),
-              )
-            : Stack(
-                children: [
-                  // Remote video (full screen)
-                  _RemoteVideo(renderer: _webrtc.remoteRenderer),
-
-                  // Local video (small, top-right)
-                  Positioned(
-                    top: 80,
-                    right: 16,
-                    child: _LocalVideo(
-                      renderer: _webrtc.localRenderer,
-                      isCameraOn: _isCameraOn,
-                      onSwitch: () => _webrtc.switchCamera(),
-                    ),
-                  ),
-
-                  // Header
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: _Header(
-                      meetingName: widget.meetingName,
-                      stopwatch: _stopwatch,
-                      formatDuration: _formatDuration,
-                      remoteUserCount: _webrtc.remoteUserCount,
-                      isConnected: _webrtc.isConnected,
-                    ),
-                  ),
-
-                  // Controls
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: _Controls(
-                      isMicOn: _isMicOn,
-                      isCameraOn: _isCameraOn,
-                      isSpeakerOn: _isSpeakerOn,
-                      onToggleMic: _toggleMic,
-                      onToggleCamera: _toggleCamera,
-                      onToggleSpeaker: _toggleSpeaker,
-                      onEndCall: _endCall,
-                    ),
-                  ),
-                ],
-              ),
+        child: _buildBody(),
       ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_joinError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: AppColors.error, size: 64),
+              const SizedBox(height: 16),
+              Text(
+                _joinError!,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                child: Text('Retour', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_isJoining) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: AppColors.primary),
+            SizedBox(height: 16),
+            Text('Connexion en cours...', style: TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        _RemoteVideo(renderer: _webrtc.remoteRenderer),
+        Positioned(
+          top: 80,
+          right: 16,
+          child: _LocalVideo(
+            renderer: _webrtc.localRenderer,
+            isCameraOn: _isCameraOn,
+            onSwitch: () => _webrtc.switchCamera(),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: _Header(
+            meetingName: widget.meetingName,
+            stopwatch: _stopwatch,
+            formatDuration: _formatDuration,
+            remoteUserCount: _webrtc.remoteUserCount,
+            isConnected: _webrtc.isConnected,
+          ),
+        ),
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: _Controls(
+            isMicOn: _isMicOn,
+            isCameraOn: _isCameraOn,
+            isSpeakerOn: _isSpeakerOn,
+            onToggleMic: _toggleMic,
+            onToggleCamera: _toggleCamera,
+            onToggleSpeaker: _toggleSpeaker,
+            onEndCall: _endCall,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -256,9 +292,7 @@ class _LocalVideo extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           child: isCameraOn && renderer.srcObject != null
               ? RTCVideoView(renderer, mirror: true)
-              : const Center(
-                  child: Icon(Icons.videocam_off, color: Colors.white54, size: 32),
-                ),
+              : const Center(child: Icon(Icons.videocam_off, color: Colors.white54, size: 32)),
         ),
       ),
     );
@@ -299,11 +333,7 @@ class _Header extends StatelessWidget {
               children: [
                 Text(
                   meetingName,
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
+                  style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
                   overflow: TextOverflow.ellipsis,
                 ),
                 StreamBuilder(
@@ -323,10 +353,7 @@ class _Header extends StatelessWidget {
               decoration: BoxDecoration(
                 color: connected ? Colors.green.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: connected ? Colors.green : Colors.white30,
-                  width: 1,
-                ),
+                border: Border.all(color: connected ? Colors.green : Colors.white30),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -390,24 +417,9 @@ class _Controls extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _ControlButton(
-                icon: isMicOn ? Icons.mic : Icons.mic_off,
-                label: 'Micro',
-                isActive: isMicOn,
-                onTap: onToggleMic,
-              ),
-              _ControlButton(
-                icon: isCameraOn ? Icons.videocam : Icons.videocam_off,
-                label: 'Caméra',
-                isActive: isCameraOn,
-                onTap: onToggleCamera,
-              ),
-              _ControlButton(
-                icon: isSpeakerOn ? Icons.volume_up : Icons.volume_off,
-                label: 'Son',
-                isActive: isSpeakerOn,
-                onTap: onToggleSpeaker,
-              ),
+              _ControlButton(icon: isMicOn ? Icons.mic : Icons.mic_off, label: 'Micro', isActive: isMicOn, onTap: onToggleMic),
+              _ControlButton(icon: isCameraOn ? Icons.videocam : Icons.videocam_off, label: 'Caméra', isActive: isCameraOn, onTap: onToggleCamera),
+              _ControlButton(icon: isSpeakerOn ? Icons.volume_up : Icons.volume_off, label: 'Son', isActive: isSpeakerOn, onTap: onToggleSpeaker),
             ],
           ),
           const SizedBox(height: 16),
@@ -417,10 +429,7 @@ class _Controls extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: onEndCall,
               icon: const Icon(Icons.call_end),
-              label: Text(
-                'Quitter la réunion',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 16),
-              ),
+              label: Text('Quitter la réunion', style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 16)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.error,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -439,12 +448,7 @@ class _ControlButton extends StatelessWidget {
   final bool isActive;
   final VoidCallback onTap;
 
-  const _ControlButton({
-    required this.icon,
-    required this.label,
-    required this.isActive,
-    required this.onTap,
-  });
+  const _ControlButton({required this.icon, required this.label, required this.isActive, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -466,10 +470,7 @@ class _ControlButton extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Text(
-          label,
-          style: GoogleFonts.poppins(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w500),
-        ),
+        Text(label, style: GoogleFonts.poppins(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w500)),
       ],
     );
   }

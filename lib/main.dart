@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:logger/logger.dart';
 import 'services/error_handler_service.dart';
 import 'firebase_options.dart';
@@ -17,27 +18,36 @@ final errorHandlerService = ErrorHandlerService();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Firebase
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     logger.i('✅ Firebase initialisé');
   } catch (e) {
-    logger.e('❌ Erreur initialisation: $e');
-    errorHandlerService.logError('Main', 'Initialization: $e');
+    logger.e('❌ Firebase init: $e');
   }
+
+  // Permissions caméra & micro pour WebRTC
+  await _requestMediaPermissions();
 
   runApp(const MyApp());
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
+Future<void> _requestMediaPermissions() async {
+  try {
+    final statuses = await [
+      Permission.camera,
+      Permission.microphone,
+    ].request();
+    logger.i('📷 Caméra: ${statuses[Permission.camera]}');
+    logger.i('🎤 Micro: ${statuses[Permission.microphone]}');
+  } catch (e) {
+    logger.w('⚠️ Permissions: $e');
+  }
 }
 
-class _MyAppState extends State<MyApp> {
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -69,10 +79,7 @@ class AuthWrapper extends StatelessWidget {
           return const Scaffold(
             backgroundColor: AppColors.whiteBg,
             body: Center(
-              child: CircularProgressIndicator(
-                color: AppColors.primary,
-                strokeWidth: 3,
-              ),
+              child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
             ),
           );
         }
@@ -81,9 +88,7 @@ class AuthWrapper extends StatelessWidget {
           final firebaseUser = snapshot.data!;
           final user = UserModel(
             uid: firebaseUser.uid,
-            name: firebaseUser.displayName ??
-                firebaseUser.email?.split('@')[0] ??
-                'Utilisateur',
+            name: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'Utilisateur',
             email: firebaseUser.email ?? '',
           );
           return HomeScreen(user: user);
