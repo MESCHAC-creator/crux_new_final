@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
 import '../models/meeting_model.dart';
@@ -66,12 +67,22 @@ class _MeetingScreenState extends State<MeetingScreen> {
 
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (_) => setState(() => _isLoading = true),
         onPageFinished: (_) => setState(() => _isLoading = false),
-        onWebResourceError: (_) => setState(() => _isLoading = false),
+        onWebResourceError: (err) {
+          setState(() => _isLoading = false);
+        },
       ))
       ..loadRequest(Uri.parse(meetUrl));
+
+    // Grant camera + microphone permissions automatically inside WebView (Android)
+    if (controller.platform is AndroidWebViewController) {
+      AndroidWebViewController.enableDebugging(false);
+      (controller.platform as AndroidWebViewController)
+          .setOnShowFileSelector((_) async => []);
+    }
 
     setState(() {
       _webController = controller;
