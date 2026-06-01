@@ -5,6 +5,7 @@ import '../theme/colors.dart';
 import '../providers/theme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../services/error_handler_service.dart';
+import '../l10n/app_translations.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -40,7 +41,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         title: Text(
-          'Paramètres',
+          AppTranslations.t('settings', localeProvider.locale.languageCode),
           style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
         ),
         leading: IconButton(
@@ -148,6 +149,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _aboutRow('Build', '1', textColor),
                   _divider(isDark),
                   _aboutRow('Développé par', 'CRUX Team', textColor),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            _sectionTitle(_legalTitle(localeProvider.locale.languageCode), isDark),
+            _card(
+              cardColor: cardColor,
+              child: Column(
+                children: [
+                  _navTile(
+                    icon: Icons.shield_outlined,
+                    label: AppTranslations.t('privacy_policy', localeProvider.locale.languageCode),
+                    textColor: textColor,
+                    onTap: () => Navigator.pushNamed(context, '/privacy'),
+                  ),
+                  _divider(isDark),
+                  _navTile(
+                    icon: Icons.gavel,
+                    label: AppTranslations.t('terms_of_use', localeProvider.locale.languageCode),
+                    textColor: textColor,
+                    onTap: () => Navigator.pushNamed(context, '/terms'),
+                  ),
                 ],
               ),
             ),
@@ -285,6 +309,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text(label, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14, color: textColor)),
           Text(value, style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textTertiary)),
         ],
+      ),
+    );
+  }
+
+  String _legalTitle(String lang) {
+    switch (lang) {
+      case 'en': return 'Legal';
+      case 'es': return 'Legal';
+      case 'de': return 'Rechtliches';
+      default: return 'Légal';
+    }
+  }
+
+  Widget _navTile({
+    required IconData icon,
+    required String label,
+    required Color textColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: AppColors.primary),
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14, color: textColor))),
+            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+          ],
+        ),
       ),
     );
   }

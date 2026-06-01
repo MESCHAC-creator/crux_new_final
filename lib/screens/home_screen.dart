@@ -7,6 +7,9 @@ import '../services/auth_service.dart';
 import '../services/meeting_service.dart';
 import '../services/error_handler_service.dart';
 import '../screens/meeting_screen.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/app_translations.dart';
+import 'package:provider/provider.dart';
 
 class HomeScreen extends StatefulWidget {
   final UserModel user;
@@ -229,7 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         Text(
-                          'Bonjour, ${widget.user.name.split(' ').first} 👋',
+                          '${AppTranslations.t('hello', context.watch<LocaleProvider>().locale.languageCode)}, ${widget.user.name.split(' ').first} 👋',
                           style: GoogleFonts.poppins(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,

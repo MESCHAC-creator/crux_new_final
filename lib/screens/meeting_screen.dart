@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../theme/colors.dart';
-import '../services/meeting_launch_service.dart';
 import '../services/meeting_service.dart';
 import '../models/meeting_model.dart';
 
@@ -29,10 +29,10 @@ class MeetingScreen extends StatefulWidget {
 }
 
 class _MeetingScreenState extends State<MeetingScreen> {
-  final _launchService = MeetingLaunchService();
   final _meetingService = MeetingService();
-  bool _isLaunching = false;
-  String? _error;
+  bool _inMeeting = false;
+  bool _isLoading = false;
+  WebViewController? _webController;
 
   @override
   void initState() {
@@ -46,24 +46,37 @@ class _MeetingScreenState extends State<MeetingScreen> {
       if (widget.isHost) {
         await _meetingService.updateMeetingStatus(widget.meetingId, MeetingStatus.ongoing);
       }
-    } catch (_) {
-      // Firestore errors don't block the video call
-    }
+    } catch (_) {}
   }
 
-  Future<void> _launchMeeting() async {
-    setState(() { _isLaunching = true; _error = null; });
-    try {
-      await _launchService.joinMeeting(
-        meetingId: widget.meetingId,
-        displayName: widget.userName,
-        email: widget.userEmail,
-      );
-    } catch (e) {
-      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) setState(() => _isLaunching = false);
-    }
+  void _startMeeting() {
+    setState(() { _isLoading = true; });
+
+    final roomName = 'CRUX-${widget.meetingId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
+    final encodedName = Uri.encodeComponent(widget.userName);
+
+    // Build Jitsi Meet URL with config to hide toolbar branding and auto-join
+    final meetUrl =
+        'https://meet.jit.si/$roomName'
+        '#userInfo.displayName="$encodedName"'
+        '&config.startWithAudioMuted=false'
+        '&config.startWithVideoMuted=false'
+        '&config.prejoinPageEnabled=false'
+        '&config.disableDeepLinking=true';
+
+    final controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageStarted: (_) => setState(() => _isLoading = true),
+        onPageFinished: (_) => setState(() => _isLoading = false),
+        onWebResourceError: (_) => setState(() => _isLoading = false),
+      ))
+      ..loadRequest(Uri.parse(meetUrl));
+
+    setState(() {
+      _webController = controller;
+      _inMeeting = true;
+    });
   }
 
   void _copyId() {
@@ -89,6 +102,34 @@ class _MeetingScreenState extends State<MeetingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_inMeeting && _webController != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              WebViewWidget(controller: _webController!),
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator(color: Colors.white)),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Material(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(24),
+                  child: IconButton(
+                    icon: const Icon(Icons.call_end, color: Colors.red),
+                    tooltip: 'Quitter',
+                    onPressed: _endMeeting,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -103,7 +144,6 @@ class _MeetingScreenState extends State<MeetingScreen> {
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
-                // Header
                 Row(
                   children: [
                     IconButton(
@@ -141,8 +181,6 @@ class _MeetingScreenState extends State<MeetingScreen> {
                   ],
                 ),
                 const Spacer(),
-
-                // Main card
                 Container(
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
@@ -152,7 +190,6 @@ class _MeetingScreenState extends State<MeetingScreen> {
                   ),
                   child: Column(
                     children: [
-                      // Avatar
                       Container(
                         width: 90,
                         height: 90,
@@ -180,7 +217,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Appuyez sur "Rejoindre" pour ouvrir la visioconférence dans votre navigateur.',
+                        'Appuyez sur "Rejoindre" pour démarrer la visioconférence directement dans l\'application.',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(
                           color: Colors.white60,
@@ -189,8 +226,6 @@ class _MeetingScreenState extends State<MeetingScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-
-                      // Meeting ID box
                       GestureDetector(
                         onTap: _copyId,
                         child: Container(
@@ -222,43 +257,18 @@ class _MeetingScreenState extends State<MeetingScreen> {
                           ),
                         ),
                       ),
-
-                      if (_error != null) ...[
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.error.withOpacity(0.3)),
-                          ),
-                          child: Text(
-                            _error!,
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(color: AppColors.error, fontSize: 12),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
-
                 const Spacer(),
-
-                // Join button
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton.icon(
-                    onPressed: _isLaunching ? null : _launchMeeting,
-                    icon: _isLaunching
-                        ? const SizedBox(
-                            width: 20, height: 20,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Icon(Icons.open_in_browser, size: 22),
+                    onPressed: _startMeeting,
+                    icon: const Icon(Icons.videocam, size: 22),
                     label: Text(
-                      _isLaunching ? 'Ouverture...' : 'Rejoindre la réunion',
+                      'Rejoindre la réunion',
                       style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700),
                     ),
                     style: ElevatedButton.styleFrom(
