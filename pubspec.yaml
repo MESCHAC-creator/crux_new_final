@@ -11,13 +11,13 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Firebase - VERSIONS LES PLUS RÉCENTES
-  firebase_core: ^4.9.0
-  firebase_auth: ^6.5.1
-  cloud_firestore: ^6.4.1
-  firebase_storage: ^13.4.1
-  firebase_analytics: ^12.4.1
-  firebase_messaging: ^16.2.2
+  # Firebase — génération 3.x, compatible Dart 3.5.x / Flutter 3.24.5
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.2
+  cloud_firestore: ^5.4.3
+  firebase_storage: ^12.3.4
+  firebase_analytics: ^11.3.3
+  firebase_messaging: ^15.1.3
 
   # Agora - VIDEO CONFERENCING
   agora_rtc_engine: ^6.6.3
