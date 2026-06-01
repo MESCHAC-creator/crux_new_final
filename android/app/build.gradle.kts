@@ -20,12 +20,17 @@ android {
         jvmTarget = "11"
     }
 
-    signingConfigs {
-        create("release") {
-            keyAlias = System.getenv("CM_KEY_ALIAS") ?: "crux_key"
-            keyPassword = System.getenv("CM_KEY_PASSWORD") ?: ""
-            storeFile = System.getenv("CM_KEYSTORE_PATH")?.let { file(it) }
-            storePassword = System.getenv("CM_KEYSTORE_PASSWORD") ?: ""
+    val keystorePath = System.getenv("CM_KEYSTORE_PATH")
+    val hasKeystore = keystorePath != null && file(keystorePath).exists()
+
+    if (hasKeystore) {
+        signingConfigs {
+            create("release") {
+                keyAlias = System.getenv("CM_KEY_ALIAS") ?: "crux_key"
+                keyPassword = System.getenv("CM_KEY_PASSWORD") ?: ""
+                storeFile = file(keystorePath!!)
+                storePassword = System.getenv("CM_KEYSTORE_PASSWORD") ?: ""
+            }
         }
     }
 
@@ -40,7 +45,10 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (hasKeystore)
+                signingConfigs.getByName("release")
+            else
+                signingConfigs.getByName("debug")
             isMinifyEnabled = false
             isShrinkResources = false
         }
