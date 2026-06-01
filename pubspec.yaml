@@ -18,8 +18,8 @@ dependencies:
   firebase_storage: ^13.4.1
   firebase_analytics: ^12.4.1
 
-  # Agora - VIDEO CONFERENCING
-  agora_rtc_engine: ^6.6.3
+  # WebRTC - VIDEO CONFERENCING (Firebase signaling)
+  flutter_webrtc: ^0.11.0
 
   # Permissions & Localization
   permission_handler: ^12.0.0

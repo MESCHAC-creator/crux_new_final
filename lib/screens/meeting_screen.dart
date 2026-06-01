@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
-import '../services/error_handler_service.dart';
+import '../services/webrtc_service.dart';
+import '../services/meeting_service.dart';
+import '../models/meeting_model.dart';
 
 class MeetingScreen extends StatefulWidget {
   final String meetingId;
   final String meetingName;
+  final String userId;
+  final bool isHost;
 
   const MeetingScreen({
     super.key,
     required this.meetingId,
     required this.meetingName,
+    required this.userId,
+    this.isHost = false,
   });
 
   @override
@@ -18,56 +25,57 @@ class MeetingScreen extends StatefulWidget {
 }
 
 class _MeetingScreenState extends State<MeetingScreen> {
-  final _errorHandler = ErrorHandlerService();
+  final _webrtc = WebRTCService();
+  final _meetingService = MeetingService();
+
   bool _isMicOn = true;
   bool _isCameraOn = true;
   bool _isSpeakerOn = true;
-  bool _isRecording = false;
-  final int _participantCount = 1;
+  bool _isJoining = true;
   late Stopwatch _stopwatch;
 
   @override
   void initState() {
     super.initState();
     _stopwatch = Stopwatch()..start();
+    _join();
+  }
+
+  Future<void> _join() async {
+    await _webrtc.initialize();
+    await _webrtc.joinMeeting(
+      meetingId: widget.meetingId,
+      userId: widget.userId,
+      isHost: widget.isHost,
+    );
+    await _meetingService.addParticipant(widget.meetingId, widget.userId);
+    await _meetingService.updateMeetingStatus(widget.meetingId, MeetingStatus.ongoing);
+    if (mounted) setState(() => _isJoining = false);
   }
 
   @override
   void dispose() {
     _stopwatch.stop();
+    _webrtc.leaveMeeting(widget.meetingId);
+    _meetingService.removeParticipant(widget.meetingId, widget.userId);
     super.dispose();
   }
 
-  void _toggleMic() {
-    setState(() => _isMicOn = !_isMicOn);
-    _errorHandler.showSuccessSnackBar(
-      context,
-      _isMicOn ? '🎤 Microphone activé' : '🔇 Microphone désactivé',
-    );
+  Future<void> _toggleMic() async {
+    final newMuted = !_webrtc.isMuted.value;
+    await _webrtc.muteAudio(newMuted);
+    setState(() => _isMicOn = !newMuted);
   }
 
-  void _toggleCamera() {
-    setState(() => _isCameraOn = !_isCameraOn);
-    _errorHandler.showSuccessSnackBar(
-      context,
-      _isCameraOn ? '📹 Caméra activée' : '❌ Caméra désactivée',
-    );
+  Future<void> _toggleCamera() async {
+    final newOff = !_webrtc.isCameraOff.value;
+    await _webrtc.muteVideo(newOff);
+    setState(() => _isCameraOn = !newOff);
   }
 
-  void _toggleSpeaker() {
+  Future<void> _toggleSpeaker() async {
     setState(() => _isSpeakerOn = !_isSpeakerOn);
-    _errorHandler.showSuccessSnackBar(
-      context,
-      _isSpeakerOn ? '🔊 Haut-parleur activé' : '🔇 Haut-parleur désactivé',
-    );
-  }
-
-  void _toggleRecording() {
-    setState(() => _isRecording = !_isRecording);
-    _errorHandler.showSuccessSnackBar(
-      context,
-      _isRecording ? '🔴 Enregistrement démarré' : '⏹️ Enregistrement arrêté',
-    );
+    await _webrtc.enableSpeakerphone(_isSpeakerOn);
   }
 
   void _endCall() {
@@ -84,7 +92,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
           ),
         ),
         content: Text(
-          'Vous allez quitter la réunion ${widget.meetingName}',
+          'Vous allez quitter ${widget.meetingName}',
           style: GoogleFonts.poppins(color: AppColors.textSecondary),
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -102,11 +110,12 @@ class _MeetingScreenState extends State<MeetingScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
+              if (widget.isHost) {
+                _meetingService.updateMeetingStatus(widget.meetingId, MeetingStatus.ended);
+              }
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: Text(
               'Quitter',
               style: GoogleFonts.poppins(
@@ -120,14 +129,10 @@ class _MeetingScreenState extends State<MeetingScreen> {
     );
   }
 
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    if (duration.inHours == 0) {
-      return '$twoDigitMinutes:$twoDigitSeconds';
-    }
-    return '${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds';
+  String _formatDuration(Duration d) {
+    String pad(int n) => n.toString().padLeft(2, '0');
+    if (d.inHours == 0) return '${pad(d.inMinutes.remainder(60))}:${pad(d.inSeconds.remainder(60))}';
+    return '${pad(d.inHours)}:${pad(d.inMinutes.remainder(60))}:${pad(d.inSeconds.remainder(60))}';
   }
 
   @override
@@ -135,195 +140,294 @@ class _MeetingScreenState extends State<MeetingScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Stack(
-          children: [
-            // Vidéo principale
-            Container(
-              color: Colors.black,
-              child: Center(
+        child: _isJoining
+            ? const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.videocam_off,
-                      color: AppColors.textTertiary,
-                      size: 100,
-                    ),
-                    const SizedBox(height: 20),
+                    CircularProgressIndicator(color: AppColors.primary),
+                    SizedBox(height: 16),
                     Text(
-                      'Caméra désactivée',
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 16,
-                      ),
+                      'Connexion en cours...',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ],
                 ),
-              ),
-            ),
+              )
+            : Stack(
+                children: [
+                  // Remote video (full screen)
+                  _RemoteVideo(renderer: _webrtc.remoteRenderer),
 
-            // Header avec infos
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.8),
-                      Colors.transparent,
-                    ],
+                  // Local video (small, top-right)
+                  Positioned(
+                    top: 80,
+                    right: 16,
+                    child: _LocalVideo(
+                      renderer: _webrtc.localRenderer,
+                      isCameraOn: _isCameraOn,
+                      onSwitch: () => _webrtc.switchCamera(),
+                    ),
                   ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.meetingName,
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          StreamBuilder(
-                            stream: Stream.periodic(const Duration(seconds: 1)),
-                            builder: (context, snapshot) {
-                              return Text(
-                                _formatDuration(_stopwatch.elapsed),
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: Colors.grey[400],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.people, color: Colors.white, size: 16),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$_participantCount',
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
 
-            // Controls au bas
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.95),
-                      Colors.transparent,
-                    ],
+                  // Header
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: _Header(
+                      meetingName: widget.meetingName,
+                      stopwatch: _stopwatch,
+                      formatDuration: _formatDuration,
+                      remoteUserCount: _webrtc.remoteUserCount,
+                      isConnected: _webrtc.isConnected,
+                    ),
                   ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Contrôles principaux
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _ControlButton(
-                          icon: _isMicOn ? Icons.mic : Icons.mic_off,
-                          isActive: _isMicOn,
-                          onTap: _toggleMic,
-                          label: 'Micro',
-                          color: _isMicOn ? AppColors.primary : Colors.grey,
-                        ),
-                        _ControlButton(
-                          icon: _isCameraOn ? Icons.videocam : Icons.videocam_off,
-                          isActive: _isCameraOn,
-                          onTap: _toggleCamera,
-                          label: 'Caméra',
-                          color: _isCameraOn ? AppColors.primary : Colors.grey,
-                        ),
-                        _ControlButton(
-                          icon: _isSpeakerOn ? Icons.volume_up : Icons.volume_off,
-                          isActive: _isSpeakerOn,
-                          onTap: _toggleSpeaker,
-                          label: 'Son',
-                          color: _isSpeakerOn ? AppColors.primary : Colors.grey,
-                        ),
-                        _ControlButton(
-                          icon: _isRecording ? Icons.stop_circle : Icons.circle,
-                          isActive: _isRecording,
-                          onTap: _toggleRecording,
-                          label: 'Enregistr',
-                          color: _isRecording ? AppColors.error : Colors.grey,
-                        ),
-                      ],
+
+                  // Controls
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: _Controls(
+                      isMicOn: _isMicOn,
+                      isCameraOn: _isCameraOn,
+                      isSpeakerOn: _isSpeakerOn,
+                      onToggleMic: _toggleMic,
+                      onToggleCamera: _toggleCamera,
+                      onToggleSpeaker: _toggleSpeaker,
+                      onEndCall: _endCall,
                     ),
-                    const SizedBox(height: 20),
-                    // Bouton quitter
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton.icon(
-                        onPressed: _endCall,
-                        icon: const Icon(Icons.call_end),
-                        label: Text(
-                          'Quitter la réunion',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.error,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ),
-          ],
+      ),
+    );
+  }
+}
+
+class _RemoteVideo extends StatelessWidget {
+  final RTCVideoRenderer renderer;
+  const _RemoteVideo({required this.renderer});
+
+  @override
+  Widget build(BuildContext context) {
+    if (renderer.srcObject == null) {
+      return Container(
+        color: const Color(0xFF1A1A2E),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.person, color: Colors.white30, size: 100),
+              const SizedBox(height: 16),
+              Text(
+                'En attente de participants...',
+                style: GoogleFonts.poppins(color: Colors.white54, fontSize: 16),
+              ),
+            ],
+          ),
         ),
+      );
+    }
+    return RTCVideoView(renderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover);
+  }
+}
+
+class _LocalVideo extends StatelessWidget {
+  final RTCVideoRenderer renderer;
+  final bool isCameraOn;
+  final VoidCallback onSwitch;
+  const _LocalVideo({required this.renderer, required this.isCameraOn, required this.onSwitch});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onSwitch,
+      child: Container(
+        width: 100,
+        height: 140,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.primary, width: 2),
+          color: Colors.black,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: isCameraOn && renderer.srcObject != null
+              ? RTCVideoView(renderer, mirror: true)
+              : const Center(
+                  child: Icon(Icons.videocam_off, color: Colors.white54, size: 32),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  final String meetingName;
+  final Stopwatch stopwatch;
+  final String Function(Duration) formatDuration;
+  final ValueNotifier<int> remoteUserCount;
+  final ValueNotifier<bool> isConnected;
+
+  const _Header({
+    required this.meetingName,
+    required this.stopwatch,
+    required this.formatDuration,
+    required this.remoteUserCount,
+    required this.isConnected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black.withValues(alpha: 0.85), Colors.transparent],
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  meetingName,
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                StreamBuilder(
+                  stream: Stream.periodic(const Duration(seconds: 1)),
+                  builder: (_, __) => Text(
+                    formatDuration(stopwatch.elapsed),
+                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[400]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ValueListenableBuilder<bool>(
+            valueListenable: isConnected,
+            builder: (_, connected, __) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: connected ? Colors.green.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: connected ? Colors.green : Colors.white30,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    connected ? Icons.wifi : Icons.wifi_off,
+                    color: connected ? Colors.greenAccent : Colors.white54,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 4),
+                  ValueListenableBuilder<int>(
+                    valueListenable: remoteUserCount,
+                    builder: (_, count, __) => Text(
+                      '${count + 1}',
+                      style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Controls extends StatelessWidget {
+  final bool isMicOn;
+  final bool isCameraOn;
+  final bool isSpeakerOn;
+  final VoidCallback onToggleMic;
+  final VoidCallback onToggleCamera;
+  final VoidCallback onToggleSpeaker;
+  final VoidCallback onEndCall;
+
+  const _Controls({
+    required this.isMicOn,
+    required this.isCameraOn,
+    required this.isSpeakerOn,
+    required this.onToggleMic,
+    required this.onToggleCamera,
+    required this.onToggleSpeaker,
+    required this.onEndCall,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [Colors.black.withValues(alpha: 0.95), Colors.transparent],
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _ControlButton(
+                icon: isMicOn ? Icons.mic : Icons.mic_off,
+                label: 'Micro',
+                isActive: isMicOn,
+                onTap: onToggleMic,
+              ),
+              _ControlButton(
+                icon: isCameraOn ? Icons.videocam : Icons.videocam_off,
+                label: 'Caméra',
+                isActive: isCameraOn,
+                onTap: onToggleCamera,
+              ),
+              _ControlButton(
+                icon: isSpeakerOn ? Icons.volume_up : Icons.volume_off,
+                label: 'Son',
+                isActive: isSpeakerOn,
+                onTap: onToggleSpeaker,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: onEndCall,
+              icon: const Icon(Icons.call_end),
+              label: Text(
+                'Quitter la réunion',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 16),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -331,21 +435,20 @@ class _MeetingScreenState extends State<MeetingScreen> {
 
 class _ControlButton extends StatelessWidget {
   final IconData icon;
+  final String label;
   final bool isActive;
   final VoidCallback onTap;
-  final String label;
-  final Color color;
 
   const _ControlButton({
     required this.icon,
+    required this.label,
     required this.isActive,
     required this.onTap,
-    required this.label,
-    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = isActive ? AppColors.primary : Colors.grey;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -355,25 +458,17 @@ class _ControlButton extends StatelessWidget {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.3),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(30),
               border: Border.all(color: color, width: 2),
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 28,
-            ),
+            child: Icon(icon, color: color, size: 26),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
           label,
-          style: GoogleFonts.poppins(
-            fontSize: 11,
-            color: Colors.white,
-            fontWeight: FontWeight.w500,
-          ),
+          style: GoogleFonts.poppins(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w500),
         ),
       ],
     );

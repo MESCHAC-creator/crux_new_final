@@ -37,6 +37,8 @@ class AppRoutes {
           builder: (_) => MeetingScreen(
             meetingId: args?['meetingId'] ?? '',
             meetingName: args?['meetingName'] ?? 'Réunion',
+            userId: args?['userId'] ?? '',
+            isHost: args?['isHost'] ?? false,
           ),
         );
 

@@ -3,8 +3,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
-import 'config/agora_config.dart';
-import 'services/agora_service.dart';
 import 'services/error_handler_service.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
@@ -24,12 +22,8 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     logger.i('✅ Firebase initialisé');
-
-    final agoraService = AgoraService();
-    await agoraService.initialize(AgoraConfig.appId);
-    logger.i('✅ Agora initialisé');
   } catch (e) {
-    logger.e('❌ Erreur: $e');
+    logger.e('❌ Erreur initialisation: $e');
     errorHandlerService.logError('Main', 'Initialization: $e');
   }
 
