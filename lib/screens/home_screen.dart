@@ -3,7 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
+import '../services/meeting_service.dart';
 import '../services/error_handler_service.dart';
+import '../screens/meeting_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final UserModel user;
@@ -16,29 +18,105 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _authService = AuthService();
+  final _meetingService = MeetingService();
   final _errorHandler = ErrorHandlerService();
-  final _meetingController = TextEditingController();
+  final _meetingNameController = TextEditingController();
+  final _joinIdController = TextEditingController();
+  bool _isCreating = false;
 
   @override
   void dispose() {
-    _meetingController.dispose();
+    _meetingNameController.dispose();
+    _joinIdController.dispose();
     super.dispose();
   }
 
-  void _createMeeting() {
-    if (_meetingController.text.isEmpty) {
-      _errorHandler.showErrorDialog(context, '⚠️ Attention',
-          'Entrez le nom de la réunion');
+  Future<void> _createMeeting() async {
+    final name = _meetingNameController.text.trim();
+    if (name.isEmpty) {
+      _errorHandler.showErrorDialog(context, '⚠️ Attention', 'Entrez le nom de la réunion');
       return;
     }
-    _errorHandler.showSuccessSnackBar(context,
-        '✅ Réunion créée: ${_meetingController.text}');
-    _meetingController.clear();
+
+    setState(() => _isCreating = true);
+    try {
+      final meetingId = await _meetingService.createMeeting(
+        title: name,
+        description: '',
+        organizerName: widget.user.name,
+        organizerId: widget.user.uid,
+      );
+      _meetingNameController.clear();
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MeetingScreen(
+            meetingId: meetingId,
+            meetingName: name,
+            userId: widget.user.uid,
+            isHost: true,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) _errorHandler.showErrorDialog(context, '❌ Erreur', e.toString());
+    } finally {
+      if (mounted) setState(() => _isCreating = false);
+    }
   }
 
-  void _joinMeeting() {
-    _errorHandler.showInfoSnackBar(context,
-        '🔗 Fonctionnalité bientôt disponible');
+  void _showJoinDialog() {
+    _joinIdController.clear();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.whiteBg,
+        title: Text(
+          'Rejoindre une réunion',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+        ),
+        content: TextField(
+          controller: _joinIdController,
+          decoration: InputDecoration(
+            hintText: 'ID de la réunion',
+            hintStyle: GoogleFonts.poppins(color: AppColors.textTertiary),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            prefixIcon: const Icon(Icons.link, color: AppColors.primary),
+          ),
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Annuler', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final id = _joinIdController.text.trim();
+              if (id.isEmpty) return;
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MeetingScreen(
+                    meetingId: id,
+                    meetingName: 'Réunion',
+                    userId: widget.user.uid,
+                    isHost: false,
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: Text(
+              'Rejoindre',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _logout() async {
@@ -46,10 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.whiteBg,
-        title: Text(
-          'Déconnexion',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-        ),
+        title: Text('Déconnexion', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
         content: Text(
           'Êtes-vous sûr de vouloir vous déconnecter?',
           style: GoogleFonts.poppins(color: AppColors.textSecondary),
@@ -64,13 +139,9 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.pop(ctx);
               try {
                 await _authService.signOut();
-                if (mounted) {
-                  Navigator.of(context).pushReplacementNamed('/login');
-                }
+                if (mounted) Navigator.of(context).pushReplacementNamed('/login');
               } catch (e) {
-                if (mounted) {
-                  _errorHandler.showErrorDialog(context, '❌ Erreur', e.toString());
-                }
+                if (mounted) _errorHandler.showErrorDialog(context, '❌ Erreur', e.toString());
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -99,6 +170,11 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: false,
         actions: [
           IconButton(
+            icon: const Icon(Icons.settings_outlined, color: AppColors.textSecondary),
+            onPressed: () => Navigator.pushNamed(context, '/settings'),
+            tooltip: 'Paramètres',
+          ),
+          IconButton(
             icon: const Icon(Icons.logout, color: AppColors.error),
             onPressed: _logout,
             tooltip: 'Déconnexion',
@@ -110,26 +186,22 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Greeting
             Text(
               'Bienvenue, ${widget.user.name}! 👋',
               style: GoogleFonts.poppins(
-                fontSize: 28,
+                fontSize: 26,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               'Prêt pour votre prochaine réunion?',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
+              style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 32),
 
-            // Nouvelle réunion
+            // Créer une réunion
             Container(
               decoration: BoxDecoration(
                 gradient: AppColors.primaryGradient,
@@ -144,9 +216,19 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               padding: const EdgeInsets.all(20),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(
+                    'Nouvelle réunion',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
-                    controller: _meetingController,
+                    controller: _meetingNameController,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: 'Nom de la réunion',
@@ -166,26 +248,30 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: _createMeeting,
+                      onPressed: _isCreating ? null : _createMeeting,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: Text(
-                        'Commencer une réunion',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                          fontSize: 16,
-                        ),
-                      ),
+                      child: _isCreating
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+                            )
+                          : Text(
+                              'Commencer la réunion',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                                fontSize: 16,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -210,63 +296,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: _QuickActionCard(
                     icon: Icons.link,
                     title: 'Rejoindre',
+                    subtitle: 'Via un ID',
                     color: AppColors.secondary,
-                    onTap: _joinMeeting,
+                    onTap: _showJoinDialog,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _QuickActionCard(
-                    icon: Icons.history,
-                    title: 'Historique',
+                    icon: Icons.settings_outlined,
+                    title: 'Paramètres',
+                    subtitle: 'Préférences',
                     color: AppColors.info,
-                    onTap: () => _errorHandler.showInfoSnackBar(
-                      context,
-                      '🔍 Historique des réunions',
-                    ),
+                    onTap: () => Navigator.pushNamed(context, '/settings'),
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 32),
-
-            // Réunions récentes
-            Text(
-              'Réunions récentes',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.lightBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                children: [
-                  const Icon(
-                    Icons.history,
-                    color: AppColors.textTertiary,
-                    size: 48,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Aucune réunion récente',
-                    style: GoogleFonts.poppins(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
@@ -278,12 +323,14 @@ class _HomeScreenState extends State<HomeScreen> {
 class _QuickActionCard extends StatelessWidget {
   final IconData icon;
   final String title;
+  final String subtitle;
   final Color color;
   final VoidCallback onTap;
 
   const _QuickActionCard({
     required this.icon,
     required this.title,
+    required this.subtitle,
     required this.color,
     required this.onTap,
   });
@@ -298,9 +345,7 @@ class _QuickActionCard extends StatelessWidget {
           color: AppColors.whiteBg,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
-          boxShadow: const [
-            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.08), blurRadius: 8),
-          ],
+          boxShadow: const [BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.08), blurRadius: 8)],
         ),
         child: Column(
           children: [
@@ -313,15 +358,18 @@ class _QuickActionCard extends StatelessWidget {
               ),
               child: Icon(icon, color: color, size: 28),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               title,
-              textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
+            ),
+            Text(
+              subtitle,
+              style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textTertiary),
             ),
           ],
         ),
