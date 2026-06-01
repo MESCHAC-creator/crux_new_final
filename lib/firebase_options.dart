@@ -3,12 +3,16 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatf
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return android;
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return android;
+      case TargetPlatform.iOS:
+        return ios;
+      default:
+        throw UnsupportedError(
+          'DefaultFirebaseOptions are not supported for this platform.',
+        );
     }
-    throw UnsupportedError(
-      'DefaultFirebaseOptions are not supported for this platform.',
-    );
   }
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -17,5 +21,16 @@ class DefaultFirebaseOptions {
     messagingSenderId: '667181830171',
     projectId: 'crux-8aa85',
     storageBucket: 'crux-8aa85.appspot.com',
+  );
+
+  // iOS: remplace ces valeurs depuis ta console Firebase
+  // Console Firebase → Paramètres projet → Ajouter app iOS → Bundle ID: com.example.crux
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'REMPLACE_PAR_IOS_API_KEY',
+    appId: 'REMPLACE_PAR_IOS_APP_ID',
+    messagingSenderId: '667181830171',
+    projectId: 'crux-8aa85',
+    storageBucket: 'crux-8aa85.appspot.com',
+    iosBundleId: 'com.example.crux',
   );
 }
