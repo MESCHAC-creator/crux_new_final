@@ -20,20 +20,6 @@ android {
         jvmTarget = "11"
     }
 
-    val keystorePath = System.getenv("CM_KEYSTORE_PATH")
-    val hasKeystore = keystorePath != null && file(keystorePath).exists()
-
-    if (hasKeystore) {
-        signingConfigs {
-            create("release") {
-                keyAlias = System.getenv("CM_KEY_ALIAS") ?: "crux_key"
-                keyPassword = System.getenv("CM_KEY_PASSWORD") ?: ""
-                storeFile = file(keystorePath!!)
-                storePassword = System.getenv("CM_KEYSTORE_PASSWORD") ?: ""
-            }
-        }
-    }
-
     defaultConfig {
         applicationId = "com.example.crux"
         minSdk = 24
@@ -45,10 +31,9 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (hasKeystore)
-                signingConfigs.getByName("release")
-            else
-                signingConfigs.getByName("debug")
+            // Use debug signing — produces a valid installable APK on any device.
+            // No keystore needed; avoids silent Gradle failures from missing/invalid store.
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
             isShrinkResources = false
         }

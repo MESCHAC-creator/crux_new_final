@@ -7,10 +7,6 @@ workflows:
     environment:
       flutter: stable
       java: 17
-      android_signing:
-        - crux_keystore
-      vars:
-        CM_KEY_ALIAS: crux_key
 
     scripts:
       - name: Set up local.properties
