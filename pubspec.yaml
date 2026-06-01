@@ -45,8 +45,8 @@ dependencies:
   # Premium UI
   flutter_animate: ^4.2.0
 
-  # In-app WebView (video conferencing)
-  webview_flutter: ^4.4.0
+  # In-app video calling (native WebRTC + Firebase signaling)
+  flutter_webrtc: ^0.9.47
 
 dev_dependencies:
   flutter_test:

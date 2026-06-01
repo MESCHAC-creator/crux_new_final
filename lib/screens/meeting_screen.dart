@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
 import '../models/meeting_model.dart';
+import 'video_call_screen.dart';
 
 class MeetingScreen extends StatefulWidget {
   final String meetingId;
@@ -31,9 +30,6 @@ class MeetingScreen extends StatefulWidget {
 
 class _MeetingScreenState extends State<MeetingScreen> {
   final _meetingService = MeetingService();
-  bool _inMeeting = false;
-  bool _isLoading = false;
-  WebViewController? _webController;
 
   @override
   void initState() {
@@ -48,46 +44,6 @@ class _MeetingScreenState extends State<MeetingScreen> {
         await _meetingService.updateMeetingStatus(widget.meetingId, MeetingStatus.ongoing);
       }
     } catch (_) {}
-  }
-
-  void _startMeeting() {
-    setState(() { _isLoading = true; });
-
-    final roomName = 'CRUX-${widget.meetingId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
-    final encodedName = Uri.encodeComponent(widget.userName);
-
-    // Build Jitsi Meet URL with config to hide toolbar branding and auto-join
-    final meetUrl =
-        'https://meet.jit.si/$roomName'
-        '#userInfo.displayName="$encodedName"'
-        '&config.startWithAudioMuted=false'
-        '&config.startWithVideoMuted=false'
-        '&config.prejoinPageEnabled=false'
-        '&config.disableDeepLinking=true';
-
-    final controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.black)
-      ..setNavigationDelegate(NavigationDelegate(
-        onPageStarted: (_) => setState(() => _isLoading = true),
-        onPageFinished: (_) => setState(() => _isLoading = false),
-        onWebResourceError: (err) {
-          setState(() => _isLoading = false);
-        },
-      ))
-      ..loadRequest(Uri.parse(meetUrl));
-
-    // Grant camera + microphone permissions automatically inside WebView (Android)
-    if (controller.platform is AndroidWebViewController) {
-      AndroidWebViewController.enableDebugging(false);
-      (controller.platform as AndroidWebViewController)
-          .setOnShowFileSelector((_) async => []);
-    }
-
-    setState(() {
-      _webController = controller;
-      _inMeeting = true;
-    });
   }
 
   void _copyId() {
@@ -111,36 +67,23 @@ class _MeetingScreenState extends State<MeetingScreen> {
     Navigator.pop(context);
   }
 
+  Future<void> _joinCall() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VideoCallScreen(
+          meetingId: widget.meetingId,
+          userName: widget.userName,
+          isHost: widget.isHost,
+        ),
+      ),
+    );
+    // When the call ends, also pop this lobby screen
+    if (mounted) _endMeeting();
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_inMeeting && _webController != null) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: SafeArea(
-          child: Stack(
-            children: [
-              WebViewWidget(controller: _webController!),
-              if (_isLoading)
-                const Center(child: CircularProgressIndicator(color: Colors.white)),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Material(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(24),
-                  child: IconButton(
-                    icon: const Icon(Icons.call_end, color: Colors.red),
-                    tooltip: 'Quitter',
-                    onPressed: _endMeeting,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -155,6 +98,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
+                // Header
                 Row(
                   children: [
                     IconButton(
@@ -164,11 +108,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                     Expanded(
                       child: Text(
                         widget.meetingName,
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -182,16 +122,15 @@ class _MeetingScreenState extends State<MeetingScreen> {
                         ),
                         child: Text(
                           'HÔTE',
-                          style: GoogleFonts.poppins(
-                            color: AppColors.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w700),
                         ),
                       ),
                   ],
                 ),
+
                 const Spacer(),
+
+                // Info card
                 Container(
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
@@ -208,11 +147,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                           gradient: AppColors.primaryGradient,
                           borderRadius: BorderRadius.circular(45),
                           boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.4),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
-                            ),
+                            BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 8)),
                           ],
                         ),
                         child: const Icon(Icons.videocam, color: Colors.white, size: 44),
@@ -220,23 +155,17 @@ class _MeetingScreenState extends State<MeetingScreen> {
                       const SizedBox(height: 20),
                       Text(
                         'Réunion prête',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                        ),
+                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Appuyez sur "Rejoindre" pour démarrer la visioconférence directement dans l\'application.',
+                        'La visioconférence se lancera directement dans l\'application. Caméra et micro natifs — aucun navigateur requis.',
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.poppins(
-                          color: Colors.white60,
-                          fontSize: 13,
-                          height: 1.5,
-                        ),
+                        style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13, height: 1.5),
                       ),
                       const SizedBox(height: 20),
+
+                      // Meeting ID
                       GestureDetector(
                         onTap: _copyId,
                         child: Container(
@@ -256,10 +185,8 @@ class _MeetingScreenState extends State<MeetingScreen> {
                                     ? widget.meetingId.substring(0, 16)
                                     : widget.meetingId,
                                 style: GoogleFonts.poppins(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1,
+                                  color: Colors.white70, fontSize: 13,
+                                  fontWeight: FontWeight.w600, letterSpacing: 1,
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -271,12 +198,15 @@ class _MeetingScreenState extends State<MeetingScreen> {
                     ],
                   ),
                 ),
+
                 const Spacer(),
+
+                // Join button
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton.icon(
-                    onPressed: _startMeeting,
+                    onPressed: _joinCall,
                     icon: const Icon(Icons.videocam, size: 22),
                     label: Text(
                       'Rejoindre la réunion',
@@ -295,10 +225,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                 TextButton.icon(
                   onPressed: _endMeeting,
                   icon: const Icon(Icons.exit_to_app, color: Colors.white38, size: 18),
-                  label: Text(
-                    'Quitter sans rejoindre',
-                    style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
-                  ),
+                  label: Text('Quitter sans rejoindre', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
                 ),
                 const SizedBox(height: 8),
               ],
