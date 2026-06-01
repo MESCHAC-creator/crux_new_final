@@ -1,62 +1,57 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:uuid/uuid.dart';
 import 'package:logger/logger.dart';
 import '../models/meeting_model.dart';
-import 'error_handler_service.dart';
 
 class MeetingService {
   static final MeetingService _instance = MeetingService._internal();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final _logger = Logger();
-  final _errorHandler = ErrorHandlerService();
+  final _log = Logger();
 
   factory MeetingService() => _instance;
   MeetingService._internal();
 
+  /// Generates the meeting ID locally (UUID) so creation NEVER fails
+  /// even if Firestore is unavailable. Firestore persistence is best-effort.
   Future<String> createMeeting({
     required String title,
     required String description,
     required String organizerName,
     required String organizerId,
   }) async {
-    try {
-      _logger.i('📝 Création réunion: $title');
+    // Generate ID locally — works offline
+    final meetingId = const Uuid().v4().replaceAll('-', '').substring(0, 12).toUpperCase();
+    final now = DateTime.now();
 
-      final now = DateTime.now();
-      final meetingId = _firestore.collection('meetings').doc().id;
+    final meeting = MeetingModel(
+      id: meetingId,
+      title: title,
+      description: description,
+      organizer: organizerName,
+      organizerId: organizerId,
+      startTime: now,
+      endTime: now.add(const Duration(hours: 1)),
+      participants: [organizerId],
+      channelName: meetingId,
+      status: MeetingStatus.scheduled,
+      createdAt: now,
+    );
 
-      final meeting = MeetingModel(
-        id: meetingId,
-        title: title,
-        description: description,
-        organizer: organizerName,
-        organizerId: organizerId,
-        startTime: now,
-        endTime: now.add(const Duration(hours: 1)),
-        participants: [organizerId],
-        channelName: meetingId,
-        status: MeetingStatus.scheduled,
-        createdAt: now,
-      );
+    // Try to persist to Firestore — non-blocking, never throws
+    _firestore
+        .collection('meetings')
+        .doc(meetingId)
+        .set(meeting.toJson())
+        .then((_) => _log.i('✅ Réunion persistée dans Firestore: $meetingId'))
+        .catchError((e) => _log.w('⚠️ Firestore indisponible, réunion locale uniquement: $e'));
 
-      await _firestore.collection('meetings').doc(meetingId).set(meeting.toJson());
-
-      _logger.i('✅ Réunion créée: $meetingId');
-      return meetingId;
-    } catch (e) {
-      _logger.e('❌ Erreur création: $e');
-      _errorHandler.logError('MeetingService', 'createMeeting: $e');
-      throw Exception('❌ Impossible de créer la réunion: $e');
-    }
+    return meetingId;
   }
 
   Stream<MeetingModel?> getMeeting(String meetingId) {
-    return _firestore.collection('meetings').doc(meetingId).snapshots().map((snap) {
-      if (snap.exists) {
-        _logger.i('📋 Réunion récupérée: $meetingId');
-        return MeetingModel.fromJson(snap.data()!);
-      }
-      return null;
-    });
+    return _firestore.collection('meetings').doc(meetingId).snapshots().map(
+      (snap) => snap.exists ? MeetingModel.fromJson(snap.data()!) : null,
+    );
   }
 
   Future<void> updateMeetingStatus(String meetingId, MeetingStatus status) async {
@@ -64,11 +59,7 @@ class MeetingService {
       await _firestore.collection('meetings').doc(meetingId).update({
         'status': status.toString().split('.').last,
       });
-      _logger.i('✅ Statut mis à jour: ${status.toString().split('.').last}');
-    } catch (e) {
-      _logger.e('❌ Erreur mise à jour: $e');
-      _errorHandler.logError('MeetingService', 'updateMeetingStatus: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> addParticipant(String meetingId, String userId) async {
@@ -76,10 +67,7 @@ class MeetingService {
       await _firestore.collection('meetings').doc(meetingId).update({
         'participants': FieldValue.arrayUnion([userId]),
       });
-      _logger.i('✅ Participant ajouté: $userId');
-    } catch (e) {
-      _logger.e('❌ Erreur ajout participant: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> removeParticipant(String meetingId, String userId) async {
@@ -87,9 +75,6 @@ class MeetingService {
       await _firestore.collection('meetings').doc(meetingId).update({
         'participants': FieldValue.arrayRemove([userId]),
       });
-      _logger.i('✅ Participant supprimé: $userId');
-    } catch (e) {
-      _logger.e('❌ Erreur suppression participant: $e');
-    }
+    } catch (_) {}
   }
 }

@@ -46,7 +46,7 @@ dependencies:
   flutter_animate: ^4.2.0
 
   # In-app video calling (native WebRTC + Firebase signaling)
-  flutter_webrtc: ^0.9.47
+  agora_rtc_engine: ^6.3.2
 
 dev_dependencies:
   flutter_test:

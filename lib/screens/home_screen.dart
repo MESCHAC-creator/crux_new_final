@@ -47,9 +47,6 @@ class _HomeScreenState extends State<HomeScreen> {
         description: '',
         organizerName: widget.user.name,
         organizerId: widget.user.uid,
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () => throw Exception('Délai dépassé. Vérifiez votre connexion Internet.'),
       );
       _meetingNameController.clear();
       if (!mounted) return;
