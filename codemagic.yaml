@@ -24,18 +24,18 @@ workflows:
       - name: Get Flutter packages
         script: flutter pub get
 
-      - name: Lock AGP 8.7.0 and patch afterEvaluate
+      - name: Configure AGP 8.1.4 + Gradle properties
         script: |
           set -e
-          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
-          sed -i 's/id("com.android.application") version "[^"]*"/id("com.android.application") version "8.7.0"/' android/settings.gradle.kts
-          sed -i 's/id("com.android.library") version "[^"]*"/id("com.android.library") version "8.7.0"/' android/settings.gradle.kts
+          # Lock to AGP 8.1.4 — this version does NOT have the afterEvaluate restriction
+          # No Python patch needed at all
+          sed -i 's/id("com.android.application") version "[^"]*"/id("com.android.application") version "8.1.4"/' android/settings.gradle.kts
+          sed -i 's/id("com.android.library") version "[^"]*"/id("com.android.library") version "8.1.4"/' android/settings.gradle.kts
+          # Use Gradle 8.4 (compatible with AGP 8.1.4)
+          sed -i 's|gradle-[0-9.]*-bin.zip|gradle-8.4-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
+          # Required Gradle property for Flutter 3.24.x
           grep -q "^android.newDsl=false" android/gradle.properties || echo "android.newDsl=false" >> android/gradle.properties
-          echo 'aW1wb3J0IHJlLCBzeXMsIGdsb2IsIG9zCgpmbHV0dGVyX3NkayA9IHN5cy5hcmd2WzFdCmdyYWRsZV9zcmMgPSBvcy5wYXRoLmpvaW4oZmx1dHRlcl9zZGssICJwYWNrYWdlcy9mbHV0dGVyX3Rvb2xzL2dyYWRsZS9zcmMvbWFpbi9rb3RsaW4iKQoKZGVmIHBhdGNoX2ZpbGUoZmlsZXBhdGgpOgogICAgd2l0aCBvcGVuKGZpbGVwYXRoKSBhcyBmOgogICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQogICAgcGF0dGVybiA9IHJlLmNvbXBpbGUociIoXGJcdyspXC5hZnRlckV2YWx1YXRlIFx7IikKICAgIGlmIG5vdCBwYXR0ZXJuLnNlYXJjaChjb250ZW50KToKICAgICAgICByZXR1cm4gRmFsc2UKICAgIHJlc3VsdCA9IFtdCiAgICBpID0gMAogICAgd2hpbGUgaSA8IGxlbihjb250ZW50KToKICAgICAgICBtID0gcGF0dGVybi5zZWFyY2goY29udGVudCwgaSkKICAgICAgICBpZiBub3QgbToKICAgICAgICAgICAgcmVzdWx0LmFwcGVuZChjb250ZW50W2k6XSkKICAgICAgICAgICAgYnJlYWsKICAgICAgICByZXN1bHQuYXBwZW5kKGNvbnRlbnRbaTptLnN0YXJ0KCldKQogICAgICAgIHZhcm5hbWUgPSBtLmdyb3VwKDEpCiAgICAgICAgZGVwdGggPSAxCiAgICAgICAgaiA9IG0uZW5kKCkKICAgICAgICB3aGlsZSBqIDwgbGVuKGNvbnRlbnQpIGFuZCBkZXB0aCA+IDA6CiAgICAgICAgICAgIGMgPSBjb250ZW50W2pdCiAgICAgICAgICAgIGlmIGMgPT0gInsiOiBkZXB0aCArPSAxCiAgICAgICAgICAgIGVsaWYgYyA9PSAifSI6IGRlcHRoIC09IDEKICAgICAgICAgICAgaiArPSAxCiAgICAgICAgYm9keSA9IGNvbnRlbnRbbS5lbmQoKTpqLTFdCiAgICAgICAgcmVwbGFjZW1lbnQgPSAiaWYgKCIgKyB2YXJuYW1lICsgIi5zdGF0ZS5leGVjdXRlZCkge1xuIiArIGJvZHkgKyAiXG59IGVsc2Uge1xuIiArIHZhcm5hbWUgKyAiLmFmdGVyRXZhbHVhdGUge1xuIiArIGJvZHkgKyAiXG59XG59IgogICAgICAgIHJlc3VsdC5hcHBlbmQocmVwbGFjZW1lbnQpCiAgICAgICAgaSA9IGoKICAgIG5ld19jb250ZW50ID0gIiIuam9pbihyZXN1bHQpCiAgICBpZiBuZXdfY29udGVudCAhPSBjb250ZW50OgogICAgICAgIHdpdGggb3BlbihmaWxlcGF0aCwgInciKSBhcyBmOgogICAgICAgICAgICBmLndyaXRlKG5ld19jb250ZW50KQogICAgICAgIHByaW50KCJQQVRDSEVEOiAiICsgb3MucGF0aC5iYXNlbmFtZShmaWxlcGF0aCkpCiAgICAgICAgcmV0dXJuIFRydWUKICAgIHJldHVybiBGYWxzZQoKcGF0Y2hlZCA9IDAKZm9yIGYgaW4gc29ydGVkKGdsb2IuZ2xvYihncmFkbGVfc3JjICsgIi8qKi8qLmt0IiwgcmVjdXJzaXZlPVRydWUpKToKICAgIGlmICIvdGVzdC8iIG5vdCBpbiBmIGFuZCBwYXRjaF9maWxlKGYpOgogICAgICAgIHBhdGNoZWQgKz0gMQpwcmludCgiRmlsZXMgcGF0Y2hlZDogIiArIHN0cihwYXRjaGVkKSkK' | base64 -d > /tmp/patch_flutter.py
-          python3 /tmp/patch_flutter.py "$FLUTTER_SDK"
-          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/" 2>/dev/null || true
-          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/" 2>/dev/null || true
-          echo "Patch done"
+          echo "✅ AGP 8.1.4 + Gradle 8.4 configurés"
 
       - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
         script: |
@@ -57,8 +57,7 @@ workflows:
         script: |
           set -e
           mkdir -p build/outputs
-          grep -q "^android.newDsl=false" android/gradle.properties || echo "android.newDsl=false" >> android/gradle.properties
-          flutter build apk --release --android-skip-build-dependency-validation || true
+          flutter build apk --release --android-skip-build-dependency-validation
           echo "=== APK search ==="
           find . -type f -name "*.apk" 2>/dev/null | grep -v ".pub-cache" || echo "(none)"
           APK=$(find . -type f -name "*.apk" ! -name "*unsigned*" 2>/dev/null | grep -v ".pub-cache" | head -1)
@@ -68,11 +67,13 @@ workflows:
           else
             echo "❌ No APK found."; exit 1
           fi
-          flutter build appbundle --release --android-skip-build-dependency-validation || true
+          flutter build appbundle --release --android-skip-build-dependency-validation
           AAB=$(find . -type f -name "*.aab" 2>/dev/null | grep -v ".pub-cache" | head -1)
           if [ -n "$AAB" ]; then
             cp "$AAB" build/outputs/crux-release.aab
             echo "✅ AAB: $AAB ($(du -sh "$AAB" | cut -f1))"
+          else
+            echo "❌ No AAB found."; exit 1
           fi
 
     artifacts:
@@ -89,14 +90,6 @@ workflows:
 
   # ═══════════════════════════════════════════════════════
   #  iOS RELEASE
-  #
-  #  AVANT DE LANCER CE BUILD, configure dans Codemagic :
-  #  1. Team → Integrations → App Store Connect API Key
-  #     (Key ID, Issuer ID, Private Key .p8)
-  #  2. Variables d'environnement (groupe "firebase_ios") :
-  #     GOOGLE_SERVICE_INFO_PLIST = contenu de GoogleService-Info.plist
-  #     encodé en base64 :
-  #     base64 -i GoogleService-Info.plist | tr -d '\n'
   # ═══════════════════════════════════════════════════════
   ios-release:
     name: iOS Release - CRUX
@@ -104,7 +97,7 @@ workflows:
     max_build_duration: 120
 
     integrations:
-      app_store_connect: codemagic_api_key  # remplace par le nom de ta clé dans Codemagic
+      app_store_connect: codemagic_api_key
 
     environment:
       flutter: 3.24.5
@@ -114,8 +107,8 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.example.crux
       groups:
-        - firebase_ios    # groupe contenant GOOGLE_SERVICE_INFO_PLIST
-        - firebase_deploy # contient FIREBASE_TOKEN (même groupe, optionnel)
+        - firebase_ios
+        - firebase_deploy
 
     scripts:
       - name: Generate iOS project files
