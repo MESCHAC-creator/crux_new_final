@@ -7,7 +7,7 @@ plugins {
 apply(plugin = "com.google.gms.google-services")
 
 android {
-    namespace = "com.example.crux"
+    namespace = "com.cruxapp.mobile"
     compileSdk = 34
 
     compileOptions {
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.crux"
+        applicationId = "com.cruxapp.mobile"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

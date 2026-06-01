@@ -129,7 +129,7 @@ workflows:
       cocoapods: default
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.example.crux
+        bundle_identifier: com.cruxapp.mobile
       groups:
         - firebase_ios
         - firebase_deploy
@@ -137,11 +137,19 @@ workflows:
     scripts:
       - name: Generate iOS project files
         script: |
+          set -e
           if [ ! -d "ios" ]; then
-            flutter create --platforms ios --org com.example --project-name crux .
+            flutter create --platforms ios --org com.cruxapp --project-name mobile .
             echo "✅ iOS folder generated"
           else
             echo "✅ iOS folder already exists"
+          fi
+          # Ensure bundle ID is correct in project.pbxproj
+          PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
+          if [ -f "$PBXPROJ" ]; then
+            sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.cruxapp.mobile/g' "$PBXPROJ" || \
+            sed -i 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.cruxapp.mobile/g' "$PBXPROJ"
+            echo "✅ Bundle ID patché dans project.pbxproj"
           fi
 
       - name: Inject GoogleService-Info.plist
@@ -150,16 +158,19 @@ workflows:
             echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
             echo "✅ GoogleService-Info.plist injecté"
           else
-            echo "⚠️  GOOGLE_SERVICE_INFO_PLIST non défini"
+            echo "⚠️  GOOGLE_SERVICE_INFO_PLIST absent — Firebase iOS désactivé"
           fi
 
       - name: Patch Info.plist permissions
         script: |
+          set -e
           PLIST="ios/Runner/Info.plist"
-          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'CRUX a besoin de la caméra pour les vidéoconférences'" "$PLIST" 2>/dev/null || \
-          /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 'CRUX a besoin de la caméra pour les vidéoconférences'" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'CRUX a besoin du microphone pour les appels'" "$PLIST" 2>/dev/null || \
-          /usr/libexec/PlistBuddy -c "Set :NSMicrophoneUsageDescription 'CRUX a besoin du microphone pour les appels'" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'CRUX needs the camera for video conferences'" "$PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 'CRUX needs the camera for video conferences'" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'CRUX needs the microphone for calls'" "$PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :NSMicrophoneUsageDescription 'CRUX needs the microphone for calls'" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'CRUX'" "$PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'CRUX'" "$PLIST"
           echo "✅ Info.plist patché"
 
       - name: Get Flutter packages
@@ -183,18 +194,22 @@ workflows:
 
       - name: Install CocoaPods
         script: |
-          cd ios && pod install --repo-update
+          set -e
+          cd ios
+          pod repo update
+          pod install
           echo "✅ CocoaPods installé"
 
       - name: Build iOS IPA
         script: |
+          set -e
           flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist \
-            || flutter build ipa --release
+            --export-options-plist=/Users/builder/export_options.plist
           echo "✅ IPA buildé"
 
     artifacts:
       - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
 
     publishing:
       email:
