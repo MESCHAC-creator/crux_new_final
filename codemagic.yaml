@@ -24,129 +24,44 @@ workflows:
       - name: Get Flutter packages
         script: flutter pub get
 
-      - name: Pre-install NDK + configure AGP + patch afterEvaluate
+      - name: Pre-install NDK + patch afterEvaluate + clear Gradle cache
         script: |
           set -e
           FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
           PUB_CACHE="${PUB_CACHE:-$HOME/.pub-cache}"
 
-          # 1. Lock AGP 8.1.4 and Gradle 8.4 (no afterEvaluate restriction from AGP side)
+          # ── 1. Lock AGP 8.1.4 + Gradle 8.4 ──────────────────────────────
           sed -i 's/id("com.android.application") version "[^"]*"/id("com.android.application") version "8.1.4"/' android/settings.gradle.kts
           sed -i 's/id("com.android.library") version "[^"]*"/id("com.android.library") version "8.1.4"/' android/settings.gradle.kts
           sed -i 's|gradle-[0-9.]*-bin.zip|gradle-8.4-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
           grep -q "^android.newDsl=false" android/gradle.properties || echo "android.newDsl=false" >> android/gradle.properties
-          echo "✅ AGP 8.1.4 + Gradle 8.4"
+          echo "AGP 8.1.4 + Gradle 8.4 set"
 
-          # 2. Pre-install NDK that Agora needs — avoids mid-evaluation download that
-          #    corrupts Gradle project state and causes afterEvaluate to fire too late
-          echo "y" | sdkmanager --install "ndk;25.1.8937393" 2>/dev/null || true
-          echo "y" | sdkmanager --install "ndk;25.2.9519653" 2>/dev/null || true
-          echo "✅ NDK pre-installed"
+          # ── 2. Pre-install NDK 25.1.8937393 (Agora requirement) ──────────
+          # Without this, Agora downloads NDK mid-Gradle-evaluation which
+          # corrupts project state and causes Flutter's afterEvaluate to fail
+          ANDROID_SDK="${ANDROID_SDK_ROOT:-/usr/local/share/android-sdk}"
+          if [ ! -d "$ANDROID_SDK/ndk/25.1.8937393" ]; then
+            yes | "$ANDROID_SDK/cmdline-tools/latest/bin/sdkmanager" "ndk;25.1.8937393" 2>/dev/null || \
+            yes | "$ANDROID_SDK/cmdline-tools/latest-2/bin/sdkmanager" "ndk;25.1.8937393" 2>/dev/null || \
+            yes | sdkmanager "ndk;25.1.8937393" 2>/dev/null || true
+          fi
+          echo "NDK pre-install done"
 
-          # 3. Patch Flutter tools Kotlin source — guard every project.afterEvaluate {} call
-          cat > /tmp/patch_flutter.py << 'PYEOF'
-          import re, sys, glob, os
-          flutter_sdk = sys.argv[1]
-          gradle_src = os.path.join(flutter_sdk, "packages/flutter_tools/gradle/src/main/kotlin")
+          # ── 3. Patch Flutter tools Kotlin files (base64-encoded, no YAML indent issue) ──
+          echo 'aW1wb3J0IHJlLCBzeXMsIGdsb2IsIG9zCgpmbHV0dGVyX3NkayA9IHN5cy5hcmd2WzFdCmdyYWRsZV9zcmMgPSBvcy5wYXRoLmpvaW4oZmx1dHRlcl9zZGssICJwYWNrYWdlcy9mbHV0dGVyX3Rvb2xzL2dyYWRsZS9zcmMvbWFpbi9rb3RsaW4iKQoKZGVmIHBhdGNoX2ZpbGUoZmlsZXBhdGgpOgogICAgd2l0aCBvcGVuKGZpbGVwYXRoKSBhcyBmOgogICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQogICAgcGF0dGVybiA9IHJlLmNvbXBpbGUociIoXGJcdyspXC5hZnRlckV2YWx1YXRlIFx7IikKICAgIGlmIG5vdCBwYXR0ZXJuLnNlYXJjaChjb250ZW50KToKICAgICAgICByZXR1cm4gRmFsc2UKICAgIHJlc3VsdCA9IFtdCiAgICBpID0gMAogICAgd2hpbGUgaSA8IGxlbihjb250ZW50KToKICAgICAgICBtID0gcGF0dGVybi5zZWFyY2goY29udGVudCwgaSkKICAgICAgICBpZiBub3QgbToKICAgICAgICAgICAgcmVzdWx0LmFwcGVuZChjb250ZW50W2k6XSkKICAgICAgICAgICAgYnJlYWsKICAgICAgICByZXN1bHQuYXBwZW5kKGNvbnRlbnRbaTptLnN0YXJ0KCldKQogICAgICAgIHZhcm5hbWUgPSBtLmdyb3VwKDEpCiAgICAgICAgZGVwdGggPSAxCiAgICAgICAgaiA9IG0uZW5kKCkKICAgICAgICB3aGlsZSBqIDwgbGVuKGNvbnRlbnQpIGFuZCBkZXB0aCA+IDA6CiAgICAgICAgICAgIGMgPSBjb250ZW50W2pdCiAgICAgICAgICAgIGlmIGMgPT0gInsiOiBkZXB0aCArPSAxCiAgICAgICAgICAgIGVsaWYgYyA9PSAifSI6IGRlcHRoIC09IDEKICAgICAgICAgICAgaiArPSAxCiAgICAgICAgYm9keSA9IGNvbnRlbnRbbS5lbmQoKTpqLTFdCiAgICAgICAgcmVwbGFjZW1lbnQgPSAiaWYgKCIgKyB2YXJuYW1lICsgIi5zdGF0ZS5leGVjdXRlZCkge1xuIiArIGJvZHkgKyAiXG59IGVsc2Uge1xuIiArIHZhcm5hbWUgKyAiLmFmdGVyRXZhbHVhdGUge1xuIiArIGJvZHkgKyAiXG59XG59IgogICAgICAgIHJlc3VsdC5hcHBlbmQocmVwbGFjZW1lbnQpCiAgICAgICAgaSA9IGoKICAgIG5ld19jb250ZW50ID0gIiIuam9pbihyZXN1bHQpCiAgICBpZiBuZXdfY29udGVudCAhPSBjb250ZW50OgogICAgICAgIHdpdGggb3BlbihmaWxlcGF0aCwgInciKSBhcyBmOgogICAgICAgICAgICBmLndyaXRlKG5ld19jb250ZW50KQogICAgICAgIHByaW50KCJQQVRDSEVEIEtUOiAiICsgb3MucGF0aC5iYXNlbmFtZShmaWxlcGF0aCkpCiAgICAgICAgcmV0dXJuIFRydWUKICAgIHJldHVybiBGYWxzZQoKcGF0Y2hlZCA9IDAKZm9yIGYgaW4gc29ydGVkKGdsb2IuZ2xvYihncmFkbGVfc3JjICsgIi8qKi8qLmt0IiwgcmVjdXJzaXZlPVRydWUpKToKICAgIGlmICIvdGVzdC8iIG5vdCBpbiBmIGFuZCBwYXRjaF9maWxlKGYpOgogICAgICAgIHBhdGNoZWQgKz0gMQpwcmludCgiS290bGluIGZpbGVzIHBhdGNoZWQ6ICIgKyBzdHIocGF0Y2hlZCkpCg==' | base64 -d > /tmp/patch_kt.py
+          python3 /tmp/patch_kt.py "$FLUTTER_SDK"
 
-          def patch_file(filepath):
-              with open(filepath) as f:
-                  content = f.read()
-              pattern = re.compile(r"(\b\w+)\.afterEvaluate \{")
-              if not pattern.search(content):
-                  return False
-              result = []
-              i = 0
-              while i < len(content):
-                  m = pattern.search(content, i)
-                  if not m:
-                      result.append(content[i:])
-                      break
-                  result.append(content[i:m.start()])
-                  varname = m.group(1)
-                  depth = 1
-                  j = m.end()
-                  while j < len(content) and depth > 0:
-                      c = content[j]
-                      if c == "{": depth += 1
-                      elif c == "}": depth -= 1
-                      j += 1
-                  body = content[m.end():j-1]
-                  replacement = "if (" + varname + ".state.executed) {\n" + body + "\n} else {\n" + varname + ".afterEvaluate {\n" + body + "\n}\n}"
-                  result.append(replacement)
-                  i = j
-              new_content = "".join(result)
-              if new_content != content:
-                  with open(filepath, "w") as f:
-                      f.write(new_content)
-                  print("PATCHED KT: " + os.path.basename(filepath))
-                  return True
-              return False
-
-          patched = 0
-          for f in sorted(glob.glob(gradle_src + "/**/*.kt", recursive=True)):
-              if "/test/" not in f and patch_file(f):
-                  patched += 1
-          print("Kotlin files patched: " + str(patched))
-          PYEOF
-          python3 /tmp/patch_flutter.py "$FLUTTER_SDK"
-
-          # 4. Patch afterEvaluate in ALL plugin .gradle files in pub cache
-          #    (covers agora_rtc_engine and any other plugin that calls afterEvaluate)
-          cat > /tmp/patch_gradle.py << 'PYEOF'
-          import re, sys, glob, os
-          pub_cache = sys.argv[1]
-
-          def patch_file(filepath):
-              with open(filepath, encoding='utf-8', errors='ignore') as f:
-                  content = f.read()
-              # Match bare "afterEvaluate {" (Groovy style, no variable prefix)
-              pattern = re.compile(r'(?<!\w)afterEvaluate\s*\{')
-              if not pattern.search(content):
-                  return False
-              result = []
-              i = 0
-              while i < len(content):
-                  m = pattern.search(content, i)
-                  if not m:
-                      result.append(content[i:])
-                      break
-                  result.append(content[i:m.start()])
-                  depth = 1
-                  j = m.end()
-                  while j < len(content) and depth > 0:
-                      if content[j] == '{': depth += 1
-                      elif content[j] == '}': depth -= 1
-                      j += 1
-                  body = content[m.end():j-1]
-                  replacement = "if (project.state.executed) {" + body + "\n} else {\nafterEvaluate {" + body + "\n}\n}"
-                  result.append(replacement)
-                  i = j
-              new_content = "".join(result)
-              if new_content != content:
-                  with open(filepath, 'w', encoding='utf-8') as f:
-                      f.write(new_content)
-                  print("PATCHED GRADLE: " + os.path.relpath(filepath, pub_cache))
-                  return True
-              return False
-
-          patched = 0
-          for ext in ('*.gradle', '*.gradle.kts'):
-              for f in glob.glob(pub_cache + "/**/" + ext, recursive=True):
-                  if '/test/' not in f and patch_file(f):
-                      patched += 1
-          print("Gradle files patched: " + str(patched))
-          PYEOF
+          # ── 4. Patch ALL .gradle files in pub cache (covers Agora + any other plugin) ──
+          echo 'aW1wb3J0IHJlLCBzeXMsIGdsb2IsIG9zCgpwdWJfY2FjaGUgPSBzeXMuYXJndlsxXQoKZGVmIHBhdGNoX2ZpbGUoZmlsZXBhdGgpOgogICAgdHJ5OgogICAgICAgIHdpdGggb3BlbihmaWxlcGF0aCwgZW5jb2Rpbmc9InV0Zi04IiwgZXJyb3JzPSJpZ25vcmUiKSBhcyBmOgogICAgICAgICAgICBjb250ZW50ID0gZi5yZWFkKCkKICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgcmV0dXJuIEZhbHNlCiAgICBwYXR0ZXJuID0gcmUuY29tcGlsZShyIig/PCFcdylhZnRlckV2YWx1YXRlXHMqXHsiKQogICAgaWYgbm90IHBhdHRlcm4uc2VhcmNoKGNvbnRlbnQpOgogICAgICAgIHJldHVybiBGYWxzZQogICAgcmVzdWx0ID0gW10KICAgIGkgPSAwCiAgICB3aGlsZSBpIDwgbGVuKGNvbnRlbnQpOgogICAgICAgIG0gPSBwYXR0ZXJuLnNlYXJjaChjb250ZW50LCBpKQogICAgICAgIGlmIG5vdCBtOgogICAgICAgICAgICByZXN1bHQuYXBwZW5kKGNvbnRlbnRbaTpdKQogICAgICAgICAgICBicmVhawogICAgICAgIHJlc3VsdC5hcHBlbmQoY29udGVudFtpOm0uc3RhcnQoKV0pCiAgICAgICAgZGVwdGggPSAxCiAgICAgICAgaiA9IG0uZW5kKCkKICAgICAgICB3aGlsZSBqIDwgbGVuKGNvbnRlbnQpIGFuZCBkZXB0aCA+IDA6CiAgICAgICAgICAgIGlmIGNvbnRlbnRbal0gPT0gInsiOiBkZXB0aCArPSAxCiAgICAgICAgICAgIGVsaWYgY29udGVudFtqXSA9PSAifSI6IGRlcHRoIC09IDEKICAgICAgICAgICAgaiArPSAxCiAgICAgICAgYm9keSA9IGNvbnRlbnRbbS5lbmQoKTpqLTFdCiAgICAgICAgcmVwbGFjZW1lbnQgPSAiaWYgKHByb2plY3Quc3RhdGUuZXhlY3V0ZWQpIHsiICsgYm9keSArICJcbn0gZWxzZSB7XG5hZnRlckV2YWx1YXRlIHsiICsgYm9keSArICJcbn1cbn0iCiAgICAgICAgcmVzdWx0LmFwcGVuZChyZXBsYWNlbWVudCkKICAgICAgICBpID0gagogICAgbmV3X2NvbnRlbnQgPSAiIi5qb2luKHJlc3VsdCkKICAgIGlmIG5ld19jb250ZW50ICE9IGNvbnRlbnQ6CiAgICAgICAgdHJ5OgogICAgICAgICAgICB3aXRoIG9wZW4oZmlsZXBhdGgsICJ3IiwgZW5jb2Rpbmc9InV0Zi04IikgYXMgZjoKICAgICAgICAgICAgICAgIGYud3JpdGUobmV3X2NvbnRlbnQpCiAgICAgICAgICAgIHByaW50KCJQQVRDSEVEIEdSQURMRTogIiArIG9zLnBhdGgucmVscGF0aChmaWxlcGF0aCwgcHViX2NhY2hlKSkKICAgICAgICAgICAgcmV0dXJuIFRydWUKICAgICAgICBleGNlcHQgRXhjZXB0aW9uOgogICAgICAgICAgICByZXR1cm4gRmFsc2UKICAgIHJldHVybiBGYWxzZQoKcGF0Y2hlZCA9IDAKZm9yIGV4dCBpbiBbIiouZ3JhZGxlIiwgIiouZ3JhZGxlLmt0cyJdOgogICAgZm9yIGYgaW4gZ2xvYi5nbG9iKHB1Yl9jYWNoZSArICIvKiovIiArIGV4dCwgcmVjdXJzaXZlPVRydWUpOgogICAgICAgIGlmICIvdGVzdC8iIG5vdCBpbiBmIGFuZCBwYXRjaF9maWxlKGYpOgogICAgICAgICAgICBwYXRjaGVkICs9IDEKcHJpbnQoIkdyYWRsZSBmaWxlcyBwYXRjaGVkOiAiICsgc3RyKHBhdGNoZWQpKQo=' | base64 -d > /tmp/patch_gradle.py
           python3 /tmp/patch_gradle.py "$PUB_CACHE"
-          echo "✅ All afterEvaluate calls patched"
 
-          # 5. Force recompilation: clear Flutter tools compiled artifacts AND Gradle build cache
+          # ── 5. Clear compiled caches so patched source is compiled fresh ──
           rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/" 2>/dev/null || true
           rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/" 2>/dev/null || true
-          # Clear Gradle file-hash / build-cache so patched source is recompiled fresh
           rm -rf "$HOME/.gradle/caches/build-cache-"* 2>/dev/null || true
-          rm -rf "$HOME/.gradle/caches/"*/executionHistory 2>/dev/null || true
-          echo "✅ Gradle caches cleared"
+          rm -rf "$HOME/.gradle/caches/"*"/executionHistory" 2>/dev/null || true
+          echo "All patches applied and caches cleared"
 
       - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
         script: |
@@ -158,7 +73,7 @@ workflows:
               --non-interactive
             echo "✅ Règles Firestore déployées"
           else
-            echo "⏭️  FIREBASE_TOKEN absent — règles non déployées (build OK)"
+            echo "⏭️  FIREBASE_TOKEN absent — build OK"
           fi
 
       - name: Generate app icons
