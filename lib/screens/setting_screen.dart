@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../theme/colors.dart';
+import '../providers/theme_provider.dart';
+import '../providers/locale_provider.dart';
 import '../services/error_handler_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -12,29 +15,36 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final _errorHandler = ErrorHandlerService();
-
   bool _notificationsEnabled = true;
-  bool _darkModeEnabled = false;
-  String _selectedLanguage = 'Français';
   String _videoQuality = 'Haute';
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
+    final localeProvider = context.watch<LocaleProvider>();
+    final isDark = themeProvider.isDark;
+    final bgColor = isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF5F3FF);
+    final cardColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+
     return Scaffold(
-      backgroundColor: AppColors.whiteBg,
+      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: AppColors.whiteBg,
-        elevation: 1,
-        title: Text(
-          'Paramètres',
-          style: GoogleFonts.poppins(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFE74C3C), Color(0xFF8E44AD)],
+            ),
           ),
         ),
+        title: Text(
+          'Paramètres',
+          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -43,239 +53,265 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Paramètres de réunion
-            _buildSectionTitle('Réunion'),
-            _buildSettingTile(
-              icon: Icons.videocam,
-              title: 'Qualité vidéo',
-              value: _videoQuality,
-              onTap: () => _showQualityDialog(),
-            ),
-            _buildSwitchTile(
-              icon: Icons.mic,
-              title: 'Micro activé par défaut',
-              value: true,
-              onChanged: (_) => _errorHandler.showInfoSnackBar(
-                context,
-                '✅ Paramètre mis à jour',
-              ),
-            ),
-            _buildSwitchTile(
-              icon: Icons.videocam,
-              title: 'Caméra activée par défaut',
-              value: true,
-              onChanged: (_) => _errorHandler.showInfoSnackBar(
-                context,
-                '✅ Paramètre mis à jour',
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Paramètres généraux
-            _buildSectionTitle('Général'),
-            _buildSettingTile(
-              icon: Icons.language,
-              title: 'Langue',
-              value: _selectedLanguage,
-              onTap: () => _showLanguageDialog(),
-            ),
-            _buildSwitchTile(
-              icon: Icons.notifications,
-              title: 'Notifications',
-              value: _notificationsEnabled,
-              onChanged: (value) {
-                setState(() => _notificationsEnabled = value);
-                _errorHandler.showSuccessSnackBar(
-                  context,
-                  value ? '✅ Notifications activées' : '✅ Notifications désactivées',
-                );
-              },
-            ),
-            _buildSwitchTile(
-              icon: Icons.dark_mode,
-              title: 'Mode sombre',
-              value: _darkModeEnabled,
-              onChanged: (value) {
-                setState(() => _darkModeEnabled = value);
-                _errorHandler.showInfoSnackBar(
-                  context,
-                  value ? '🌙 Mode sombre activé' : '☀️ Mode clair activé',
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // À propos
-            _buildSectionTitle('À propos'),
-            _buildAboutTile('Version', '1.0.0'),
-            _buildAboutTile('Build', '1'),
-            _buildAboutTile('Développé par', 'CRUX Team'),
-            const SizedBox(height: 24),
-
-            // Actions
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: () => _errorHandler.showInfoSnackBar(
-                  context,
-                  '📧 Email: support@crux.app',
-                ),
-                icon: const Icon(Icons.help_outline),
-                label: Text(
-                  'Assistance',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.info,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            const SizedBox(height: 8),
+            _sectionTitle('Réunion', isDark),
+            _card(
+              cardColor: cardColor,
+              child: Column(
+                children: [
+                  _settingTile(
+                    icon: Icons.videocam_outlined,
+                    title: 'Qualité vidéo',
+                    trailing: Text(_videoQuality, style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textTertiary)),
+                    onTap: () => _showQualityDialog(),
+                    textColor: textColor,
                   ),
-                ),
+                  _divider(isDark),
+                  _switchTile(
+                    icon: Icons.mic_outlined,
+                    title: 'Micro activé par défaut',
+                    value: true,
+                    onChanged: (_) => _errorHandler.showInfoSnackBar(context, '✅ Paramètre mis à jour'),
+                    textColor: textColor,
+                  ),
+                  _divider(isDark),
+                  _switchTile(
+                    icon: Icons.videocam_outlined,
+                    title: 'Caméra activée par défaut',
+                    value: true,
+                    onChanged: (_) => _errorHandler.showInfoSnackBar(context, '✅ Paramètre mis à jour'),
+                    textColor: textColor,
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(height: 20),
+
+            _sectionTitle('Apparence', isDark),
+            _card(
+              cardColor: cardColor,
+              child: Column(
+                children: [
+                  _switchTile(
+                    icon: Icons.dark_mode_outlined,
+                    title: 'Mode sombre',
+                    subtitle: isDark ? 'Activé' : 'Désactivé',
+                    value: isDark,
+                    onChanged: (val) {
+                      context.read<ThemeProvider>().setDarkMode(val);
+                      _errorHandler.showInfoSnackBar(context, val ? '🌙 Mode sombre activé' : '☀️ Mode clair activé');
+                    },
+                    textColor: textColor,
+                    activeColor: AppColors.secondary,
+                  ),
+                  _divider(isDark),
+                  _settingTile(
+                    icon: Icons.language_outlined,
+                    title: 'Langue',
+                    trailing: Text(localeProvider.languageLabel, style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textTertiary)),
+                    onTap: () => _showLanguageDialog(localeProvider),
+                    textColor: textColor,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            _sectionTitle('Notifications', isDark),
+            _card(
+              cardColor: cardColor,
+              child: _switchTile(
+                icon: Icons.notifications_outlined,
+                title: 'Notifications',
+                subtitle: _notificationsEnabled ? 'Activées' : 'Désactivées',
+                value: _notificationsEnabled,
+                onChanged: (val) {
+                  setState(() => _notificationsEnabled = val);
+                  _errorHandler.showSuccessSnackBar(
+                    context,
+                    val ? '✅ Notifications activées' : '✅ Notifications désactivées',
+                  );
+                },
+                textColor: textColor,
+                activeColor: AppColors.success,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            _sectionTitle('À propos', isDark),
+            _card(
+              cardColor: cardColor,
+              child: Column(
+                children: [
+                  _aboutRow('Version', '1.0.0', textColor),
+                  _divider(isDark),
+                  _aboutRow('Build', '1', textColor),
+                  _divider(isDark),
+                  _aboutRow('Développé par', 'CRUX Team', textColor),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Support button
+            _gradientButton(
+              icon: Icons.headset_mic_outlined,
+              label: 'Assistance',
+              colors: const [Color(0xFF3498DB), Color(0xFF2980B9)],
+              onTap: () => _errorHandler.showInfoSnackBar(context, '📧 support@crux.app'),
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: () => _errorHandler.showInfoSnackBar(
-                  context,
-                  '📱 Suivez-nous sur les réseaux sociaux',
-                ),
-                icon: const Icon(Icons.share),
-                label: Text(
-                  'Partager l\'app',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
+            _gradientButton(
+              icon: Icons.share_outlined,
+              label: 'Partager l\'app',
+              colors: const [Color(0xFF8E44AD), Color(0xFF6C3483)],
+              onTap: () => _errorHandler.showInfoSnackBar(context, '📱 Partagez CRUX avec vos contacts !'),
             ),
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _sectionTitle(String title, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12, top: 12),
+      padding: const EdgeInsets.only(bottom: 8, left: 4),
       child: Text(
-        title,
+        title.toUpperCase(),
         style: GoogleFonts.poppins(
-          fontSize: 14,
+          fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: AppColors.textSecondary,
+          color: AppColors.secondary,
+          letterSpacing: 1.2,
         ),
       ),
     );
   }
 
-  Widget _buildSettingTile({
-    required IconData icon,
-    required String title,
-    required String value,
-    required VoidCallback onTap,
-  }) {
+  Widget _card({required Color cardColor, required Widget child}) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: AppColors.lightBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 4))],
       ),
-      child: ListTile(
-        leading: Icon(icon, color: AppColors.primary),
-        title: Text(
-          title,
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
+      child: child,
+    );
+  }
+
+  Widget _divider(bool isDark) {
+    return Divider(
+      height: 1,
+      indent: 56,
+      color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.15),
+    );
+  }
+
+  Widget _settingTile({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required Widget trailing,
+    required VoidCallback onTap,
+    required Color textColor,
+  }) {
+    return ListTile(
+      onTap: onTap,
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          borderRadius: BorderRadius.circular(10),
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
-          ],
-        ),
-        onTap: onTap,
+        child: Icon(icon, color: Colors.white, size: 18),
+      ),
+      title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14, color: textColor)),
+      subtitle: subtitle != null
+          ? Text(subtitle, style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textTertiary))
+          : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          trailing,
+          const SizedBox(width: 4),
+          Icon(Icons.chevron_right, color: AppColors.textTertiary, size: 18),
+        ],
       ),
     );
   }
 
-  Widget _buildSwitchTile({
+  Widget _switchTile({
     required IconData icon,
     required String title,
+    String? subtitle,
     required bool value,
     required Function(bool) onChanged,
+    required Color textColor,
+    Color activeColor = AppColors.primary,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: AppColors.lightBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+    return ListTile(
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: Colors.white, size: 18),
       ),
-      child: ListTile(
-        leading: Icon(icon, color: AppColors.primary),
-        title: Text(
-          title,
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        trailing: Switch(
-          value: value,
-          onChanged: onChanged,
-          activeThumbColor: AppColors.primary,
-          activeTrackColor: AppColors.primaryLight,
-        ),
+      title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14, color: textColor)),
+      subtitle: subtitle != null
+          ? Text(subtitle, style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textTertiary))
+          : null,
+      trailing: Switch(
+        value: value,
+        onChanged: onChanged,
+        activeColor: Colors.white,
+        activeTrackColor: activeColor,
+        inactiveThumbColor: Colors.white,
+        inactiveTrackColor: Colors.grey.shade300,
       ),
     );
   }
 
-  Widget _buildAboutTile(String title, String value) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.lightBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
+  Widget _aboutRow(String label, String value, Color textColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
-          ),
+          Text(label, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14, color: textColor)),
+          Text(value, style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textTertiary)),
         ],
+      ),
+    );
+  }
+
+  Widget _gradientButton({
+    required IconData icon,
+    required String label,
+    required List<Color> colors,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: colors),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [BoxShadow(color: colors.first.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 5))],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Text(label, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+          ],
+        ),
       ),
     );
   }
@@ -285,60 +321,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: AppColors.whiteBg,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text('Qualité vidéo', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
-          content: RadioGroup<String>(
-            groupValue: _videoQuality,
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _videoQuality = value);
-                setDialogState(() {});
-                Navigator.pop(ctx);
-                _errorHandler.showSuccessSnackBar(context, '✅ Qualité vidéo: $value');
-              }
-            },
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: ['Basse', 'Moyenne', 'Haute', 'Très haute']
-                  .map((q) => RadioListTile<String>(
-                        title: Text(q, style: GoogleFonts.poppins()),
-                        value: q,
-                      ))
-                  .toList(),
-            ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: ['Basse', 'Moyenne', 'Haute', 'Très haute'].map((q) {
+              return RadioListTile<String>(
+                title: Text(q, style: GoogleFonts.poppins()),
+                value: q,
+                groupValue: _videoQuality,
+                activeColor: AppColors.primary,
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _videoQuality = val);
+                    setDialogState(() {});
+                    Navigator.pop(ctx);
+                    _errorHandler.showSuccessSnackBar(context, '✅ Qualité: $val');
+                  }
+                },
+              );
+            }).toList(),
           ),
         ),
       ),
     );
   }
 
-  void _showLanguageDialog() {
+  void _showLanguageDialog(LocaleProvider localeProvider) {
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: AppColors.whiteBg,
-          title: Text('Langue', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
-          content: RadioGroup<String>(
-            groupValue: _selectedLanguage,
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _selectedLanguage = value);
-                setDialogState(() {});
-                Navigator.pop(ctx);
-                _errorHandler.showSuccessSnackBar(context, '✅ Langue: $value');
-              }
-            },
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: ['Français', 'English', 'Español', 'Deutsch']
-                  .map((lang) => RadioListTile<String>(
-                        title: Text(lang, style: GoogleFonts.poppins()),
-                        value: lang,
-                      ))
-                  .toList(),
-            ),
-          ),
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Langue', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: LocaleProvider.languages.keys.map((lang) {
+            return RadioListTile<String>(
+              title: Text(lang, style: GoogleFonts.poppins()),
+              value: lang,
+              groupValue: localeProvider.languageLabel,
+              activeColor: AppColors.secondary,
+              onChanged: (val) {
+                if (val != null) {
+                  context.read<LocaleProvider>().setLanguage(val);
+                  Navigator.pop(ctx);
+                  _errorHandler.showSuccessSnackBar(context, '✅ Langue: $val');
+                }
+              },
+            );
+          }).toList(),
         ),
       ),
     );

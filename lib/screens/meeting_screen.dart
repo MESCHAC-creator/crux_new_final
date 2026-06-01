@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
-import '../services/jitsi_service.dart';
+import '../services/meeting_launch_service.dart';
 import '../services/meeting_service.dart';
 import '../models/meeting_model.dart';
 
@@ -28,180 +29,262 @@ class MeetingScreen extends StatefulWidget {
 }
 
 class _MeetingScreenState extends State<MeetingScreen> {
-  final _jitsi = JitsiService();
+  final _launchService = MeetingLaunchService();
   final _meetingService = MeetingService();
-
-  bool _isJoining = true;
+  bool _isLaunching = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _join();
+    _prepare();
   }
 
-  Future<void> _join() async {
+  Future<void> _prepare() async {
     try {
       await _meetingService.addParticipant(widget.meetingId, widget.userId);
       if (widget.isHost) {
         await _meetingService.updateMeetingStatus(widget.meetingId, MeetingStatus.ongoing);
       }
+    } catch (_) {
+      // Firestore errors don't block the video call
+    }
+  }
 
-      await _jitsi.joinMeeting(
+  Future<void> _launchMeeting() async {
+    setState(() { _isLaunching = true; _error = null; });
+    try {
+      await _launchService.joinMeeting(
         meetingId: widget.meetingId,
         displayName: widget.userName,
         email: widget.userEmail,
       );
-
-      if (mounted) setState(() => _isJoining = false);
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isJoining = false;
-          _error = e.toString().replaceFirst('Exception: ', '');
-        });
-      }
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isLaunching = false);
     }
   }
 
-  @override
-  void dispose() {
+  void _copyId() {
+    Clipboard.setData(ClipboardData(text: widget.meetingId));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('ID copié !', style: GoogleFonts.poppins()),
+        backgroundColor: AppColors.success,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _endMeeting() {
     _meetingService.removeParticipant(widget.meetingId, widget.userId);
     if (widget.isHost) {
       _meetingService.updateMeetingStatus(widget.meetingId, MeetingStatus.ended);
     }
-    super.dispose();
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: _buildBody(),
-      ),
-    );
-  }
-
-  Widget _buildBody() {
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: AppColors.error, size: 64),
-              const SizedBox(height: 16),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-                child: Text(
-                  'Retour',
-                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A1A2E), Color(0xFF16213E), Color(0xFF0F3460)],
           ),
         ),
-      );
-    }
-
-    if (_isJoining) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
-            const SizedBox(height: 20),
-            Text(
-              'Connexion à la réunion...',
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.meetingName,
-              style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Jitsi launched in its own UI — show a minimal overlay with back option
-    return Stack(
-      children: [
-        Container(
-          color: const Color(0xFF1A1A2E),
-          child: Center(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(40),
-                    border: Border.all(color: AppColors.primary, width: 2),
-                  ),
-                  child: const Icon(Icons.video_call, color: AppColors.primary, size: 40),
+                // Header
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: _endMeeting,
+                      icon: const Icon(Icons.arrow_back_ios, color: Colors.white70),
+                    ),
+                    Expanded(
+                      child: Text(
+                        widget.meetingName,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (widget.isHost)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.primary, width: 1),
+                        ),
+                        child: Text(
+                          'HÔTE',
+                          style: GoogleFonts.poppins(
+                            color: AppColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  widget.meetingName,
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
+                const Spacer(),
+
+                // Main card
+                Container(
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
+                  ),
+                  child: Column(
+                    children: [
+                      // Avatar
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          gradient: AppColors.primaryGradient,
+                          borderRadius: BorderRadius.circular(45),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.4),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.videocam, color: Colors.white, size: 44),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Réunion prête',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Appuyez sur "Rejoindre" pour ouvrir la visioconférence dans votre navigateur.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white60,
+                          fontSize: 13,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Meeting ID box
+                      GestureDetector(
+                        onTap: _copyId,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.tag, color: Colors.white54, size: 16),
+                              const SizedBox(width: 8),
+                              Text(
+                                widget.meetingId.length > 16
+                                    ? widget.meetingId.substring(0, 16)
+                                    : widget.meetingId,
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.copy, color: Colors.white38, size: 14),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      if (_error != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(color: AppColors.error, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                const Spacer(),
+
+                // Join button
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLaunching ? null : _launchMeeting,
+                    icon: _isLaunching
+                        ? const SizedBox(
+                            width: 20, height: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.open_in_browser, size: 22),
+                    label: Text(
+                      _isLaunching ? 'Ouverture...' : 'Rejoindre la réunion',
+                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 8,
+                      shadowColor: AppColors.primary.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: _endMeeting,
+                  icon: const Icon(Icons.exit_to_app, color: Colors.white38, size: 18),
+                  label: Text(
+                    'Quitter sans rejoindre',
+                    style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Réunion en cours dans Jitsi',
-                  style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'ID: ${widget.meetingId.substring(0, widget.meetingId.length > 12 ? 12 : widget.meetingId.length)}...',
-                  style: GoogleFonts.poppins(color: Colors.white38, fontSize: 12),
-                ),
               ],
             ),
           ),
         ),
-        Positioned(
-          bottom: 32,
-          left: 24,
-          right: 24,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              _jitsi.hangUp();
-              Navigator.pop(context);
-            },
-            icon: const Icon(Icons.call_end),
-            label: Text(
-              'Quitter la réunion',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 16),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              minimumSize: const Size(double.infinity, 52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
