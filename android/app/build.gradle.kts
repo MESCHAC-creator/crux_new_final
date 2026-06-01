@@ -8,7 +8,7 @@ apply(plugin = "com.google.gms.google-services")
 
 android {
     namespace = "com.cruxapp.mobile"
-    compileSdk = 34
+    compileSdk = 35
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -22,7 +22,7 @@ android {
     defaultConfig {
         applicationId = "com.cruxapp.mobile"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
         multiDexEnabled = true
