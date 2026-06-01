@@ -45,7 +45,7 @@ dependencies:
   # Premium UI
   flutter_animate: ^4.2.0
 
-  # In-app video calling (native WebRTC + Firebase signaling)
+  # In-app video calling (Agora native SDK — no external signaling needed)
   agora_rtc_engine: ^6.3.2
 
 dev_dependencies:
