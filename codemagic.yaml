@@ -1,4 +1,8 @@
 workflows:
+
+  # ═══════════════════════════════════════════════════════
+  #  ANDROID RELEASE
+  # ═══════════════════════════════════════════════════════
   android-release:
     name: Android Release - CRUX
     instance_type: linux
@@ -7,6 +11,8 @@ workflows:
     environment:
       flutter: 3.24.5
       java: 17
+      groups:
+        - firebase_deploy   # contient FIREBASE_TOKEN (optionnel)
 
     scripts:
       - name: Set up local.properties
@@ -18,61 +24,80 @@ workflows:
       - name: Get Flutter packages
         script: flutter pub get
 
-      - name: Lock AGP 8.7.0 and patch afterEvaluate
+      - name: Pre-install NDK + patch afterEvaluate + clear Gradle cache
         script: |
           set -e
           FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
+          PUB_CACHE="${PUB_CACHE:-$HOME/.pub-cache}"
 
-          # Re-pin AGP to 8.7.0 in case Flutter pub get upgraded it
-          sed -i 's/id("com.android.application") version "[^"]*"/id("com.android.application") version "8.7.0"/' android/settings.gradle.kts
-          sed -i 's/id("com.android.library") version "[^"]*"/id("com.android.library") version "8.7.0"/' android/settings.gradle.kts
-
-          # Re-ensure android.newDsl=false
+          # ── 1. Lock AGP 8.1.4 + Gradle 8.4 ──────────────────────────────
+          sed -i 's/id("com.android.application") version "[^"]*"/id("com.android.application") version "8.1.4"/' android/settings.gradle.kts
+          sed -i 's/id("com.android.library") version "[^"]*"/id("com.android.library") version "8.1.4"/' android/settings.gradle.kts
+          sed -i 's|gradle-[0-9.]*-bin.zip|gradle-8.4-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
           grep -q "^android.newDsl=false" android/gradle.properties || echo "android.newDsl=false" >> android/gradle.properties
+          echo "AGP 8.1.4 + Gradle 8.4 set"
 
-          echo "=== settings.gradle.kts AGP version ==="
-          grep "com.android.application\|com.android.library" android/settings.gradle.kts
-          echo "=== gradle.properties ==="
-          cat android/gradle.properties
+          # ── 2. Pre-install NDK 25.1.8937393 (Agora requirement) ──────────
+          # Without this, Agora downloads NDK mid-Gradle-evaluation which
+          # corrupts project state and causes Flutter's afterEvaluate to fail
+          ANDROID_SDK="${ANDROID_SDK_ROOT:-/usr/local/share/android-sdk}"
+          if [ ! -d "$ANDROID_SDK/ndk/25.1.8937393" ]; then
+            yes | "$ANDROID_SDK/cmdline-tools/latest/bin/sdkmanager" "ndk;25.1.8937393" 2>/dev/null || \
+            yes | "$ANDROID_SDK/cmdline-tools/latest-2/bin/sdkmanager" "ndk;25.1.8937393" 2>/dev/null || \
+            yes | sdkmanager "ndk;25.1.8937393" 2>/dev/null || true
+          fi
+          echo "NDK pre-install done"
 
-          # Patch Flutter Gradle plugin source for afterEvaluate timing fix
-          echo 'aW1wb3J0IHJlLCBzeXMsIGdsb2IsIG9zCgpmbHV0dGVyX3NkayA9IHN5cy5hcmd2WzFdCmdyYWRsZV9zcmMgPSBvcy5wYXRoLmpvaW4oZmx1dHRlcl9zZGssICJwYWNrYWdlcy9mbHV0dGVyX3Rvb2xzL2dyYWRsZS9zcmMvbWFpbi9rb3RsaW4iKQoKZGVmIHBhdGNoX2ZpbGUoZmlsZXBhdGgpOgogICAgd2l0aCBvcGVuKGZpbGVwYXRoKSBhcyBmOgogICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQogICAgcGF0dGVybiA9IHJlLmNvbXBpbGUociIoXGJcdyspXC5hZnRlckV2YWx1YXRlIFx7IikKICAgIGlmIG5vdCBwYXR0ZXJuLnNlYXJjaChjb250ZW50KToKICAgICAgICByZXR1cm4gRmFsc2UKICAgIHJlc3VsdCA9IFtdCiAgICBpID0gMAogICAgd2hpbGUgaSA8IGxlbihjb250ZW50KToKICAgICAgICBtID0gcGF0dGVybi5zZWFyY2goY29udGVudCwgaSkKICAgICAgICBpZiBub3QgbToKICAgICAgICAgICAgcmVzdWx0LmFwcGVuZChjb250ZW50W2k6XSkKICAgICAgICAgICAgYnJlYWsKICAgICAgICByZXN1bHQuYXBwZW5kKGNvbnRlbnRbaTptLnN0YXJ0KCldKQogICAgICAgIHZhcm5hbWUgPSBtLmdyb3VwKDEpCiAgICAgICAgZGVwdGggPSAxCiAgICAgICAgaiA9IG0uZW5kKCkKICAgICAgICB3aGlsZSBqIDwgbGVuKGNvbnRlbnQpIGFuZCBkZXB0aCA+IDA6CiAgICAgICAgICAgIGMgPSBjb250ZW50W2pdCiAgICAgICAgICAgIGlmIGMgPT0gInsiOiBkZXB0aCArPSAxCiAgICAgICAgICAgIGVsaWYgYyA9PSAifSI6IGRlcHRoIC09IDEKICAgICAgICAgICAgaiArPSAxCiAgICAgICAgYm9keSA9IGNvbnRlbnRbbS5lbmQoKTpqLTFdCiAgICAgICAgcmVwbGFjZW1lbnQgPSAoCiAgICAgICAgICAgICJpZiAoIiArIHZhcm5hbWUgKyAiLnN0YXRlLmV4ZWN1dGVkKSB7CiIgKyBib2R5ICsgIgp9IGVsc2UgewoiCiAgICAgICAgICAgICsgdmFybmFtZSArICIuYWZ0ZXJFdmFsdWF0ZSB7CiIgKyBib2R5ICsgIgp9Cn0iCiAgICAgICAgKQogICAgICAgIHJlc3VsdC5hcHBlbmQocmVwbGFjZW1lbnQpCiAgICAgICAgaSA9IGoKICAgIG5ld19jb250ZW50ID0gIiIuam9pbihyZXN1bHQpCiAgICBpZiBuZXdfY29udGVudCAhPSBjb250ZW50OgogICAgICAgIHdpdGggb3BlbihmaWxlcGF0aCwgInciKSBhcyBmOgogICAgICAgICAgICBmLndyaXRlKG5ld19jb250ZW50KQogICAgICAgIHByaW50KCJQQVRDSEVEOiAiICsgb3MucGF0aC5iYXNlbmFtZShmaWxlcGF0aCkpCiAgICAgICAgcmV0dXJuIFRydWUKICAgIHJldHVybiBGYWxzZQoKcGF0Y2hlZCA9IDAKZm9yIGYgaW4gc29ydGVkKGdsb2IuZ2xvYihncmFkbGVfc3JjICsgIi8qKi8qLmt0IiwgcmVjdXJzaXZlPVRydWUpKToKICAgIGlmICIvdGVzdC8iIG5vdCBpbiBmIGFuZCBwYXRjaF9maWxlKGYpOgogICAgICAgIHBhdGNoZWQgKz0gMQpwcmludCgiRmlsZXMgcGF0Y2hlZDogIiArIHN0cihwYXRjaGVkKSkK' | base64 -d > /tmp/patch_flutter.py
-          python3 /tmp/patch_flutter.py "$FLUTTER_SDK"
+          # ── 3. Patch Flutter tools Kotlin files (base64-encoded, no YAML indent issue) ──
+          echo 'aW1wb3J0IHJlLCBzeXMsIGdsb2IsIG9zCgpmbHV0dGVyX3NkayA9IHN5cy5hcmd2WzFdCmdyYWRsZV9zcmMgPSBvcy5wYXRoLmpvaW4oZmx1dHRlcl9zZGssICJwYWNrYWdlcy9mbHV0dGVyX3Rvb2xzL2dyYWRsZS9zcmMvbWFpbi9rb3RsaW4iKQoKZGVmIHBhdGNoX2ZpbGUoZmlsZXBhdGgpOgogICAgd2l0aCBvcGVuKGZpbGVwYXRoKSBhcyBmOgogICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQogICAgcGF0dGVybiA9IHJlLmNvbXBpbGUociIoXGJcdyspXC5hZnRlckV2YWx1YXRlIFx7IikKICAgIGlmIG5vdCBwYXR0ZXJuLnNlYXJjaChjb250ZW50KToKICAgICAgICByZXR1cm4gRmFsc2UKICAgIHJlc3VsdCA9IFtdCiAgICBpID0gMAogICAgd2hpbGUgaSA8IGxlbihjb250ZW50KToKICAgICAgICBtID0gcGF0dGVybi5zZWFyY2goY29udGVudCwgaSkKICAgICAgICBpZiBub3QgbToKICAgICAgICAgICAgcmVzdWx0LmFwcGVuZChjb250ZW50W2k6XSkKICAgICAgICAgICAgYnJlYWsKICAgICAgICByZXN1bHQuYXBwZW5kKGNvbnRlbnRbaTptLnN0YXJ0KCldKQogICAgICAgIHZhcm5hbWUgPSBtLmdyb3VwKDEpCiAgICAgICAgZGVwdGggPSAxCiAgICAgICAgaiA9IG0uZW5kKCkKICAgICAgICB3aGlsZSBqIDwgbGVuKGNvbnRlbnQpIGFuZCBkZXB0aCA+IDA6CiAgICAgICAgICAgIGMgPSBjb250ZW50W2pdCiAgICAgICAgICAgIGlmIGMgPT0gInsiOiBkZXB0aCArPSAxCiAgICAgICAgICAgIGVsaWYgYyA9PSAifSI6IGRlcHRoIC09IDEKICAgICAgICAgICAgaiArPSAxCiAgICAgICAgYm9keSA9IGNvbnRlbnRbbS5lbmQoKTpqLTFdCiAgICAgICAgcmVwbGFjZW1lbnQgPSAiaWYgKCIgKyB2YXJuYW1lICsgIi5zdGF0ZS5leGVjdXRlZCkge1xuIiArIGJvZHkgKyAiXG59IGVsc2Uge1xuIiArIHZhcm5hbWUgKyAiLmFmdGVyRXZhbHVhdGUge1xuIiArIGJvZHkgKyAiXG59XG59IgogICAgICAgIHJlc3VsdC5hcHBlbmQocmVwbGFjZW1lbnQpCiAgICAgICAgaSA9IGoKICAgIG5ld19jb250ZW50ID0gIiIuam9pbihyZXN1bHQpCiAgICBpZiBuZXdfY29udGVudCAhPSBjb250ZW50OgogICAgICAgIHdpdGggb3BlbihmaWxlcGF0aCwgInciKSBhcyBmOgogICAgICAgICAgICBmLndyaXRlKG5ld19jb250ZW50KQogICAgICAgIHByaW50KCJQQVRDSEVEIEtUOiAiICsgb3MucGF0aC5iYXNlbmFtZShmaWxlcGF0aCkpCiAgICAgICAgcmV0dXJuIFRydWUKICAgIHJldHVybiBGYWxzZQoKcGF0Y2hlZCA9IDAKZm9yIGYgaW4gc29ydGVkKGdsb2IuZ2xvYihncmFkbGVfc3JjICsgIi8qKi8qLmt0IiwgcmVjdXJzaXZlPVRydWUpKToKICAgIGlmICIvdGVzdC8iIG5vdCBpbiBmIGFuZCBwYXRjaF9maWxlKGYpOgogICAgICAgIHBhdGNoZWQgKz0gMQpwcmludCgiS290bGluIGZpbGVzIHBhdGNoZWQ6ICIgKyBzdHIocGF0Y2hlZCkpCg==' | base64 -d > /tmp/patch_kt.py
+          python3 /tmp/patch_kt.py "$FLUTTER_SDK"
+
+          # ── 4. Patch ALL .gradle files in pub cache (covers Agora + any other plugin) ──
+          echo 'aW1wb3J0IHJlLCBzeXMsIGdsb2IsIG9zCgpwdWJfY2FjaGUgPSBzeXMuYXJndlsxXQoKZGVmIHBhdGNoX2ZpbGUoZmlsZXBhdGgpOgogICAgdHJ5OgogICAgICAgIHdpdGggb3BlbihmaWxlcGF0aCwgZW5jb2Rpbmc9InV0Zi04IiwgZXJyb3JzPSJpZ25vcmUiKSBhcyBmOgogICAgICAgICAgICBjb250ZW50ID0gZi5yZWFkKCkKICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgcmV0dXJuIEZhbHNlCiAgICBwYXR0ZXJuID0gcmUuY29tcGlsZShyIig/PCFcdylhZnRlckV2YWx1YXRlXHMqXHsiKQogICAgaWYgbm90IHBhdHRlcm4uc2VhcmNoKGNvbnRlbnQpOgogICAgICAgIHJldHVybiBGYWxzZQogICAgcmVzdWx0ID0gW10KICAgIGkgPSAwCiAgICB3aGlsZSBpIDwgbGVuKGNvbnRlbnQpOgogICAgICAgIG0gPSBwYXR0ZXJuLnNlYXJjaChjb250ZW50LCBpKQogICAgICAgIGlmIG5vdCBtOgogICAgICAgICAgICByZXN1bHQuYXBwZW5kKGNvbnRlbnRbaTpdKQogICAgICAgICAgICBicmVhawogICAgICAgIHJlc3VsdC5hcHBlbmQoY29udGVudFtpOm0uc3RhcnQoKV0pCiAgICAgICAgZGVwdGggPSAxCiAgICAgICAgaiA9IG0uZW5kKCkKICAgICAgICB3aGlsZSBqIDwgbGVuKGNvbnRlbnQpIGFuZCBkZXB0aCA+IDA6CiAgICAgICAgICAgIGlmIGNvbnRlbnRbal0gPT0gInsiOiBkZXB0aCArPSAxCiAgICAgICAgICAgIGVsaWYgY29udGVudFtqXSA9PSAifSI6IGRlcHRoIC09IDEKICAgICAgICAgICAgaiArPSAxCiAgICAgICAgYm9keSA9IGNvbnRlbnRbbS5lbmQoKTpqLTFdCiAgICAgICAgcmVwbGFjZW1lbnQgPSAiaWYgKHByb2plY3Quc3RhdGUuZXhlY3V0ZWQpIHsiICsgYm9keSArICJcbn0gZWxzZSB7XG5hZnRlckV2YWx1YXRlIHsiICsgYm9keSArICJcbn1cbn0iCiAgICAgICAgcmVzdWx0LmFwcGVuZChyZXBsYWNlbWVudCkKICAgICAgICBpID0gagogICAgbmV3X2NvbnRlbnQgPSAiIi5qb2luKHJlc3VsdCkKICAgIGlmIG5ld19jb250ZW50ICE9IGNvbnRlbnQ6CiAgICAgICAgdHJ5OgogICAgICAgICAgICB3aXRoIG9wZW4oZmlsZXBhdGgsICJ3IiwgZW5jb2Rpbmc9InV0Zi04IikgYXMgZjoKICAgICAgICAgICAgICAgIGYud3JpdGUobmV3X2NvbnRlbnQpCiAgICAgICAgICAgIHByaW50KCJQQVRDSEVEIEdSQURMRTogIiArIG9zLnBhdGgucmVscGF0aChmaWxlcGF0aCwgcHViX2NhY2hlKSkKICAgICAgICAgICAgcmV0dXJuIFRydWUKICAgICAgICBleGNlcHQgRXhjZXB0aW9uOgogICAgICAgICAgICByZXR1cm4gRmFsc2UKICAgIHJldHVybiBGYWxzZQoKcGF0Y2hlZCA9IDAKZm9yIGV4dCBpbiBbIiouZ3JhZGxlIiwgIiouZ3JhZGxlLmt0cyJdOgogICAgZm9yIGYgaW4gZ2xvYi5nbG9iKHB1Yl9jYWNoZSArICIvKiovIiArIGV4dCwgcmVjdXJzaXZlPVRydWUpOgogICAgICAgIGlmICIvdGVzdC8iIG5vdCBpbiBmIGFuZCBwYXRjaF9maWxlKGYpOgogICAgICAgICAgICBwYXRjaGVkICs9IDEKcHJpbnQoIkdyYWRsZSBmaWxlcyBwYXRjaGVkOiAiICsgc3RyKHBhdGNoZWQpKQo=' | base64 -d > /tmp/patch_gradle.py
+          python3 /tmp/patch_gradle.py "$PUB_CACHE"
+
+          # ── 5. Clear compiled caches so patched source is compiled fresh ──
           rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/" 2>/dev/null || true
           rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/" 2>/dev/null || true
-          echo "Patch done"
+          rm -rf "$HOME/.gradle/caches/build-cache-"* 2>/dev/null || true
+          rm -rf "$HOME/.gradle/caches/"*"/executionHistory" 2>/dev/null || true
+          echo "All patches applied and caches cleared"
+
+      - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
+        script: |
+          if [ -n "$FIREBASE_TOKEN" ]; then
+            npm install -g firebase-tools --silent
+            firebase deploy --only firestore:rules \
+              --project crux-8aa85 \
+              --token "$FIREBASE_TOKEN" \
+              --non-interactive
+            echo "✅ Règles Firestore déployées"
+          else
+            echo "⏭️  FIREBASE_TOKEN absent — build OK"
+          fi
 
       - name: Generate app icons
-        script: dart run flutter_launcher_icons
+        script: dart run flutter_launcher_icons -f flutter_launcher_icons_android.yaml
 
       - name: Build APK and AAB
         script: |
           set -e
           mkdir -p build/outputs
-
-          # Final guard: re-apply newDsl=false right before gradle runs
-          grep -q "^android.newDsl=false" android/gradle.properties || echo "android.newDsl=false" >> android/gradle.properties
-
-          flutter build apk --release --android-skip-build-dependency-validation || true
-
-          echo "=== APK search ==="
-          find . -type f -name "*.apk" 2>/dev/null | grep -v ".pub-cache" || echo "(none)"
-
+          flutter build apk --release --android-skip-build-dependency-validation
           APK=$(find . -type f -name "*.apk" ! -name "*unsigned*" 2>/dev/null | grep -v ".pub-cache" | head -1)
           if [ -n "$APK" ]; then
             cp "$APK" build/outputs/crux-release.apk
             echo "✅ APK: $APK ($(du -sh "$APK" | cut -f1))"
           else
-            echo "❌ No APK found."
-            exit 1
+            echo "❌ No APK found."; exit 1
           fi
-
-          flutter build appbundle --release --android-skip-build-dependency-validation || true
-
+          flutter build appbundle --release --android-skip-build-dependency-validation
           AAB=$(find . -type f -name "*.aab" 2>/dev/null | grep -v ".pub-cache" | head -1)
           if [ -n "$AAB" ]; then
             cp "$AAB" build/outputs/crux-release.aab
             echo "✅ AAB: $AAB ($(du -sh "$AAB" | cut -f1))"
+          else
+            echo "❌ No AAB found."; exit 1
           fi
 
     artifacts:
@@ -86,3 +111,98 @@ workflows:
         notify:
           success: true
           failure: true
+
+  # ═══════════════════════════════════════════════════════
+  #  iOS RELEASE
+  # ═══════════════════════════════════════════════════════
+  ios-release:
+    name: iOS Release - CRUX
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+    integrations:
+      app_store_connect: codemagic_api_key
+
+    environment:
+      flutter: 3.24.5
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.example.crux
+      groups:
+        - firebase_ios
+        - firebase_deploy
+
+    scripts:
+      - name: Generate iOS project files
+        script: |
+          if [ ! -d "ios" ]; then
+            flutter create --platforms ios --org com.example --project-name crux .
+            echo "✅ iOS folder generated"
+          else
+            echo "✅ iOS folder already exists"
+          fi
+
+      - name: Inject GoogleService-Info.plist
+        script: |
+          if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
+            echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            echo "✅ GoogleService-Info.plist injecté"
+          else
+            echo "⚠️  GOOGLE_SERVICE_INFO_PLIST non défini"
+          fi
+
+      - name: Patch Info.plist permissions
+        script: |
+          PLIST="ios/Runner/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'CRUX a besoin de la caméra pour les vidéoconférences'" "$PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 'CRUX a besoin de la caméra pour les vidéoconférences'" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'CRUX a besoin du microphone pour les appels'" "$PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :NSMicrophoneUsageDescription 'CRUX a besoin du microphone pour les appels'" "$PLIST"
+          echo "✅ Info.plist patché"
+
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
+        script: |
+          if [ -n "$FIREBASE_TOKEN" ]; then
+            npm install -g firebase-tools --silent
+            firebase deploy --only firestore:rules \
+              --project crux-8aa85 \
+              --token "$FIREBASE_TOKEN" \
+              --non-interactive
+            echo "✅ Règles Firestore déployées"
+          else
+            echo "⏭️  FIREBASE_TOKEN absent — build OK"
+          fi
+
+      - name: Generate app icons
+        script: dart run flutter_launcher_icons -f flutter_launcher_icons_ios.yaml
+
+      - name: Install CocoaPods
+        script: |
+          cd ios && pod install --repo-update
+          echo "✅ CocoaPods installé"
+
+      - name: Build iOS IPA
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist \
+            || flutter build ipa --release
+          echo "✅ IPA buildé"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+
+    publishing:
+      email:
+        recipients:
+          - kouakouchristevann@gmail.com
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

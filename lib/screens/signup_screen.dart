@@ -238,9 +238,9 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                               child: Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.15),
+                                  color: Colors.white.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                                  border: Border.all(color: Colors.white.withOpacity(0.3)),
                                 ),
                                 child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
                               ),
@@ -263,12 +263,12 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.1),
+                            color: Colors.white.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(28),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                            border: Border.all(color: Colors.white.withOpacity(0.25)),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.3),
+                                color: Colors.black.withOpacity(0.3),
                                 blurRadius: 30,
                                 offset: const Offset(0, 10),
                               ),
@@ -401,7 +401,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
               borderRadius: BorderRadius.circular(22),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF4081).withValues(alpha: 0.5),
+                  color: const Color(0xFFFF4081).withOpacity(0.5),
                   blurRadius: 20,
                   spreadRadius: 4,
                 ),
@@ -445,7 +445,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFF4081).withValues(alpha: 0.5),
+              color: const Color(0xFFFF4081).withOpacity(0.5),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -584,14 +584,14 @@ class _GlassTextField extends StatelessWidget {
         prefixIcon: Icon(icon, color: Colors.white70, size: 20),
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.12),
+        fillColor: Colors.white.withOpacity(0.12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),

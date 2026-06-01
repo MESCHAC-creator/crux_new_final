@@ -227,7 +227,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             borderRadius: BorderRadius.circular(30),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.25),
+                                color: Colors.black.withOpacity(0.25),
                                 blurRadius: 30,
                                 offset: const Offset(0, 10),
                               ),
@@ -275,9 +275,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
+                      color: Colors.white.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
+                      border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
                     ),
                     child: Column(
                       children: [
@@ -468,8 +468,8 @@ class _FloatingCircle extends StatelessWidget {
             height: sizes[index],
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.06),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1),
+              color: Colors.white.withOpacity(0.06),
+              border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
             ),
           ),
         );
@@ -509,14 +509,14 @@ class _GlassTextField extends StatelessWidget {
         prefixIcon: Icon(icon, color: Colors.white60, size: 20),
         suffixIcon: suffix,
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.12),
+        fillColor: Colors.white.withOpacity(0.12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),

@@ -8,8 +8,7 @@ apply(plugin = "com.google.gms.google-services")
 
 android {
     namespace = "com.example.crux"
-    compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    compileSdk = 34
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -23,7 +22,7 @@ android {
     defaultConfig {
         applicationId = "com.example.crux"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
         multiDexEnabled = true
@@ -65,11 +64,6 @@ flutter {
 }
 
 dependencies {
-    implementation(platform("com.google.firebase:firebase-bom:33.15.0"))
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-firestore")
-    implementation("com.google.firebase:firebase-storage")
-    implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-messaging")
+    // Firebase native deps are managed by the Flutter Firebase plugins — no manual bom needed.
     implementation("androidx.multidex:multidex:2.0.1")
 }

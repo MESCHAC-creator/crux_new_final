@@ -70,7 +70,7 @@ class AppTheme {
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           elevation: 4,
-          shadowColor: AppColors.primary.withValues(alpha: 0.4),
+          shadowColor: AppColors.primary.withOpacity(0.4),
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -134,7 +134,7 @@ class AppTheme {
         }),
       ),
 
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: AppColors.whiteBg,
         elevation: 2,
         shadowColor: Colors.black12,
@@ -180,7 +180,7 @@ class AppTheme {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 4,
-        splashColor: AppColors.primaryDark.withValues(alpha: 0.5),
+        splashColor: AppColors.primaryDark.withOpacity(0.5),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -205,13 +205,13 @@ class AppTheme {
         ),
         iconTheme: const IconThemeData(color: Colors.white, size: 24),
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: const Color(0xFF1A1A1A),
         elevation: 2,
         shadowColor: Colors.black54,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 1),
+          side: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
         ),
       ),
     );

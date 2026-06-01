@@ -5,6 +5,7 @@ import '../theme/colors.dart';
 import '../providers/theme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../services/error_handler_service.dart';
+import '../l10n/app_translations.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -40,7 +41,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         title: Text(
-          'Paramètres',
+          AppTranslations.t('settings', localeProvider.locale.languageCode),
           style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
         ),
         leading: IconButton(
@@ -151,6 +152,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 20),
+
+            _sectionTitle(_legalTitle(localeProvider.locale.languageCode), isDark),
+            _card(
+              cardColor: cardColor,
+              child: Column(
+                children: [
+                  _navTile(
+                    icon: Icons.shield_outlined,
+                    label: AppTranslations.t('privacy_policy', localeProvider.locale.languageCode),
+                    textColor: textColor,
+                    onTap: () => Navigator.pushNamed(context, '/privacy'),
+                  ),
+                  _divider(isDark),
+                  _navTile(
+                    icon: Icons.gavel,
+                    label: AppTranslations.t('terms_of_use', localeProvider.locale.languageCode),
+                    textColor: textColor,
+                    onTap: () => Navigator.pushNamed(context, '/terms'),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 24),
 
             // Support button
@@ -194,7 +218,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: child,
     );
@@ -204,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Divider(
       height: 1,
       indent: 56,
-      color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.15),
+      color: isDark ? Colors.white.withOpacity(0.07) : Colors.grey.withOpacity(0.15),
     );
   }
 
@@ -289,6 +313,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  String _legalTitle(String lang) {
+    switch (lang) {
+      case 'en': return 'Legal';
+      case 'es': return 'Legal';
+      case 'de': return 'Rechtliches';
+      default: return 'Légal';
+    }
+  }
+
+  Widget _navTile({
+    required IconData icon,
+    required String label,
+    required Color textColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: AppColors.primary),
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14, color: textColor))),
+            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _gradientButton({
     required IconData icon,
     required String label,
@@ -302,7 +357,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         decoration: BoxDecoration(
           gradient: LinearGradient(colors: colors),
           borderRadius: BorderRadius.circular(14),
-          boxShadow: [BoxShadow(color: colors.first.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 5))],
+          boxShadow: [BoxShadow(color: colors.first.withOpacity(0.35), blurRadius: 12, offset: const Offset(0, 5))],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -7,6 +7,9 @@ import '../services/auth_service.dart';
 import '../services/meeting_service.dart';
 import '../services/error_handler_service.dart';
 import '../screens/meeting_screen.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/app_translations.dart';
+import 'package:provider/provider.dart';
 
 class HomeScreen extends StatefulWidget {
   final UserModel user;
@@ -44,9 +47,6 @@ class _HomeScreenState extends State<HomeScreen> {
         description: '',
         organizerName: widget.user.name,
         organizerId: widget.user.uid,
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () => throw Exception('Délai dépassé. Vérifiez votre connexion Internet.'),
       );
       _meetingNameController.clear();
       if (!mounted) return;
@@ -229,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         Text(
-                          'Bonjour, ${widget.user.name.split(' ').first} 👋',
+                          '${AppTranslations.t('hello', context.watch<LocaleProvider>().locale.languageCode)}, ${widget.user.name.split(' ').first} 👋',
                           style: GoogleFonts.poppins(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -267,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFE74C3C).withValues(alpha: 0.35),
+                          color: const Color(0xFFE74C3C).withOpacity(0.35),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
@@ -282,7 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
+                                color: Colors.white.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: const Icon(Icons.video_call, color: Colors.white, size: 22),
@@ -311,14 +311,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             hintStyle: GoogleFonts.poppins(color: Colors.white54),
                             prefixIcon: const Icon(Icons.edit, color: Colors.white60, size: 20),
                             filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.15),
+                            fillColor: Colors.white.withOpacity(0.15),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                              borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                              borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
@@ -439,11 +439,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? Colors.white.withValues(alpha: 0.05)
+                          ? Colors.white.withOpacity(0.05)
                           : const Color(0xFFEDE7F6),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AppColors.secondary.withValues(alpha: 0.3),
+                        color: AppColors.secondary.withOpacity(0.3),
                       ),
                     ),
                     child: Row(
@@ -451,7 +451,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: AppColors.secondary.withValues(alpha: 0.15),
+                            color: AppColors.secondary.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(Icons.info_outline, color: AppColors.secondary, size: 20),
@@ -508,12 +508,12 @@ class _ActionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.grey.withValues(alpha: 0.15),
+                ? Colors.white.withOpacity(0.08)
+                : Colors.grey.withOpacity(0.15),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
+              color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
