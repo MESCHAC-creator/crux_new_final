@@ -38,6 +38,8 @@ class AppRoutes {
             meetingId: args?['meetingId'] ?? '',
             meetingName: args?['meetingName'] ?? 'Réunion',
             userId: args?['userId'] ?? '',
+            userName: args?['userName'] ?? 'Utilisateur',
+            userEmail: args?['userEmail'],
             isHost: args?['isHost'] ?? false,
           ),
         );

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:logger/logger.dart';
 import 'services/error_handler_service.dart';
 import 'firebase_options.dart';
@@ -26,24 +25,9 @@ void main() async {
     logger.e('❌ Firebase init: $e');
   }
 
-  // Permissions caméra & micro pour WebRTC
-  await _requestMediaPermissions();
-
   runApp(const MyApp());
 }
 
-Future<void> _requestMediaPermissions() async {
-  try {
-    final statuses = await [
-      Permission.camera,
-      Permission.microphone,
-    ].request();
-    logger.i('📷 Caméra: ${statuses[Permission.camera]}');
-    logger.i('🎤 Micro: ${statuses[Permission.microphone]}');
-  } catch (e) {
-    logger.w('⚠️ Permissions: $e');
-  }
-}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

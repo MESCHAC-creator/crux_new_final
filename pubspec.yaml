@@ -18,8 +18,8 @@ dependencies:
   firebase_storage: ^13.4.1
   firebase_analytics: ^12.4.1
 
-  # WebRTC - VIDEO CONFERENCING (Firebase signaling)
-  flutter_webrtc: ^0.11.0
+  # Jitsi Meet - VIDEO CONFERENCING (free, open-source, no compile issues)
+  jitsi_meet_flutter_sdk: ^10.2.0
 
   # Permissions & Localization
   permission_handler: ^12.0.0
