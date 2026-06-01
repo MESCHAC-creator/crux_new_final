@@ -16,24 +16,6 @@ workflows:
           echo "Flutter SDK path: $FLUTTER_SDK"
           flutter --version
 
-      - name: Patch Flutter Gradle plugin (afterEvaluate -> state.executed guard)
-        script: |
-          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
-          GRADLE_SRC="$FLUTTER_SDK/packages/flutter_tools/gradle/src/main/kotlin"
-
-          echo "=== Scanning for afterEvaluate calls ==="
-          COUNT=$(grep -rn "afterEvaluate" "$GRADLE_SRC" --include="*.kt" 2>/dev/null | grep -v "/test/" | wc -l || echo 0)
-          echo "afterEvaluate occurrences: $COUNT"
-
-          echo 'aW1wb3J0IHJlLCBzeXMsIGdsb2IsIG9zCgpmbHV0dGVyX3NkayA9IHN5cy5hcmd2WzFdCmdyYWRsZV9zcmMgPSBvcy5wYXRoLmpvaW4oZmx1dHRlcl9zZGssICJwYWNrYWdlcy9mbHV0dGVyX3Rvb2xzL2dyYWRsZS9zcmMvbWFpbi9rb3RsaW4iKQoKZGVmIGZpbmRfbWF0Y2hpbmdfYnJhY2UoY29udGVudCwgc3RhcnQpOgogICAgZGVwdGggPSAxCiAgICBqID0gc3RhcnQKICAgIGluX3N0ciA9IEZhbHNlCiAgICBpbl9saW5lX2NvbW1lbnQgPSBGYWxzZQogICAgd2hpbGUgaiA8IGxlbihjb250ZW50KSBhbmQgZGVwdGggPiAwOgogICAgICAgIGMgPSBjb250ZW50W2pdCiAgICAgICAgaWYgaW5fbGluZV9jb21tZW50OgogICAgICAgICAgICBpZiBjID09ICdcbic6CiAgICAgICAgICAgICAgICBpbl9saW5lX2NvbW1lbnQgPSBGYWxzZQogICAgICAgIGVsaWYgaW5fc3RyOgogICAgICAgICAgICBpZiBjID09ICdcXCc6CiAgICAgICAgICAgICAgICBqICs9IDEKICAgICAgICAgICAgZWxpZiBjID09ICciJzoKICAgICAgICAgICAgICAgIGluX3N0ciA9IEZhbHNlCiAgICAgICAgZWxzZToKICAgICAgICAgICAgaWYgaiArIDEgPCBsZW4oY29udGVudCkgYW5kIGNvbnRlbnRbajpqKzJdID09ICcvLyc6CiAgICAgICAgICAgICAgICBpbl9saW5lX2NvbW1lbnQgPSBUcnVlCiAgICAgICAgICAgICAgICBqICs9IDEKICAgICAgICAgICAgZWxpZiBjID09ICciJzoKICAgICAgICAgICAgICAgIGluX3N0ciA9IFRydWUKICAgICAgICAgICAgZWxpZiBjID09ICd7JzoKICAgICAgICAgICAgICAgIGRlcHRoICs9IDEKICAgICAgICAgICAgZWxpZiBjID09ICd9JzoKICAgICAgICAgICAgICAgIGRlcHRoIC09IDEKICAgICAgICBqICs9IDEKICAgIHJldHVybiBqCgpjb3VudCA9IFswXQoKZGVmIHBhdGNoX2ZpbGUoZmlsZXBhdGgpOgogICAgd2l0aCBvcGVuKGZpbGVwYXRoKSBhcyBmOgogICAgICAgIGNvbnRlbnQgPSBmLnJlYWQoKQogICAgcGF0dGVybiA9IHJlLmNvbXBpbGUocicoXGJcdyspXC5hZnRlckV2YWx1YXRlIFx7JykKICAgIGlmIG5vdCBwYXR0ZXJuLnNlYXJjaChjb250ZW50KToKICAgICAgICByZXR1cm4gRmFsc2UKICAgIHJlc3VsdCA9IFtdCiAgICBpID0gMAogICAgd2hpbGUgaSA8IGxlbihjb250ZW50KToKICAgICAgICBtID0gcGF0dGVybi5zZWFyY2goY29udGVudCwgaSkKICAgICAgICBpZiBub3QgbToKICAgICAgICAgICAgcmVzdWx0LmFwcGVuZChjb250ZW50W2k6XSkKICAgICAgICAgICAgYnJlYWsKICAgICAgICB2YXJuYW1lID0gbS5ncm91cCgxKQogICAgICAgIHJlc3VsdC5hcHBlbmQoY29udGVudFtpOm0uc3RhcnQoKV0pCiAgICAgICAgaiA9IGZpbmRfbWF0Y2hpbmdfYnJhY2UoY29udGVudCwgbS5lbmQoKSkKICAgICAgICBib2R5ID0gY29udGVudFttLmVuZCgpOmotMV0KICAgICAgICBjb3VudFswXSArPSAxCiAgICAgICAgbiA9IGNvdW50WzBdCiAgICAgICAgbGJsID0gJ19mbHV0dGVyQUUnICsgc3RyKG4pCiAgICAgICAgYm9keSA9IGJvZHkucmVwbGFjZSgncmV0dXJuQGFmdGVyRXZhbHVhdGUnLCAncmV0dXJuQCcgKyBsYmwpCiAgICAgICAgcmVwbGFjZW1lbnQgPSAoCiAgICAgICAgICAgICdydW4ge1xuJwogICAgICAgICAgICAnICAgIHZhbCAnICsgbGJsICsgJzogUHJvamVjdC4oKSAtPiBVbml0ID0gJyArIGxibCArICdAeycgKyBib2R5ICsgJ31cbicKICAgICAgICAgICAgJyAgICBpZiAoJyArIHZhcm5hbWUgKyAnLnN0YXRlLmV4ZWN1dGVkKSAnICsgdmFybmFtZSArICcuJyArIGxibCArICcoKVxuJwogICAgICAgICAgICAnICAgIGVsc2UgJyArIHZhcm5hbWUgKyAnLmFmdGVyRXZhbHVhdGUoJyArIGxibCArICcpXG4nCiAgICAgICAgICAgICd9JwogICAgICAgICkKICAgICAgICByZXN1bHQuYXBwZW5kKHJlcGxhY2VtZW50KQogICAgICAgIGkgPSBqCiAgICBuZXdfY29udGVudCA9ICcnLmpvaW4ocmVzdWx0KQogICAgaWYgbmV3X2NvbnRlbnQgIT0gY29udGVudDoKICAgICAgICB3aXRoIG9wZW4oZmlsZXBhdGgsICd3JykgYXMgZjoKICAgICAgICAgICAgZi53cml0ZShuZXdfY29udGVudCkKICAgICAgICBwcmludCgnUEFUQ0hFRDogJyArIG9zLnBhdGguYmFzZW5hbWUoZmlsZXBhdGgpKQogICAgICAgIHJldHVybiBUcnVlCiAgICByZXR1cm4gRmFsc2UKCnBhdGNoZWQgPSAwCmZvciBmIGluIHNvcnRlZChnbG9iLmdsb2IoZ3JhZGxlX3NyYyArICcvKiovKi5rdCcsIHJlY3Vyc2l2ZT1UcnVlKSk6CiAgICBpZiAnL3Rlc3QvJyBub3QgaW4gZiBhbmQgcGF0Y2hfZmlsZShmKToKICAgICAgICBwYXRjaGVkICs9IDEKcHJpbnQoJ0ZpbGVzIHBhdGNoZWQ6ICcgKyBzdHIocGF0Y2hlZCkpCg==' | base64 -d > /tmp/patch_flutter.py
-          python3 /tmp/patch_flutter.py "$FLUTTER_SDK"
-
-          echo "=== Clearing compiled Gradle caches ==="
-          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/" 2>/dev/null || true
-          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/" 2>/dev/null || true
-          rm -rf ~/.gradle/caches/ 2>/dev/null || true
-          echo "Done"
-
       - name: Get Flutter packages
         script: flutter pub get
 
@@ -48,32 +30,26 @@ workflows:
           # --- APK ---
           flutter build apk --release --android-skip-build-dependency-validation || true
 
-          echo "=== Searching for APK in ALL possible locations ==="
-          # Flutter output:  build/app/outputs/flutter-apk/
-          # Gradle output:   android/app/build/outputs/apk/
-          find . -name "*.apk" 2>/dev/null | grep -v ".pub-cache" || echo "(none found)"
+          echo "=== APK search ==="
+          find . -type f -name "*.apk" 2>/dev/null | grep -v ".pub-cache" || echo "(none)"
 
-          APK=$(find . -type f -name "*.apk" ! -name "*unsigned*" 2>/dev/null \
-                | grep -v ".pub-cache" | xargs ls -t 2>/dev/null | head -1)
+          APK=$(find . -type f -name "*.apk" ! -name "*unsigned*" 2>/dev/null | grep -v ".pub-cache" | head -1)
 
           if [ -n "$APK" ]; then
             cp "$APK" build/outputs/crux-release.apk
-            echo "✅ APK $(du -sh "$APK" | cut -f1) → build/outputs/crux-release.apk"
+            echo "✅ APK: $APK → build/outputs/crux-release.apk ($(du -sh "$APK" | cut -f1))"
           else
-            echo "❌ APK not found anywhere. Full build tree:"
-            find . -type f -name "*.apk" -o -name "*.aab" 2>/dev/null | grep -v ".pub-cache"
+            echo "❌ No APK found."
             exit 1
           fi
 
           # --- AAB ---
           flutter build appbundle --release --android-skip-build-dependency-validation || true
 
-          AAB=$(find . -type f -name "*.aab" 2>/dev/null \
-                | grep -v ".pub-cache" | xargs ls -t 2>/dev/null | head -1)
-
+          AAB=$(find . -type f -name "*.aab" 2>/dev/null | grep -v ".pub-cache" | head -1)
           if [ -n "$AAB" ]; then
             cp "$AAB" build/outputs/crux-release.aab
-            echo "✅ AAB $(du -sh "$AAB" | cut -f1) → build/outputs/crux-release.aab"
+            echo "✅ AAB: $AAB → build/outputs/crux-release.aab ($(du -sh "$AAB" | cut -f1))"
           fi
 
     artifacts:
