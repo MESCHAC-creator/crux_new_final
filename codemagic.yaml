@@ -16,6 +16,69 @@ workflows:
           echo "Flutter SDK path: $FLUTTER_SDK"
           flutter --version
 
+      - name: Patch Flutter Gradle plugin (afterEvaluate timing fix)
+        script: |
+          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
+          GRADLE_SRC="$FLUTTER_SDK/packages/flutter_tools/gradle/src/main/kotlin"
+
+          python3 - "$FLUTTER_SDK" << 'PYEOF'
+import re, sys, glob, os
+
+flutter_sdk = sys.argv[1]
+gradle_src = os.path.join(flutter_sdk, "packages/flutter_tools/gradle/src/main/kotlin")
+
+def patch_file(filepath):
+    with open(filepath) as f:
+        content = f.read()
+    # Replace: foo.afterEvaluate { BODY }
+    # With:    if (foo.state.executed) { BODY } else { foo.afterEvaluate { BODY } }
+    pattern = re.compile(r'(\b\w+)\.afterEvaluate\s*\{')
+    if not pattern.search(content):
+        return False
+    result = []
+    i = 0
+    while i < len(content):
+        m = pattern.search(content, i)
+        if not m:
+            result.append(content[i:])
+            break
+        result.append(content[i:m.start()])
+        varname = m.group(1)
+        # find matching brace
+        depth = 1
+        j = m.end()
+        while j < len(content) and depth > 0:
+            c = content[j]
+            if c == '{': depth += 1
+            elif c == '}': depth -= 1
+            j += 1
+        body = content[m.end():j-1]
+        replacement = (
+            'if (' + varname + '.state.executed) {\n' + body + '\n} else {\n'
+            + varname + '.afterEvaluate {\n' + body + '\n}\n}'
+        )
+        result.append(replacement)
+        i = j
+    new_content = ''.join(result)
+    if new_content != content:
+        with open(filepath, 'w') as f:
+            f.write(new_content)
+        print('PATCHED: ' + os.path.basename(filepath))
+        return True
+    return False
+
+patched = 0
+for f in sorted(glob.glob(gradle_src + '/**/*.kt', recursive=True)):
+    if '/test/' not in f and patch_file(f):
+        patched += 1
+print('Files patched: ' + str(patched))
+PYEOF
+
+          # Clear compiled Gradle plugin cache so patch takes effect
+          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/build/" 2>/dev/null || true
+          rm -rf "$FLUTTER_SDK/packages/flutter_tools/gradle/.gradle/" 2>/dev/null || true
+          echo "Patch complete"
+
       - name: Get Flutter packages
         script: flutter pub get
 
