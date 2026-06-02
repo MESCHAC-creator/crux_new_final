@@ -1,14 +1,17 @@
 import 'dart:async';
+import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/colors.dart';
+import '../services/meeting_service.dart';
 
 // ─────────────────────────────────────────────
-//  DATA MODEL for floating emoji reactions
+//  MODELS
 // ─────────────────────────────────────────────
 class _Reaction {
   final String emoji;
@@ -21,6 +24,8 @@ class _Reaction {
         bottomOffset = 100,
         opacity = 1.0;
 }
+
+enum _NetQuality { good, fair, poor, unknown }
 
 // ─────────────────────────────────────────────
 //  WIDGET
@@ -41,7 +46,8 @@ class VideoCallScreen extends StatefulWidget {
   State<VideoCallScreen> createState() => _VideoCallScreenState();
 }
 
-class _VideoCallScreenState extends State<VideoCallScreen> {
+class _VideoCallScreenState extends State<VideoCallScreen>
+    with TickerProviderStateMixin {
   // ── WebRTC ──────────────────────────────────
   final _localRenderer = RTCVideoRenderer();
   final _remoteRenderer = RTCVideoRenderer();
@@ -58,11 +64,26 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   bool _sharingScreen = false;
   bool _showChat = false;
   bool _showEmojiBar = false;
+  bool _isLocked = false;
+  bool _speakerOn = true;
   String? _error;
   String _loadingStep = 'Démarrage...';
 
+  // ── Network quality ──────────────────────────
+  _NetQuality _netQuality = _NetQuality.unknown;
+  Timer? _statsTimer;
+
+  // ── Call timer ───────────────────────────────
+  Timer? _callTimer;
+  int _callSeconds = 0;
+
+  // ── Auto-reconnect ───────────────────────────
+  int _reconnectAttempts = 0;
+  static const _maxReconnect = 3;
+  Timer? _reconnectTimer;
+
   // ── Chat / Notes ─────────────────────────────
-  int _chatTab = 0; // 0 = Chat, 1 = Notes
+  int _chatTab = 0;
   final _chatController = TextEditingController();
   final _chatScrollController = ScrollController();
   final _notesController = TextEditingController();
@@ -74,8 +95,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   StreamSubscription? _callSub;
   StreamSubscription? _candidateSub;
   StreamSubscription<QuerySnapshot>? _reactionSub;
+  StreamSubscription? _lockSub;
 
   final _db = FirebaseFirestore.instance;
+  final _meetingService = MeetingService();
 
   String get _docId =>
       'room_${widget.meetingId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
@@ -86,6 +109,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         'urls': [
           'stun:stun.l.google.com:19302',
           'stun:stun1.l.google.com:19302',
+          'stun:stun2.l.google.com:19302',
         ]
       },
     ],
@@ -103,6 +127,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     ]);
     _init();
     _listenReactions();
+    _listenLock();
   }
 
   @override
@@ -111,6 +136,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _callSub?.cancel();
     _candidateSub?.cancel();
     _reactionSub?.cancel();
+    _lockSub?.cancel();
+    _callTimer?.cancel();
+    _statsTimer?.cancel();
+    _reconnectTimer?.cancel();
     _chatController.dispose();
     _chatScrollController.dispose();
     _notesController.dispose();
@@ -151,16 +180,21 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       }
 
       if (mounted) setState(() => _loadingStep = 'Démarrage caméra...');
+
+      // Read quality preference
+      final prefs = await SharedPreferences.getInstance();
+      final quality = prefs.getString('crux_video_quality') ?? 'HD (720p)';
+      final constraints = _videoConstraints(quality);
+
       _localStream = await navigator.mediaDevices.getUserMedia({
         'audio': true,
-        'video': {'facingMode': 'user', 'width': 640, 'height': 480},
+        'video': constraints,
       }).timeout(
         const Duration(seconds: 20),
         onTimeout: () =>
             throw TimeoutException('Impossible d\'accéder à la caméra.'),
       );
 
-      // ⚡ Show local camera immediately — don't wait for signaling
       if (mounted) {
         setState(() {
           _localRenderer.srcObject = _localStream;
@@ -180,6 +214,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             _remoteRenderer.srcObject = event.streams[0];
             _remoteConnected = true;
           });
+          _startCallTimer();
+          _startStatsMonitor();
+          _reconnectAttempts = 0;
         }
       };
 
@@ -187,18 +224,38 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         if (!mounted) return;
         if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
           setState(() => _remoteConnected = true);
+          _startCallTimer();
+          _startStatsMonitor();
+          _reconnectAttempts = 0;
         } else if (state ==
                 RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
             state ==
                 RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
-          setState(() => _remoteConnected = false);
+          setState(() {
+            _remoteConnected = false;
+            _netQuality = _NetQuality.poor;
+          });
+          _attemptReconnect();
+        }
+      };
+
+      _pc!.onIceConnectionState = (state) {
+        if (!mounted) return;
+        if (state == RTCIceConnectionState.RTCIceConnectionStateChecking) {
+          setState(() => _netQuality = _NetQuality.fair);
+        } else if (state ==
+            RTCIceConnectionState.RTCIceConnectionStateConnected) {
+          setState(() => _netQuality = _NetQuality.good);
+        } else if (state ==
+                RTCIceConnectionState.RTCIceConnectionStateFailed ||
+            state == RTCIceConnectionState.RTCIceConnectionStateDisconnected) {
+          setState(() => _netQuality = _NetQuality.poor);
         }
       };
 
       _pc!.onIceCandidate = (c) {
         if (c.candidate == null) return;
-        final col =
-            widget.isHost ? 'offerCandidates' : 'answerCandidates';
+        final col = widget.isHost ? 'offerCandidates' : 'answerCandidates';
         _db
             .collection('webrtc_rooms')
             .doc(_docId)
@@ -223,6 +280,100 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         });
       }
     }
+  }
+
+  Map<String, dynamic> _videoConstraints(String quality) {
+    switch (quality) {
+      case 'SD (480p)':
+        return {'facingMode': 'user', 'width': 640, 'height': 480};
+      case 'Full HD (1080p)':
+        return {'facingMode': 'user', 'width': 1920, 'height': 1080};
+      case 'HD (720p)':
+      default:
+        return {'facingMode': 'user', 'width': 1280, 'height': 720};
+    }
+  }
+
+  // ── CALL TIMER ───────────────────────────────
+  void _startCallTimer() {
+    _callTimer?.cancel();
+    _callTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _callSeconds++);
+    });
+  }
+
+  String get _formattedDuration {
+    final h = _callSeconds ~/ 3600;
+    final m = (_callSeconds % 3600) ~/ 60;
+    final s = _callSeconds % 60;
+    if (h > 0) {
+      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    }
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  // ── STATS MONITOR ────────────────────────────
+  void _startStatsMonitor() {
+    _statsTimer?.cancel();
+    _statsTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (_pc == null || !mounted) return;
+      try {
+        final stats = await _pc!.getStats();
+        int packetsLost = 0;
+        int packetsReceived = 0;
+        for (final stat in stats) {
+          final values = stat.values;
+          if (values.containsKey('packetsLost')) {
+            packetsLost += (values['packetsLost'] as num?)?.toInt() ?? 0;
+          }
+          if (values.containsKey('packetsReceived')) {
+            packetsReceived +=
+                (values['packetsReceived'] as num?)?.toInt() ?? 0;
+          }
+        }
+        if (!mounted) return;
+        final total = packetsLost + packetsReceived;
+        if (total == 0) return;
+        final lossRatio = packetsLost / total;
+        setState(() {
+          if (lossRatio < 0.02) {
+            _netQuality = _NetQuality.good;
+          } else if (lossRatio < 0.08) {
+            _netQuality = _NetQuality.fair;
+          } else {
+            _netQuality = _NetQuality.poor;
+          }
+        });
+      } catch (_) {}
+    });
+  }
+
+  // ── AUTO-RECONNECT ───────────────────────────
+  void _attemptReconnect() {
+    if (_reconnectAttempts >= _maxReconnect) return;
+    _reconnectAttempts++;
+    final delay = Duration(seconds: _reconnectAttempts * 2);
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(delay, () async {
+      if (!mounted) return;
+      try {
+        await _pc?.restartIce();
+        if (!widget.isHost) await _joinCall();
+      } catch (_) {}
+    });
+  }
+
+  // ── LOCK LISTENER ────────────────────────────
+  void _listenLock() {
+    _lockSub = _db
+        .collection('meetings')
+        .doc(widget.meetingId)
+        .snapshots()
+        .listen((snap) {
+      if (!snap.exists || !mounted) return;
+      final locked = snap.data()?['isLocked'] ?? false;
+      setState(() => _isLocked = locked as bool);
+    });
   }
 
   // ── WEBRTC SIGNALING ────────────────────────
@@ -272,8 +423,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   Future<void> _joinCall() async {
-    final snap =
-        await _db.collection('webrtc_rooms').doc(_docId).get();
+    final snap = await _db.collection('webrtc_rooms').doc(_docId).get();
     if (!snap.exists || snap.data()?['offer'] == null) {
       if (mounted) {
         setState(() {
@@ -313,8 +463,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   // ── SCREEN SHARE ────────────────────────────
   Future<void> _toggleScreenShare() async {
+    HapticFeedback.mediumImpact();
     if (_sharingScreen) {
-      // Restore camera track
       final senders = await _pc!.getSenders();
       for (final sender in senders) {
         if (sender.track?.kind == 'video') {
@@ -348,7 +498,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             await sender.replaceTrack(screenTrack);
           }
         }
-        // Stop sharing automatically when user dismisses the system picker
         screenTrack.onEnded = () {
           if (mounted) _toggleScreenShare();
         };
@@ -366,12 +515,20 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                 style: GoogleFonts.poppins()),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ));
         }
       }
     }
+  }
+
+  // ── LOCK (host only) ─────────────────────────
+  Future<void> _toggleLock() async {
+    HapticFeedback.mediumImpact();
+    final next = !_isLocked;
+    await _meetingService.setLocked(widget.meetingId, next);
+    if (mounted) setState(() => _isLocked = next);
   }
 
   // ── REACTIONS ────────────────────────────────
@@ -387,7 +544,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       for (final ch in snap.docChanges) {
         if (ch.type == DocumentChangeType.added) {
           final emoji = ch.doc.data()?['emoji'] as String?;
-          // Only animate reactions from others (own reactions already shown locally)
           final sender = ch.doc.data()?['sender'] as String?;
           if (emoji != null && sender != widget.userName && mounted) {
             _spawnReaction(emoji);
@@ -417,9 +573,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   void _sendReaction(String emoji) {
-    // Animate locally immediately
+    HapticFeedback.lightImpact();
     _spawnReaction(emoji);
-    // Broadcast to others via Firestore
     _db
         .collection('webrtc_rooms')
         .doc(_docId)
@@ -435,6 +590,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   void _sendMessage() {
     final text = _chatController.text.trim();
     if (text.isEmpty) return;
+    HapticFeedback.selectionClick();
     _chatController.clear();
     _db
         .collection('meetings')
@@ -449,9 +605,14 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   // ── LEAVE ───────────────────────────────────
   Future<void> _leave() async {
+    HapticFeedback.heavyImpact();
     _callSub?.cancel();
     _candidateSub?.cancel();
     _reactionSub?.cancel();
+    _lockSub?.cancel();
+    _callTimer?.cancel();
+    _statsTimer?.cancel();
+    _reconnectTimer?.cancel();
     if (widget.isHost) {
       try {
         await _db.collection('webrtc_rooms').doc(_docId).delete();
@@ -478,18 +639,15 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     );
   }
 
-  // ── LOADING SCREEN ───────────────────────────
   Widget _buildLoading() => Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const CircularProgressIndicator(color: Colors.white),
           const SizedBox(height: 20),
           Text(_loadingStep,
-              style:
-                  GoogleFonts.poppins(color: Colors.white70, fontSize: 14)),
+              style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14)),
         ]),
       );
 
-  // ── ERROR SCREEN ─────────────────────────────
   Widget _buildError() => Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -503,8 +661,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _leave,
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary),
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
               child: Text('Retour',
                   style: GoogleFonts.poppins(color: Colors.white)),
             ),
@@ -512,19 +670,17 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         ),
       );
 
-  // ── MAIN CALL UI ─────────────────────────────
   Widget _buildCall() {
     return Stack(children: [
-      // Remote video (full screen) or waiting
+      // Remote video or waiting
       Positioned.fill(
         child: _remoteConnected
             ? RTCVideoView(_remoteRenderer,
-                objectFit:
-                    RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
             : _buildWaiting(),
       ),
 
-      // Local camera PiP (top-right)
+      // Local PiP (top-right)
       Positioned(
         top: 16,
         right: 16,
@@ -540,12 +696,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             child: _camOn
                 ? RTCVideoView(_localRenderer,
                     mirror: !_sharingScreen,
-                    objectFit: RTCVideoViewObjectFit
-                        .RTCVideoViewObjectFitCover)
-                : Container(
-                    color: Colors.black87,
-                    child: const Icon(Icons.videocam_off,
-                        color: Colors.white54, size: 32)),
+                    objectFit:
+                        RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                : _buildInitialsAvatar(widget.userName, size: 110),
           ),
         ),
       ),
@@ -568,13 +721,12 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           child: AnimatedOpacity(
             duration: const Duration(milliseconds: 700),
             opacity: r.opacity,
-            child: Text(r.emoji,
-                style: const TextStyle(fontSize: 38)),
+            child: Text(r.emoji, style: const TextStyle(fontSize: 38)),
           ),
         ),
       ),
 
-      // Emoji quick bar
+      // Emoji bar
       AnimatedPositioned(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
@@ -584,7 +736,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         child: _buildEmojiBar(),
       ),
 
-      // Chat panel (slides up from bottom)
+      // Chat panel
       AnimatedPositioned(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeInOut,
@@ -595,7 +747,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         child: _buildChatPanel(),
       ),
 
-      // Controls bar (shifts up when chat is open)
+      // Controls
       AnimatedPositioned(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeInOut,
@@ -607,8 +759,62 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     ]);
   }
 
+  // ── INITIALS AVATAR ──────────────────────────
+  Widget _buildInitialsAvatar(String name, {double size = 80}) {
+    final parts = name.trim().split(' ');
+    final initials = parts.length >= 2
+        ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
+        : name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
+    return Container(
+      width: size,
+      height: size,
+      color: Colors.black87,
+      child: Center(
+        child: Container(
+          width: size * 0.6,
+          height: size * 0.6,
+          decoration: BoxDecoration(
+            gradient: AppColors.primaryGradient,
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              initials,
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: size * 0.2,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── TOP BAR ──────────────────────────────────
   Widget _buildTopBar() {
+    Color netColor;
+    String netLabel;
+    switch (_netQuality) {
+      case _NetQuality.good:
+        netColor = Colors.green;
+        netLabel = 'Excellent';
+        break;
+      case _NetQuality.fair:
+        netColor = Colors.orange;
+        netLabel = 'Moyen';
+        break;
+      case _NetQuality.poor:
+        netColor = Colors.red;
+        netLabel = 'Faible';
+        break;
+      case _NetQuality.unknown:
+        netColor = Colors.grey;
+        netLabel = '';
+        break;
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
@@ -619,20 +825,32 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         ),
       ),
       child: Row(children: [
-        const Icon(Icons.fiber_manual_record, color: Colors.red, size: 10),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 6),
         Text(
           widget.meetingId.length > 12
               ? widget.meetingId.substring(0, 12)
               : widget.meetingId,
-          style:
-              GoogleFonts.poppins(color: Colors.white70, fontSize: 12),
+          style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12),
         ),
+        if (_remoteConnected && _callSeconds > 0) ...[
+          const SizedBox(width: 8),
+          Text(
+            _formattedDuration,
+            style: GoogleFonts.poppins(
+                color: Colors.white60,
+                fontSize: 12,
+                fontFeatures: [const FontFeature.tabularFigures()]),
+          ),
+        ],
         if (_sharingScreen) ...[
           const SizedBox(width: 8),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: Colors.blue.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(12),
@@ -645,11 +863,27 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     fontWeight: FontWeight.w600)),
           ),
         ],
+        if (_isLocked) ...[
+          const SizedBox(width: 8),
+          const Icon(Icons.lock, color: Colors.amber, size: 14),
+        ],
         const Spacer(),
+        // Network quality dot
+        if (_netQuality != _NetQuality.unknown) ...[
+          Container(
+            width: 8,
+            height: 8,
+            decoration:
+                BoxDecoration(color: netColor, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 4),
+          Text(netLabel,
+              style: GoogleFonts.poppins(color: netColor, fontSize: 10)),
+          const SizedBox(width: 8),
+        ],
         if (!_remoteConnected)
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: Colors.orange.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
@@ -689,8 +923,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(e,
-                        style: const TextStyle(fontSize: 26)),
+                    child: Text(e, style: const TextStyle(fontSize: 26)),
                   ),
                 ))
             .toList(),
@@ -703,15 +936,13 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF181818),
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
               color: Colors.black.withValues(alpha: 0.7), blurRadius: 20)
         ],
       ),
       child: Column(children: [
-        // Handle
         const SizedBox(height: 8),
         Container(
           width: 40,
@@ -721,8 +952,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(height: 4),
-
-        // Tab bar
         Row(children: [
           _ChatTab(
             icon: Icons.chat_bubble_outline,
@@ -740,21 +969,13 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           IconButton(
             icon: const Icon(Icons.keyboard_arrow_down,
                 color: Colors.white54, size: 22),
-            onPressed: () =>
-                setState(() => _showChat = false),
+            onPressed: () => setState(() => _showChat = false),
           ),
         ]),
-
         const Divider(color: Colors.white12, height: 1),
-
-        // Content area
         Expanded(
-          child: _chatTab == 0
-              ? _buildChatMessages()
-              : _buildNotes(),
+          child: _chatTab == 0 ? _buildChatMessages() : _buildNotes(),
         ),
-
-        // Input (chat only)
         if (_chatTab == 0) _buildChatInput(),
       ]),
     );
@@ -786,23 +1007,19 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         return ListView.builder(
           reverse: true,
           controller: _chatScrollController,
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           itemCount: docs.length,
           itemBuilder: (ctx, i) {
-            final d =
-                docs[i].data()! as Map<String, dynamic>;
+            final d = docs[i].data()! as Map<String, dynamic>;
             final isMine = d['sender'] == widget.userName;
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: Align(
-                alignment: isMine
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
+                alignment:
+                    isMine ? Alignment.centerRight : Alignment.centerLeft,
                 child: Container(
                   constraints: BoxConstraints(
-                      maxWidth:
-                          MediaQuery.of(ctx).size.width * 0.72),
+                      maxWidth: MediaQuery.of(ctx).size.width * 0.72),
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
@@ -846,22 +1063,21 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         Expanded(
           child: TextField(
             controller: _chatController,
-            style: GoogleFonts.poppins(
-                color: Colors.white, fontSize: 13),
+            style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
             textInputAction: TextInputAction.send,
             onSubmitted: (_) => _sendMessage(),
             decoration: InputDecoration(
               hintText: 'Message...',
-              hintStyle: GoogleFonts.poppins(
-                  color: Colors.white38, fontSize: 13),
+              hintStyle:
+                  GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
               filled: true,
               fillColor: Colors.white.withValues(alpha: 0.08),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide.none,
               ),
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 10),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
           ),
         ),
@@ -871,8 +1087,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           child: Container(
             width: 40,
             height: 40,
-            decoration: BoxDecoration(
-                color: AppColors.primary, shape: BoxShape.circle),
+            decoration:
+                BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
             child: const Icon(Icons.send, color: Colors.white, size: 18),
           ),
         ),
@@ -887,26 +1103,24 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         Expanded(
           child: TextField(
             controller: _notesController,
-            style: GoogleFonts.poppins(
-                color: Colors.white, fontSize: 13, height: 1.5),
+            style:
+                GoogleFonts.poppins(color: Colors.white, fontSize: 13, height: 1.5),
             maxLines: null,
             expands: true,
             textAlignVertical: TextAlignVertical.top,
             decoration: InputDecoration(
               hintText: 'Prenez vos notes ici...',
-              hintStyle: GoogleFonts.poppins(
-                  color: Colors.white38, fontSize: 13),
+              hintStyle:
+                  GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
               filled: true,
               fillColor: Colors.white.withValues(alpha: 0.05),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: Colors.white12),
+                borderSide: const BorderSide(color: Colors.white12),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: Colors.white12),
+                borderSide: const BorderSide(color: Colors.white12),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -921,22 +1135,19 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           width: double.infinity,
           child: OutlinedButton.icon(
             onPressed: () {
-              Clipboard.setData(
-                  ClipboardData(text: _notesController.text));
+              Clipboard.setData(ClipboardData(text: _notesController.text));
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Notes copiées !',
-                    style: GoogleFonts.poppins()),
+                content: Text('Notes copiées !', style: GoogleFonts.poppins()),
                 backgroundColor: AppColors.success,
                 behavior: SnackBarBehavior.floating,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ));
             },
-            icon: const Icon(Icons.copy,
-                size: 16, color: Colors.white54),
+            icon: const Icon(Icons.copy, size: 16, color: Colors.white54),
             label: Text('Copier les notes',
-                style: GoogleFonts.poppins(
-                    color: Colors.white54, fontSize: 12)),
+                style:
+                    GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Colors.white12),
               shape: RoundedRectangleBorder(
@@ -951,8 +1162,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   // ── CONTROLS BAR ─────────────────────────────
   Widget _buildControls() {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
       decoration: BoxDecoration(
         gradient: _showChat
             ? null
@@ -962,83 +1172,120 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                 colors: [Colors.black87, Colors.transparent],
               ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _Btn(
-            icon: _micOn ? Icons.mic : Icons.mic_off,
-            label: _micOn ? 'Micro' : 'Muet',
-            active: _micOn,
-            onTap: () {
-              for (final t in _localStream?.getAudioTracks() ?? []) {
-                t.enabled = !_micOn;
-              }
-              setState(() => _micOn = !_micOn);
-            },
-          ),
-          _Btn(
-            icon: _camOn ? Icons.videocam : Icons.videocam_off,
-            label: _camOn ? 'Caméra' : 'Arrêt',
-            active: _camOn,
-            onTap: () {
-              for (final t in _localStream?.getVideoTracks() ?? []) {
-                t.enabled = !_camOn;
-              }
-              setState(() => _camOn = !_camOn);
-            },
-          ),
-          _Btn(
-            icon: Icons.flip_camera_ios,
-            label: 'Flip',
-            active: true,
-            onTap: () async {
-              for (final t in _localStream?.getVideoTracks() ?? []) {
-                await Helper.switchCamera(t);
-              }
-            },
-          ),
-          _Btn(
-            icon: _sharingScreen
-                ? Icons.stop_screen_share
-                : Icons.screen_share,
-            label: _sharingScreen ? 'Stopper' : 'Écran',
-            active: !_sharingScreen,
-            isHighlight: _sharingScreen,
-            onTap: _toggleScreenShare,
-          ),
-          _Btn(
-            icon: Icons.chat_bubble_outline,
-            label: 'Chat',
-            active: !_showChat,
-            isHighlight: _showChat,
-            onTap: () => setState(() {
-              _showChat = !_showChat;
-              if (_showChat) _showEmojiBar = false;
-            }),
-          ),
-          _Btn(
-            icon: Icons.emoji_emotions_outlined,
-            label: 'Emoji',
-            active: !_showEmojiBar,
-            isHighlight: _showEmojiBar,
-            onTap: () => setState(() {
-              _showEmojiBar = !_showEmojiBar;
-              if (_showEmojiBar) _showChat = false;
-            }),
-          ),
-          _Btn(
-            icon: Icons.call_end,
-            label: 'Fin',
-            active: false,
-            isEnd: true,
-            onTap: _leave,
-          ),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _Btn(
+              icon: _micOn ? Icons.mic : Icons.mic_off,
+              label: _micOn ? 'Micro' : 'Muet',
+              active: _micOn,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                for (final t in _localStream?.getAudioTracks() ?? []) {
+                  t.enabled = !_micOn;
+                }
+                setState(() => _micOn = !_micOn);
+              },
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: _camOn ? Icons.videocam : Icons.videocam_off,
+              label: _camOn ? 'Caméra' : 'Arrêt',
+              active: _camOn,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                for (final t in _localStream?.getVideoTracks() ?? []) {
+                  t.enabled = !_camOn;
+                }
+                setState(() => _camOn = !_camOn);
+              },
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: Icons.flip_camera_ios,
+              label: 'Flip',
+              active: true,
+              onTap: () async {
+                HapticFeedback.selectionClick();
+                for (final t in _localStream?.getVideoTracks() ?? []) {
+                  await Helper.switchCamera(t);
+                }
+              },
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
+              label: _speakerOn ? 'HP' : 'Muet HP',
+              active: _speakerOn,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _speakerOn = !_speakerOn);
+                // Toggle speaker/earpiece via WebRTC helper
+                try {
+                  Helper.setSpeakerphoneOn(_speakerOn ? false : true);
+                } catch (_) {}
+              },
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: _sharingScreen
+                  ? Icons.stop_screen_share
+                  : Icons.screen_share,
+              label: _sharingScreen ? 'Stopper' : 'Écran',
+              active: !_sharingScreen,
+              isHighlight: _sharingScreen,
+              onTap: _toggleScreenShare,
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: Icons.chat_bubble_outline,
+              label: 'Chat',
+              active: !_showChat,
+              isHighlight: _showChat,
+              onTap: () => setState(() {
+                _showChat = !_showChat;
+                if (_showChat) _showEmojiBar = false;
+              }),
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: Icons.emoji_emotions_outlined,
+              label: 'Emoji',
+              active: !_showEmojiBar,
+              isHighlight: _showEmojiBar,
+              onTap: () => setState(() {
+                _showEmojiBar = !_showEmojiBar;
+                if (_showEmojiBar) _showChat = false;
+              }),
+            ),
+            if (widget.isHost) ...[
+              const SizedBox(width: 8),
+              _Btn(
+                icon: _isLocked ? Icons.lock : Icons.lock_open,
+                label: _isLocked ? 'Déverrouiller' : 'Verrouiller',
+                active: !_isLocked,
+                isHighlight: _isLocked,
+                onTap: _toggleLock,
+              ),
+            ],
+            const SizedBox(width: 8),
+            _Btn(
+              icon: Icons.call_end,
+              label: 'Fin',
+              active: false,
+              isEnd: true,
+              onTap: _leave,
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // ── WAITING SCREEN (no remote yet) ───────────
+  // ── WAITING ──────────────────────────────────
   Widget _buildWaiting() {
     return Container(
       color: const Color(0xFF1A1A2E),
@@ -1048,9 +1295,18 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                shape: BoxShape.circle),
-            child: const Icon(Icons.person, color: Colors.white, size: 40),
+                gradient: AppColors.primaryGradient, shape: BoxShape.circle),
+            child: Center(
+              child: Text(
+                widget.userName.isNotEmpty
+                    ? widget.userName[0].toUpperCase()
+                    : '?',
+                style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w700),
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           Text(
@@ -1058,19 +1314,16 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                 ? 'Partagez l\'ID pour inviter des participants'
                 : 'Connexion à la réunion...',
             textAlign: TextAlign.center,
-            style:
-                GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
+            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
           ),
           if (widget.isHost) ...[
             const SizedBox(height: 12),
             GestureDetector(
               onTap: () {
-                Clipboard.setData(
-                    ClipboardData(text: widget.meetingId));
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(
-                  content: Text('ID copié !',
-                      style: GoogleFonts.poppins()),
+                HapticFeedback.selectionClick();
+                Clipboard.setData(ClipboardData(text: widget.meetingId));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('ID copié !', style: GoogleFonts.poppins()),
                   backgroundColor: AppColors.success,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
@@ -1078,16 +1331,15 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                 ));
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.white24),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.copy,
-                      color: Colors.white54, size: 14),
+                  const Icon(Icons.copy, color: Colors.white54, size: 14),
                   const SizedBox(width: 8),
                   Text(widget.meetingId,
                       style: GoogleFonts.poppins(
@@ -1198,8 +1450,7 @@ class _Btn extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(label,
-            style: GoogleFonts.poppins(
-                color: Colors.white54, fontSize: 9)),
+            style: GoogleFonts.poppins(color: Colors.white54, fontSize: 9)),
       ]),
     );
   }

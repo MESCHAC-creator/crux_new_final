@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/colors.dart';
 import '../providers/theme_provider.dart';
 import '../providers/locale_provider.dart';
@@ -18,6 +19,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _errorHandler = ErrorHandlerService();
   bool _notificationsEnabled = true;
   String _videoQuality = 'Haute';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuality();
+  }
+
+  Future<void> _loadQuality() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() => _videoQuality = prefs.getString('crux_video_quality') ?? 'Haute');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -390,6 +402,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   if (val != null) {
                     setState(() => _videoQuality = val);
                     setDialogState(() {});
+                    SharedPreferences.getInstance().then(
+                        (p) => p.setString('crux_video_quality', val));
                     Navigator.pop(ctx);
                     _errorHandler.showSuccessSnackBar(context, '✅ Qualité: $val');
                   }

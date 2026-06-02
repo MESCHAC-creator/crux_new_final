@@ -13,6 +13,7 @@ class MeetingModel {
   final bool isRecording;
   final bool isLocked;
   final String? recordingUrl;
+  final String? password; // optional PIN set by host
 
   MeetingModel({
     required this.id,
@@ -29,48 +30,50 @@ class MeetingModel {
     this.isRecording = false,
     this.isLocked = false,
     this.recordingUrl,
+    this.password,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'title': title,
-      'description': description,
-      'organizer': organizer,
-      'organizerId': organizerId,
-      'startTime': startTime.toIso8601String(),
-      'endTime': endTime.toIso8601String(),
-      'participants': participants,
-      'channelName': channelName,
-      'status': status.toString().split('.').last,
-      'createdAt': createdAt.toIso8601String(),
-      'isRecording': isRecording,
-      'isLocked': isLocked,
-      'recordingUrl': recordingUrl,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'description': description,
+        'organizer': organizer,
+        'organizerId': organizerId,
+        'startTime': startTime.toIso8601String(),
+        'endTime': endTime.toIso8601String(),
+        'participants': participants,
+        'channelName': channelName,
+        'status': status.toString().split('.').last,
+        'createdAt': createdAt.toIso8601String(),
+        'isRecording': isRecording,
+        'isLocked': isLocked,
+        'recordingUrl': recordingUrl,
+        if (password != null) 'password': password,
+      };
 
-  factory MeetingModel.fromJson(Map<String, dynamic> json) {
-    return MeetingModel(
-      id: json['id'] ?? '',
-      title: json['title'] ?? '',
-      description: json['description'] ?? '',
-      organizer: json['organizer'] ?? '',
-      organizerId: json['organizerId'] ?? '',
-      startTime: DateTime.parse(json['startTime'] ?? DateTime.now().toIso8601String()),
-      endTime: DateTime.parse(json['endTime'] ?? DateTime.now().toIso8601String()),
-      participants: List<String>.from(json['participants'] ?? []),
-      channelName: json['channelName'] ?? '',
-      status: _statusFromString(json['status'] ?? 'scheduled'),
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
-      isRecording: json['isRecording'] ?? false,
-      isLocked: json['isLocked'] ?? false,
-      recordingUrl: json['recordingUrl'],
-    );
-  }
+  factory MeetingModel.fromJson(Map<String, dynamic> json) => MeetingModel(
+        id: json['id'] ?? '',
+        title: json['title'] ?? '',
+        description: json['description'] ?? '',
+        organizer: json['organizer'] ?? '',
+        organizerId: json['organizerId'] ?? '',
+        startTime: DateTime.parse(
+            json['startTime'] ?? DateTime.now().toIso8601String()),
+        endTime:
+            DateTime.parse(json['endTime'] ?? DateTime.now().toIso8601String()),
+        participants: List<String>.from(json['participants'] ?? []),
+        channelName: json['channelName'] ?? '',
+        status: _statusFromString(json['status'] ?? 'scheduled'),
+        createdAt: DateTime.parse(
+            json['createdAt'] ?? DateTime.now().toIso8601String()),
+        isRecording: json['isRecording'] ?? false,
+        isLocked: json['isLocked'] ?? false,
+        recordingUrl: json['recordingUrl'],
+        password: json['password'],
+      );
 
-  static MeetingStatus _statusFromString(String status) {
-    switch (status) {
+  static MeetingStatus _statusFromString(String s) {
+    switch (s) {
       case 'ongoing':
         return MeetingStatus.ongoing;
       case 'ended':
@@ -95,31 +98,28 @@ class MeetingModel {
     bool? isRecording,
     bool? isLocked,
     String? recordingUrl,
-  }) {
-    return MeetingModel(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      organizer: organizer ?? this.organizer,
-      organizerId: organizerId ?? this.organizerId,
-      startTime: startTime ?? this.startTime,
-      endTime: endTime ?? this.endTime,
-      participants: participants ?? this.participants,
-      channelName: channelName ?? this.channelName,
-      status: status ?? this.status,
-      createdAt: createdAt ?? this.createdAt,
-      isRecording: isRecording ?? this.isRecording,
-      isLocked: isLocked ?? this.isLocked,
-      recordingUrl: recordingUrl ?? this.recordingUrl,
-    );
-  }
+    String? password,
+  }) =>
+      MeetingModel(
+        id: id ?? this.id,
+        title: title ?? this.title,
+        description: description ?? this.description,
+        organizer: organizer ?? this.organizer,
+        organizerId: organizerId ?? this.organizerId,
+        startTime: startTime ?? this.startTime,
+        endTime: endTime ?? this.endTime,
+        participants: participants ?? this.participants,
+        channelName: channelName ?? this.channelName,
+        status: status ?? this.status,
+        createdAt: createdAt ?? this.createdAt,
+        isRecording: isRecording ?? this.isRecording,
+        isLocked: isLocked ?? this.isLocked,
+        recordingUrl: recordingUrl ?? this.recordingUrl,
+        password: password ?? this.password,
+      );
 
   @override
   String toString() => 'MeetingModel(id: $id, title: $title, status: $status)';
 }
 
-enum MeetingStatus {
-  scheduled,
-  ongoing,
-  ended,
-}
+enum MeetingStatus { scheduled, ongoing, ended }
