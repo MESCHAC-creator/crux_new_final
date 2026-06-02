@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/colors.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
@@ -32,6 +33,19 @@ class _HomeScreenState extends State<HomeScreen> {
     _meetingNameController.dispose();
     _joinIdController.dispose();
     super.dispose();
+  }
+
+  /// Returns the first name of the currently logged-in user.
+  /// Reads directly from Firebase to avoid stale UserModel values.
+  String _displayFirstName() {
+    final fbUser = FirebaseAuth.instance.currentUser;
+    final raw = fbUser?.displayName?.trim().isNotEmpty == true
+        ? fbUser!.displayName!
+        : (fbUser?.email?.contains('@') == true
+            ? fbUser!.email!.split('@')[0]
+            : widget.user.name);
+    // Take only the first word (first name)
+    return raw.split(' ').first;
   }
 
   Future<void> _createMeeting() async {
@@ -229,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         Text(
-                          '${AppTranslations.t('hello', context.watch<LocaleProvider>().locale.languageCode)}, ${widget.user.name.split(' ').first} 👋',
+                          '${AppTranslations.t('hello', context.watch<LocaleProvider>().locale.languageCode)}, ${_displayFirstName()} 👋',
                           style: GoogleFonts.poppins(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -432,44 +446,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 28),
-
-                  // Info banner
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white.withOpacity(0.05)
-                          : const Color(0xFFEDE7F6),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppColors.secondary.withOpacity(0.3),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.info_outline, color: AppColors.secondary, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Les réunions s\'ouvrent dans votre navigateur via Jitsi Meet — gratuit et sécurisé.',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: isDark ? Colors.white70 : AppColors.textSecondary,
-                              height: 1.4,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   const SizedBox(height: 20),
                 ],
               ),

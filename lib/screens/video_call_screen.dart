@@ -35,6 +35,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   bool _remoteConnected = false;
   bool _answerSet = false; // guard: avoid setting remote description twice
   String? _error;
+  String _loadingStep = 'Démarrage...';
 
   StreamSubscription? _callSub;
   StreamSubscription? _candidateSub;
@@ -69,25 +70,39 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   Future<void> _init() async {
     try {
+      if (mounted) setState(() => _loadingStep = 'Initialisation...');
       await _localRenderer.initialize();
       await _remoteRenderer.initialize();
 
-      final cam = await Permission.camera.request();
-      final mic = await Permission.microphone.request();
+      if (mounted) setState(() => _loadingStep = 'Vérification des autorisations...');
+      // Request permissions one at a time with a timeout to avoid hanging
+      final cam = await Permission.camera.request().timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => PermissionStatus.denied,
+      );
+      final mic = await Permission.microphone.request().timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => PermissionStatus.denied,
+      );
       if (!cam.isGranted || !mic.isGranted) {
         if (mounted) {
           setState(() {
             _loading = false;
-            _error = 'Camera and microphone permissions required.';
+            _error = 'Accès caméra et microphone requis.\nActivez-les dans Paramètres → Apps → CRUX → Autorisations.';
           });
         }
         return;
       }
 
+      if (mounted) setState(() => _loadingStep = 'Accès caméra et micro...');
       _localStream = await navigator.mediaDevices.getUserMedia({
         'audio': true,
         'video': {'facingMode': 'user', 'width': 640, 'height': 480},
-      });
+      }).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => throw TimeoutException('Impossible d\'accéder à la caméra. Vérifiez les autorisations.'),
+      );
+      if (mounted) setState(() => _loadingStep = widget.isHost ? 'Création de la réunion...' : 'Connexion en cours...');
       if (mounted) setState(() => _localRenderer.srcObject = _localStream);
 
       _pc = await createPeerConnection(_iceConfig);
@@ -254,7 +269,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           const CircularProgressIndicator(color: Colors.white),
           const SizedBox(height: 20),
           Text(
-            widget.isHost ? 'Creating meeting...' : 'Connecting...',
+            _loadingStep,
             style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
           ),
         ]),
