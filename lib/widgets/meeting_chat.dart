@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../theme/premium_colors.dart';
 
 class MeetingChat extends StatefulWidget {
@@ -13,14 +14,8 @@ class MeetingChat extends StatefulWidget {
 
 class _MeetingChatState extends State<MeetingChat> {
   late TextEditingController _messageController;
-  final List<ChatMessage> _messages = [
-    ChatMessage(
-      sender: 'System',
-      message: 'Meeting started',
-      timestamp: DateTime.now(),
-      isSystem: true,
-    ),
-  ];
+  final _db = FirebaseFirestore.instance;
+  String _userName = 'You';
 
   @override
   void initState() {
@@ -35,20 +30,18 @@ class _MeetingChatState extends State<MeetingChat> {
   }
 
   void _sendMessage() {
-    if (_messageController.text.isEmpty) return;
-
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          sender: 'You',
-          message: _messageController.text,
-          timestamp: DateTime.now(),
-        ),
-      );
-    });
-
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
     _messageController.clear();
-    // TODO: Send to Firestore
+    _db
+        .collection('meetings')
+        .doc(widget.meetingId)
+        .collection('chat')
+        .add({
+      'sender': _userName,
+      'message': text,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
   }
 
   @override
@@ -77,15 +70,42 @@ class _MeetingChatState extends State<MeetingChat> {
             ),
           ),
 
-          // Messages
+          // Messages (live from Firestore)
           Expanded(
-            child: ListView.builder(
-              reverse: true,
-              padding: const EdgeInsets.all(12),
-              itemCount: _messages.length,
-              itemBuilder: (ctx, index) {
-                final msg = _messages[_messages.length - 1 - index];
-                return _ChatMessageWidget(message: msg);
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _db
+                  .collection('meetings')
+                  .doc(widget.meetingId)
+                  .collection('chat')
+                  .orderBy('timestamp', descending: true)
+                  .limit(100)
+                  .snapshots(),
+              builder: (ctx, snap) {
+                final docs = snap.data?.docs ?? [];
+                if (docs.isEmpty) {
+                  return Center(
+                    child: Text('No messages yet',
+                        style: GoogleFonts.poppins(
+                            color: PremiumColors.textTertiary, fontSize: 12)),
+                  );
+                }
+                return ListView.builder(
+                  reverse: true,
+                  padding: const EdgeInsets.all(12),
+                  itemCount: docs.length,
+                  itemBuilder: (ctx, i) {
+                    final d = docs[i].data()! as Map<String, dynamic>;
+                    return _ChatMessageWidget(
+                      message: ChatMessage(
+                        sender: d['sender'] ?? '?',
+                        message: d['message'] ?? '',
+                        timestamp: (d['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+                        isSystem: d['isSystem'] == true,
+                      ),
+                      isMine: d['sender'] == _userName,
+                    );
+                  },
+                );
               },
             ),
           ),
@@ -151,8 +171,9 @@ class _MeetingChatState extends State<MeetingChat> {
 
 class _ChatMessageWidget extends StatelessWidget {
   final ChatMessage message;
+  final bool isMine;
 
-  const _ChatMessageWidget({required this.message});
+  const _ChatMessageWidget({required this.message, this.isMine = false});
 
   @override
   Widget build(BuildContext context) {
@@ -181,14 +202,14 @@ class _ChatMessageWidget extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Align(
-        alignment: message.sender == 'You' ? Alignment.centerRight : Alignment.centerLeft,
+        alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.7,
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: message.sender == 'You'
+            color: isMine
                 ? PremiumColors.flamePrimary
                 : PremiumColors.textSecondary.withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
@@ -196,7 +217,7 @@ class _ChatMessageWidget extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (message.sender != 'You')
+              if (!isMine)
                 Text(
                   message.sender,
                   style: GoogleFonts.poppins(
@@ -208,7 +229,7 @@ class _ChatMessageWidget extends StatelessWidget {
               Text(
                 message.message,
                 style: GoogleFonts.poppins(
-                  color: message.sender == 'You'
+                  color: isMine
                       ? PremiumColors.snowWhite
                       : PremiumColors.textPrimary,
                   fontSize: 12,

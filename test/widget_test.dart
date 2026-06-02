@@ -1,9 +1,3 @@
-import 'package:flutter_test/flutter_test.dart';
-
-void main() {
-  testWidgets('App smoke test', (WidgetTester tester) async {
-    // Placeholder test - app uses Firebase auth which requires special setup
-  });
-}
-
-
+// Placeholder — Firebase auth requires special setup for widget tests.
+// Run integration tests on device for full coverage.
+void main() {}
