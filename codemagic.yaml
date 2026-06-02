@@ -45,21 +45,32 @@ workflows:
         script: |
           set -e
           mkdir -p build/outputs
-          flutter build apk --release --android-skip-build-dependency-validation
-          APK=$(find . -type f -name "*.apk" ! -name "*unsigned*" 2>/dev/null | grep -v ".pub-cache" | head -1)
-          if [ -n "$APK" ]; then
+
+          # APK
+          flutter build apk --release
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          if [ -f "$APK" ]; then
             cp "$APK" build/outputs/crux-release.apk
-            echo "✅ APK: $APK ($(du -sh "$APK" | cut -f1))"
+            echo "✅ APK ready ($(du -sh "$APK" | cut -f1))"
           else
-            echo "❌ No APK found."; exit 1
+            # fallback: search anywhere under build/
+            APK=$(find build/ -name "app-release.apk" 2>/dev/null | head -1)
+            [ -n "$APK" ] && cp "$APK" build/outputs/crux-release.apk \
+              && echo "✅ APK found at $APK" \
+              || { echo "❌ APK not found"; exit 1; }
           fi
-          flutter build appbundle --release --android-skip-build-dependency-validation
-          AAB=$(find . -type f -name "*.aab" 2>/dev/null | grep -v ".pub-cache" | head -1)
-          if [ -n "$AAB" ]; then
+
+          # AAB
+          flutter build appbundle --release
+          AAB="build/app/outputs/bundle/release/app-release.aab"
+          if [ -f "$AAB" ]; then
             cp "$AAB" build/outputs/crux-release.aab
-            echo "✅ AAB: $AAB ($(du -sh "$AAB" | cut -f1))"
+            echo "✅ AAB ready ($(du -sh "$AAB" | cut -f1))"
           else
-            echo "❌ No AAB found."; exit 1
+            AAB=$(find build/ -name "app-release.aab" 2>/dev/null | head -1)
+            [ -n "$AAB" ] && cp "$AAB" build/outputs/crux-release.aab \
+              && echo "✅ AAB found at $AAB" \
+              || { echo "❌ AAB not found"; exit 1; }
           fi
 
     artifacts:
