@@ -33,6 +33,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   bool _camOn = true;
   bool _loading = true;
   bool _remoteConnected = false;
+  bool _answerSet = false; // guard: avoid setting remote description twice
   String? _error;
 
   StreamSubscription? _callSub;
@@ -156,7 +157,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         .snapshots().listen((snap) async {
       if (!snap.exists) return;
       final data = snap.data()!;
-      if (data['answer'] != null && await _pc?.getRemoteDescription() == null) {
+      if (data['answer'] != null && !_answerSet) {
+        _answerSet = true;
         await _pc?.setRemoteDescription(RTCSessionDescription(
           data['answer']['sdp'], data['answer']['type'],
         ));
