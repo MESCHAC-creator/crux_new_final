@@ -24,13 +24,13 @@ class DefaultFirebaseOptions {
   );
 
   // iOS: remplace ces valeurs depuis ta console Firebase
-  // Console Firebase → Paramètres projet → Ajouter app iOS → Bundle ID: com.cruxapp.mobile
+  // Console Firebase → Paramètres projet → Ajouter app iOS → Bundle ID: com.example.crux
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'REMPLACE_PAR_IOS_API_KEY',
     appId: 'REMPLACE_PAR_IOS_APP_ID',
     messagingSenderId: '667181830171',
     projectId: 'crux-8aa85',
     storageBucket: 'crux-8aa85.appspot.com',
-    iosBundleId: 'com.cruxapp.mobile',
+    iosBundleId: 'com.example.crux',
   );
 }

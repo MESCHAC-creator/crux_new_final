@@ -91,7 +91,7 @@ workflows:
       cocoapods: default
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.cruxapp.mobile
+        bundle_identifier: com.example.crux
       groups:
         - firebase_ios
         - firebase_deploy
@@ -101,7 +101,7 @@ workflows:
         script: |
           set -e
           if [ ! -d "ios" ]; then
-            flutter create --platforms ios --org com.cruxapp --project-name mobile .
+            flutter create --platforms ios --org com.example --project-name crux .
             echo "✅ iOS folder generated"
           else
             echo "✅ iOS folder already exists"
@@ -109,8 +109,8 @@ workflows:
           # Ensure bundle ID is correct in project.pbxproj
           PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
           if [ -f "$PBXPROJ" ]; then
-            sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.cruxapp.mobile/g' "$PBXPROJ" || \
-            sed -i 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.cruxapp.mobile/g' "$PBXPROJ"
+            sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.example.crux/g' "$PBXPROJ" || \
+            sed -i 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.example.crux/g' "$PBXPROJ"
             echo "✅ Bundle ID patché dans project.pbxproj"
           fi
 
