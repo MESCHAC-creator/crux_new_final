@@ -46,32 +46,36 @@ workflows:
           set -e
           mkdir -p build/outputs
 
-          # APK
-          flutter build apk --release
-          APK="build/app/outputs/flutter-apk/app-release.apk"
-          if [ -f "$APK" ]; then
-            cp "$APK" build/outputs/crux-release.apk
-            echo "✅ APK ready ($(du -sh "$APK" | cut -f1))"
-          else
-            # fallback: search anywhere under build/
-            APK=$(find build/ -name "app-release.apk" 2>/dev/null | head -1)
-            [ -n "$APK" ] && cp "$APK" build/outputs/crux-release.apk \
-              && echo "✅ APK found at $APK" \
-              || { echo "❌ APK not found"; exit 1; }
-          fi
+          # Flutter 3.29 reports "can't find APK" even when Gradle succeeds.
+          # Bypass flutter build apk and invoke Gradle directly — reliable output paths.
+          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
+          LOCAL_PROPS="android/local.properties"
+          echo "flutter.sdk=$FLUTTER_SDK" > "$LOCAL_PROPS"
+          echo "sdk.dir=${ANDROID_SDK_ROOT:-/usr/local/share/android-sdk}" >> "$LOCAL_PROPS"
 
-          # AAB
-          flutter build appbundle --release
-          AAB="build/app/outputs/bundle/release/app-release.aab"
-          if [ -f "$AAB" ]; then
-            cp "$AAB" build/outputs/crux-release.aab
-            echo "✅ AAB ready ($(du -sh "$AAB" | cut -f1))"
-          else
-            AAB=$(find build/ -name "app-release.aab" 2>/dev/null | head -1)
-            [ -n "$AAB" ] && cp "$AAB" build/outputs/crux-release.aab \
-              && echo "✅ AAB found at $AAB" \
-              || { echo "❌ AAB not found"; exit 1; }
+          # ── APK ──────────────────────────────────────────────────────────────
+          cd android
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tail -30
+          cd ..
+          APK=$(find android/app/build/outputs/apk/release -name "*.apk" 2>/dev/null | head -1)
+          if [ -z "$APK" ]; then
+            APK=$(find . -path "*/build/outputs/apk/release/*.apk" 2>/dev/null | grep -v ".pub-cache" | head -1)
           fi
+          [ -n "$APK" ] || { echo "❌ APK not found"; exit 1; }
+          cp "$APK" build/outputs/crux-release.apk
+          echo "✅ APK: $(du -sh build/outputs/crux-release.apk | cut -f1)"
+
+          # ── AAB ──────────────────────────────────────────────────────────────
+          cd android
+          ./gradlew bundleRelease --no-daemon 2>&1 | tail -10
+          cd ..
+          AAB=$(find android/app/build/outputs/bundle/release -name "*.aab" 2>/dev/null | head -1)
+          if [ -z "$AAB" ]; then
+            AAB=$(find . -path "*/build/outputs/bundle/release/*.aab" 2>/dev/null | grep -v ".pub-cache" | head -1)
+          fi
+          [ -n "$AAB" ] || { echo "❌ AAB not found"; exit 1; }
+          cp "$AAB" build/outputs/crux-release.aab
+          echo "✅ AAB: $(du -sh build/outputs/crux-release.aab | cut -f1)"
 
     artifacts:
       - build/outputs/crux-release.apk
