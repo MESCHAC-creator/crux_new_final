@@ -46,7 +46,7 @@ dependencies:
   flutter_animate: ^4.2.0
 
   # In-app video calling (WebRTC — P2P via Firebase signaling, no external service)
-  flutter_webrtc: ^0.10.0
+  flutter_webrtc: ^1.4.1
 
 dev_dependencies:
   flutter_test:
