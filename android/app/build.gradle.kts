@@ -9,10 +9,6 @@ apply(plugin = "com.google.gms.google-services")
 android {
     namespace = "com.cruxapp.mobile"
     compileSdk = 35
-    // Declare NDK version explicitly so Agora never triggers a mid-evaluation download.
-    // Without this, Agora resolves NDK during Gradle config and causes Flutter's
-    // afterEvaluate to fire on an already-evaluated project → build crash.
-    ndkVersion = "25.1.8937393"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
