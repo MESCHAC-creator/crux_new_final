@@ -73,6 +73,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
       MaterialPageRoute(
         builder: (_) => VideoCallScreen(
           meetingId: widget.meetingId,
+          userId: widget.userId,
           userName: widget.userName,
           isHost: widget.isHost,
         ),

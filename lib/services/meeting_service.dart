@@ -150,4 +150,54 @@ class MeetingService {
       return [];
     }
   }
+
+  Future<void> addCoHost(String meetingId, String userId) async {
+    try {
+      await _firestore.collection('meetings').doc(meetingId)
+          .update({'coHosts': FieldValue.arrayUnion([userId])});
+    } catch (_) {}
+  }
+
+  Future<void> removeCoHost(String meetingId, String userId) async {
+    try {
+      await _firestore.collection('meetings').doc(meetingId)
+          .update({'coHosts': FieldValue.arrayRemove([userId])});
+    } catch (_) {}
+  }
+
+  Future<void> triggerMuteAll(String meetingId) async {
+    try {
+      await _firestore.collection('meetings').doc(meetingId)
+          .update({'muteAllCount': FieldValue.increment(1)});
+    } catch (_) {}
+  }
+
+  Future<void> registerPresence(String meetingId, String userId, String name) async {
+    try {
+      await _firestore
+          .collection('meetings').doc(meetingId)
+          .collection('presence').doc(userId)
+          .set({'name': name, 'joinedAt': FieldValue.serverTimestamp()});
+    } catch (_) {}
+  }
+
+  Future<void> removePresence(String meetingId, String userId) async {
+    try {
+      await _firestore
+          .collection('meetings').doc(meetingId)
+          .collection('presence').doc(userId)
+          .delete();
+    } catch (_) {}
+  }
+
+  Stream<List<Map<String, dynamic>>> streamPresence(String meetingId) {
+    return _firestore
+        .collection('meetings')
+        .doc(meetingId)
+        .collection('presence')
+        .snapshots()
+        .map((s) => s.docs
+            .map((d) => <String, dynamic>{'userId': d.id, ...d.data()})
+            .toList());
+  }
 }

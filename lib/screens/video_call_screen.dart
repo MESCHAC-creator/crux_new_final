@@ -32,12 +32,14 @@ enum _NetQuality { good, fair, poor, unknown }
 // ─────────────────────────────────────────────
 class VideoCallScreen extends StatefulWidget {
   final String meetingId;
+  final String userId;
   final String userName;
   final bool isHost;
 
   const VideoCallScreen({
     super.key,
     required this.meetingId,
+    required this.userId,
     required this.userName,
     required this.isHost,
   });
@@ -91,11 +93,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── Reactions ────────────────────────────────
   final List<_Reaction> _reactions = [];
 
+  // ── Co-host / mute-all / presence ───────────
+  bool _isCoHost = false;
+  int _lastMuteAllCount = 0;
+  List<Map<String, dynamic>> _presenceList = [];
+  bool _showParticipants = false;
+
   // ── Firestore streams ────────────────────────
   StreamSubscription? _callSub;
   StreamSubscription? _candidateSub;
   StreamSubscription<QuerySnapshot>? _reactionSub;
-  StreamSubscription? _lockSub;
+  StreamSubscription? _meetingDocSub;
+  StreamSubscription? _presenceSub;
 
   final _db = FirebaseFirestore.instance;
   final _meetingService = MeetingService();
@@ -127,7 +136,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     ]);
     _init();
     _listenReactions();
-    _listenLock();
+    _listenMeetingDoc();
+    _listenPresence();
   }
 
   @override
@@ -136,7 +146,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _callSub?.cancel();
     _candidateSub?.cancel();
     _reactionSub?.cancel();
-    _lockSub?.cancel();
+    _meetingDocSub?.cancel();
+    _presenceSub?.cancel();
     _callTimer?.cancel();
     _statsTimer?.cancel();
     _reconnectTimer?.cancel();
@@ -201,6 +212,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           _loading = false;
         });
       }
+
+      // Register presence now that we have media
+      await _meetingService.registerPresence(
+          widget.meetingId, widget.userId, widget.userName);
 
       _pc = await createPeerConnection(_iceConfig);
 
@@ -363,16 +378,55 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     });
   }
 
-  // ── LOCK LISTENER ────────────────────────────
-  void _listenLock() {
-    _lockSub = _db
+  // ── MEETING DOC LISTENER (lock + co-host + mute-all) ────────────────
+  void _listenMeetingDoc() {
+    _meetingDocSub = _db
         .collection('meetings')
         .doc(widget.meetingId)
         .snapshots()
         .listen((snap) {
       if (!snap.exists || !mounted) return;
-      final locked = snap.data()?['isLocked'] ?? false;
-      setState(() => _isLocked = locked as bool);
+      final data = snap.data()!;
+      // co-host check
+      final coHosts = List<String>.from(data['coHosts'] ?? []);
+      final nowCoHost = coHosts.contains(widget.userId);
+      // mute-all check
+      final muteCount = (data['muteAllCount'] ?? 0) as int;
+      final isPrivileged = widget.isHost || nowCoHost;
+      if (muteCount > _lastMuteAllCount && !isPrivileged) {
+        _lastMuteAllCount = muteCount;
+        for (final t in _localStream?.getAudioTracks() ?? []) {
+          t.enabled = false;
+        }
+        if (mounted) {
+          setState(() => _micOn = false);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text("L'hôte a coupé tous les micros",
+                style: GoogleFonts.poppins()),
+            backgroundColor: Colors.orange.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+          ));
+        }
+      } else if (muteCount > _lastMuteAllCount) {
+        _lastMuteAllCount = muteCount;
+      }
+      // isLocked check
+      final locked = data['isLocked'] ?? false;
+      if (mounted) setState(() {
+        _isCoHost = nowCoHost;
+        _isLocked = locked as bool;
+      });
+    });
+  }
+
+  // ── PRESENCE LISTENER ────────────────────────
+  void _listenPresence() {
+    _presenceSub = _meetingService
+        .streamPresence(widget.meetingId)
+        .listen((list) {
+      if (mounted) setState(() => _presenceList = list);
     });
   }
 
@@ -523,7 +577,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     }
   }
 
-  // ── LOCK (host only) ─────────────────────────
+  // ── LOCK (host/co-host) ──────────────────────
   Future<void> _toggleLock() async {
     HapticFeedback.mediumImpact();
     final next = !_isLocked;
@@ -609,10 +663,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _callSub?.cancel();
     _candidateSub?.cancel();
     _reactionSub?.cancel();
-    _lockSub?.cancel();
+    _meetingDocSub?.cancel();
+    _presenceSub?.cancel();
     _callTimer?.cancel();
     _statsTimer?.cancel();
     _reconnectTimer?.cancel();
+    await _meetingService.removePresence(widget.meetingId, widget.userId);
     if (widget.isHost) {
       try {
         await _db.collection('webrtc_rooms').doc(_docId).delete();
@@ -671,29 +727,78 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       );
 
   Widget _buildCall() {
-    // Host solo (no remote yet): local camera is the full-screen main view,
-    // exactly like Zoom / TikTok Live.
-    final hostSolo = widget.isHost && !_remoteConnected;
+    final isPrivileged = widget.isHost || _isCoHost;
 
     return Stack(children: [
-      // ── Background layer ────────────────────────────────────────────────
+      // ── MAIN VIDEO (full screen) ──────────────────────────────────────
       Positioned.fill(
-        child: hostSolo
-            // HOST SOLO — local camera fills the screen
+        child: isPrivileged
+            // Privileged: own camera big (TikTok Live style)
             ? (_camOn
                 ? RTCVideoView(_localRenderer,
                     mirror: !_sharingScreen,
                     objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
                 : _buildInitialsAvatar(widget.userName, size: double.infinity))
-            // REMOTE CONNECTED or PARTICIPANT — remote fills the screen
+            // Participant: remote host camera big
             : (_remoteConnected
                 ? RTCVideoView(_remoteRenderer,
                     objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
                 : _buildWaiting()),
       ),
 
-      // ── Local PiP (top-right) — only shown when remote is connected ────
-      if (_remoteConnected)
+      // ── REMOTE CARD (for host/cohost when someone joined) ─────────────
+      if (isPrivileged && _remoteConnected)
+        Positioned(
+          bottom: 85,
+          right: 12,
+          width: 120,
+          height: 165,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(children: [
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white30, width: 1.5),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: RTCVideoView(_remoteRenderer,
+                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
+              ),
+              // participant label at bottom of their card
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [Colors.black87, Colors.transparent],
+                    ),
+                    borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(16)),
+                  ),
+                  child: Text(
+                    _presenceList
+                        .where((p) => p['userId'] != widget.userId)
+                        .map((p) => (p['name'] as String? ?? '').split(' ').first)
+                        .join(', '),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ),
+
+      // ── LOCAL PiP (for participants — their own camera, top-right) ────
+      if (!isPrivileged)
         Positioned(
           top: 16,
           right: 16,
@@ -709,77 +814,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               child: _camOn
                   ? RTCVideoView(_localRenderer,
                       mirror: !_sharingScreen,
-                      objectFit:
-                          RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
                   : _buildInitialsAvatar(widget.userName, size: 110),
             ),
           ),
         ),
 
-      // ── Host-solo overlay: gradient + "share ID" banner ────────────────
-      if (hostSolo)
-        Positioned(
-          bottom: 70, // sits just above the controls bar
-          left: 0,
-          right: 0,
-          child: Center(
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                Clipboard.setData(ClipboardData(text: widget.meetingId));
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content:
-                      Text('ID copié !', style: GoogleFonts.poppins()),
-                  backgroundColor: AppColors.success,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ));
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.25)),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.copy, color: Colors.white70, size: 15),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Inviter des participants',
-                          style: GoogleFonts.poppins(
-                              color: Colors.white70,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500)),
-                      Text(widget.meetingId,
-                          style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 2)),
-                    ],
-                  ),
-                ]),
-              ),
-            ),
-          ),
-        ),
+      // ── TOP BAR ──────────────────────────────────────────────────────
+      Positioned(top: 0, left: 0, right: 0, child: _buildTopBar()),
 
-      // Top bar
-      Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
-        child: _buildTopBar(),
-      ),
-
-      // Floating reactions
+      // ── FLOATING REACTIONS ───────────────────────────────────────────
       ..._reactions.map(
         (r) => AnimatedPositioned(
           duration: const Duration(milliseconds: 2000),
@@ -794,7 +838,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         ),
       ),
 
-      // Emoji bar
+      // ── EMOJI BAR ────────────────────────────────────────────────────
       AnimatedPositioned(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
@@ -804,7 +848,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         child: _buildEmojiBar(),
       ),
 
-      // Chat panel
+      // ── PARTICIPANTS PANEL ───────────────────────────────────────────
+      AnimatedPositioned(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOut,
+        bottom: _showParticipants ? 0 : -380,
+        left: 0,
+        right: 0,
+        height: 380,
+        child: _buildParticipantsPanel(),
+      ),
+
+      // ── CHAT PANEL ───────────────────────────────────────────────────
       AnimatedPositioned(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeInOut,
@@ -815,15 +870,62 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         child: _buildChatPanel(),
       ),
 
-      // Controls
+      // ── CONTROLS ─────────────────────────────────────────────────────
       AnimatedPositioned(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeInOut,
-        bottom: _showChat ? 400 : 0,
+        bottom: (_showChat || _showParticipants) ? 400 : 0,
         left: 0,
         right: 0,
         child: _buildControls(),
       ),
+
+      // ── HOST SOLO INVITE BANNER ──────────────────────────────────────
+      if (isPrivileged && !_remoteConnected)
+        Positioned(
+          bottom: 75,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                Clipboard.setData(ClipboardData(text: widget.meetingId));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('ID copié !', style: GoogleFonts.poppins()),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ));
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.copy, color: Colors.white70, size: 15),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Inviter des participants',
+                          style: GoogleFonts.poppins(
+                              color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500)),
+                      Text(widget.meetingId,
+                          style: GoogleFonts.poppins(
+                              color: Colors.white, fontSize: 15,
+                              fontWeight: FontWeight.w800, letterSpacing: 2)),
+                    ],
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        ),
     ]);
   }
 
@@ -935,6 +1037,20 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           const SizedBox(width: 8),
           const Icon(Icons.lock, color: Colors.amber, size: 14),
         ],
+        if (_isCoHost) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.amber.withValues(alpha: 0.6)),
+            ),
+            child: Text('Co-hôte',
+                style: GoogleFonts.poppins(
+                    color: Colors.amber, fontSize: 9, fontWeight: FontWeight.w600)),
+          ),
+        ],
         const Spacer(),
         // Network quality dot
         if (_netQuality != _NetQuality.unknown) ...[
@@ -996,6 +1112,129 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 ))
             .toList(),
       ),
+    );
+  }
+
+  // ── PARTICIPANTS PANEL ────────────────────────
+  Widget _buildParticipantsPanel() {
+    final isPrivileged = widget.isHost || _isCoHost;
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF181818),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.7), blurRadius: 20)
+        ],
+      ),
+      child: Column(children: [
+        const SizedBox(height: 8),
+        Container(
+          width: 40, height: 4,
+          decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(children: [
+            const Icon(Icons.people, color: Colors.white70, size: 18),
+            const SizedBox(width: 8),
+            Text('Participants (${_presenceList.length})',
+                style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+            const Spacer(),
+            if (isPrivileged)
+              GestureDetector(
+                onTap: () async {
+                  HapticFeedback.mediumImpact();
+                  await _meetingService.triggerMuteAll(widget.meetingId);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Tous les micros ont été coupés', style: GoogleFonts.poppins()),
+                    backgroundColor: Colors.orange.shade700,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ));
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.6)),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.mic_off, color: Colors.orange, size: 14),
+                    const SizedBox(width: 5),
+                    Text('Couper tous', style: GoogleFonts.poppins(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+              ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white54, size: 22),
+              onPressed: () => setState(() => _showParticipants = false),
+            ),
+          ]),
+        ),
+        const Divider(color: Colors.white12, height: 1),
+        Expanded(
+          child: _presenceList.isEmpty
+              ? Center(child: Text('Aucun participant', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)))
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: _presenceList.length,
+                  itemBuilder: (ctx, i) {
+                    final p = _presenceList[i];
+                    final pId = p['userId'] as String? ?? '';
+                    final pName = p['name'] as String? ?? 'Participant';
+                    final isMe = pId == widget.userId;
+                    final initial = pName.isNotEmpty ? pName[0].toUpperCase() : '?';
+                    return ListTile(
+                      leading: Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
+                        child: Center(child: Text(initial,
+                            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16))),
+                      ),
+                      title: Text(
+                        '$pName${isMe ? ' (Moi)' : ''}',
+                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      trailing: isPrivileged && !isMe
+                          ? PopupMenuButton<String>(
+                              color: const Color(0xFF282828),
+                              icon: const Icon(Icons.more_vert, color: Colors.white54, size: 20),
+                              onSelected: (action) async {
+                                if (action == 'cohost') {
+                                  await _meetingService.addCoHost(widget.meetingId, pId);
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                    content: Text('$pName est maintenant co-hôte', style: GoogleFonts.poppins()),
+                                    backgroundColor: AppColors.success,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ));
+                                } else if (action == 'remove_cohost') {
+                                  await _meetingService.removeCoHost(widget.meetingId, pId);
+                                }
+                              },
+                              itemBuilder: (_) => [
+                                PopupMenuItem(value: 'cohost',
+                                    child: Row(children: [
+                                      const Icon(Icons.star, color: Colors.amber, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text('Nommer co-hôte', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                                    ])),
+                                PopupMenuItem(value: 'remove_cohost',
+                                    child: Row(children: [
+                                      const Icon(Icons.star_border, color: Colors.white54, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text('Retirer co-hôte', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13)),
+                                    ])),
+                              ],
+                            )
+                          : null,
+                    );
+                  },
+                ),
+        ),
+      ]),
     );
   }
 
@@ -1229,10 +1468,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── CONTROLS BAR ─────────────────────────────
   Widget _buildControls() {
+    final isPrivileged = widget.isHost || _isCoHost;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
       decoration: BoxDecoration(
-        gradient: _showChat
+        gradient: (_showChat || _showParticipants)
             ? null
             : const LinearGradient(
                 begin: Alignment.bottomCenter,
@@ -1291,7 +1531,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               onTap: () {
                 HapticFeedback.selectionClick();
                 setState(() => _speakerOn = !_speakerOn);
-                // Toggle speaker/earpiece via WebRTC helper
                 try {
                   Helper.setSpeakerphoneOn(_speakerOn ? false : true);
                 } catch (_) {}
@@ -1315,7 +1554,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               isHighlight: _showChat,
               onTap: () => setState(() {
                 _showChat = !_showChat;
-                if (_showChat) _showEmojiBar = false;
+                if (_showChat) { _showEmojiBar = false; _showParticipants = false; }
+              }),
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: Icons.people_outline,
+              label: 'Participants',
+              active: !_showParticipants,
+              isHighlight: _showParticipants,
+              onTap: () => setState(() {
+                _showParticipants = !_showParticipants;
+                if (_showParticipants) { _showChat = false; _showEmojiBar = false; }
               }),
             ),
             const SizedBox(width: 8),
@@ -1329,7 +1579,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 if (_showEmojiBar) _showChat = false;
               }),
             ),
-            if (widget.isHost) ...[
+            if (isPrivileged) ...[
               const SizedBox(width: 8),
               _Btn(
                 icon: _isLocked ? Icons.lock : Icons.lock_open,
@@ -1337,6 +1587,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 active: !_isLocked,
                 isHighlight: _isLocked,
                 onTap: _toggleLock,
+              ),
+              const SizedBox(width: 8),
+              _Btn(
+                icon: Icons.mic_off,
+                label: 'Couper tous',
+                active: true,
+                onTap: () async {
+                  HapticFeedback.mediumImpact();
+                  await _meetingService.triggerMuteAll(widget.meetingId);
+                },
               ),
             ],
             const SizedBox(width: 8),

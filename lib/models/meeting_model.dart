@@ -14,6 +14,8 @@ class MeetingModel {
   final bool isLocked;
   final String? recordingUrl;
   final String? password; // optional PIN set by host
+  final List<String> coHosts;
+  final int muteAllCount;
 
   MeetingModel({
     required this.id,
@@ -31,6 +33,8 @@ class MeetingModel {
     this.isLocked = false,
     this.recordingUrl,
     this.password,
+    this.coHosts = const [],
+    this.muteAllCount = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -49,6 +53,8 @@ class MeetingModel {
         'isLocked': isLocked,
         'recordingUrl': recordingUrl,
         if (password != null) 'password': password,
+        'coHosts': coHosts,
+        'muteAllCount': muteAllCount,
       };
 
   factory MeetingModel.fromJson(Map<String, dynamic> json) => MeetingModel(
@@ -70,6 +76,8 @@ class MeetingModel {
         isLocked: json['isLocked'] ?? false,
         recordingUrl: json['recordingUrl'],
         password: json['password'],
+        coHosts: List<String>.from(json['coHosts'] ?? []),
+        muteAllCount: (json['muteAllCount'] ?? 0) as int,
       );
 
   static MeetingStatus _statusFromString(String s) {
@@ -99,6 +107,8 @@ class MeetingModel {
     bool? isLocked,
     String? recordingUrl,
     String? password,
+    List<String>? coHosts,
+    int? muteAllCount,
   }) =>
       MeetingModel(
         id: id ?? this.id,
@@ -116,6 +126,8 @@ class MeetingModel {
         isLocked: isLocked ?? this.isLocked,
         recordingUrl: recordingUrl ?? this.recordingUrl,
         password: password ?? this.password,
+        coHosts: coHosts ?? this.coHosts,
+        muteAllCount: muteAllCount ?? this.muteAllCount,
       );
 
   @override
