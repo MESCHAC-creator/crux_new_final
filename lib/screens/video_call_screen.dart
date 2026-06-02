@@ -671,37 +671,105 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       );
 
   Widget _buildCall() {
-    return Stack(children: [
-      // Remote video or waiting
-      Positioned.fill(
-        child: _remoteConnected
-            ? RTCVideoView(_remoteRenderer,
-                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
-            : _buildWaiting(),
-      ),
+    // Host solo (no remote yet): local camera is the full-screen main view,
+    // exactly like Zoom / TikTok Live.
+    final hostSolo = widget.isHost && !_remoteConnected;
 
-      // Local PiP (top-right)
-      Positioned(
-        top: 16,
-        right: 16,
-        width: 110,
-        height: 150,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.primary, width: 2),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: _camOn
+    return Stack(children: [
+      // ── Background layer ────────────────────────────────────────────────
+      Positioned.fill(
+        child: hostSolo
+            // HOST SOLO — local camera fills the screen
+            ? (_camOn
                 ? RTCVideoView(_localRenderer,
                     mirror: !_sharingScreen,
-                    objectFit:
-                        RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
-                : _buildInitialsAvatar(widget.userName, size: 110),
+                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                : _buildInitialsAvatar(widget.userName, size: double.infinity))
+            // REMOTE CONNECTED or PARTICIPANT — remote fills the screen
+            : (_remoteConnected
+                ? RTCVideoView(_remoteRenderer,
+                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                : _buildWaiting()),
+      ),
+
+      // ── Local PiP (top-right) — only shown when remote is connected ────
+      if (_remoteConnected)
+        Positioned(
+          top: 16,
+          right: 16,
+          width: 110,
+          height: 150,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.primary, width: 2),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: _camOn
+                  ? RTCVideoView(_localRenderer,
+                      mirror: !_sharingScreen,
+                      objectFit:
+                          RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                  : _buildInitialsAvatar(widget.userName, size: 110),
+            ),
           ),
         ),
-      ),
+
+      // ── Host-solo overlay: gradient + "share ID" banner ────────────────
+      if (hostSolo)
+        Positioned(
+          bottom: 70, // sits just above the controls bar
+          left: 0,
+          right: 0,
+          child: Center(
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                Clipboard.setData(ClipboardData(text: widget.meetingId));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content:
+                      Text('ID copié !', style: GoogleFonts.poppins()),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ));
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.25)),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.copy, color: Colors.white70, size: 15),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Inviter des participants',
+                          style: GoogleFonts.poppins(
+                              color: Colors.white70,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500)),
+                      Text(widget.meetingId,
+                          style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 2)),
+                    ],
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        ),
 
       // Top bar
       Positioned(
@@ -1285,7 +1353,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     );
   }
 
-  // ── WAITING ──────────────────────────────────
+  // ── WAITING (participant only — host uses full-screen local cam) ────────
   Widget _buildWaiting() {
     return Container(
       color: const Color(0xFF1A1A2E),
@@ -1310,46 +1378,17 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            widget.isHost
-                ? 'Partagez l\'ID pour inviter des participants'
-                : 'Connexion à la réunion...',
+            'Connexion à la réunion...',
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
           ),
-          if (widget.isHost) ...[
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                Clipboard.setData(ClipboardData(text: widget.meetingId));
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('ID copié !', style: GoogleFonts.poppins()),
-                  backgroundColor: AppColors.success,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ));
-              },
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white24),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.copy, color: Colors.white54, size: 14),
-                  const SizedBox(width: 8),
-                  Text(widget.meetingId,
-                      style: GoogleFonts.poppins(
-                          color: Colors.white70,
-                          fontSize: 13,
-                          letterSpacing: 1)),
-                ]),
-              ),
-            ),
-          ],
+          const SizedBox(height: 12),
+          const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+                color: Colors.white54, strokeWidth: 2),
+          ),
         ]),
       ),
     );
