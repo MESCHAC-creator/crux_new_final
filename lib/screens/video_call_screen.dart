@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
+import '../services/pro_service.dart';
 
 // ─────────────────────────────────────────────
 //  MODELS
@@ -99,15 +100,22 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   List<Map<String, dynamic>> _presenceList = [];
   bool _showParticipants = false;
 
+  // ── Pro / paywall ────────────────────────────
+  bool _isPro = false;
+  bool _paywallShown = false;
+  static const _freeMinutes = 30;
+
   // ── Firestore streams ────────────────────────
   StreamSubscription? _callSub;
   StreamSubscription? _candidateSub;
   StreamSubscription<QuerySnapshot>? _reactionSub;
   StreamSubscription? _meetingDocSub;
   StreamSubscription? _presenceSub;
+  StreamSubscription<bool>? _proSub;
 
   final _db = FirebaseFirestore.instance;
   final _meetingService = MeetingService();
+  final _proService = ProService();
 
   String get _docId =>
       'room_${widget.meetingId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
@@ -138,6 +146,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _listenReactions();
     _listenMeetingDoc();
     _listenPresence();
+    _listenProStatus();
   }
 
   @override
@@ -148,6 +157,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _reactionSub?.cancel();
     _meetingDocSub?.cancel();
     _presenceSub?.cancel();
+    _proSub?.cancel();
     _callTimer?.cancel();
     _statsTimer?.cancel();
     _reconnectTimer?.cancel();
@@ -310,11 +320,126 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   // ── CALL TIMER ───────────────────────────────
+  void _listenProStatus() {
+    _proSub = _proService.proStream(widget.userId).listen((pro) {
+      if (mounted) setState(() => _isPro = pro);
+    });
+  }
+
   void _startCallTimer() {
     _callTimer?.cancel();
     _callTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _callSeconds++);
+      if (!mounted) return;
+      setState(() => _callSeconds++);
+      // Check 30-min free limit
+      if (!_isPro && !_paywallShown && _callSeconds >= _freeMinutes * 60) {
+        _paywallShown = true;
+        _showPaywall();
+      }
     });
+  }
+
+  void _showPaywall() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => WillPopScope(
+        onWillPop: () async => false,
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF1A1A2E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.lock_clock, color: Colors.white, size: 36),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Limite gratuite atteinte',
+                style: GoogleFonts.poppins(
+                  color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '30 minutes gratuites écoulées.\nPassez à Crux Pro pour continuer.',
+                style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14, height: 1.5),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+                ),
+                child: Column(
+                  children: [
+                    Text('Crux Pro', style: GoogleFonts.poppins(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    Text('25 000 FCFA / mois', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 20)),
+                    const SizedBox(height: 8),
+                    Text('✓ Réunions illimitées\n✓ Tous les participants\n✓ Accès immédiat',
+                      style: GoogleFonts.poppins(color: Colors.white60, fontSize: 12, height: 1.6),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _leave();
+              },
+              child: Text('Quitter', style: GoogleFonts.poppins(color: Colors.white38)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              onPressed: () async {
+                Navigator.pop(context);
+                try {
+                  await _proService.startPayment(
+                    userId: widget.userId,
+                    userName: widget.userName,
+                  );
+                  // After returning from payment, re-check Pro status
+                  final pro = await _proService.isPro(widget.userId);
+                  if (mounted && pro) {
+                    setState(() { _isPro = true; _paywallShown = false; });
+                  } else if (mounted) {
+                    // Not paid yet, show paywall again after 10s
+                    Future.delayed(const Duration(seconds: 10), () {
+                      if (mounted && !_isPro) _showPaywall();
+                    });
+                  }
+                } catch (_) {
+                  if (mounted) _showPaywall();
+                }
+              },
+              child: Text('Passer Pro', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String get _formattedDuration {
