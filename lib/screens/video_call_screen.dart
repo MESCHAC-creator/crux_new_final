@@ -88,6 +88,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   static const _maxReconnect = 3;
   Timer? _reconnectTimer;
 
+  // ── Waiting for host (participant side) ──────
+  bool _waitingForHost = false;
+  Timer? _hostWaitTimer;
+
   // ── Chat / Notes ─────────────────────────────
   int _chatTab = 0;
   final _chatController = TextEditingController();
@@ -132,8 +136,19 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           'stun:stun2.l.google.com:19302',
         ]
       },
+      {
+        'urls': [
+          'turn:openrelay.metered.ca:80',
+          'turn:openrelay.metered.ca:443',
+          'turn:openrelay.metered.ca:443?transport=tcp',
+        ],
+        'username': 'openrelayproject',
+        'credential': 'openrelayproject',
+      },
     ],
     'sdpSemantics': 'unified-plan',
+    'iceTransportPolicy': 'all',
+    'bundlePolicy': 'max-bundle',
   };
 
   // ── LIFECYCLE ───────────────────────────────
@@ -164,6 +179,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _callTimer?.cancel();
     _statsTimer?.cancel();
     _reconnectTimer?.cancel();
+    _hostWaitTimer?.cancel();
     _chatController.dispose();
     _chatScrollController.dispose();
     _notesController.dispose();
@@ -623,13 +639,13 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     final snap = await _db.collection('webrtc_rooms').doc(_docId).get();
     if (!snap.exists || snap.data()?['offer'] == null) {
       if (mounted) {
-        setState(() {
-          _error =
-              'Réunion introuvable.\nDemandez à l\'hôte de démarrer l\'appel d\'abord.';
-        });
+        setState(() => _waitingForHost = true);
+        _hostWaitTimer?.cancel();
+        _hostWaitTimer = Timer(const Duration(seconds: 3), _joinCall);
       }
       return;
     }
+    if (mounted) setState(() => _waitingForHost = false);
 
     final offerData = snap.data()!['offer'];
     await _pc!.setRemoteDescription(
@@ -974,10 +990,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                     objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
                 : _buildInitialsAvatar(widget.userName, size: double.infinity))
             // Participant: remote host camera big
-            : (_remoteConnected
-                ? RTCVideoView(_remoteRenderer,
-                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
-                : _buildWaiting()),
+            : (_waitingForHost
+                ? _buildWaitingForHost()
+                : _remoteConnected
+                    ? RTCVideoView(_remoteRenderer,
+                        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                    : _buildWaiting()),
       ),
 
       // ── REMOTE CARD (for host/cohost when someone joined) ─────────────
@@ -1860,39 +1878,175 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
             )
           : Container(color: const Color(0xFF1A1A2E)),
-      // Overlay: semi-transparent scrim + connecting indicator
-      Container(color: Colors.black.withValues(alpha: 0.45)),
+      // Overlay: semi-transparent scrim
+      Container(color: Colors.black.withValues(alpha: 0.50)),
       Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient, shape: BoxShape.circle),
-            child: Center(
-              child: Text(
-                widget.userName.isNotEmpty
-                    ? widget.userName[0].toUpperCase()
-                    : '?',
-                style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w700),
+          // Pulsing ring animation
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.85, end: 1.15),
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeInOut,
+            builder: (context, scale, child) {
+              return Transform.scale(
+                scale: scale,
+                child: child,
+              );
+            },
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.primary, width: 4),
+                color: AppColors.primary.withValues(alpha: 0.15),
               ),
+              child: const Icon(Icons.people_outline, color: Colors.white, size: 44),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           Text(
-            'Connexion à la réunion...',
+            'En attente d\'un participant...',
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
+            style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Partagez l\'ID de réunion :',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
+            ),
+            child: Text(
+              widget.meetingId,
+              style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 2),
+            ),
           ),
           const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: widget.meetingId));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('ID copié !', style: GoogleFonts.poppins()),
+                backgroundColor: AppColors.primary,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                duration: const Duration(seconds: 2),
+              ));
+            },
+            icon: const Icon(Icons.copy, color: Colors.white70, size: 18),
+            label: Text(
+              'Copier l\'ID',
+              style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
+            ),
+          ),
+          const SizedBox(height: 28),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30)),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+            ),
+            onPressed: _leave,
+            icon: const Icon(Icons.call_end, color: Colors.white),
+            label: Text('Quitter',
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _buildWaitingForHost() {
+    return Stack(fit: StackFit.expand, children: [
+      // Local camera preview as full-screen background
+      _localStream != null && _camOn
+          ? RTCVideoView(
+              _localRenderer,
+              mirror: true,
+              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+            )
+          : Container(color: const Color(0xFF1A1A2E)),
+      Container(color: Colors.black.withValues(alpha: 0.55)),
+      Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.85, end: 1.15),
+            duration: const Duration(milliseconds: 1000),
+            curve: Curves.easeInOut,
+            builder: (context, scale, child) {
+              return Transform.scale(scale: scale, child: child);
+            },
+            child: Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.primary, width: 4),
+                color: AppColors.primary.withValues(alpha: 0.12),
+              ),
+              child: const Icon(Icons.hourglass_top_rounded,
+                  color: Colors.white70, size: 40),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'En attente de l\'hôte...',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'La réunion démarrera automatiquement\ndès que l\'hôte sera prêt.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+                color: Colors.white60, fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 20),
           const SizedBox(
             width: 24,
             height: 24,
             child: CircularProgressIndicator(
                 color: Colors.white54, strokeWidth: 2),
+          ),
+          const SizedBox(height: 32),
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.red.shade700.withValues(alpha: 0.85),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30)),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+            ),
+            onPressed: () {
+              _hostWaitTimer?.cancel();
+              _leave();
+            },
+            icon: const Icon(Icons.call_end, color: Colors.white),
+            label: Text('Quitter',
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontWeight: FontWeight.w600)),
           ),
         ]),
       ),

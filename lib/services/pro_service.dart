@@ -43,8 +43,10 @@ class ProService {
     String? userEmail,
   }) async {
     final uri = Uri.parse(_paymentUrl);
-    if (await canLaunchUrl(uri)) {
+    try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      await launchUrl(uri, mode: LaunchMode.platformDefault);
     }
   }
 
