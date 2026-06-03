@@ -336,7 +336,7 @@ class _CheckboxRow extends StatelessWidget {
               style: GoogleFonts.poppins(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white87 : Colors.black87,
+                color: isDark ? Colors.white.withValues(alpha: 0.87) : Colors.black87,
               ),
             ),
           ),
