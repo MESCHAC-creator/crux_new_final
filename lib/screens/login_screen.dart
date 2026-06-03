@@ -23,6 +23,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   bool _isGoogleLoading = false;
   bool _showPassword = false;
 
+  // Inline error states
+  String? _emailError;
+  String? _passwordError;
+
   // Animation controllers
   late AnimationController _bgController;
   late AnimationController _contentController;
@@ -149,6 +153,32 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     super.dispose();
   }
 
+  /// Validate fields locally and set inline errors. Returns true if valid.
+  bool _validateFields() {
+    String? emailErr;
+    String? passErr;
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty) {
+      emailErr = 'Entrez votre adresse email';
+    } else if (!email.contains('@')) {
+      emailErr = 'Format invalide (ex: nom@domaine.com)';
+    }
+
+    if (password.isEmpty) {
+      passErr = 'Entrez votre mot de passe';
+    }
+
+    setState(() {
+      _emailError = emailErr;
+      _passwordError = passErr;
+    });
+
+    return emailErr == null && passErr == null;
+  }
+
   Future<void> _handleGoogleLogin() async {
     setState(() => _isGoogleLoading = true);
     try {
@@ -167,10 +197,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   }
 
   Future<void> _handleLogin() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _errorHandler.showErrorDialog(context, '⚠️ Attention', 'Veuillez remplir tous les champs');
-      return;
-    }
+    if (!_validateFields()) return;
+
     await _buttonController.forward();
     await _buttonController.reverse();
 
@@ -182,13 +210,163 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       );
       if (mounted) Navigator.of(context).pushReplacementNamed('/home');
     } catch (e) {
-      if (mounted) {
-        _errorHandler.showErrorDialog(context, '❌ Connexion échouée',
-            e.toString().replaceFirst('Exception: ', ''));
+      if (!mounted) return;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+
+      if (msg.contains('wrong-password') ||
+          msg.contains('invalid-credential') ||
+          msg.contains('INVALID_LOGIN_CREDENTIALS') ||
+          msg.contains('incorrect')) {
+        setState(() => _passwordError = 'Mot de passe incorrect');
+      } else if (msg.contains('user-not-found') || msg.contains('no user') || msg.contains('non trouvé')) {
+        setState(() => _emailError = 'Aucun compte trouvé avec cet email');
+      } else if (msg.contains('invalid-email') || msg.contains('invalide')) {
+        setState(() => _emailError = 'Format d\'email invalide (ex: nom@domaine.com)');
+      } else if (msg.contains('too-many-requests') || msg.contains('Trop de tentatives')) {
+        _errorHandler.showWarningSnackBar(
+            context, 'Trop de tentatives. Réessayez dans quelques minutes.');
+      } else if (msg.contains('network') || msg.contains('réseau')) {
+        _errorHandler.showWarningSnackBar(
+            context, 'Pas de connexion Internet. Vérifiez votre réseau.');
+      } else if (msg.contains('disabled') || msg.contains('désactivé')) {
+        _errorHandler.showErrorDialog(
+            context, 'Compte désactivé', 'Compte désactivé. Contactez le support.');
+      } else {
+        _errorHandler.showErrorDialog(context, '❌ Connexion échouée', msg);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _showForgotPasswordDialog() async {
+    final emailController = TextEditingController();
+    String? dialogError;
+    bool sending = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1A0030),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Text(
+                'Mot de passe oublié',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Entrez votre adresse email pour recevoir un lien de réinitialisation.',
+                    style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'email@exemple.com',
+                      hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
+                      prefixIcon: const Icon(Icons.email_outlined, color: Colors.white60, size: 20),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.1),
+                      errorText: dialogError,
+                      errorStyle: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.white, width: 1.5),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    ),
+                    onChanged: (_) => setDialogState(() => dialogError = null),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Annuler',
+                      style: GoogleFonts.poppins(color: Colors.white54, fontWeight: FontWeight.w600)),
+                ),
+                TextButton(
+                  onPressed: sending
+                      ? null
+                      : () async {
+                          final email = emailController.text.trim();
+                          if (email.isEmpty || !email.contains('@')) {
+                            setDialogState(() => dialogError = 'Entrez un email valide');
+                            return;
+                          }
+                          setDialogState(() => sending = true);
+                          try {
+                            await _authService.resetPassword(email);
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                              if (mounted) {
+                                _errorHandler.showSuccessSnackBar(
+                                  context,
+                                  'Email de réinitialisation envoyé ! Vérifiez votre boîte mail.',
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            final msg = e.toString().replaceFirst('Exception: ', '');
+                            String errorMsg;
+                            if (msg.contains('user-not-found') || msg.contains('non trouvé')) {
+                              errorMsg = 'Aucun compte avec cet email';
+                            } else if (msg.contains('network') || msg.contains('réseau')) {
+                              errorMsg = 'Problème réseau';
+                            } else {
+                              errorMsg = msg;
+                            }
+                            setDialogState(() {
+                              dialogError = errorMsg;
+                              sending = false;
+                            });
+                          }
+                        },
+                  child: sending
+                      ? const SizedBox(
+                          width: 18, height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
+                        )
+                      : Text('Envoyer',
+                          style: GoogleFonts.poppins(
+                            color: const Color(0xFFE74C3C),
+                            fontWeight: FontWeight.w700,
+                          )),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -309,6 +487,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               hint: 'Email',
                               icon: Icons.email_outlined,
                               keyboardType: TextInputType.emailAddress,
+                              errorText: _emailError,
+                              onChanged: (_) => setState(() => _emailError = null),
                             ),
                           ),
                         ),
@@ -324,6 +504,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               hint: 'Mot de passe',
                               icon: Icons.lock_outlined,
                               obscure: !_showPassword,
+                              errorText: _passwordError,
+                              onChanged: (_) => setState(() => _passwordError = null),
                               suffix: IconButton(
                                 icon: Icon(
                                   _showPassword ? Icons.visibility : Icons.visibility_off,
@@ -341,8 +523,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: () => _errorHandler.showInfoSnackBar(
-                                context, '📧 Réinitialisation par email bientôt disponible'),
+                            onPressed: _showForgotPasswordDialog,
                             child: Text(
                               'Mot de passe oublié ?',
                               style: GoogleFonts.poppins(
@@ -558,7 +739,7 @@ class _FloatingCircle extends StatelessWidget {
   }
 }
 
-// Glass-morphism text field
+// Glass-morphism text field with inline error support
 class _GlassTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
@@ -566,6 +747,8 @@ class _GlassTextField extends StatelessWidget {
   final bool obscure;
   final TextInputType? keyboardType;
   final Widget? suffix;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
 
   const _GlassTextField({
     required this.controller,
@@ -574,33 +757,53 @@ class _GlassTextField extends StatelessWidget {
     this.obscure = false,
     this.keyboardType,
     this.suffix,
+    this.errorText,
+    this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasError = errorText != null;
     return TextField(
       controller: controller,
       obscureText: obscure,
       keyboardType: keyboardType,
       style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
+      onChanged: onChanged,
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: GoogleFonts.poppins(color: Colors.white54, fontSize: 14),
-        prefixIcon: Icon(icon, color: Colors.white60, size: 20),
+        prefixIcon: Icon(icon, color: hasError ? Colors.redAccent : Colors.white60, size: 20),
         suffixIcon: suffix,
+        errorText: errorText,
+        errorStyle: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 11.5, fontWeight: FontWeight.w500),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.12),
+        fillColor: hasError
+            ? Colors.red.withOpacity(0.08)
+            : Colors.white.withOpacity(0.12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
+          borderSide: hasError
+              ? const BorderSide(color: Colors.redAccent, width: 1.5)
+              : BorderSide(color: Colors.white.withOpacity(0.25)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.white, width: 2),
+          borderSide: hasError
+              ? const BorderSide(color: Colors.redAccent, width: 2)
+              : const BorderSide(color: Colors.white, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),

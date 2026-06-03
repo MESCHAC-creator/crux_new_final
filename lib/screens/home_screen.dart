@@ -104,8 +104,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _createMeeting() async {
     final name = _meetingNameController.text.trim();
     if (name.isEmpty) {
-      _errorHandler.showErrorDialog(
-          context, '⚠️ Attention', 'Entrez le nom de la réunion');
+      _errorHandler.showWarningSnackBar(context, '⚠️ Entrez le nom de la réunion');
+      return;
+    }
+    if (name.length < 2) {
+      _errorHandler.showWarningSnackBar(context, '⚠️ Le nom doit faire au moins 2 caractères');
       return;
     }
     final password =
@@ -140,8 +143,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
     } catch (e) {
       if (mounted) {
-        _errorHandler.showErrorDialog(context, '❌ Erreur',
-            e.toString().replaceFirst('Exception: ', ''));
+        _errorHandler.showError(context,
+            _errorHandler.getMeetingErrorMessage(e.toString()));
       }
     } finally {
       if (mounted) setState(() => _isCreating = false);
@@ -156,27 +159,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     if (!mounted) return;
 
-    if (meeting != null && meeting.isLocked) {
-      _errorHandler.showErrorDialog(
-        context,
-        '🔒 Réunion verrouillée',
-        'L\'hôte a verrouillé cette réunion. Réessayez plus tard.',
-      );
+    if (meeting == null) {
+      _errorHandler.showError(context, '🔍 Réunion introuvable. Vérifiez l\'ID saisi.');
       return;
     }
 
-    if (meeting != null &&
-        meeting.password != null &&
-        meeting.password!.isNotEmpty) {
+    if (meeting.isLocked) {
+      _errorHandler.showWarningSnackBar(context,
+          '🔒 Cette réunion est verrouillée par l\'hôte. Réessayez plus tard.');
+      return;
+    }
+
+    if (meeting.password != null && meeting.password!.isNotEmpty) {
       final entered = await _showPasswordPrompt();
       if (!mounted) return;
       if (entered == null) return; // user cancelled
+      if (entered.isEmpty) {
+        _errorHandler.showWarningSnackBar(context, '⚠️ Entrez le code d\'accès');
+        return;
+      }
       if (entered != meeting.password) {
-        _errorHandler.showErrorDialog(
-          context,
-          '❌ Mot de passe incorrect',
-          'Le code d\'accès entré est incorrect.',
-        );
+        _errorHandler.showError(context,
+            '🔑 Code d\'accès incorrect. Vérifiez et réessayez.');
         return;
       }
     }

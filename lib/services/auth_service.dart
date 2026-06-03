@@ -11,11 +11,7 @@ class AuthService {
   final _errorHandler = ErrorHandlerService();
 
   static final AuthService _instance = AuthService._internal();
-
-  factory AuthService() {
-    return _instance;
-  }
-
+  factory AuthService() => _instance;
   AuthService._internal();
 
   User? get currentUser => _auth.currentUser;
@@ -27,22 +23,6 @@ class AuthService {
     required String name,
   }) async {
     try {
-      if (email.isEmpty || password.isEmpty || name.isEmpty) {
-        throw Exception('⚠️ Tous les champs sont obligatoires');
-      }
-
-      if (!email.contains('@')) {
-        throw Exception('⚠️ Email invalide');
-      }
-
-      if (password.length < 6) {
-        throw Exception('⚠️ Mot de passe: minimum 6 caractères');
-      }
-
-      if (name.length < 2) {
-        throw Exception('⚠️ Nom: minimum 2 caractères');
-      }
-
       _logger.i('📝 Inscription en cours: $email');
 
       final userCredential = await _auth.createUserWithEmailAndPassword(
@@ -61,12 +41,12 @@ class AuthService {
         name: name.trim(),
       );
     } on FirebaseAuthException catch (e) {
-      final errorMsg = _errorHandler.getFirebaseErrorMessage(e.code);
-      _logger.e('❌ Firebase Auth: ${e.code}');
-      throw Exception(errorMsg);
+      _logger.e('❌ Firebase Auth signUp: ${e.code}');
+      // Re-throw raw FirebaseAuthException so screens can distinguish codes
+      throw FirebaseAuthException(code: e.code, message: e.message);
     } catch (e) {
       _logger.e('❌ Erreur inscription: $e');
-      throw Exception('❌ Erreur d\'inscription: $e');
+      throw FirebaseAuthException(code: 'network-request-failed');
     }
   }
 
@@ -75,10 +55,6 @@ class AuthService {
     required String password,
   }) async {
     try {
-      if (email.isEmpty || password.isEmpty) {
-        throw Exception('⚠️ Email et mot de passe obligatoires');
-      }
-
       _logger.i('🔑 Connexion en cours: $email');
 
       final userCredential = await _auth.signInWithEmailAndPassword(
@@ -94,42 +70,37 @@ class AuthService {
         name: userCredential.user!.displayName ?? 'Utilisateur',
       );
     } on FirebaseAuthException catch (e) {
-      final errorMsg = _errorHandler.getFirebaseErrorMessage(e.code);
-      _logger.e('❌ Firebase Auth: ${e.code}');
-      throw Exception(errorMsg);
+      _logger.e('❌ Firebase Auth signIn: ${e.code}');
+      throw FirebaseAuthException(code: e.code, message: e.message);
     } catch (e) {
       _logger.e('❌ Erreur connexion: $e');
-      throw Exception('❌ Erreur de connexion: $e');
+      throw FirebaseAuthException(code: 'network-request-failed');
     }
   }
 
   Future<void> signOut() async {
     try {
       _logger.i('👋 Déconnexion en cours...');
+      await _googleSignIn.signOut().catchError((_) {});
       await _auth.signOut();
       _logger.i('✅ Déconnecté avec succès');
     } catch (e) {
       _logger.e('❌ Erreur déconnexion: $e');
-      throw Exception('❌ Erreur de déconnexion: $e');
+      // Don't throw — sign out should always succeed locally
     }
   }
 
   Future<void> resetPassword(String email) async {
     try {
-      if (email.isEmpty) {
-        throw Exception('⚠️ Email obligatoire');
-      }
-
       _logger.i('🔄 Réinitialisation du mot de passe: $email');
       await _auth.sendPasswordResetEmail(email: email.trim());
       _logger.i('✅ Email de réinitialisation envoyé');
     } on FirebaseAuthException catch (e) {
-      final errorMsg = _errorHandler.getFirebaseErrorMessage(e.code);
-      _logger.e('❌ Firebase Auth: ${e.code}');
-      throw Exception(errorMsg);
+      _logger.e('❌ Firebase Auth resetPassword: ${e.code}');
+      throw FirebaseAuthException(code: e.code, message: e.message);
     } catch (e) {
       _logger.e('❌ Erreur réinitialisation: $e');
-      throw Exception('❌ Erreur: $e');
+      throw FirebaseAuthException(code: 'network-request-failed');
     }
   }
 
@@ -157,12 +128,14 @@ class AuthService {
         name: user.displayName ?? googleUser.displayName ?? 'Utilisateur',
       );
     } on FirebaseAuthException catch (e) {
-      final errorMsg = _errorHandler.getFirebaseErrorMessage(e.code);
       _logger.e('❌ Firebase Auth Google: ${e.code}');
-      throw Exception(errorMsg);
+      throw FirebaseAuthException(code: e.code, message: e.message);
     } catch (e) {
       _logger.e('❌ Erreur Google Sign-In: $e');
-      throw Exception('❌ Erreur de connexion Google: $e');
+      if (e.toString().contains('cancelled') || e.toString().contains('canceled')) {
+        throw FirebaseAuthException(code: 'popup-closed-by-user');
+      }
+      throw FirebaseAuthException(code: 'network-request-failed');
     }
   }
 }

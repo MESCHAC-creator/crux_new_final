@@ -24,6 +24,12 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
   bool _showPassword = false;
   bool _showConfirmPassword = false;
 
+  // Inline error states
+  String? _nameError;
+  String? _emailError;
+  String? _passwordError;
+  String? _confirmError;
+
   late AnimationController _bgController;
   late AnimationController _contentController;
   late AnimationController _pulseController;
@@ -154,20 +160,54 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
   }
 
   Future<void> _signUp() async {
-    if (_nameController.text.trim().isEmpty ||
-        _emailController.text.trim().isEmpty ||
-        _passwordController.text.isEmpty) {
-      _errorHandler.showError(context, 'Veuillez remplir tous les champs.');
-      return;
+    // Clear previous errors
+    setState(() {
+      _nameError = null;
+      _emailError = null;
+      _passwordError = null;
+      _confirmError = null;
+    });
+
+    // Inline validation
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final pass = _passwordController.text;
+    final confirm = _confirmPasswordController.text;
+    bool hasError = false;
+
+    if (name.isEmpty) {
+      setState(() => _nameError = 'Entrez votre nom complet');
+      hasError = true;
+    } else if (name.length < 2) {
+      setState(() => _nameError = 'Le nom doit faire au moins 2 caractères');
+      hasError = true;
     }
-    if (_passwordController.text != _confirmPasswordController.text) {
-      _errorHandler.showError(context, 'Les mots de passe ne correspondent pas.');
-      return;
+
+    if (email.isEmpty) {
+      setState(() => _emailError = 'Entrez votre adresse email');
+      hasError = true;
+    } else if (!email.contains('@') || !email.contains('.')) {
+      setState(() => _emailError = 'Format invalide (ex: nom@domaine.com)');
+      hasError = true;
     }
-    if (_passwordController.text.length < 6) {
-      _errorHandler.showError(context, 'Mot de passe trop court (min. 6 caractères).');
-      return;
+
+    if (pass.isEmpty) {
+      setState(() => _passwordError = 'Entrez un mot de passe');
+      hasError = true;
+    } else if (pass.length < 6) {
+      setState(() => _passwordError = 'Minimum 6 caractères requis');
+      hasError = true;
     }
+
+    if (confirm.isEmpty) {
+      setState(() => _confirmError = 'Confirmez votre mot de passe');
+      hasError = true;
+    } else if (pass != confirm) {
+      setState(() => _confirmError = 'Les mots de passe ne correspondent pas');
+      hasError = true;
+    }
+
+    if (hasError) return;
 
     await _buttonController.forward();
     await _buttonController.reverse();
@@ -175,15 +215,27 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
     setState(() => _isLoading = true);
     try {
       final user = await _authService.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        name: _nameController.text.trim(),
+        email: email,
+        password: pass,
+        name: name,
       );
       if (mounted && user != null) {
         Navigator.of(context).pushReplacementNamed('/home', arguments: user);
       }
     } catch (e) {
-      if (mounted) _errorHandler.showError(context, e.toString());
+      if (!mounted) return;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      if (msg.contains('email-already-in-use') || msg.contains('déjà utilisé')) {
+        setState(() => _emailError = 'Cet email est déjà utilisé');
+      } else if (msg.contains('invalid-email') || msg.contains('invalide')) {
+        setState(() => _emailError = 'Format d\'email invalide');
+      } else if (msg.contains('weak-password') || msg.contains('trop faible')) {
+        setState(() => _passwordError = 'Mot de passe trop faible');
+      } else if (msg.contains('network') || msg.contains('réseau')) {
+        _errorHandler.showWarningSnackBar(context, 'Pas de connexion Internet');
+      } else {
+        _errorHandler.showError(context, msg);
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -284,6 +336,8 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                                     label: 'Nom complet',
                                     hint: 'Jean Dupont',
                                     icon: Icons.person_outline,
+                                    errorText: _nameError,
+                                    onChanged: (_) => setState(() => _nameError = null),
                                   ),
                                 ),
                               ),
@@ -298,6 +352,8 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                                     hint: 'email@exemple.com',
                                     icon: Icons.email_outlined,
                                     keyboardType: TextInputType.emailAddress,
+                                    errorText: _emailError,
+                                    onChanged: (_) => setState(() => _emailError = null),
                                   ),
                                 ),
                               ),
@@ -312,6 +368,8 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                                     hint: '••••••••',
                                     icon: Icons.lock_outline,
                                     obscureText: !_showPassword,
+                                    errorText: _passwordError,
+                                    onChanged: (_) => setState(() => _passwordError = null),
                                     suffixIcon: IconButton(
                                       icon: Icon(
                                         _showPassword ? Icons.visibility_off : Icons.visibility,
@@ -334,6 +392,8 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                                     hint: '••••••••',
                                     icon: Icons.lock_outline,
                                     obscureText: !_showConfirmPassword,
+                                    errorText: _confirmError,
+                                    onChanged: (_) => setState(() => _confirmError = null),
                                     suffixIcon: IconButton(
                                       icon: Icon(
                                         _showConfirmPassword ? Icons.visibility_off : Icons.visibility,
@@ -549,7 +609,7 @@ class _FloatingParticle extends StatelessWidget {
   }
 }
 
-// Reusable glass text field
+// Reusable glass text field with inline error support
 class _GlassTextField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
@@ -558,6 +618,8 @@ class _GlassTextField extends StatelessWidget {
   final bool obscureText;
   final TextInputType? keyboardType;
   final Widget? suffixIcon;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
 
   const _GlassTextField({
     required this.controller,
@@ -567,35 +629,62 @@ class _GlassTextField extends StatelessWidget {
     this.obscureText = false,
     this.keyboardType,
     this.suffixIcon,
+    this.errorText,
+    this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasError = errorText != null;
     return TextField(
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
       style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        labelStyle: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
+        labelStyle: GoogleFonts.poppins(
+          color: hasError ? Colors.redAccent : Colors.white70,
+          fontSize: 13,
+        ),
         hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 14),
-        prefixIcon: Icon(icon, color: Colors.white70, size: 20),
+        prefixIcon: Icon(icon, color: hasError ? Colors.redAccent : Colors.white70, size: 20),
         suffixIcon: suffixIcon,
+        errorText: errorText,
+        errorStyle: GoogleFonts.poppins(
+          color: Colors.redAccent,
+          fontSize: 11.5,
+          fontWeight: FontWeight.w500,
+        ),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.12),
+        fillColor: hasError
+            ? Colors.red.withOpacity(0.08)
+            : Colors.white.withOpacity(0.12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
+          borderSide: hasError
+              ? const BorderSide(color: Colors.redAccent, width: 1.5)
+              : BorderSide(color: Colors.white.withOpacity(0.25)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFFF4081), width: 1.5),
+          borderSide: hasError
+              ? const BorderSide(color: Colors.redAccent, width: 2)
+              : const BorderSide(color: Color(0xFFFF4081), width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
