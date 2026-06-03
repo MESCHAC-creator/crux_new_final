@@ -11,6 +11,8 @@ import '../providers/color_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/error_handler_service.dart';
 import '../services/pro_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../l10n/app_translations.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -99,7 +101,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                               alignment: Alignment.bottomLeft,
                               child: Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
-                                child: Text('Paramètres',
+                                child: Text(AppTranslations.t('settings', localeProvider.locale.languageCode),
                                   style: GoogleFonts.poppins(
                                     fontSize: 28, fontWeight: FontWeight.w800,
                                     color: Colors.white, letterSpacing: -0.5,
@@ -127,9 +129,50 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ── PROFIL ─────────────────────────────────────────
+                      _SectionLabel(AppTranslations.t('profile', localeProvider.locale.languageCode), colorProvider.primary),
+                      GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/profile'),
+                        child: _GlassCard(
+                          isDark: isDark,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(children: [
+                              Builder(builder: (_) {
+                                final user = FirebaseAuth.instance.currentUser;
+                                final initials = (user?.displayName?.isNotEmpty == true)
+                                    ? user!.displayName!.split(' ').take(2).map((w) => w[0].toUpperCase()).join()
+                                    : (user?.email?[0].toUpperCase() ?? 'U');
+                                return Container(
+                                  width: 56, height: 56,
+                                  decoration: BoxDecoration(gradient: colorProvider.gradient, shape: BoxShape.circle),
+                                  child: ClipOval(
+                                    child: user?.photoURL != null
+                                        ? Image.network(user!.photoURL!, fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Center(child: Text(initials,
+                                                style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 22))))
+                                        : Center(child: Text(initials,
+                                            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 22))),
+                                  ),
+                                );
+                              }),
+                              const SizedBox(width: 14),
+                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(FirebaseAuth.instance.currentUser?.displayName ?? FirebaseAuth.instance.currentUser?.email?.split('@')[0] ?? 'Utilisateur',
+                                    style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+                                Text(FirebaseAuth.instance.currentUser?.email ?? '',
+                                    style: GoogleFonts.poppins(fontSize: 12, color: isDark ? Colors.white54 : Colors.black45)),
+                              ])),
+                              Icon(Icons.chevron_right, color: isDark ? Colors.white30 : Colors.black26, size: 20),
+                            ]),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
 
                       // ── COULEUR D'ACCENT ─────────────────────────────
-                      _SectionLabel('Couleur de l\'application', colorProvider.primary),
+                      _SectionLabel(AppTranslations.t('app_color', localeProvider.locale.languageCode), colorProvider.primary),
                       _GlassCard(
                         isDark: isDark,
                         child: Padding(
@@ -149,7 +192,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                 ),
                                 const SizedBox(width: 12),
                                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                  Text('Thème actuel', style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+                                  Text(AppTranslations.t('current_theme', localeProvider.locale.languageCode), style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
                                   Text(colorProvider.name, style: GoogleFonts.poppins(fontSize: 12, color: isDark ? Colors.white54 : Colors.black45)),
                                 ]),
                               ]),
@@ -219,15 +262,15 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       const SizedBox(height: 24),
 
                       // ── APPARENCE ────────────────────────────────────
-                      _SectionLabel('Apparence', colorProvider.primary),
+                      _SectionLabel(AppTranslations.t('appearance', localeProvider.locale.languageCode), colorProvider.primary),
                       _GlassCard(
                         isDark: isDark,
                         child: Column(children: [
                           _GlassTile(
                             icon: isDark ? Icons.dark_mode : Icons.light_mode_outlined,
                             iconColor: isDark ? const Color(0xFF6366F1) : const Color(0xFFF59E0B),
-                            title: 'Mode sombre',
-                            subtitle: isDark ? 'Activé' : 'Désactivé',
+                            title: AppTranslations.t('dark_mode', localeProvider.locale.languageCode),
+                            subtitle: isDark ? AppTranslations.t('enabled', localeProvider.locale.languageCode) : AppTranslations.t('disabled', localeProvider.locale.languageCode),
                             isDark: isDark,
                             trailing: _GlassSwitch(
                               value: isDark,
@@ -242,7 +285,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                           _GlassTile(
                             icon: Icons.language_outlined,
                             iconColor: const Color(0xFF10B981),
-                            title: 'Langue',
+                            title: AppTranslations.t('language', localeProvider.locale.languageCode),
                             subtitle: localeProvider.languageLabel,
                             isDark: isDark,
                             trailing: Icon(Icons.chevron_right, color: isDark ? Colors.white30 : Colors.black26, size: 20),
@@ -254,14 +297,14 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       const SizedBox(height: 24),
 
                       // ── RÉUNION ──────────────────────────────────────
-                      _SectionLabel('Réunion', colorProvider.primary),
+                      _SectionLabel(AppTranslations.t('meeting_settings', localeProvider.locale.languageCode), colorProvider.primary),
                       _GlassCard(
                         isDark: isDark,
                         child: Column(children: [
                           _GlassTile(
                             icon: Icons.hd_outlined,
                             iconColor: const Color(0xFF0EA5E9),
-                            title: 'Qualité vidéo',
+                            title: AppTranslations.t('video_quality', localeProvider.locale.languageCode),
                             subtitle: _videoQuality,
                             isDark: isDark,
                             trailing: Icon(Icons.chevron_right, color: isDark ? Colors.white30 : Colors.black26, size: 20),
@@ -271,7 +314,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                           _GlassTile(
                             icon: Icons.mic_outlined,
                             iconColor: const Color(0xFF27AE60),
-                            title: 'Micro activé par défaut',
+                            title: AppTranslations.t('mic_default', localeProvider.locale.languageCode),
                             isDark: isDark,
                             trailing: _GlassSwitch(
                               value: _micDefault,
@@ -288,7 +331,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                           _GlassTile(
                             icon: Icons.videocam_outlined,
                             iconColor: colorProvider.primary,
-                            title: 'Caméra activée par défaut',
+                            title: AppTranslations.t('cam_default', localeProvider.locale.languageCode),
                             isDark: isDark,
                             trailing: _GlassSwitch(
                               value: _camDefault,
@@ -307,14 +350,14 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       const SizedBox(height: 24),
 
                       // ── NOTIFICATIONS ────────────────────────────────
-                      _SectionLabel('Notifications', colorProvider.primary),
+                      _SectionLabel(AppTranslations.t('notifications', localeProvider.locale.languageCode), colorProvider.primary),
                       _GlassCard(
                         isDark: isDark,
                         child: _GlassTile(
                           icon: Icons.notifications_outlined,
                           iconColor: const Color(0xFFF59E0B),
-                          title: 'Notifications push',
-                          subtitle: _notificationsEnabled ? 'Activées' : 'Désactivées',
+                          title: AppTranslations.t('push_notifs', localeProvider.locale.languageCode),
+                          subtitle: _notificationsEnabled ? AppTranslations.t('enabled', localeProvider.locale.languageCode) : AppTranslations.t('disabled', localeProvider.locale.languageCode),
                           isDark: isDark,
                           trailing: _GlassSwitch(
                             value: _notificationsEnabled,
@@ -332,7 +375,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       const SizedBox(height: 24),
 
                       // ── ABONNEMENT ───────────────────────────────────
-                      _SectionLabel('Abonnement', colorProvider.primary),
+                      _SectionLabel(AppTranslations.t('subscription', localeProvider.locale.languageCode), colorProvider.primary),
                       GestureDetector(
                         onTap: () async {
                           final uid = (await SharedPreferences.getInstance()).getString('crux_uid') ?? '';
@@ -358,16 +401,16 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                             const Icon(Icons.workspace_premium, color: Colors.white, size: 32),
                             const SizedBox(width: 14),
                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(_isPro ? 'Crux Pro Actif ✓' : 'Passer à Crux Pro',
+                              Text(_isPro ? AppTranslations.t('pro_active', localeProvider.locale.languageCode) : AppTranslations.t('pro_inactive', localeProvider.locale.languageCode),
                                 style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
-                              Text(_isPro ? 'Réunions illimitées actives' : '25 000 FCFA/mois · Réunions illimitées',
+                              Text(_isPro ? AppTranslations.t('pro_active_sub', localeProvider.locale.languageCode) : AppTranslations.t('pro_inactive_sub', localeProvider.locale.languageCode),
                                 style: GoogleFonts.poppins(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
                             ])),
                             if (!_isPro)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                                child: Text('Activer', style: GoogleFonts.poppins(color: const Color(0xFFFFA500), fontWeight: FontWeight.w800, fontSize: 13)),
+                                child: Text(AppTranslations.t('activate', localeProvider.locale.languageCode), style: GoogleFonts.poppins(color: const Color(0xFFFFA500), fontWeight: FontWeight.w800, fontSize: 13)),
                               ),
                           ]),
                         ),
@@ -376,14 +419,14 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       const SizedBox(height: 24),
 
                       // ── LÉGAL ────────────────────────────────────────
-                      _SectionLabel('Légal & Support', colorProvider.primary),
+                      _SectionLabel(AppTranslations.t('legal', localeProvider.locale.languageCode), colorProvider.primary),
                       _GlassCard(
                         isDark: isDark,
                         child: Column(children: [
                           _GlassTile(
                             icon: Icons.shield_outlined,
                             iconColor: const Color(0xFF6366F1),
-                            title: 'Politique de confidentialité',
+                            title: AppTranslations.t('privacy_policy', localeProvider.locale.languageCode),
                             isDark: isDark,
                             trailing: Icon(Icons.chevron_right, color: isDark ? Colors.white30 : Colors.black26, size: 20),
                             onTap: () => Navigator.pushNamed(context, '/privacy'),
@@ -392,7 +435,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                           _GlassTile(
                             icon: Icons.gavel_outlined,
                             iconColor: const Color(0xFFEF4444),
-                            title: 'Conditions d\'utilisation',
+                            title: AppTranslations.t('terms_of_use', localeProvider.locale.languageCode),
                             isDark: isDark,
                             trailing: Icon(Icons.chevron_right, color: isDark ? Colors.white30 : Colors.black26, size: 20),
                             onTap: () => Navigator.pushNamed(context, '/terms'),
@@ -401,7 +444,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                           _GlassTile(
                             icon: Icons.headset_mic_outlined,
                             iconColor: const Color(0xFF0EA5E9),
-                            title: 'Assistance',
+                            title: AppTranslations.t('support_label', localeProvider.locale.languageCode),
                             subtitle: 'kouakouchristevann@gmail.com',
                             isDark: isDark,
                             trailing: Icon(Icons.chevron_right, color: isDark ? Colors.white30 : Colors.black26, size: 20),
@@ -421,11 +464,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       _GlassCard(
                         isDark: isDark,
                         child: Column(children: [
-                          _GlassTile(icon: Icons.info_outline, iconColor: Colors.grey, title: 'Version', subtitle: '1.0.0', isDark: isDark, trailing: const SizedBox()),
+                          _GlassTile(icon: Icons.info_outline, iconColor: Colors.grey, title: AppTranslations.t('version', localeProvider.locale.languageCode), subtitle: '1.0.0', isDark: isDark, trailing: const SizedBox()),
                           _GlassDivider(isDark: isDark),
                           _GlassTile(icon: Icons.build_outlined, iconColor: Colors.grey, title: 'Build', subtitle: '1', isDark: isDark, trailing: const SizedBox()),
                           _GlassDivider(isDark: isDark),
-                          _GlassTile(icon: Icons.business_outlined, iconColor: colorProvider.primary, title: 'Développé par', subtitle: 'CRUX Team', isDark: isDark, trailing: const SizedBox()),
+                          _GlassTile(icon: Icons.business_outlined, iconColor: colorProvider.primary, title: AppTranslations.t('built_by', localeProvider.locale.languageCode), subtitle: 'CRUX Team', isDark: isDark, trailing: const SizedBox()),
                         ]),
                       ),
 

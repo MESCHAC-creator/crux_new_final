@@ -7,6 +7,7 @@ import '../screens/setting_screen.dart';
 import '../screens/signup_screen.dart';
 import '../screens/privacy_policy_screen.dart';
 import '../screens/terms_screen.dart';
+import '../screens/profile_screen.dart';
 import '../models/user_model.dart';
 
 class AppRoutes {
@@ -18,6 +19,7 @@ class AppRoutes {
   static const String settings = '/settings';
   static const String privacy = '/privacy';
   static const String terms = '/terms';
+  static const String profile = '/profile';
 
   static Route<dynamic> generateRoute(RouteSettings routeSettings) {
     switch (routeSettings.name) {
@@ -61,6 +63,9 @@ class AppRoutes {
 
       case terms:
         return MaterialPageRoute(builder: (_) => const TermsScreen());
+
+      case profile:
+        return MaterialPageRoute(builder: (_) => const ProfileScreen());
 
       default:
         return MaterialPageRoute(builder: (_) => const SplashScreen());

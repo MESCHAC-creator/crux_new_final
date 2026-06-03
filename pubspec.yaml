@@ -49,6 +49,10 @@ dependencies:
   # Google Sign-In
   google_sign_in: ^6.2.1
 
+  # Profile photo
+  image_picker: ^1.1.2
+  firebase_storage: ^12.3.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

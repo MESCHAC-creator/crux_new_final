@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/colors.dart';
 import '../models/user_model.dart';
@@ -11,6 +12,9 @@ import '../services/meeting_service.dart';
 import '../services/pro_service.dart';
 import '../services/error_handler_service.dart';
 import '../screens/meeting_screen.dart';
+import '../providers/locale_provider.dart';
+import '../providers/color_provider.dart';
+import '../l10n/app_translations.dart';
 
 class HomeScreen extends StatefulWidget {
   final UserModel user;
@@ -368,9 +372,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    final cp = context.watch<ColorProvider>();
     final firstName = _displayFirstName();
     final hour = DateTime.now().hour;
-    final greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
+    final greeting = hour < 12
+        ? AppTranslations.t('good_morning', lang)
+        : hour < 18
+            ? AppTranslations.t('good_afternoon', lang)
+            : AppTranslations.t('good_evening', lang);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0A0A0F) : const Color(0xFFF0F2FF),
@@ -432,21 +442,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 ],
                               ),
                             ),
-                            // Avatar + settings
-                            GestureDetector(
-                              onTap: _logout,
+                            // Avatar → profile menu
+                            PopupMenuButton<String>(
+                              offset: const Offset(0, 52),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+                              onSelected: (val) {
+                                if (val == 'profile') Navigator.pushNamed(context, '/profile');
+                                if (val == 'logout') _logout();
+                              },
+                              itemBuilder: (_) => [
+                                PopupMenuItem(value: 'profile', child: Row(children: [
+                                  Icon(Icons.person_outline, color: cp.primary, size: 18),
+                                  const SizedBox(width: 10),
+                                  Text(AppTranslations.t('profile', lang),
+                                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600,
+                                          color: isDark ? Colors.white : Colors.black87)),
+                                ])),
+                                PopupMenuItem(value: 'logout', child: Row(children: [
+                                  const Icon(Icons.logout, color: Colors.red, size: 18),
+                                  const SizedBox(width: 10),
+                                  Text(AppTranslations.t('logout', lang),
+                                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.red)),
+                                ])),
+                              ],
                               child: Container(
                                 width: 44, height: 44,
                                 decoration: BoxDecoration(
-                                  gradient: AppColors.primaryGradient,
+                                  gradient: cp.gradient,
                                   shape: BoxShape.circle,
-                                  boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4))],
+                                  boxShadow: [BoxShadow(color: cp.primary.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4))],
                                 ),
                                 child: Center(
-                                  child: Text(
-                                    firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
-                                    style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18),
-                                  ),
+                                  child: FirebaseAuth.instance.currentUser?.photoURL != null
+                                      ? ClipOval(child: Image.network(FirebaseAuth.instance.currentUser!.photoURL!, fit: BoxFit.cover, width: 44, height: 44,
+                                          errorBuilder: (_, __, ___) => Text(firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18))))
+                                      : Text(firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
                                 ),
                               ),
                             ),
@@ -484,7 +517,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             scale: _pulse,
                             child: _BigActionButton(
                               icon: Icons.videocam_rounded,
-                              label: 'Nouvelle\nRéunion',
+                              label: AppTranslations.t('new_meeting', lang),
                               gradient: const LinearGradient(
                                 colors: [Color(0xFFE74C3C), Color(0xFF9B59B6)],
                                 begin: Alignment.topLeft,
@@ -499,7 +532,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         Expanded(
                           child: _BigActionButton(
                             icon: Icons.add_link_rounded,
-                            label: 'Rejoindre\nRéunion',
+                            label: AppTranslations.t('join_meeting', lang),
                             gradient: const LinearGradient(
                               colors: [Color(0xFF5B5FFF), Color(0xFF8E44AD)],
                               begin: Alignment.topLeft,
@@ -531,11 +564,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                       child: Row(
                         children: [
-                          _StatItem(label: 'Réunions', value: '${_recentMeetings.length}', icon: Icons.videocam_outlined, color: const Color(0xFFE74C3C)),
+                          _StatItem(label: AppTranslations.t('meetings', lang), value: '${_recentMeetings.length}', icon: Icons.videocam_outlined, color: const Color(0xFFE74C3C)),
                           _Divider(),
-                          _StatItem(label: 'Statut', value: _isPro ? 'Pro' : 'Gratuit', icon: Icons.workspace_premium_outlined, color: _isPro ? const Color(0xFFFFD700) : Colors.grey),
+                          _StatItem(label: AppTranslations.t('status', lang), value: _isPro ? AppTranslations.t('pro_label', lang) : AppTranslations.t('free', lang), icon: Icons.workspace_premium_outlined, color: _isPro ? const Color(0xFFFFD700) : Colors.grey),
                           _Divider(),
-                          _StatItem(label: 'Limite', value: _isPro ? '∞' : '30min', icon: Icons.timer_outlined, color: const Color(0xFF5B5FFF)),
+                          _StatItem(label: AppTranslations.t('limit', lang), value: _isPro ? '∞' : '30min', icon: Icons.timer_outlined, color: const Color(0xFF5B5FFF)),
                         ],
                       ),
                     ),
@@ -551,27 +584,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Actions rapides',
+                        Text(AppTranslations.t('quick_actions', lang),
                           style: GoogleFonts.poppins(
                             fontSize: 16, fontWeight: FontWeight.w800,
                             color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                           )),
                         const SizedBox(height: 14),
                         Row(children: [
-                          Expanded(child: _QuickAction(icon: Icons.link, label: 'Rejoindre', color: const Color(0xFF5B5FFF), onTap: _showJoinDialog)),
+                          Expanded(child: _QuickAction(icon: Icons.link, label: AppTranslations.t('join', lang), color: const Color(0xFF5B5FFF), onTap: _showJoinDialog)),
                           const SizedBox(width: 10),
-                          Expanded(child: _QuickAction(icon: Icons.share_outlined, label: 'Partager', color: const Color(0xFF27AE60),
+                          Expanded(child: _QuickAction(icon: Icons.share_outlined, label: AppTranslations.t('share', lang), color: const Color(0xFF27AE60),
                             onTap: () async {
                               const msg = '🎥 Rejoins-moi sur CRUX — la meilleure app de visioconférence !\n\nTélécharge ici : https://github.com/MESCHAC-creator/crux_new_final/releases\n\n📲 Gratuit · 30 min offertes · Disponible sur Android';
                               await Clipboard.setData(const ClipboardData(text: msg));
-                              if (context.mounted) _errorHandler.showInfoSnackBar(context, '📋 Lien copié ! Colle-le où tu veux.');
+                              if (context.mounted) _errorHandler.showInfoSnackBar(context, AppTranslations.t('copied', lang));
                             })),
                           const SizedBox(width: 10),
-                          Expanded(child: _QuickAction(icon: Icons.tune, label: 'Réglages', color: const Color(0xFF3498DB),
+                          Expanded(child: _QuickAction(icon: Icons.tune, label: AppTranslations.t('settings_short', lang), color: const Color(0xFF3498DB),
                             onTap: () => Navigator.pushNamed(context, '/settings'))),
                           const SizedBox(width: 10),
-                          Expanded(child: _QuickAction(icon: Icons.headset_mic_outlined, label: 'Support', color: const Color(0xFFF39C12),
-                            onTap: () => _errorHandler.showInfoSnackBar(context, '📧 support@crux.app'))),
+                          Expanded(child: _QuickAction(icon: Icons.person_outline, label: AppTranslations.t('profile', lang), color: const Color(0xFFF39C12),
+                            onTap: () => Navigator.pushNamed(context, '/profile'))),
                         ]),
                       ],
                     ),
@@ -610,15 +643,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Passez à Crux Pro', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
-                                    Text('Réunions illimitées • 25 000 FCFA/mois', style: GoogleFonts.poppins(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
+                                    Text(AppTranslations.t('go_pro', lang), style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                                    Text(AppTranslations.t('go_pro_sub', lang), style: GoogleFonts.poppins(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
                                   ],
                                 ),
                               ),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                                child: Text('Activer', style: GoogleFonts.poppins(color: const Color(0xFFFFA500), fontWeight: FontWeight.w800, fontSize: 13)),
+                                child: Text(AppTranslations.t('activate', lang), style: GoogleFonts.poppins(color: const Color(0xFFFFA500), fontWeight: FontWeight.w800, fontSize: 13)),
                               ),
                             ],
                           ),
@@ -637,7 +670,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Récentes',
+                          Text(AppTranslations.t('recent', lang),
                             style: GoogleFonts.poppins(
                               fontSize: 16, fontWeight: FontWeight.w800,
                               color: isDark ? Colors.white : const Color(0xFF1A1A2E),
@@ -648,7 +681,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               await prefs.remove('crux_recent_meetings');
                               await _loadHistory();
                             },
-                            child: Text('Tout effacer', style: GoogleFonts.poppins(fontSize: 12, color: Colors.red.shade400)),
+                            child: Text(AppTranslations.t('clear_all', lang), style: GoogleFonts.poppins(fontSize: 12, color: Colors.red.shade400)),
                           ),
                         ],
                       ),
