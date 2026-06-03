@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,11 +8,9 @@ import '../theme/colors.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/meeting_service.dart';
+import '../services/pro_service.dart';
 import '../services/error_handler_service.dart';
 import '../screens/meeting_screen.dart';
-import '../providers/locale_provider.dart';
-import '../l10n/app_translations.dart';
-import 'package:provider/provider.dart';
 
 class HomeScreen extends StatefulWidget {
   final UserModel user;
@@ -21,22 +20,55 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final _authService = AuthService();
   final _meetingService = MeetingService();
+  final _proService = ProService();
   final _errorHandler = ErrorHandlerService();
   final _meetingNameController = TextEditingController();
   final _joinIdController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isCreating = false;
-  bool _showPassword = false; // toggle password field in create card
+  bool _showPassword = false;
   bool _obscurePassword = true;
+  bool _isPro = false;
   List<Map<String, dynamic>> _recentMeetings = [];
+
+  late AnimationController _headerAnim;
+  late AnimationController _pulseAnim;
+  late Animation<double> _headerFade;
+  late Animation<Offset> _headerSlide;
+  late Animation<double> _pulse;
 
   @override
   void initState() {
     super.initState();
     _loadHistory();
+    _checkPro();
+    _setupAnimations();
+  }
+
+  void _setupAnimations() {
+    _headerAnim = AnimationController(
+        duration: const Duration(milliseconds: 900), vsync: this);
+    _pulseAnim = AnimationController(
+        duration: const Duration(milliseconds: 2000), vsync: this)
+      ..repeat(reverse: true);
+
+    _headerFade = Tween<double>(begin: 0, end: 1).animate(
+        CurvedAnimation(parent: _headerAnim, curve: Curves.easeOut));
+    _headerSlide =
+        Tween<Offset>(begin: const Offset(0, -0.3), end: Offset.zero).animate(
+            CurvedAnimation(parent: _headerAnim, curve: Curves.easeOutCubic));
+    _pulse = Tween<double>(begin: 1.0, end: 1.05)
+        .animate(CurvedAnimation(parent: _pulseAnim, curve: Curves.easeInOut));
+
+    _headerAnim.forward();
+  }
+
+  Future<void> _checkPro() async {
+    final pro = await _proService.isPro(widget.user.uid);
+    if (mounted) setState(() => _isPro = pro);
   }
 
   Future<void> _loadHistory() async {
@@ -46,6 +78,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _headerAnim.dispose();
+    _pulseAnim.dispose();
     _meetingNameController.dispose();
     _joinIdController.dispose();
     _passwordController.dispose();
@@ -334,416 +368,665 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor =
-        isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF5F3FF);
+    final firstName = _displayFirstName();
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
 
     return Scaffold(
-      backgroundColor: bgColor,
-      body: CustomScrollView(
-        slivers: [
-          // ── App bar ─────────────────────────────────────
-          SliverAppBar(
-            expandedHeight: 140,
-            floating: false,
-            pinned: true,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFE74C3C), Color(0xFF8E44AD)],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
+      backgroundColor: isDark ? const Color(0xFF0A0A0F) : const Color(0xFFF0F2FF),
+      body: Stack(
+        children: [
+          // Animated background orbs
+          _AnimatedOrbs(isDark: isDark),
+
+          // Main content
+          SafeArea(
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // ── Header ──────────────────────────────────
+                SliverToBoxAdapter(
+                  child: SlideTransition(
+                    position: _headerSlide,
+                    child: FadeTransition(
+                      opacity: _headerFade,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(22, 16, 22, 0),
+                        child: Row(
                           children: [
-                            Text('CRUX',
-                                style: GoogleFonts.poppins(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    letterSpacing: 2)),
-                            Row(children: [
-                              IconButton(
-                                icon: const Icon(Icons.settings_outlined,
-                                    color: Colors.white70),
-                                onPressed: () => Navigator.pushNamed(
-                                    context, '/settings'),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.logout,
-                                    color: Colors.white70),
-                                onPressed: _logout,
-                              ),
-                            ]),
-                          ],
-                        ),
-                        Text(
-                          '${AppTranslations.t('hello', context.watch<LocaleProvider>().locale.languageCode)}, ${_displayFirstName()} 👋',
-                          style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white),
-                        ),
-                        Text(
-                          'Prêt pour votre prochaine réunion ?',
-                          style: GoogleFonts.poppins(
-                              fontSize: 13, color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-
-                  // ── Create meeting card ──────────────────
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Color(0xFFE74C3C),
-                          Color(0xFF9B59B6),
-                          Color(0xFF8E44AD)
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              const Color(0xFFE74C3C).withValues(alpha: 0.35),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(22),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.video_call,
-                                color: Colors.white, size: 22),
-                          ),
-                          const SizedBox(width: 12),
-                          Text('Nouvelle réunion',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white)),
-                        ]),
-                        const SizedBox(height: 16),
-                        // Meeting name
-                        TextField(
-                          controller: _meetingNameController,
-                          style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500),
-                          decoration: InputDecoration(
-                            hintText: 'Nom de la réunion...',
-                            hintStyle: GoogleFonts.poppins(
-                                color: Colors.white54),
-                            prefixIcon: const Icon(Icons.edit,
-                                color: Colors.white60, size: 20),
-                            filled: true,
-                            fillColor:
-                                Colors.white.withValues(alpha: 0.15),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(
-                                  color: Colors.white
-                                      .withValues(alpha: 0.3)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(
-                                  color: Colors.white
-                                      .withValues(alpha: 0.3)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(
-                                  color: Colors.white, width: 2),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 14),
-                          ),
-                        ),
-
-                        // Password toggle
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: () => setState(
-                              () => _showPassword = !_showPassword),
-                          child: Row(children: [
-                            Icon(
-                              _showPassword
-                                  ? Icons.lock_outline
-                                  : Icons.lock_open_outlined,
-                              color: Colors.white70,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _showPassword
-                                  ? 'Supprimer le code d\'accès'
-                                  : 'Ajouter un code d\'accès',
-                              style: GoogleFonts.poppins(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                  decoration:
-                                      TextDecoration.underline,
-                                  decorationColor: Colors.white70),
-                            ),
-                          ]),
-                        ),
-
-                        // Password field
-                        if (_showPassword) ...[
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            keyboardType: TextInputType.number,
-                            style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500),
-                            decoration: InputDecoration(
-                              hintText: 'Code d\'accès (optionnel)...',
-                              hintStyle: GoogleFonts.poppins(
-                                  color: Colors.white54),
-                              prefixIcon: const Icon(Icons.lock_outline,
-                                  color: Colors.white60, size: 20),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: Colors.white60,
-                                  size: 18,
-                                ),
-                                onPressed: () => setState(() =>
-                                    _obscurePassword = !_obscurePassword),
-                              ),
-                              filled: true,
-                              fillColor:
-                                  Colors.white.withValues(alpha: 0.15),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide(
-                                    color: Colors.white
-                                        .withValues(alpha: 0.3)),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide(
-                                    color: Colors.white
-                                        .withValues(alpha: 0.3)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                    color: Colors.white, width: 2),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 14),
-                            ),
-                          ),
-                        ],
-
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed:
-                                _isCreating ? null : _createMeeting,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFFE74C3C),
-                              disabledBackgroundColor: Colors.white60,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(14)),
-                            ),
-                            child: _isCreating
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                        color: Color(0xFFE74C3C),
-                                        strokeWidth: 2.5),
-                                  )
-                                : Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.center,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '$greeting,',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      color: isDark ? Colors.white54 : Colors.black45,
+                                    ),
+                                  ),
+                                  Row(
                                     children: [
-                                      const Icon(Icons.rocket_launch,
-                                          size: 18),
+                                      Text(
+                                        firstName,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.w800,
+                                          color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                                        ),
+                                      ),
                                       const SizedBox(width: 8),
-                                      Text('Démarrer la réunion',
-                                          style: GoogleFonts.poppins(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 15)),
+                                      if (_isPro)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFFA500)]),
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Text('PRO', style: GoogleFonts.poppins(
+                                            fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white,
+                                          )),
+                                        ),
                                     ],
                                   ),
+                                ],
+                              ),
+                            ),
+                            // Avatar + settings
+                            GestureDetector(
+                              onTap: _logout,
+                              child: Container(
+                                width: 44, height: 44,
+                                decoration: BoxDecoration(
+                                  gradient: AppColors.primaryGradient,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4))],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                    style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            GestureDetector(
+                              onTap: () => Navigator.pushNamed(context, '/settings'),
+                              child: Container(
+                                width: 44, height: 44,
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.settings_outlined,
+                                  color: isDark ? Colors.white70 : Colors.black54, size: 20),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                SliverToBoxAdapter(child: const SizedBox(height: 24)),
+
+                // ── Two big action buttons ───────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    child: Row(
+                      children: [
+                        // NEW MEETING
+                        Expanded(
+                          child: ScaleTransition(
+                            scale: _pulse,
+                            child: _BigActionButton(
+                              icon: Icons.videocam_rounded,
+                              label: 'Nouvelle\nRéunion',
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFE74C3C), Color(0xFF9B59B6)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              onTap: _showCreateBottomSheet,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        // JOIN MEETING
+                        Expanded(
+                          child: _BigActionButton(
+                            icon: Icons.add_link_rounded,
+                            label: 'Rejoindre\nRéunion',
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF5B5FFF), Color(0xFF8E44AD)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            onTap: _showJoinDialog,
                           ),
                         ),
                       ],
                     ),
                   ),
+                ),
 
-                  const SizedBox(height: 28),
+                SliverToBoxAdapter(child: const SizedBox(height: 28)),
 
-                  // ── Quick actions ────────────────────────
-                  Text('Actions rapides',
-                      style: GoogleFonts.poppins(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: isDark
-                              ? Colors.white
-                              : AppColors.textPrimary)),
-                  const SizedBox(height: 14),
-
-                  Row(children: [
-                    Expanded(
-                      child: _ActionCard(
-                        icon: Icons.group_add,
-                        title: 'Rejoindre',
-                        subtitle: 'Via un ID',
-                        gradientColors: const [
-                          Color(0xFF8E44AD),
-                          Color(0xFF6C3483)
-                        ],
-                        onTap: _showJoinDialog,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ActionCard(
-                        icon: Icons.tune,
-                        title: 'Paramètres',
-                        subtitle: 'Préférences',
-                        gradientColors: const [
-                          Color(0xFF3498DB),
-                          Color(0xFF2980B9)
-                        ],
-                        onTap: () =>
-                            Navigator.pushNamed(context, '/settings'),
-                      ),
-                    ),
-                  ]),
-
-                  const SizedBox(height: 12),
-                  Row(children: [
-                    Expanded(
-                      child: _ActionCard(
-                        icon: Icons.share,
-                        title: 'Partager',
-                        subtitle: 'Inviter',
-                        gradientColors: const [
-                          Color(0xFF27AE60),
-                          Color(0xFF1E8449)
-                        ],
-                        onTap: () => _errorHandler.showInfoSnackBar(
-                            context,
-                            '📱 Partagez l\'app CRUX avec vos contacts'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ActionCard(
-                        icon: Icons.help_outline,
-                        title: 'Aide',
-                        subtitle: 'Support',
-                        gradientColors: const [
-                          Color(0xFFF39C12),
-                          Color(0xFFD68910)
-                        ],
-                        onTap: () => _errorHandler.showInfoSnackBar(
-                            context, '📧 support@crux.app'),
-                      ),
-                    ),
-                  ]),
-
-                  // ── Recent meetings ──────────────────────
-                  if (_recentMeetings.isNotEmpty) ...[
-                    const SizedBox(height: 28),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Récentes',
-                            style: GoogleFonts.poppins(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                color: isDark
-                                    ? Colors.white
-                                    : AppColors.textPrimary)),
-                        TextButton(
-                          onPressed: () async {
-                            final prefs = await SharedPreferences.getInstance();
-                            await prefs.remove('crux_recent_meetings');
-                            await _loadHistory();
-                          },
-                          child: Text('Effacer',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: AppColors.textTertiary)),
+                // ── Quick stats bar ──────────────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.12),
                         ),
+                        boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 4))],
+                      ),
+                      child: Row(
+                        children: [
+                          _StatItem(label: 'Réunions', value: '${_recentMeetings.length}', icon: Icons.videocam_outlined, color: const Color(0xFFE74C3C)),
+                          _Divider(),
+                          _StatItem(label: 'Statut', value: _isPro ? 'Pro' : 'Gratuit', icon: Icons.workspace_premium_outlined, color: _isPro ? const Color(0xFFFFD700) : Colors.grey),
+                          _Divider(),
+                          _StatItem(label: 'Limite', value: _isPro ? '∞' : '30min', icon: Icons.timer_outlined, color: const Color(0xFF5B5FFF)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                SliverToBoxAdapter(child: const SizedBox(height: 28)),
+
+                // ── Quick actions grid ───────────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Actions rapides',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16, fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                          )),
+                        const SizedBox(height: 14),
+                        Row(children: [
+                          Expanded(child: _QuickAction(icon: Icons.link, label: 'Rejoindre', color: const Color(0xFF5B5FFF), onTap: _showJoinDialog)),
+                          const SizedBox(width: 10),
+                          Expanded(child: _QuickAction(icon: Icons.share_outlined, label: 'Partager', color: const Color(0xFF27AE60),
+                            onTap: () => _errorHandler.showInfoSnackBar(context, '📱 Partagez CRUX avec vos contacts'))),
+                          const SizedBox(width: 10),
+                          Expanded(child: _QuickAction(icon: Icons.tune, label: 'Réglages', color: const Color(0xFF3498DB),
+                            onTap: () => Navigator.pushNamed(context, '/settings'))),
+                          const SizedBox(width: 10),
+                          Expanded(child: _QuickAction(icon: Icons.headset_mic_outlined, label: 'Support', color: const Color(0xFFF39C12),
+                            onTap: () => _errorHandler.showInfoSnackBar(context, '📧 support@crux.app'))),
+                        ]),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    ..._recentMeetings
-                        .map((m) => _RecentMeetingTile(
-                              title: m['title'] ?? 'Réunion',
-                              meetingId: m['id'] ?? '',
-                              timestamp: m['ts'] is int
-                                  ? DateTime.fromMillisecondsSinceEpoch(
-                                      m['ts'] as int)
-                                  : DateTime.now(),
-                              isDark: isDark,
-                              onJoin: () => _joinById(m['id'] ?? ''),
-                              onCopy: () {
-                                Clipboard.setData(
-                                    ClipboardData(text: m['id'] ?? ''));
-                                _errorHandler.showInfoSnackBar(
-                                    context, '📋 ID copié !');
-                              },
-                            ))
-                        .toList(),
-                  ],
+                  ),
+                ),
 
-                  const SizedBox(height: 20),
+                SliverToBoxAdapter(child: const SizedBox(height: 28)),
+
+                // ── Pro banner (if not Pro) ──────────────────
+                if (!_isPro)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 22),
+                      child: GestureDetector(
+                        onTap: () async {
+                          try {
+                            await _proService.startPayment(userId: widget.user.uid, userName: widget.user.name);
+                          } catch (_) {}
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFD700), Color(0xFFFFA500), Color(0xFFFF6B35)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [BoxShadow(color: const Color(0xFFFFD700).withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6))],
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.workspace_premium, color: Colors.white, size: 36),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Passez à Crux Pro', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                                    Text('Réunions illimitées • 25 000 FCFA/mois', style: GoogleFonts.poppins(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                                child: Text('Activer', style: GoogleFonts.poppins(color: const Color(0xFFFFA500), fontWeight: FontWeight.w800, fontSize: 13)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                if (!_isPro) SliverToBoxAdapter(child: const SizedBox(height: 28)),
+
+                // ── Recent meetings ──────────────────────────
+                if (_recentMeetings.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 22),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Récentes',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16, fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                            )),
+                          TextButton(
+                            onPressed: () async {
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.remove('crux_recent_meetings');
+                              await _loadHistory();
+                            },
+                            child: Text('Tout effacer', style: GoogleFonts.poppins(fontSize: 12, color: Colors.red.shade400)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (ctx, i) {
+                        final m = _recentMeetings[i];
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+                          child: _RecentMeetingTile(
+                            title: m['title'] ?? 'Réunion',
+                            meetingId: m['id'] ?? '',
+                            timestamp: m['ts'] is int
+                                ? DateTime.fromMillisecondsSinceEpoch(m['ts'] as int)
+                                : DateTime.now(),
+                            isDark: isDark,
+                            onJoin: () => _joinById(m['id'] ?? ''),
+                            onCopy: () {
+                              Clipboard.setData(ClipboardData(text: m['id'] ?? ''));
+                              _errorHandler.showInfoSnackBar(context, '📋 ID copié !');
+                            },
+                          ),
+                        );
+                      },
+                      childCount: _recentMeetings.length,
+                    ),
+                  ),
                 ],
+
+                SliverToBoxAdapter(child: const SizedBox(height: 32)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCreateBottomSheet() {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CreateMeetingSheet(
+        nameController: _meetingNameController,
+        passwordController: _passwordController,
+        showPassword: _showPassword,
+        obscurePassword: _obscurePassword,
+        isCreating: _isCreating,
+        onTogglePassword: () => setState(() => _showPassword = !_showPassword),
+        onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+        onSubmit: () {
+          Navigator.pop(context);
+          _createMeeting();
+        },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  ANIMATED BACKGROUND ORBS
+// ─────────────────────────────────────────────
+class _AnimatedOrbs extends StatefulWidget {
+  final bool isDark;
+  const _AnimatedOrbs({required this.isDark});
+  @override
+  State<_AnimatedOrbs> createState() => _AnimatedOrbsState();
+}
+
+class _AnimatedOrbsState extends State<_AnimatedOrbs> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(duration: const Duration(seconds: 8), vsync: this)..repeat();
+  }
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final t = _ctrl.value;
+        return Stack(children: [
+          Positioned(
+            top: -60 + math.sin(t * 2 * math.pi) * 30,
+            right: -40 + math.cos(t * 2 * math.pi) * 20,
+            child: _Orb(size: 220, color: const Color(0xFFE74C3C), opacity: widget.isDark ? 0.12 : 0.08),
+          ),
+          Positioned(
+            bottom: 100 + math.cos(t * 2 * math.pi) * 20,
+            left: -60 + math.sin(t * 2 * math.pi) * 15,
+            child: _Orb(size: 180, color: const Color(0xFF5B5FFF), opacity: widget.isDark ? 0.1 : 0.06),
+          ),
+          Positioned(
+            top: 300 + math.sin((t + 0.5) * 2 * math.pi) * 20,
+            right: 20 + math.cos((t + 0.3) * 2 * math.pi) * 15,
+            child: _Orb(size: 120, color: const Color(0xFF9B59B6), opacity: widget.isDark ? 0.08 : 0.05),
+          ),
+        ]);
+      },
+    );
+  }
+}
+
+class _Orb extends StatelessWidget {
+  final double size;
+  final Color color;
+  final double opacity;
+  const _Orb({required this.size, required this.color, required this.opacity});
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size, height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: RadialGradient(colors: [color.withValues(alpha: opacity), color.withValues(alpha: 0)]),
+    ),
+  );
+}
+
+// ─────────────────────────────────────────────
+//  BIG ACTION BUTTON
+// ─────────────────────────────────────────────
+class _BigActionButton extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final LinearGradient gradient;
+  final VoidCallback onTap;
+  const _BigActionButton({required this.icon, required this.label, required this.gradient, required this.onTap});
+  @override
+  State<_BigActionButton> createState() => _BigActionButtonState();
+}
+
+class _BigActionButtonState extends State<_BigActionButton> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(duration: const Duration(milliseconds: 120), vsync: this);
+    _scale = Tween<double>(begin: 1, end: 0.95).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) { HapticFeedback.lightImpact(); _ctrl.forward(); },
+      onTapUp: (_) { _ctrl.reverse(); widget.onTap(); },
+      onTapCancel: () => _ctrl.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: Container(
+          height: 130,
+          decoration: BoxDecoration(
+            gradient: widget.gradient,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [BoxShadow(color: widget.gradient.colors.first.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 8))],
+          ),
+          child: Stack(
+            children: [
+              // Background decoration circle
+              Positioned(
+                right: -20, bottom: -20,
+                child: Container(
+                  width: 100, height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
               ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(widget.icon, color: Colors.white, size: 26),
+                    ),
+                    const Spacer(),
+                    Text(widget.label,
+                      style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15, height: 1.2),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  STAT ITEM
+// ─────────────────────────────────────────────
+class _StatItem extends StatelessWidget {
+  final String label, value;
+  final IconData icon;
+  final Color color;
+  const _StatItem({required this.label, required this.value, required this.icon, required this.color});
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Expanded(
+      child: Column(children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(value, style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
+        Text(label, style: GoogleFonts.poppins(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38)),
+      ]),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(width: 1, height: 40, color: isDark ? Colors.white12 : Colors.black12, margin: const EdgeInsets.symmetric(horizontal: 4));
+  }
+}
+
+// ─────────────────────────────────────────────
+//  QUICK ACTION CHIP
+// ─────────────────────────────────────────────
+class _QuickAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _QuickAction({required this.icon, required this.label, required this.color, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: () { HapticFeedback.selectionClick(); onTap(); },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.1)),
+          boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12)],
+        ),
+        child: Column(children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 6),
+          Text(label, style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black54)),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  CREATE MEETING BOTTOM SHEET
+// ─────────────────────────────────────────────
+class _CreateMeetingSheet extends StatelessWidget {
+  final TextEditingController nameController;
+  final TextEditingController passwordController;
+  final bool showPassword, obscurePassword, isCreating;
+  final VoidCallback onTogglePassword, onToggleObscure, onSubmit;
+
+  const _CreateMeetingSheet({
+    required this.nameController, required this.passwordController,
+    required this.showPassword, required this.obscurePassword,
+    required this.isCreating, required this.onTogglePassword,
+    required this.onToggleObscure, required this.onSubmit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF12121E) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2))),
+          ),
+          const SizedBox(height: 20),
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.videocam_rounded, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Text('Nouvelle réunion', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
+          ]),
+          const SizedBox(height: 20),
+          TextField(
+            controller: nameController,
+            autofocus: true,
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black87),
+            decoration: InputDecoration(
+              hintText: 'Nom de la réunion',
+              hintStyle: GoogleFonts.poppins(color: Colors.grey),
+              prefixIcon: const Icon(Icons.edit_outlined, size: 20),
+              filled: true,
+              fillColor: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            ),
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: onTogglePassword,
+            child: Row(children: [
+              Icon(showPassword ? Icons.lock_outline : Icons.lock_open_outlined, size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Text(showPassword ? 'Supprimer le code d\'accès' : 'Ajouter un code d\'accès',
+                style: GoogleFonts.poppins(fontSize: 13, color: AppColors.primary, decoration: TextDecoration.underline, decorationColor: AppColors.primary)),
+            ]),
+          ),
+          if (showPassword) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: passwordController,
+              obscureText: obscurePassword,
+              keyboardType: TextInputType.number,
+              style: GoogleFonts.poppins(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(
+                hintText: 'Code d\'accès',
+                hintStyle: GoogleFonts.poppins(color: Colors.grey),
+                prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                suffixIcon: IconButton(
+                  icon: Icon(obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
+                  onPressed: onToggleObscure,
+                ),
+                filled: true,
+                fillColor: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity, height: 54,
+            child: ElevatedButton(
+              onPressed: isCreating ? null : onSubmit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 8,
+                shadowColor: AppColors.primary.withValues(alpha: 0.5),
+              ),
+              child: isCreating
+                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Icon(Icons.rocket_launch, size: 18),
+                    const SizedBox(width: 8),
+                    Text('Démarrer', style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 16)),
+                  ]),
             ),
           ),
         ],
@@ -852,79 +1135,3 @@ class _RecentMeetingTile extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-//  ACTION CARD
-// ─────────────────────────────────────────────
-class _ActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final List<Color> gradientColors;
-  final VoidCallback onTap;
-
-  const _ActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.gradientColors,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.grey.withValues(alpha: 0.15),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: gradientColors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: Colors.white, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                  style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: isDark
-                          ? Colors.white
-                          : AppColors.textPrimary)),
-              Text(subtitle,
-                  style: GoogleFonts.poppins(
-                      fontSize: 11, color: AppColors.textTertiary)),
-            ],
-          ),
-        ]),
-      ),
-    );
-  }
-}
