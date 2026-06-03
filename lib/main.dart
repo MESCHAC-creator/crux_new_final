@@ -4,10 +4,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/error_handler_service.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/consent_screen.dart';
 import 'models/user_model.dart';
 import 'providers/auth_provider.dart' show CruxAuthProvider;
 import 'providers/meeting_provider.dart';
@@ -74,6 +76,11 @@ class MyApp extends StatelessWidget {
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
+  static Future<bool> _checkTermsAccepted() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('crux_terms_accepted') ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
@@ -94,7 +101,15 @@ class AuthWrapper extends StatelessWidget {
             name: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'Utilisateur',
             email: firebaseUser.email ?? '',
           );
-          return HomeScreen(user: user);
+          // Check terms accepted
+          return FutureBuilder<bool>(
+            future: _checkTermsAccepted(),
+            builder: (ctx, snap) {
+              if (!snap.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              if (snap.data == true) return HomeScreen(user: user);
+              return ConsentScreen(user: user);
+            },
+          );
         }
         return const SplashScreen();
       },

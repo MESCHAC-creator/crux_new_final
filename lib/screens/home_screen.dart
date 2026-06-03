@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _obscurePassword = true;
   bool _isPro = false;
   List<Map<String, dynamic>> _recentMeetings = [];
+  String? _localPhotoPath;
 
   late AnimationController _headerAnim;
   late AnimationController _pulseAnim;
@@ -50,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _loadHistory();
     _checkPro();
     _setupAnimations();
+    _loadLocalPhoto();
   }
 
   void _setupAnimations() {
@@ -78,6 +81,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _loadHistory() async {
     final history = await _meetingService.getRecentMeetings();
     if (mounted) setState(() => _recentMeetings = history);
+  }
+
+  Future<void> _loadLocalPhoto() async {
+    final prefs = await SharedPreferences.getInstance();
+    final path = prefs.getString('crux_local_photo_path');
+    if (mounted) setState(() => _localPhotoPath = path);
   }
 
   @override
@@ -452,7 +461,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
                               onSelected: (val) {
-                                if (val == 'profile') Navigator.pushNamed(context, '/profile');
+                                if (val == 'profile') Navigator.pushNamed(context, '/profile').then((_) => _loadLocalPhoto());
                                 if (val == 'logout') _logout();
                               },
                               itemBuilder: (_) => [
@@ -478,12 +487,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   boxShadow: [BoxShadow(color: cp.primary.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4))],
                                 ),
                                 child: Center(
-                                  child: FirebaseAuth.instance.currentUser?.photoURL != null
-                                      ? ClipOval(child: Image.network(FirebaseAuth.instance.currentUser!.photoURL!, fit: BoxFit.cover, width: 44, height: 44,
-                                          errorBuilder: (_, __, ___) => Text(firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
-                                              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18))))
-                                      : Text(firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
-                                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
+                                  child: _localPhotoPath != null && File(_localPhotoPath!).existsSync()
+                                      ? ClipOval(child: Image.file(File(_localPhotoPath!), fit: BoxFit.cover, width: 44, height: 44))
+                                      : FirebaseAuth.instance.currentUser?.photoURL != null
+                                          ? ClipOval(child: Image.network(FirebaseAuth.instance.currentUser!.photoURL!, fit: BoxFit.cover, width: 44, height: 44,
+                                              errorBuilder: (_, __, ___) => Text(firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18))))
+                                          : Text(firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
                                 ),
                               ),
                             ),
@@ -608,7 +619,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             onTap: () => Navigator.pushNamed(context, '/settings'))),
                           const SizedBox(width: 10),
                           Expanded(child: _QuickAction(icon: Icons.person_outline, label: AppTranslations.t('profile', lang), color: const Color(0xFFF39C12),
-                            onTap: () => Navigator.pushNamed(context, '/profile'))),
+                            onTap: () => Navigator.pushNamed(context, '/profile').then((_) => _loadLocalPhoto()))),
                         ]),
                       ],
                     ),
