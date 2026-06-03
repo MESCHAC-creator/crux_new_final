@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
 import '../services/pro_service.dart';
+import '../models/meeting_model.dart';
 
 // ─────────────────────────────────────────────
 //  MODELS
@@ -512,6 +513,21 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         .listen((snap) {
       if (!snap.exists || !mounted) return;
       final data = snap.data()!;
+
+      // Host ended meeting for everyone
+      final status = data['status'] as String? ?? '';
+      if (status == 'ended' && !widget.isHost) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("L'hôte a terminé la réunion", style: GoogleFonts.poppins()),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
+        ));
+        _leave();
+        return;
+      }
+
       // co-host check
       final coHosts = List<String>.from(data['coHosts'] ?? []);
       final nowCoHost = coHosts.contains(widget.userId);
@@ -783,6 +799,78 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   // ── LEAVE ───────────────────────────────────
+  Future<void> _confirmLeave() async {
+    HapticFeedback.mediumImpact();
+    if (widget.isHost) {
+      // Host gets two options: leave only, or end for everyone
+      await showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A2E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text('Terminer la réunion ?',
+              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+          content: Text('Voulez-vous quitter uniquement ou terminer la réunion pour tous les participants ?',
+              style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13, height: 1.5)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white38)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _leave();
+              },
+              child: Text('Quitter seulement', style: GoogleFonts.poppins(color: Colors.white70)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                Navigator.pop(context);
+                await _meetingService.updateMeetingStatus(
+                    widget.meetingId, MeetingStatus.ended);
+                _leave();
+              },
+              child: Text('Terminer pour tous', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Participant gets simple confirm
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A2E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text('Quitter la réunion ?',
+              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+          content: Text('Êtes-vous sûr de vouloir quitter cette réunion ?',
+              style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white38)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text('Quitter', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      );
+      if (confirm == true) _leave();
+    }
+  }
+
   Future<void> _leave() async {
     HapticFeedback.heavyImpact();
     _callSub?.cancel();
@@ -790,6 +878,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _reactionSub?.cancel();
     _meetingDocSub?.cancel();
     _presenceSub?.cancel();
+    _proSub?.cancel();
     _callTimer?.cancel();
     _statsTimer?.cancel();
     _reconnectTimer?.cancel();
@@ -1730,7 +1819,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               label: 'Fin',
               active: false,
               isEnd: true,
-              onTap: _leave,
+              onTap: _confirmLeave,
             ),
           ],
         ),
