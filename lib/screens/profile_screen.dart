@@ -210,8 +210,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     setState(() => _isSavingName = true);
     try {
       await _auth.currentUser!.updateDisplayName(newName);
-      final uid = _auth.currentUser!.uid;
-      await _db.collection('users').doc(uid).set({'name': newName}, SetOptions(merge: true));
       if (mounted) {
         setState(() => _isSavingName = false);
         _snack(AppTranslations.t('name_updated', lang));

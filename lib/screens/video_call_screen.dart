@@ -106,6 +106,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   int _lastMuteAllCount = 0;
   List<Map<String, dynamic>> _presenceList = [];
   bool _showParticipants = false;
+  bool _handRaised = false;
+  final Set<String> _raisedHands = {};
 
   // ── Pro / paywall ────────────────────────────
   bool _isPro = false;
@@ -585,8 +587,50 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _presenceSub = _meetingService
         .streamPresence(widget.meetingId)
         .listen((list) {
-      if (mounted) setState(() => _presenceList = list);
+      if (!mounted) return;
+      if (widget.isHost) {
+        for (final p in list) {
+          final uid = p['userId'] as String? ?? '';
+          final raised = p['handRaised'] == true;
+          if (raised && uid != widget.userId && !_raisedHands.contains(uid)) {
+            _raisedHands.add(uid);
+            final name = p['userName'] ?? 'Participant';
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('🖐 $name a levé la main', style: GoogleFonts.poppins(color: Colors.white)),
+              backgroundColor: Colors.orange.shade800,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ));
+          } else if (!raised) {
+            _raisedHands.remove(uid);
+          }
+        }
+      }
+      setState(() => _presenceList = list);
     });
+  }
+
+  Future<void> _toggleRaiseHand() async {
+    final next = !_handRaised;
+    setState(() => _handRaised = next);
+    try {
+      await _db
+          .collection('meetings')
+          .doc(widget.meetingId)
+          .collection('presence')
+          .doc(widget.userId)
+          .update({'handRaised': next});
+    } catch (_) {}
+    if (next && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('🖐 Main levée', style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: Colors.orange.shade700,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+    }
   }
 
   // ── WEBRTC SIGNALING ────────────────────────
@@ -864,8 +908,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               ),
               onPressed: () async {
                 Navigator.pop(context);
-                await _meetingService.updateMeetingStatus(
-                    widget.meetingId, MeetingStatus.ended);
+                try {
+                  await _meetingService.updateMeetingStatus(
+                      widget.meetingId, MeetingStatus.ended);
+                } catch (_) {}
                 _leave();
               },
               child: Text('Terminer pour tous', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
@@ -877,7 +923,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       // Participant gets simple confirm
       final confirm = await showDialog<bool>(
         context: context,
-        builder: (_) => AlertDialog(
+        builder: (ctx) => AlertDialog(
           backgroundColor: const Color(0xFF1A1A2E),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text('Quitter la réunion ?',
@@ -886,7 +932,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13)),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(ctx, false),
               child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white38)),
             ),
             ElevatedButton(
@@ -894,7 +940,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 backgroundColor: Colors.red,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(ctx, true),
               child: Text('Quitter', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
             ),
           ],
@@ -1247,18 +1293,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         ),
       ),
       child: Row(children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          widget.meetingId.length > 12
-              ? widget.meetingId.substring(0, 12)
-              : widget.meetingId,
-          style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12),
-        ),
         if (_remoteConnected && _callSeconds > 0) ...[
           const SizedBox(width: 8),
           Text(
@@ -1304,6 +1338,35 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ),
         ],
         const Spacer(),
+        // Meeting ID chip (right side)
+        GestureDetector(
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: widget.meetingId));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('ID copié', style: GoogleFonts.poppins(fontSize: 12)),
+              duration: const Duration(seconds: 1),
+              behavior: SnackBarBehavior.floating,
+            ));
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white30, width: 0.5),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 6, height: 6,
+                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+              const SizedBox(width: 4),
+              Text(
+                widget.meetingId.length > 10 ? widget.meetingId.substring(0, 10) : widget.meetingId,
+                style: GoogleFonts.poppins(color: Colors.white70, fontSize: 10),
+              ),
+            ]),
+          ),
+        ),
+        const SizedBox(width: 6),
         // Network quality dot
         if (_netQuality != _NetQuality.unknown) ...[
           Container(
@@ -1821,6 +1884,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 _showParticipants = !_showParticipants;
                 if (_showParticipants) { _showChat = false; _showEmojiBar = false; }
               }),
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: _handRaised ? Icons.front_hand : Icons.front_hand_outlined,
+              label: _handRaised ? 'Main levée' : 'Lever main',
+              active: !_handRaised,
+              isHighlight: _handRaised,
+              onTap: _toggleRaiseHand,
             ),
             const SizedBox(width: 8),
             _Btn(
