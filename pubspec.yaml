@@ -19,7 +19,7 @@ dependencies:
 
   # Permissions & Localization
   permission_handler: ^11.3.0
-  intl: 0.19.0
+  intl: any
   flutter_localizations:
     sdk: flutter
 
@@ -45,6 +45,9 @@ dependencies:
   # Monetization
   http: ^1.2.0
   url_launcher: ^6.3.0
+
+  # Google Sign-In
+  google_sign_in: ^6.2.1
 
 dev_dependencies:
   flutter_test:

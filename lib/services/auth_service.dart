@@ -1,10 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
 import '../models/user_model.dart';
 import 'error_handler_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final _googleSignIn = GoogleSignIn();
   final _logger = Logger();
   final _errorHandler = ErrorHandlerService();
 
@@ -132,4 +134,35 @@ class AuthService {
   }
 
   bool get isLoggedIn => _auth.currentUser != null;
+
+  Future<UserModel?> signInWithGoogle() async {
+    try {
+      _logger.i('🔑 Connexion Google en cours...');
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return null; // User cancelled
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user!;
+      _logger.i('✅ Connexion Google réussie: ${user.email}');
+
+      return UserModel(
+        uid: user.uid,
+        email: user.email ?? '',
+        name: user.displayName ?? googleUser.displayName ?? 'Utilisateur',
+      );
+    } on FirebaseAuthException catch (e) {
+      final errorMsg = _errorHandler.getFirebaseErrorMessage(e.code);
+      _logger.e('❌ Firebase Auth Google: ${e.code}');
+      throw Exception(errorMsg);
+    } catch (e) {
+      _logger.e('❌ Erreur Google Sign-In: $e');
+      throw Exception('❌ Erreur de connexion Google: $e');
+    }
+  }
 }

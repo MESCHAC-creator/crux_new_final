@@ -20,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   final _errorHandler = ErrorHandlerService();
 
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   bool _showPassword = false;
 
   // Animation controllers
@@ -146,6 +147,23 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleGoogleLogin() async {
+    setState(() => _isGoogleLoading = true);
+    try {
+      final user = await _authService.signInWithGoogle();
+      if (user != null && mounted) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
+    } catch (e) {
+      if (mounted) {
+        _errorHandler.showErrorDialog(context, '❌ Connexion Google échouée',
+            e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -375,6 +393,68 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 ),
                               ),
                             ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Divider
+                        Row(children: [
+                          Expanded(child: Divider(color: Colors.white24, thickness: 1)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text('ou', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
+                          ),
+                          Expanded(child: Divider(color: Colors.white24, thickness: 1)),
+                        ]),
+                        const SizedBox(height: 16),
+
+                        // Google button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 54,
+                          child: OutlinedButton(
+                            onPressed: (_isLoading || _isGoogleLoading) ? null : _handleGoogleLogin,
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: Colors.white.withOpacity(0.4), width: 1.5),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              backgroundColor: Colors.white.withOpacity(0.08),
+                            ),
+                            child: _isGoogleLoading
+                                ? const SizedBox(
+                                    width: 22, height: 22,
+                                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white70),
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      // Google "G" logo
+                                      Container(
+                                        width: 24, height: 24,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Center(
+                                          child: Text('G',
+                                            style: TextStyle(
+                                              color: Color(0xFF4285F4),
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Continuer avec Google',
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                           ),
                         ),
                       ],
