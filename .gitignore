@@ -47,6 +47,8 @@ app.*.map.json
 # Keystore and signing files (never commit)
 *.jks
 *.keystore
+# Exception: project keystore committed intentionally for consistent CI signing
+!android/app/crux.keystore
 key.properties
 
 # Build error logs

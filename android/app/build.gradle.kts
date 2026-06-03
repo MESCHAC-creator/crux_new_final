@@ -19,24 +19,32 @@ android {
         jvmTarget = "11"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("crux.keystore")
+            storePassword = "crux2024!"
+            keyAlias = "crux_key"
+            keyPassword = "crux2024!"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.example.crux"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
         multiDexEnabled = true
     }
 
     buildTypes {
         release {
-            // Use debug signing — produces a valid installable APK on any device.
-            // No keystore needed; avoids silent Gradle failures from missing/invalid store.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             isShrinkResources = false
         }
         debug {
+            signingConfig = signingConfigs.getByName("release")
             isDebuggable = true
         }
     }
@@ -64,6 +72,5 @@ flutter {
 }
 
 dependencies {
-    // Firebase native deps are managed by the Flutter Firebase plugins — no manual bom needed.
     implementation("androidx.multidex:multidex:2.0.1")
 }
