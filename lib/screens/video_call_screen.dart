@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -60,6 +61,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   MediaStream? _screenStream;
 
   // ── State flags ─────────────────────────────
+  bool _leaving = false;
   bool _micOn = true;
   bool _camOn = true;
   bool _loading = true;
@@ -511,7 +513,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         .doc(widget.meetingId)
         .snapshots()
         .listen((snap) {
-      if (!snap.exists || !mounted) return;
+      if (!snap.exists || !mounted || _leaving) return;
       final data = snap.data()!;
 
       // Host ended meeting for everyone
@@ -679,6 +681,20 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       }
     } else {
       try {
+        if (Platform.isAndroid) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                  'Partage d\'écran non supporté sur Android. Utilisez la version web.',
+                  style: GoogleFonts.poppins()),
+              backgroundColor: Colors.orange.shade700,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ));
+          }
+          return;
+        }
         _screenStream = await navigator.mediaDevices.getDisplayMedia({
           'video': true,
           'audio': false,
@@ -800,6 +816,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── LEAVE ───────────────────────────────────
   Future<void> _confirmLeave() async {
+    if (_leaving) return;
     HapticFeedback.mediumImpact();
     if (widget.isHost) {
       // Host gets two options: leave only, or end for everyone
@@ -872,7 +889,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   Future<void> _leave() async {
+    if (_leaving) return;
+    _leaving = true;
     HapticFeedback.heavyImpact();
+    // Cancel subscriptions first to prevent further callbacks
     _callSub?.cancel();
     _candidateSub?.cancel();
     _reactionSub?.cancel();
@@ -891,7 +911,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     await _screenStream?.dispose();
     await _localStream?.dispose();
     await _pc?.close();
-    if (mounted) Navigator.pop(context);
+    if (mounted) Navigator.of(context).pop();
   }
 
   // ── BUILD ────────────────────────────────────
@@ -1750,16 +1770,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 } catch (_) {}
               },
             ),
-            const SizedBox(width: 8),
-            _Btn(
-              icon: _sharingScreen
-                  ? Icons.stop_screen_share
-                  : Icons.screen_share,
-              label: _sharingScreen ? 'Stopper' : 'Écran',
-              active: !_sharingScreen,
-              isHighlight: _sharingScreen,
-              onTap: _toggleScreenShare,
-            ),
+            if (!Platform.isAndroid) ...[
+              const SizedBox(width: 8),
+              _Btn(
+                icon: _sharingScreen
+                    ? Icons.stop_screen_share
+                    : Icons.screen_share,
+                label: _sharingScreen ? 'Stopper' : 'Écran',
+                active: !_sharingScreen,
+                isHighlight: _sharingScreen,
+                onTap: _toggleScreenShare,
+              ),
+            ],
             const SizedBox(width: 8),
             _Btn(
               icon: Icons.chat_bubble_outline,
@@ -1829,9 +1851,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── WAITING (participant only — host uses full-screen local cam) ────────
   Widget _buildWaiting() {
-    return Container(
-      color: const Color(0xFF1A1A2E),
-      child: Center(
+    return Stack(fit: StackFit.expand, children: [
+      // Local camera preview as full-screen background
+      _localStream != null && _camOn
+          ? RTCVideoView(
+              _localRenderer,
+              mirror: true,
+              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+            )
+          : Container(color: const Color(0xFF1A1A2E)),
+      // Overlay: semi-transparent scrim + connecting indicator
+      Container(color: Colors.black.withValues(alpha: 0.45)),
+      Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
             width: 80,
@@ -1865,7 +1896,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ),
         ]),
       ),
-    );
+    ]);
   }
 }
 

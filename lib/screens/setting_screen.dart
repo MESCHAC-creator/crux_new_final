@@ -8,6 +8,7 @@ import '../theme/colors.dart';
 import '../providers/theme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../providers/color_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/error_handler_service.dart';
 import '../services/pro_service.dart';
 
@@ -401,10 +402,15 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                             icon: Icons.headset_mic_outlined,
                             iconColor: const Color(0xFF0EA5E9),
                             title: 'Assistance',
-                            subtitle: 'support@crux.app',
+                            subtitle: 'kouakouchristevann@gmail.com',
                             isDark: isDark,
                             trailing: Icon(Icons.chevron_right, color: isDark ? Colors.white30 : Colors.black26, size: 20),
-                            onTap: () => _errorHandler.showInfoSnackBar(context, '📧 support@crux.app'),
+                            onTap: () async {
+                              final uri = Uri(scheme: 'mailto', path: 'kouakouchristevann@gmail.com', query: 'subject=Support CRUX');
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri);
+                              }
+                            },
                           ),
                         ]),
                       ),

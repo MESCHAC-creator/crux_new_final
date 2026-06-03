@@ -561,7 +561,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           Expanded(child: _QuickAction(icon: Icons.link, label: 'Rejoindre', color: const Color(0xFF5B5FFF), onTap: _showJoinDialog)),
                           const SizedBox(width: 10),
                           Expanded(child: _QuickAction(icon: Icons.share_outlined, label: 'Partager', color: const Color(0xFF27AE60),
-                            onTap: () => _errorHandler.showInfoSnackBar(context, '📱 Partagez CRUX avec vos contacts'))),
+                            onTap: () async {
+                              const msg = '🎥 Rejoins-moi sur CRUX — la meilleure app de visioconférence !\n\nTélécharge ici : https://github.com/MESCHAC-creator/crux_new_final/releases\n\n📲 Gratuit · 30 min offertes · Disponible sur Android';
+                              await Clipboard.setData(const ClipboardData(text: msg));
+                              if (context.mounted) _errorHandler.showInfoSnackBar(context, '📋 Lien copié ! Colle-le où tu veux.');
+                            })),
                           const SizedBox(width: 10),
                           Expanded(child: _QuickAction(icon: Icons.tune, label: 'Réglages', color: const Color(0xFF3498DB),
                             onTap: () => Navigator.pushNamed(context, '/settings'))),
