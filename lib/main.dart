@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/error_handler_service.dart';
+import 'services/notification_service.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
@@ -29,8 +31,18 @@ void main() async {
   try {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     logger.i('✅ Firebase initialisé');
+
+    // Enable Firestore offline persistence (40MB cache)
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: 40 * 1024 * 1024,
+    );
+    logger.i('✅ Firestore offline persistence enabled');
+
+    // Initialize notifications
+    await NotificationService().initialize();
   } catch (e) {
-    logger.e('❌ Firebase init: $e');
+    logger.e('❌ Init error: $e');
   }
   runApp(const MyApp());
 }
