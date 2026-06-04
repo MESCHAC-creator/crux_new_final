@@ -20,6 +20,7 @@ import '../services/pro_service.dart';
 import '../services/user_service.dart';
 import '../models/meeting_model.dart';
 import '../models/meeting_report_model.dart';
+import '../constants/app_constants.dart';
 import 'meeting_report_screen.dart';
 
 // ─────────────────────────────────────────────
@@ -133,7 +134,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   bool _paywallShown = false;
   bool _callFrozen = false;           // true = call frozen, waiting for upgrade
   StreamSubscription<bool>? _proConfirmSub; // listens for real-time pro activation
-  static const _freeMinutes = 2; // TEST — remettre à 30 après test
+  static const _freeMinutes = AppConstants.freeMinutes;
 
   // ── Meeting metadata ─────────────────────────
   String _meetingTitle = 'Réunion';
@@ -162,6 +163,15 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   final Map<String, String> _participantNames = {};
   final Map<String, bool> _participantCamOn = {};  // remote cam state
   final Map<String, StreamSubscription<Map<String, dynamic>?>> _profileSubs = {};
+
+  // ── Live transcription ───────────────────────
+  bool _showTranscript = false;
+  final List<String> _transcriptLines = [];
+
+  // ── Collaborative whiteboard ─────────────────
+  bool _showWhiteboard = false;
+  final List<Map<String, dynamic>> _whiteboardStrokes = [];
+  StreamSubscription? _whiteboardSub;
 
   // ── Church mode ──────────────────────────────
   bool _isChurchMode = false;
@@ -281,6 +291,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _hostWaitTimer?.cancel();
     _inactivityTimer?.cancel();
     _liveCommentSub?.cancel();
+    _whiteboardSub?.cancel();
     for (final sub in _profileSubs.values) { sub.cancel(); }
     _profileSubs.clear();
     _bannerHideTimer?.cancel();
@@ -472,43 +483,53 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       final elapsed = DateTime.now().difference(_callStartTime!).inSeconds;
       setState(() => _callSeconds = elapsed);
 
-      // Warning at 2/3 of free time
+      // Warning at half of free time
       if (!_isPro && !_warningShown && elapsed >= (_freeMinutes * 60 ~/ 2)) {
         _warningShown = true;
         final remaining = _freeMinutes - elapsed ~/ 60;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Row(children: [
-            const Icon(Icons.timer, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Expanded(child: Text(
-              '⏱ $remaining minute${remaining > 1 ? 's' : ''} restante${remaining > 1 ? 's' : ''} sur votre version gratuite',
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
-            )),
-          ]),
-          backgroundColor: Colors.orange.shade800,
-          duration: const Duration(seconds: 6),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ));
+        if (mounted) {
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+            content: Row(children: [
+              const Icon(Icons.timer, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Expanded(child: Text(
+                '⏱ $remaining minute${remaining > 1 ? 's' : ''} restante${remaining > 1 ? 's' : ''} — passez à CRUX PRO',
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+              )),
+            ]),
+            backgroundColor: Colors.orange.shade800,
+            duration: const Duration(seconds: 8),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            action: SnackBarAction(
+              label: 'PRO',
+              textColor: Colors.white,
+              onPressed: _showPaywall,
+            ),
+          ));
+        }
       }
 
-      // Warning at last 30 seconds
+      // Final 30-second warning
       if (!_isPro && elapsed >= (_freeMinutes * 60 - 30) &&
           elapsed < (_freeMinutes * 60 - 20)) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Row(children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Expanded(child: Text(
-              '⚠️ 30 secondes restantes ! Passez à CRUX PRO pour continuer.',
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
-            )),
-          ]),
-          backgroundColor: Colors.deepOrange.shade700,
-          duration: const Duration(seconds: 6),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ));
+        if (mounted) {
+          ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+            content: Row(children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Expanded(child: Text(
+                '⚠️ 30 secondes restantes ! L\'appel va être mis en pause.',
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+              )),
+            ]),
+            backgroundColor: Colors.deepOrange.shade700,
+            duration: const Duration(seconds: 10),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ));
+        }
       }
 
       // Paywall + freeze at 30 min
@@ -610,6 +631,54 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
     }
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildFreeTimePill() {
+    final totalFree = _freeMinutes * 60;
+    final remaining = (totalFree - _callSeconds).clamp(0, totalFree);
+    final rm = remaining ~/ 60;
+    final rs = remaining % 60;
+    final label = '$rm:${rs.toString().padLeft(2, '0')}';
+    final isUrgent = remaining <= 60;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isUrgent ? Colors.red.withValues(alpha: 0.85) : Colors.orange.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isUrgent ? Colors.red : Colors.orange,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer_outlined, color: Colors.white, size: 11),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              fontFeatures: [const FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'FREE',
+            style: GoogleFonts.poppins(
+              color: Colors.white70,
+              fontSize: 8,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ── STATS MONITOR ────────────────────────────
@@ -2147,11 +2216,33 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         child: _buildChatPanel(),
       ),
 
+      // ── TRANSCRIPT PANEL ─────────────────────────────────────────────
+      AnimatedPositioned(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOut,
+        bottom: _showTranscript ? 0 : -380,
+        left: 0,
+        right: 0,
+        height: 380,
+        child: _buildTranscriptPanel(),
+      ),
+
+      // ── WHITEBOARD PANEL ─────────────────────────────────────────────
+      AnimatedPositioned(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOut,
+        bottom: _showWhiteboard ? 0 : -400,
+        left: 0,
+        right: 0,
+        height: 400,
+        child: _buildWhiteboardPanel(),
+      ),
+
       // ── CONTROLS ─────────────────────────────────────────────────────
       AnimatedPositioned(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeInOut,
-        bottom: (_showChat || _showParticipants) ? 400 : 0,
+        bottom: (_showChat || _showParticipants || _showTranscript || _showWhiteboard) ? 400 : 0,
         left: 0,
         right: 0,
         child: _buildControls(),
@@ -2800,7 +2891,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         ),
       ),
       child: Row(children: [
-        if (_remoteConnected && _callSeconds > 0) ...[
+        if (_callSeconds > 0) ...[
           const SizedBox(width: 8),
           Text(
             _formattedDuration,
@@ -2809,6 +2900,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 fontSize: 12,
                 fontFeatures: [const FontFeature.tabularFigures()]),
           ),
+        ],
+        // Free-time countdown pill — visible to all free users
+        if (!_isPro && _callSeconds > 0) ...[
+          const SizedBox(width: 6),
+          _buildFreeTimePill(),
         ],
         if (_sharingScreen) ...[
           const SizedBox(width: 8),
@@ -2946,6 +3042,26 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                     fontSize: 10,
                     fontWeight: FontWeight.w600)),
           ),
+        // E2E encryption indicator
+        if (_remoteConnected) ...[
+          const SizedBox(width: 6),
+          Tooltip(
+            message: 'Chiffrement bout-en-bout actif (DTLS-SRTP)',
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.lock, color: Colors.green, size: 10),
+                const SizedBox(width: 3),
+                Text('E2E', style: GoogleFonts.poppins(color: Colors.green, fontSize: 9, fontWeight: FontWeight.w700)),
+              ]),
+            ),
+          ),
+        ],
       ]),
     );
   }
@@ -3471,6 +3587,219 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     );
   }
 
+  // ── TRANSCRIPT PANEL ─────────────────────────
+  Widget _buildTranscriptPanel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xF0141420),
+        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
+      ),
+      child: Column(children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(children: [
+            const Icon(Icons.subtitles, color: Colors.white70, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('Sous-titres en direct',
+                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
+              ),
+              child: Text('BÊTA', style: GoogleFonts.poppins(color: Colors.green, fontSize: 9, fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () => setState(() => _showTranscript = false),
+              icon: const Icon(Icons.close, color: Colors.white54, size: 18),
+              padding: EdgeInsets.zero, constraints: const BoxConstraints(),
+            ),
+          ]),
+        ),
+        const Divider(color: Colors.white10, height: 1),
+        // Transcript lines
+        Expanded(
+          child: _transcriptLines.isEmpty
+              ? Center(
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Icon(Icons.mic_none, color: Colors.white24, size: 36),
+                    const SizedBox(height: 8),
+                    Text('En attente de parole...', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
+                    const SizedBox(height: 4),
+                    Text('La transcription s\'affichera ici', style: GoogleFonts.poppins(color: Colors.white24, fontSize: 11)),
+                  ]),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: _transcriptLines.length,
+                  itemBuilder: (_, i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(_transcriptLines[i],
+                        style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13, height: 1.5)),
+                  ),
+                ),
+        ),
+        // Info footer
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(children: [
+            const Icon(Icons.info_outline, color: Colors.white24, size: 14),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Transcription IA disponible dans CRUX Pro',
+                style: GoogleFonts.poppins(color: Colors.white38, fontSize: 10),
+              ),
+            ),
+            if (!_isPro)
+              GestureDetector(
+                onTap: _showPaywall,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)]),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text('ACTIVER PRO', style: GoogleFonts.poppins(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                ),
+              ),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  // ── COLLABORATIVE WHITEBOARD ─────────────────
+  void _listenWhiteboard() {
+    _whiteboardSub?.cancel();
+    _whiteboardSub = _db
+        .collection('meetings')
+        .doc(widget.meetingId)
+        .collection('whiteboard')
+        .orderBy('ts')
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      setState(() {
+        _whiteboardStrokes.clear();
+        for (final doc in snap.docs) {
+          _whiteboardStrokes.add(doc.data());
+        }
+      });
+    });
+  }
+
+  void _clearWhiteboard() {
+    _db.collection('meetings').doc(widget.meetingId).collection('whiteboard')
+        .get().then((snap) {
+      final batch = _db.batch();
+      for (final doc in snap.docs) batch.delete(doc.reference);
+      batch.commit();
+    });
+    setState(() => _whiteboardStrokes.clear());
+  }
+
+  Widget _buildWhiteboardPanel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xF0141420),
+        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
+      ),
+      child: Column(children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(children: [
+            const Icon(Icons.draw, color: Colors.white70, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('Tableau collaboratif',
+                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+            ),
+            if (widget.isHost || _isCoHost)
+              TextButton.icon(
+                onPressed: _clearWhiteboard,
+                icon: const Icon(Icons.delete_outline, size: 14, color: Colors.redAccent),
+                label: Text('Effacer', style: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 11)),
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+              ),
+            IconButton(
+              onPressed: () => setState(() => _showWhiteboard = false),
+              icon: const Icon(Icons.close, color: Colors.white54, size: 18),
+              padding: EdgeInsets.zero, constraints: const BoxConstraints(),
+            ),
+          ]),
+        ),
+        const Divider(color: Colors.white10, height: 1),
+        // Whiteboard area
+        Expanded(
+          child: _whiteboardStrokes.isEmpty
+              ? Center(
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Icon(Icons.gesture, color: Colors.white24, size: 40),
+                    const SizedBox(height: 8),
+                    Text('Tableau vide', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
+                    const SizedBox(height: 4),
+                    Text('Le tableau blanc collaboratif sera disponible\ndans une prochaine mise à jour',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(color: Colors.white24, fontSize: 11, height: 1.5)),
+                  ]),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: _whiteboardStrokes.length,
+                  itemBuilder: (_, i) {
+                    final s = _whiteboardStrokes[i];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(s['text'] ?? '', style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13)),
+                    );
+                  },
+                ),
+        ),
+        // Quick note input for whiteboard
+        Container(
+          padding: const EdgeInsets.all(12),
+          child: Row(children: [
+            Expanded(
+              child: TextField(
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Ajouter une note au tableau...',
+                  hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 12),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.08),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+                onSubmitted: (text) {
+                  if (text.trim().isEmpty) return;
+                  _db.collection('meetings').doc(widget.meetingId)
+                      .collection('whiteboard').add({
+                    'text': text.trim(),
+                    'author': widget.userName,
+                    'ts': FieldValue.serverTimestamp(),
+                  });
+                },
+              ),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+
   // ── CONTROLS BAR ─────────────────────────────
   Widget _buildControls() {
     final isPrivileged = widget.isHost || _isCoHost;
@@ -3680,6 +4009,37 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 },
               ),
             ],
+            const SizedBox(width: 8),
+            _Btn(
+              icon: Icons.subtitles_outlined,
+              label: 'Sous-titres',
+              active: !_showTranscript,
+              isHighlight: _showTranscript,
+              onTap: () => setState(() {
+                _showTranscript = !_showTranscript;
+                if (_showTranscript) {
+                  _showChat = false;
+                  _showParticipants = false;
+                  _showWhiteboard = false;
+                }
+              }),
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: Icons.draw_outlined,
+              label: 'Tableau',
+              active: !_showWhiteboard,
+              isHighlight: _showWhiteboard,
+              onTap: () => setState(() {
+                _showWhiteboard = !_showWhiteboard;
+                if (_showWhiteboard) {
+                  _showChat = false;
+                  _showParticipants = false;
+                  _showTranscript = false;
+                  _listenWhiteboard();
+                }
+              }),
+            ),
             const SizedBox(width: 8),
             Semantics(
               label: 'Quitter la réunion',

@@ -26,6 +26,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/locale_provider.dart';
 import '../providers/color_provider.dart';
 import '../l10n/app_translations.dart';
+import '../constants/app_constants.dart';
 
 enum MeetingMode { standard, business, church, live }
 
@@ -890,7 +891,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           _Divider(),
                           _StatItem(label: AppTranslations.t('status', lang), value: _isPro ? AppTranslations.t('pro_label', lang) : AppTranslations.t('free', lang), icon: Icons.workspace_premium_outlined, color: _isPro ? const Color(0xFFFFD700) : Colors.grey),
                           _Divider(),
-                          _StatItem(label: AppTranslations.t('limit', lang), value: _isPro ? '∞' : '30min', icon: Icons.timer_outlined, color: const Color(0xFF5B5FFF)),
+                          _StatItem(label: AppTranslations.t('limit', lang), value: _isPro ? '∞' : '${AppConstants.freeMinutes}min', icon: Icons.timer_outlined, color: const Color(0xFF5B5FFF)),
                         ],
                       ),
                     ),
@@ -917,7 +918,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           const SizedBox(width: 10),
                           Expanded(child: _QuickAction(icon: Icons.share_outlined, label: AppTranslations.t('share', lang), color: const Color(0xFF27AE60),
                             onTap: () async {
-                              const msg = '🎥 Rejoins-moi sur CRUX — la meilleure app de visioconférence !\n\nTélécharge ici : https://github.com/MESCHAC-creator/crux_new_final/releases\n\n📲 Gratuit · 30 min offertes · Disponible sur Android';
+                              final msg = '🎥 Rejoins-moi sur CRUX — la meilleure app de visioconférence !\n\nTélécharge ici : https://github.com/MESCHAC-creator/crux_new_final/releases\n\n📲 Gratuit · ${AppConstants.freeMinutes} min offertes · Disponible sur Android';
                               await Clipboard.setData(const ClipboardData(text: msg));
                               if (context.mounted) _errorHandler.showInfoSnackBar(context, AppTranslations.t('copied', lang));
                             })),
