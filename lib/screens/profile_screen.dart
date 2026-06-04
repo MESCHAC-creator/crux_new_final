@@ -552,8 +552,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       backgroundColor: isDark ? const Color(0xFF0A0A14) : const Color(0xFFF0F2FF),
       body: FadeTransition(
         opacity: _fadeAnim,
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            HapticFeedback.lightImpact();
+            await _loadAll();
+          },
+          color: cp.primary,
+          backgroundColor: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+          child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
             SliverAppBar(
               expandedHeight: 200,
@@ -706,6 +713,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               ),
             ),
           ],
+        ),
         ),
       ),
     );

@@ -16,6 +16,7 @@ class MeetingModel {
   final String? password; // optional PIN set by host
   final List<String> coHosts;
   final int muteAllCount;
+  final String? offeringLink; // Lien de paiement pour offrandes (mode Église)
 
   MeetingModel({
     required this.id,
@@ -35,6 +36,7 @@ class MeetingModel {
     this.password,
     this.coHosts = const [],
     this.muteAllCount = 0,
+    this.offeringLink,
   });
 
   Map<String, dynamic> toJson() => {
@@ -55,6 +57,7 @@ class MeetingModel {
         if (password != null) 'password': password,
         'coHosts': coHosts,
         'muteAllCount': muteAllCount,
+        if (offeringLink != null) 'offeringLink': offeringLink,
       };
 
   factory MeetingModel.fromJson(Map<String, dynamic> json) => MeetingModel(
@@ -78,6 +81,7 @@ class MeetingModel {
         password: json['password'],
         coHosts: List<String>.from(json['coHosts'] ?? []),
         muteAllCount: (json['muteAllCount'] ?? 0) as int,
+        offeringLink: json['offeringLink'] as String?,
       );
 
   static MeetingStatus _statusFromString(String s) {
@@ -109,6 +113,7 @@ class MeetingModel {
     String? password,
     List<String>? coHosts,
     int? muteAllCount,
+    String? offeringLink,
   }) =>
       MeetingModel(
         id: id ?? this.id,
@@ -128,6 +133,7 @@ class MeetingModel {
         password: password ?? this.password,
         coHosts: coHosts ?? this.coHosts,
         muteAllCount: muteAllCount ?? this.muteAllCount,
+        offeringLink: offeringLink ?? this.offeringLink,
       );
 
   @override

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -9,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../theme/colors.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
@@ -25,7 +27,7 @@ import '../providers/locale_provider.dart';
 import '../providers/color_provider.dart';
 import '../l10n/app_translations.dart';
 
-enum MeetingMode { standard, webinar, business, church, live, conference }
+enum MeetingMode { standard, business, church, live }
 
 class HomeScreen extends StatefulWidget {
   final UserModel user;
@@ -59,6 +61,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late Animation<double> _pulse;
 
   bool _isOnline = false;
+  bool _isRefreshing = false;
+  bool _hasNetwork = true;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   @override
   void initState() {
@@ -69,6 +74,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _loadLocalPhoto();
     _syncProfileFromFirestore();
     _setOnlineStatus(true);
+    _listenConnectivity();
+  }
+
+  void _listenConnectivity() {
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      final connected = results.any((r) => r != ConnectivityResult.none);
+      if (mounted) setState(() => _hasNetwork = connected);
+      // Auto-refresh when reconnected
+      if (connected && !_hasNetwork) _onRefresh();
+    });
+    // Initial check
+    Connectivity().checkConnectivity().then((results) {
+      if (mounted) setState(() => _hasNetwork = results.any((r) => r != ConnectivityResult.none));
+    });
+  }
+
+  Future<void> _onRefresh() async {
+    if (_isRefreshing) return;
+    HapticFeedback.lightImpact();
+    setState(() => _isRefreshing = true);
+    await Future.wait([
+      _loadHistory(),
+      _checkPro(),
+      _syncProfileFromFirestore(),
+      _loadLocalPhoto(),
+    ]);
+    if (mounted) setState(() => _isRefreshing = false);
   }
 
   void _setupAnimations() {
@@ -160,6 +192,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     _setOnlineStatus(false);
+    _connectivitySub?.cancel();
     _headerAnim.dispose();
     _pulseAnim.dispose();
     _meetingNameController.dispose();
@@ -516,10 +549,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // Animated background orbs
           _AnimatedOrbs(isDark: isDark),
 
+          // Offline badge
+          if (!_hasNetwork)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 4,
+              left: 0, right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade800,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8)],
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.wifi_off, color: Colors.white, size: 14),
+                    const SizedBox(width: 6),
+                    Text('Hors ligne — les données peuvent être obsolètes',
+                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+              ),
+            ),
+
           // Main content
           SafeArea(
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
+            child: RefreshIndicator(
+              onRefresh: _onRefresh,
+              color: AppColors.primary,
+              backgroundColor: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+              displacement: 60,
+              strokeWidth: 2.5,
+              child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
               slivers: [
                 // ── Header ──────────────────────────────────
                 SliverToBoxAdapter(
@@ -821,30 +883,81 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 if (!_isPro) SliverToBoxAdapter(child: const SizedBox(height: 28)),
 
                 // ── Recent meetings ──────────────────────────
-                if (_recentMeetings.isNotEmpty) ...[
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 22),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(AppTranslations.t('recent', lang),
-                            style: GoogleFonts.poppins(
-                              fontSize: 16, fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                            )),
+                // Section titre "Réunions récentes"
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(AppTranslations.t('recent', lang),
+                          style: GoogleFonts.poppins(
+                            fontSize: 16, fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                          )),
+                        if (_recentMeetings.isNotEmpty)
                           TextButton(
                             onPressed: () async {
+                              HapticFeedback.lightImpact();
                               final prefs = await SharedPreferences.getInstance();
                               await prefs.remove('crux_recent_meetings');
                               await _loadHistory();
                             },
                             child: Text(AppTranslations.t('clear_all', lang), style: GoogleFonts.poppins(fontSize: 12, color: Colors.red.shade400)),
                           ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
+                ),
+
+                if (_recentMeetings.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+                      child: Container(
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1A1A2E).withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.15),
+                          ),
+                        ),
+                        child: Column(children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.videocam_off_outlined, color: Colors.white, size: 32),
+                          ),
+                          const SizedBox(height: 16),
+                          Text('Aucune réunion récente',
+                              style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 15,
+                                  color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
+                          const SizedBox(height: 6),
+                          Text('Crée ta première réunion ou rejoins-en une !',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.poppins(fontSize: 12,
+                                  color: isDark ? Colors.white54 : Colors.black45)),
+                          const SizedBox(height: 20),
+                          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            ElevatedButton.icon(
+                              onPressed: _showCreateBottomSheet,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(Icons.add, size: 16, color: Colors.white),
+                              label: Text('Créer', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+                            ),
+                          ]),
+                        ]),
+                      ),
+                    ),
+                  )
+                else
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (ctx, i) {
@@ -863,18 +976,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               Clipboard.setData(ClipboardData(text: m['id'] ?? ''));
                               _errorHandler.showInfoSnackBar(context, '📋 ID copié !');
                             },
+                            onShare: () {
+                              final id = m['id'] ?? '';
+                              final title = m['title'] ?? 'Réunion';
+                              Clipboard.setData(ClipboardData(
+                                  text: '🎥 Rejoins ma réunion CRUX "$title"\nID: $id\n\nTélécharge CRUX pour nous rejoindre!'));
+                              _errorHandler.showInfoSnackBar(context, '📤 Lien copié — partage-le !');
+                            },
                           ),
                         );
                       },
                       childCount: _recentMeetings.length,
                     ),
                   ),
-                ],
 
                 SliverToBoxAdapter(child: const SizedBox(height: 32)),
               ],
             ),
           ),
+        ),
         ],
       ),
     );
@@ -911,10 +1031,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     switch (mode) {
       case MeetingMode.standard: return '';
       case MeetingMode.business: return '[Business]';
-      case MeetingMode.webinar: return '[Webinaire]';
       case MeetingMode.church: return '[Église]';
       case MeetingMode.live: return '[Live]';
-      case MeetingMode.conference: return '[Conférence]';
     }
   }
 }
@@ -1164,10 +1282,8 @@ class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
   static const _modes = [
     (MeetingMode.standard, Icons.videocam, 'Standard'),
     (MeetingMode.business, Icons.business_center, 'Business'),
-    (MeetingMode.webinar, Icons.cast_for_education, 'Webinaire'),
     (MeetingMode.church, Icons.church, 'Église'),
     (MeetingMode.live, Icons.live_tv, 'Live'),
-    (MeetingMode.conference, Icons.groups, 'Conférence'),
   ];
 
   @override
@@ -1340,6 +1456,7 @@ class _RecentMeetingTile extends StatelessWidget {
   final bool isDark;
   final VoidCallback onJoin;
   final VoidCallback onCopy;
+  final VoidCallback? onShare;
 
   const _RecentMeetingTile({
     required this.title,
@@ -1348,6 +1465,7 @@ class _RecentMeetingTile extends StatelessWidget {
     required this.isDark,
     required this.onJoin,
     required this.onCopy,
+    this.onShare,
   });
 
   Future<void> _openReport(BuildContext context) async {
@@ -1432,6 +1550,13 @@ class _RecentMeetingTile extends StatelessWidget {
           onPressed: onCopy,
           tooltip: 'Copier l\'ID',
         ),
+        if (onShare != null)
+          IconButton(
+            icon: const Icon(Icons.share_outlined, size: 18),
+            color: AppColors.secondary,
+            onPressed: onShare,
+            tooltip: 'Partager',
+          ),
         IconButton(
           icon: const Icon(Icons.bar_chart_rounded, size: 18),
           color: AppColors.secondary,

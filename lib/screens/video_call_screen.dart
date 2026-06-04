@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show FontFeature;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -157,6 +158,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   final Map<String, String> _participantNames = {};
   final Map<String, bool> _participantCamOn = {};  // remote cam state
   final Map<String, StreamSubscription<Map<String, dynamic>?>> _profileSubs = {};
+
+  // ── Church mode ──────────────────────────────
+  bool _isChurchMode = false;
+  String? _offeringLink; // Lien de paiement pour offrandes
 
   // ── Live mode ────────────────────────────────
   bool _isLiveMode = false;
@@ -1078,6 +1083,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           _meetingDescription = snap.data()?['description'] as String? ?? '';
           _meetingPassword = snap.data()?['password'] as String?;
           _isLiveMode = title.contains('[Live]') || title.contains('[LIVE]');
+          _isChurchMode = title.contains('[Église]') || title.contains('[Eglise]') || title.contains('[EGLISE]');
+          _offeringLink = snap.data()?['offeringLink'] as String?;
         });
         if (_isLiveMode) {
           _listenLiveComments();
@@ -2923,8 +2930,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         const Divider(color: Colors.white12, height: 1),
         Expanded(
           child: _presenceList.isEmpty
-              ? Center(child: Text('Aucun participant', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)))
-              : ListView.builder(
+              ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.person_off_outlined, color: Colors.white24, size: 40),
+                  const SizedBox(height: 8),
+                  Text('En attente de participants...', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
+                ]))
+              : RefreshIndicator(
+                  onRefresh: () async {
+                    HapticFeedback.lightImpact();
+                    _loadParticipantProfiles(_presenceList);
+                  },
+                  color: AppColors.primary,
+                  child: ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: _presenceList.length,
                   itemBuilder: (ctx, i) {
@@ -2985,6 +3002,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                           : null,
                     );
                   },
+                ),
                 ),
         ),
       ]),
@@ -3453,6 +3471,20 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 },
               ),
             ],
+            // ── CHURCH OFFERING BUTTON ──────────────────────
+            if (_isChurchMode) ...[
+              const SizedBox(width: 8),
+              _Btn(
+                icon: Icons.volunteer_activism,
+                label: 'Offrande',
+                active: true,
+                isHighlight: true,
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  _showOfferingPanel();
+                },
+              ),
+            ],
             const SizedBox(width: 8),
             Semantics(
               label: 'Quitter la réunion',
@@ -3467,6 +3499,23 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── CHURCH OFFERING PANEL ────────────────────────────────────
+  void _showOfferingPanel() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _OfferingSheet(
+        meetingId: widget.meetingId,
+        isHost: widget.isHost,
+        initialLink: _offeringLink,
+        onLinkSaved: (link) {
+          setState(() => _offeringLink = link);
+        },
       ),
     );
   }
@@ -4121,6 +4170,242 @@ class _ChatTab extends StatelessWidget {
               )),
         ]),
       ),
+    );
+  }
+}
+
+// ── CHURCH OFFERING SHEET ─────────────────────────────────────────────────────
+class _OfferingSheet extends StatefulWidget {
+  final String meetingId;
+  final bool isHost;
+  final String? initialLink;
+  final void Function(String link) onLinkSaved;
+
+  const _OfferingSheet({
+    required this.meetingId,
+    required this.isHost,
+    required this.initialLink,
+    required this.onLinkSaved,
+  });
+
+  @override
+  State<_OfferingSheet> createState() => _OfferingSheetState();
+}
+
+class _OfferingSheetState extends State<_OfferingSheet> {
+  late final TextEditingController _linkCtrl;
+  bool _saving = false;
+  bool _editMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _linkCtrl = TextEditingController(text: widget.initialLink ?? '');
+    _editMode = widget.isHost && (widget.initialLink == null || widget.initialLink!.isEmpty);
+  }
+
+  @override
+  void dispose() {
+    _linkCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveLink() async {
+    final link = _linkCtrl.text.trim();
+    if (link.isEmpty) return;
+    setState(() => _saving = true);
+    try {
+      await FirebaseFirestore.instance
+          .collection('meetings')
+          .doc(widget.meetingId)
+          .update({'offeringLink': link});
+      widget.onLinkSaved(link);
+      if (mounted) {
+        setState(() { _saving = false; _editMode = false; });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('✅ Lien d\'offrande enregistré!',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+          backgroundColor: const Color(0xFF388E3C),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      }
+    } catch (_) {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _openLink() async {
+    final link = widget.initialLink ?? _linkCtrl.text.trim();
+    if (link.isEmpty) return;
+    try {
+      await launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      await launchUrl(Uri.parse(link), mode: LaunchMode.platformDefault);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const grad = LinearGradient(
+      colors: [Color(0xFF4A148C), Color(0xFF880E4F)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+
+    final hasLink = (widget.initialLink?.isNotEmpty ?? false) || _linkCtrl.text.isNotEmpty;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A1529),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 32),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        // Handle
+        Center(child: Container(width: 36, height: 4,
+            decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+        const SizedBox(height: 20),
+
+        // Header
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(gradient: grad, borderRadius: BorderRadius.circular(14)),
+            child: const Icon(Icons.volunteer_activism, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Offrandes', style: GoogleFonts.poppins(color: Colors.white,
+                fontWeight: FontWeight.w800, fontSize: 18)),
+            Text('Faire une offrande à l\'Église', style: GoogleFonts.poppins(
+                color: Colors.white54, fontSize: 12)),
+          ])),
+          if (widget.isHost && !_editMode && hasLink)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, color: Colors.white54, size: 20),
+              onPressed: () => setState(() => _editMode = true),
+              tooltip: 'Modifier le lien',
+            ),
+        ]),
+        const SizedBox(height: 24),
+
+        if (_editMode && widget.isHost) ...[
+          // Host: enter payment link
+          Text('Configurez votre lien de paiement',
+              style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _linkCtrl,
+            style: GoogleFonts.poppins(color: Colors.white),
+            keyboardType: TextInputType.url,
+            decoration: InputDecoration(
+              hintText: 'https://pay.djamo.com/... ou autre lien',
+              hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 12),
+              prefixIcon: const Icon(Icons.link, color: Color(0xFF4A148C)),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.08),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFF4A148C), width: 2)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity, height: 50,
+            child: DecoratedBox(
+              decoration: BoxDecoration(gradient: grad, borderRadius: BorderRadius.circular(25)),
+              child: TextButton(
+                style: TextButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25))),
+                onPressed: _saving ? null : _saveLink,
+                child: _saving
+                    ? const SizedBox(width: 20, height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        const Icon(Icons.save_outlined, color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Text('Enregistrer le lien', style: GoogleFonts.poppins(
+                            color: Colors.white, fontWeight: FontWeight.w700)),
+                      ]),
+              ),
+            ),
+          ),
+        ] else if (hasLink) ...[
+          // Participants: show offering button
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [
+                const Color(0xFF4A148C).withValues(alpha: 0.3),
+                const Color(0xFF880E4F).withValues(alpha: 0.3),
+              ]),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF4A148C).withValues(alpha: 0.5), width: 1),
+            ),
+            child: Column(children: [
+              const Icon(Icons.church, color: Colors.white70, size: 40),
+              const SizedBox(height: 12),
+              Text('Contribuer à l\'œuvre de Dieu',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+              const SizedBox(height: 6),
+              Text('Tout don compte. Dieu bénit les donateurs.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(color: Colors.white60, fontSize: 12)),
+            ]),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity, height: 54,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: grad,
+                borderRadius: BorderRadius.circular(27),
+                boxShadow: [BoxShadow(color: const Color(0xFF4A148C).withValues(alpha: 0.5), blurRadius: 16, offset: const Offset(0, 4))],
+              ),
+              child: TextButton(
+                style: TextButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27))),
+                onPressed: _openLink,
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.favorite, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Text('Faire une offrande', style: GoogleFonts.poppins(
+                      color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                ]),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text('Vous serez redirigé vers le lien de paiement',
+              style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+        ] else ...[
+          // Host mode but no link yet, participant sees message
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(children: [
+              const Icon(Icons.info_outline, color: Colors.white38, size: 36),
+              const SizedBox(height: 12),
+              Text('Aucun lien de paiement configuré',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13)),
+              if (widget.isHost) ...[
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => setState(() => _editMode = true),
+                  child: Text('Configurer maintenant →',
+                      style: GoogleFonts.poppins(color: const Color(0xFF4A148C), fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ]),
+          ),
+        ],
+        const SizedBox(height: 8),
+      ]),
     );
   }
 }

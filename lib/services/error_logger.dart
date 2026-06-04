@@ -8,10 +8,10 @@ class ErrorLogger {
   factory ErrorLogger() => _instance;
 
   /// Log and optionally rethrow errors
-  void logError(String context, dynamic error, {StackTrace? stackTrace, bool rethrow = false}) {
+  void logError(String context, dynamic error, {StackTrace? stackTrace, bool shouldRethrow = false}) {
     final msg = '❌ [$context] ${error.toString()}';
     _logger.e(msg, stackTrace: stackTrace ?? StackTrace.current);
-    if (rethrow) throw error;
+    if (shouldRethrow) throw error;
   }
 
   /// Wrap async operations with automatic error logging
