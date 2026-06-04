@@ -17,6 +17,8 @@ import '../providers/locale_provider.dart';
 import '../providers/color_provider.dart';
 import '../l10n/app_translations.dart';
 
+enum MeetingMode { standard, webinar, business, church, live, conference }
+
 class HomeScreen extends StatefulWidget {
   final UserModel user;
   const HomeScreen({super.key, required this.user});
@@ -457,6 +459,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ),
                             // Avatar → profile menu
                             PopupMenuButton<String>(
+                              tooltip: 'Profil et déconnexion',
                               offset: const Offset(0, 52),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
@@ -499,16 +502,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               ),
                             ),
                             const SizedBox(width: 10),
-                            GestureDetector(
-                              onTap: () => Navigator.pushNamed(context, '/settings'),
-                              child: Container(
-                                width: 44, height: 44,
-                                decoration: BoxDecoration(
-                                  color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
-                                  shape: BoxShape.circle,
+                            Tooltip(
+                              message: 'Paramètres',
+                              child: GestureDetector(
+                                onTap: () => Navigator.pushNamed(context, '/settings'),
+                                child: Container(
+                                  width: 44, height: 44,
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(Icons.settings_outlined,
+                                    color: isDark ? Colors.white70 : Colors.black54, size: 20),
                                 ),
-                                child: Icon(Icons.settings_outlined,
-                                  color: isDark ? Colors.white70 : Colors.black54, size: 20),
                               ),
                             ),
                           ],
@@ -528,32 +534,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       children: [
                         // NEW MEETING
                         Expanded(
-                          child: ScaleTransition(
-                            scale: _pulse,
-                            child: _BigActionButton(
-                              icon: Icons.videocam_rounded,
-                              label: AppTranslations.t('new_meeting', lang),
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFE74C3C), Color(0xFF9B59B6)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
+                          child: Semantics(
+                            label: 'Nouvelle réunion — créer une réunion vidéo',
+                            button: true,
+                            child: ScaleTransition(
+                              scale: _pulse,
+                              child: _BigActionButton(
+                                icon: Icons.videocam_rounded,
+                                label: AppTranslations.t('new_meeting', lang),
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFFE74C3C), Color(0xFF9B59B6)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                onTap: _showCreateBottomSheet,
                               ),
-                              onTap: _showCreateBottomSheet,
                             ),
                           ),
                         ),
                         const SizedBox(width: 14),
                         // JOIN MEETING
                         Expanded(
-                          child: _BigActionButton(
-                            icon: Icons.add_link_rounded,
-                            label: AppTranslations.t('join_meeting', lang),
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF5B5FFF), Color(0xFF8E44AD)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
+                          child: Semantics(
+                            label: 'Rejoindre une réunion existante',
+                            button: true,
+                            child: _BigActionButton(
+                              icon: Icons.add_link_rounded,
+                              label: AppTranslations.t('join_meeting', lang),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF5B5FFF), Color(0xFF8E44AD)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              onTap: _showJoinDialog,
                             ),
-                            onTap: _showJoinDialog,
                           ),
                         ),
                       ],
@@ -751,12 +765,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         isCreating: _isCreating,
         onTogglePassword: () => setState(() => _showPassword = !_showPassword),
         onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
-        onSubmit: () {
+        onSubmit: (MeetingMode mode) {
+          // Prepend mode tag to the meeting name
+          final tag = _modeTag(mode);
+          if (tag.isNotEmpty && !_meetingNameController.text.startsWith('[')) {
+            _meetingNameController.text = '$tag ${_meetingNameController.text}'.trim();
+          }
           Navigator.pop(context);
           _createMeeting();
         },
       ),
     );
+  }
+
+  String _modeTag(MeetingMode mode) {
+    switch (mode) {
+      case MeetingMode.standard: return '';
+      case MeetingMode.business: return '[Business]';
+      case MeetingMode.webinar: return '[Webinaire]';
+      case MeetingMode.church: return '[Église]';
+      case MeetingMode.live: return '[Live]';
+      case MeetingMode.conference: return '[Conférence]';
+    }
   }
 }
 
@@ -914,12 +944,15 @@ class _StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
-      child: Column(children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(height: 4),
-        Text(value, style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
-        Text(label, style: GoogleFonts.poppins(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38)),
-      ]),
+      child: Semantics(
+        label: '$value $label',
+        child: Column(children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 4),
+          Text(value, style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
+          Text(label, style: GoogleFonts.poppins(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38)),
+        ]),
+      ),
     );
   }
 }

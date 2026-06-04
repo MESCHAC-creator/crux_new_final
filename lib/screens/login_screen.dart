@@ -357,7 +357,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                         )
                       : Text('Envoyer',
                           style: GoogleFonts.poppins(
-                            color: const Color(0xFFE74C3C),
+                            color: const Color(0xFFB71C1C),
                             fontWeight: FontWeight.w700,
                           )),
                 ),
@@ -385,10 +385,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                     begin: Alignment(math.cos(t * 2 * math.pi), math.sin(t * 2 * math.pi)),
                     end: Alignment(-math.cos(t * 2 * math.pi), -math.sin(t * 2 * math.pi)),
                     colors: const [
-                      Color(0xFFE74C3C),
-                      Color(0xFF8E44AD),
+                      Color(0xFFB71C1C),
+                      Color(0xFF6A1B9A),
                       Color(0xFF3498DB),
-                      Color(0xFF8E44AD),
+                      Color(0xFF6A1B9A),
                     ],
                     stops: [0.0, 0.4 + t * 0.2, 0.7 + t * 0.1, 1.0],
                   ),
@@ -430,7 +430,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             ],
                           ),
                           child: const Icon(Icons.videocam_rounded,
-                              color: Color(0xFFE74C3C), size: 52),
+                              color: Color(0xFFB71C1C), size: 52),
                         ),
                       ),
                     ),
@@ -550,7 +550,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                   onPressed: _isLoading ? null : _handleLogin,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
-                                    foregroundColor: const Color(0xFFE74C3C),
+                                    foregroundColor: const Color(0xFFB71C1C),
                                     elevation: 8,
                                     shadowColor: Colors.black38,
                                     shape: RoundedRectangleBorder(
@@ -561,7 +561,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                           width: 22, height: 22,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2.5,
-                                            valueColor: AlwaysStoppedAnimation(Color(0xFFE74C3C)),
+                                            valueColor: AlwaysStoppedAnimation(Color(0xFFB71C1C)),
                                           ),
                                         )
                                       : Text(
@@ -779,8 +779,8 @@ class _GlassTextField extends StatelessWidget {
         errorStyle: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 11.5, fontWeight: FontWeight.w500),
         filled: true,
         fillColor: hasError
-            ? Colors.red.withOpacity(0.08)
-            : Colors.white.withOpacity(0.12),
+            ? Colors.red.withValues(alpha: 0.08)
+            : Colors.white.withValues(alpha: 0.12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),

@@ -1,101 +1,95 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // 🔴 PRIMARY COLORS - ROUGE & VIOLET & BLANC
-  static const Color primary = Color(0xFFE74C3C); // Rouge vibrant
-  static const Color primaryDark = Color(0xFFC0392B); // Rouge foncé
-  static const Color primaryLight = Color(0xFFF8706E); // Rouge clair
+  // PRIMARY — Blood Red
+  static const Color primary = Color(0xFFB71C1C);        // sang profond
+  static const Color primaryDark = Color(0xFF7F0000);    // rouge abyssal
+  static const Color primaryLight = Color(0xFFE53935);   // rouge vif
 
-  static const Color secondary = Color(0xFF8E44AD); // Violet principal
-  static const Color secondaryDark = Color(0xFF6C3483); // Violet foncé
-  static const Color secondaryLight = Color(0xFFBB8FCE); // Violet clair
+  // SECONDARY — Cross Purple
+  static const Color secondary = Color(0xFF6A1B9A);      // violet croix
+  static const Color secondaryDark = Color(0xFF38006B);  // violet obscur
+  static const Color secondaryLight = Color(0xFF9C27B0); // violet électrique
 
-  static const Color accent = Color(0xFF9B59B6); // Violet accent
-  static const Color accentLight = Color(0xFFD7BDE2); // Violet très clair
+  // ACCENT — Art White / Lavande
+  static const Color accent = Color(0xFF7B1FA2);         // violet artistique
+  static const Color accentLight = Color(0xFFE1BEE7);    // lavande douce
 
-  // ⚪ BACKGROUND - BLANC & GRIS (Premium)
-  static const Color whiteBg = Color(0xFFFFFFFF); // Blanc pur
-  static const Color lightBg = Color(0xFFF8F9FA); // Blanc cassé
-  static const Color mediumBg = Color(0xFFEEF0F4); // Gris très clair
+  // Backgrounds
+  static const Color whiteBg = Color(0xFFFFFFFF);
+  static const Color lightBg = Color(0xFFFAF8FF);        // légèrement teintée violet
+  static const Color mediumBg = Color(0xFFF0EBF8);       // parchemin violet pâle
 
   // Gradient backgrounds
-  static const Color bgGradient1 = Color(0xFFF5F7FA); // Fond dégradé 1
-  static const Color bgGradient2 = Color(0xFFE8EAEF); // Fond dégradé 2
+  static const Color bgGradient1 = Color(0xFFF8F5FF);
+  static const Color bgGradient2 = Color(0xFFEDE7F6);
 
   // TEXT COLORS
-  static const Color textPrimary = Color(0xFF1A1A1A); // Noir texte
-  static const Color textSecondary = Color(0xFF555555); // Gris texte
-  static const Color textTertiary = Color(0xFF999999); // Gris clair texte
-  static const Color textOnPrimary = Color(0xFFFFFFFF); // Blanc sur rouge
+  static const Color textPrimary = Color(0xFF1A0A2E);    // presque noir violet
+  static const Color textSecondary = Color(0xFF4A3560);
+  static const Color textTertiary = Color(0xFF9E8FAF);
+  static const Color textOnPrimary = Color(0xFFFFFFFF);
 
-  // STATUS & FEEDBACK
-  static const Color success = Color(0xFF27AE60); // Vert succès
-  static const Color error = Color(0xFFE74C3C); // Rouge erreur (même que primary)
-  static const Color warning = Color(0xFFF39C12); // Orange warning
-  static const Color info = Color(0xFF3498DB); // Bleu info
-  static const Color pending = Color(0xFF95A5A6); // Gris en attente
+  // STATUS
+  static const Color success = Color(0xFF2E7D32);
+  static const Color error = Color(0xFFB71C1C);
+  static const Color warning = Color(0xFFE65100);
+  static const Color info = Color(0xFF1565C0);
+  static const Color pending = Color(0xFF78909C);
 
-  // BORDERS & DIVIDERS
-  static const Color border = Color(0xFFDCDCDC); // Border gris clair
-  static const Color divider = Color(0xFFE8EAEF); // Divider léger
-  static const Color borderFocus = Color(0xFF8E44AD); // Border violet focus
+  // BORDERS
+  static const Color border = Color(0xFFD1C4E9);
+  static const Color divider = Color(0xFFEDE7F6);
+  static const Color borderFocus = Color(0xFF6A1B9A);
 
-  // OVERLAY & SHADOWS
-  static const Color overlay = Color(0x00000000); // Transparent
-  static const Color overlayLight = Color(0x20000000); // Overlay léger
-  static const Color overlayDark = Color(0x80000000); // Overlay sombre
+  // OVERLAY
+  static const Color overlay = Color(0x00000000);
+  static const Color overlayLight = Color(0x20000000);
+  static const Color overlayDark = Color(0x80000000);
 
   // SPECIAL STATES
-  static const Color onlineGreen = Color(0xFF27AE60); // En ligne
-  static const Color offlineGray = Color(0xFF95A5A6); // Hors ligne
-  static const Color busyRed = Color(0xFFE74C3C); // Occupé
-  static const Color awayYellow = Color(0xFFF39C12); // Absent
+  static const Color onlineGreen = Color(0xFF2E7D32);
+  static const Color offlineGray = Color(0xFF78909C);
+  static const Color busyRed = Color(0xFFB71C1C);
+  static const Color awayYellow = Color(0xFFE65100);
 
-  // GRADIENT COMBINATIONS (Meilleur que Zoom & Google Meet!)
+  // PRIMARY GRADIENT — Blood red → Cross purple (dramatic)
   static const LinearGradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [
-      Color(0xFFE74C3C), // Rouge
-      Color(0xFF8E44AD), // Violet
-    ],
+    colors: [Color(0xFFB71C1C), Color(0xFF6A1B9A)],
   );
 
+  // ACCENT GRADIENT — Cross purple → Deeper
   static const LinearGradient accentGradient = LinearGradient(
     begin: Alignment.topRight,
     end: Alignment.bottomLeft,
-    colors: [
-      Color(0xFF8E44AD), // Violet
-      Color(0xFFC0392B), // Rouge foncé
-    ],
+    colors: [Color(0xFF9C27B0), Color(0xFF7F0000)],
   );
 
+  // PREMIUM GRADIENT — Crimson → Purple → White-art
   static const LinearGradient premiumGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFFF8706E), // Rouge clair
-      Color(0xFFBB8FCE), // Violet clair
-      Color(0xFFFFFFFF), // Blanc
-    ],
+    colors: [Color(0xFFB71C1C), Color(0xFF6A1B9A), Color(0xFFF8F5FF)],
   );
 }
 
-// Pallette couleurs pour thèmes différents
+// Palette couleurs pour thèmes différents
 class AppColorsPalette {
   // Theme Clair (Jour)
   static const Map<String, Color> lightTheme = {
-    'primary': Color(0xFFE74C3C),
-    'secondary': Color(0xFF8E44AD),
+    'primary': Color(0xFFB71C1C),
+    'secondary': Color(0xFF6A1B9A),
     'background': Color(0xFFFFFFFF),
-    'surface': Color(0xFFF8F9FA),
-    'text': Color(0xFF1A1A1A),
+    'surface': Color(0xFFFAF8FF),
+    'text': Color(0xFF1A0A2E),
   };
 
   // Theme Sombre (Nuit)
   static const Map<String, Color> darkTheme = {
-    'primary': Color(0xFFF8706E),
-    'secondary': Color(0xFFBB8FCE),
+    'primary': Color(0xFFE53935),
+    'secondary': Color(0xFF9C27B0),
     'background': Color(0xFF0F0F0F),
     'surface': Color(0xFF1A1A1A),
     'text': Color(0xFFFFFFFF),

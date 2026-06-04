@@ -30,6 +30,8 @@ class _Reaction {
 
 enum _NetQuality { good, fair, poor, unknown }
 
+enum _VideoQuality { low, medium, high, hd }
+
 // ─────────────────────────────────────────────
 //  WIDGET
 // ─────────────────────────────────────────────
@@ -78,6 +80,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── Network quality ──────────────────────────
   _NetQuality _netQuality = _NetQuality.unknown;
   Timer? _statsTimer;
+
+  // ── Video quality ────────────────────────────
+  _VideoQuality _videoQuality = _VideoQuality.medium;
 
   // ── Call timer ───────────────────────────────
   Timer? _callTimer;
@@ -718,6 +723,27 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     });
   }
 
+  // ── VIDEO QUALITY ────────────────────────────
+  Future<void> _applyVideoQuality(_VideoQuality q) async {
+    setState(() => _videoQuality = q);
+    final videoTrack = _localStream?.getVideoTracks().firstOrNull;
+    if (videoTrack == null) return;
+    switch (q) {
+      case _VideoQuality.low:
+        await videoTrack.applyConstraints({'width': 320, 'height': 240, 'frameRate': 15});
+        break;
+      case _VideoQuality.medium:
+        await videoTrack.applyConstraints({'width': 640, 'height': 480, 'frameRate': 24});
+        break;
+      case _VideoQuality.high:
+        await videoTrack.applyConstraints({'width': 1280, 'height': 720, 'frameRate': 30});
+        break;
+      case _VideoQuality.hd:
+        await videoTrack.applyConstraints({'width': 1920, 'height': 1080, 'frameRate': 30});
+        break;
+    }
+  }
+
   // ── SCREEN SHARE ────────────────────────────
   Future<void> _toggleScreenShare() async {
     HapticFeedback.mediumImpact();
@@ -1338,6 +1364,19 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ),
         ],
         const Spacer(),
+        // Video quality selector
+        PopupMenuButton<_VideoQuality>(
+          icon: const Icon(Icons.hd_outlined, color: Colors.white70, size: 18),
+          color: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          onSelected: _applyVideoQuality,
+          itemBuilder: (_) => [
+            PopupMenuItem(value: _VideoQuality.low, child: _QualityItem('Basse qualité', '320p', _videoQuality == _VideoQuality.low)),
+            PopupMenuItem(value: _VideoQuality.medium, child: _QualityItem('Qualité moyenne', '480p', _videoQuality == _VideoQuality.medium)),
+            PopupMenuItem(value: _VideoQuality.high, child: _QualityItem('Haute qualité', '720p HD', _videoQuality == _VideoQuality.high)),
+            PopupMenuItem(value: _VideoQuality.hd, child: _QualityItem('Full HD', '1080p', _videoQuality == _VideoQuality.hd)),
+          ],
+        ),
         // Meeting ID chip (right side)
         GestureDetector(
           onTap: () {
@@ -2222,5 +2261,33 @@ class _Btn extends StatelessWidget {
             style: GoogleFonts.poppins(color: Colors.white54, fontSize: 9)),
       ]),
     );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  VIDEO QUALITY MENU ITEM
+// ─────────────────────────────────────────────
+class _QualityItem extends StatelessWidget {
+  final String label;
+  final String badge;
+  final bool selected;
+  const _QualityItem(this.label, this.badge, this.selected);
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      if (selected) const Icon(Icons.check, color: Color(0xFFB71C1C), size: 16)
+      else const SizedBox(width: 16),
+      const SizedBox(width: 8),
+      Text(label, style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13)),
+      const Spacer(),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFB71C1C).withValues(alpha: 0.3) : Colors.white12,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(badge, style: GoogleFonts.poppins(color: selected ? const Color(0xFFE53935) : Colors.white54, fontSize: 10, fontWeight: FontWeight.w600)),
+      ),
+    ]);
   }
 }

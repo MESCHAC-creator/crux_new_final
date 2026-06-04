@@ -454,14 +454,14 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
             height: 80,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFF4081), Color(0xFFAA00FF)],
+                colors: [Color(0xFFE53935), Color(0xFF6A1B9A)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(22),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF4081).withOpacity(0.5),
+                  color: const Color(0xFFE53935).withValues(alpha: 0.5),
                   blurRadius: 20,
                   spreadRadius: 4,
                 ),
@@ -500,12 +500,12 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFFFF4081), Color(0xFFAA00FF)],
+            colors: [Color(0xFFE53935), Color(0xFF6A1B9A)],
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFF4081).withOpacity(0.5),
+              color: const Color(0xFFE53935).withValues(alpha: 0.5),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -550,11 +550,11 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
           child: Text(
             'Se connecter',
             style: GoogleFonts.poppins(
-              color: const Color(0xFFFF4081),
+              color: const Color(0xFFE53935),
               fontSize: 14,
               fontWeight: FontWeight.w700,
               decoration: TextDecoration.underline,
-              decorationColor: const Color(0xFFFF4081),
+              decorationColor: const Color(0xFFE53935),
             ),
           ),
         ),
@@ -597,7 +597,7 @@ class _FloatingParticle extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(colors: [
-                  index.isEven ? const Color(0xFFFF4081) : const Color(0xFFAA00FF),
+                  index.isEven ? const Color(0xFFE53935) : const Color(0xFF6A1B9A),
                   Colors.transparent,
                 ]),
               ),
@@ -660,8 +660,8 @@ class _GlassTextField extends StatelessWidget {
         ),
         filled: true,
         fillColor: hasError
-            ? Colors.red.withOpacity(0.08)
-            : Colors.white.withOpacity(0.12),
+            ? Colors.red.withValues(alpha: 0.08)
+            : Colors.white.withValues(alpha: 0.12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
@@ -676,7 +676,7 @@ class _GlassTextField extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           borderSide: hasError
               ? const BorderSide(color: Colors.redAccent, width: 2)
-              : const BorderSide(color: Color(0xFFFF4081), width: 1.5),
+              : const BorderSide(color: Color(0xFFE53935), width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
