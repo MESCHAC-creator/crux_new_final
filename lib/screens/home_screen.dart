@@ -1004,11 +1004,12 @@ class _QuickAction extends StatelessWidget {
 // ─────────────────────────────────────────────
 //  CREATE MEETING BOTTOM SHEET
 // ─────────────────────────────────────────────
-class _CreateMeetingSheet extends StatelessWidget {
+class _CreateMeetingSheet extends StatefulWidget {
   final TextEditingController nameController;
   final TextEditingController passwordController;
   final bool showPassword, obscurePassword, isCreating;
-  final VoidCallback onTogglePassword, onToggleObscure, onSubmit;
+  final VoidCallback onTogglePassword, onToggleObscure;
+  final void Function(MeetingMode mode) onSubmit;
 
   const _CreateMeetingSheet({
     required this.nameController, required this.passwordController,
@@ -1016,6 +1017,22 @@ class _CreateMeetingSheet extends StatelessWidget {
     required this.isCreating, required this.onTogglePassword,
     required this.onToggleObscure, required this.onSubmit,
   });
+
+  @override
+  State<_CreateMeetingSheet> createState() => _CreateMeetingSheetState();
+}
+
+class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
+  MeetingMode _selectedMode = MeetingMode.standard;
+
+  static const _modes = [
+    (MeetingMode.standard, Icons.videocam, 'Standard'),
+    (MeetingMode.business, Icons.business_center, 'Business'),
+    (MeetingMode.webinar, Icons.cast_for_education, 'Webinaire'),
+    (MeetingMode.church, Icons.church, 'Église'),
+    (MeetingMode.live, Icons.live_tv, 'Live'),
+    (MeetingMode.conference, Icons.groups, 'Conférence'),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -1044,9 +1061,49 @@ class _CreateMeetingSheet extends StatelessWidget {
             const SizedBox(width: 12),
             Text('Nouvelle réunion', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
           ]),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          // ── Meeting mode selector ──
+          Text('Type de réunion', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white54 : Colors.black45)),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _modes.map((entry) {
+                final mode = entry.$1;
+                final icon = entry.$2;
+                final label = entry.$3;
+                final selected = _selectedMode == mode;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () { HapticFeedback.selectionClick(); setState(() => _selectedMode = mode); },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: selected ? AppColors.primaryGradient : null,
+                        color: selected ? null : (isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08)),
+                        borderRadius: BorderRadius.circular(20),
+                        border: selected ? null : Border.all(
+                          color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(icon, size: 14, color: selected ? Colors.white : (isDark ? Colors.white54 : Colors.black45)),
+                        const SizedBox(width: 5),
+                        Text(label, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600,
+                            color: selected ? Colors.white : (isDark ? Colors.white54 : Colors.black45))),
+                      ]),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
           TextField(
-            controller: nameController,
+            controller: widget.nameController,
             autofocus: true,
             style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black87),
             decoration: InputDecoration(
@@ -1062,19 +1119,19 @@ class _CreateMeetingSheet extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           GestureDetector(
-            onTap: onTogglePassword,
+            onTap: widget.onTogglePassword,
             child: Row(children: [
-              Icon(showPassword ? Icons.lock_outline : Icons.lock_open_outlined, size: 16, color: AppColors.primary),
+              Icon(widget.showPassword ? Icons.lock_outline : Icons.lock_open_outlined, size: 16, color: AppColors.primary),
               const SizedBox(width: 6),
-              Text(showPassword ? 'Supprimer le code d\'accès' : 'Ajouter un code d\'accès',
+              Text(widget.showPassword ? 'Supprimer le code d\'accès' : 'Ajouter un code d\'accès',
                 style: GoogleFonts.poppins(fontSize: 13, color: AppColors.primary, decoration: TextDecoration.underline, decorationColor: AppColors.primary)),
             ]),
           ),
-          if (showPassword) ...[
+          if (widget.showPassword) ...[
             const SizedBox(height: 12),
             TextField(
-              controller: passwordController,
-              obscureText: obscurePassword,
+              controller: widget.passwordController,
+              obscureText: widget.obscurePassword,
               keyboardType: TextInputType.number,
               style: GoogleFonts.poppins(color: isDark ? Colors.white : Colors.black87),
               decoration: InputDecoration(
@@ -1082,8 +1139,8 @@ class _CreateMeetingSheet extends StatelessWidget {
                 hintStyle: GoogleFonts.poppins(color: Colors.grey),
                 prefixIcon: const Icon(Icons.lock_outline, size: 20),
                 suffixIcon: IconButton(
-                  icon: Icon(obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
-                  onPressed: onToggleObscure,
+                  icon: Icon(widget.obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
+                  onPressed: widget.onToggleObscure,
                 ),
                 filled: true,
                 fillColor: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08),
@@ -1097,7 +1154,7 @@ class _CreateMeetingSheet extends StatelessWidget {
           SizedBox(
             width: double.infinity, height: 54,
             child: ElevatedButton(
-              onPressed: isCreating ? null : onSubmit,
+              onPressed: widget.isCreating ? null : () => widget.onSubmit(_selectedMode),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -1105,7 +1162,7 @@ class _CreateMeetingSheet extends StatelessWidget {
                 elevation: 8,
                 shadowColor: AppColors.primary.withValues(alpha: 0.5),
               ),
-              child: isCreating
+              child: widget.isCreating
                 ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
                 : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     const Icon(Icons.rocket_launch, size: 18),

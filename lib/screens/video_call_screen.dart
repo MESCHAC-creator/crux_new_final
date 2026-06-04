@@ -1840,30 +1840,38 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _Btn(
-              icon: _micOn ? Icons.mic : Icons.mic_off,
-              label: _micOn ? 'Micro' : 'Muet',
-              active: _micOn,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                for (final t in _localStream?.getAudioTracks() ?? []) {
-                  t.enabled = !_micOn;
-                }
-                setState(() => _micOn = !_micOn);
-              },
+            Semantics(
+              label: 'Activer/désactiver le micro',
+              button: true,
+              child: _Btn(
+                icon: _micOn ? Icons.mic : Icons.mic_off,
+                label: _micOn ? 'Micro' : 'Muet',
+                active: _micOn,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  for (final t in _localStream?.getAudioTracks() ?? []) {
+                    t.enabled = !_micOn;
+                  }
+                  setState(() => _micOn = !_micOn);
+                },
+              ),
             ),
             const SizedBox(width: 8),
-            _Btn(
-              icon: _camOn ? Icons.videocam : Icons.videocam_off,
-              label: _camOn ? 'Caméra' : 'Arrêt',
-              active: _camOn,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                for (final t in _localStream?.getVideoTracks() ?? []) {
-                  t.enabled = !_camOn;
-                }
-                setState(() => _camOn = !_camOn);
-              },
+            Semantics(
+              label: 'Activer/désactiver la caméra',
+              button: true,
+              child: _Btn(
+                icon: _camOn ? Icons.videocam : Icons.videocam_off,
+                label: _camOn ? 'Caméra' : 'Arrêt',
+                active: _camOn,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  for (final t in _localStream?.getVideoTracks() ?? []) {
+                    t.enabled = !_camOn;
+                  }
+                  setState(() => _camOn = !_camOn);
+                },
+              ),
             ),
             const SizedBox(width: 8),
             _Btn(
@@ -1964,12 +1972,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               ),
             ],
             const SizedBox(width: 8),
-            _Btn(
-              icon: Icons.call_end,
-              label: 'Fin',
-              active: false,
-              isEnd: true,
-              onTap: _confirmLeave,
+            Semantics(
+              label: 'Quitter la réunion',
+              button: true,
+              child: _Btn(
+                icon: Icons.call_end,
+                label: 'Fin',
+                active: false,
+                isEnd: true,
+                onTap: _confirmLeave,
+              ),
             ),
           ],
         ),
