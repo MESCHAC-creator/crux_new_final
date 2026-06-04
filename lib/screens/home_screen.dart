@@ -13,6 +13,9 @@ import '../services/meeting_service.dart';
 import '../services/pro_service.dart';
 import '../services/error_handler_service.dart';
 import '../screens/meeting_screen.dart';
+import '../screens/meeting_report_screen.dart';
+import '../models/meeting_report_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/locale_provider.dart';
 import '../providers/color_provider.dart';
 import '../l10n/app_translations.dart';
@@ -1201,6 +1204,29 @@ class _RecentMeetingTile extends StatelessWidget {
     required this.onCopy,
   });
 
+  Future<void> _openReport(BuildContext context) async {
+    final snap = await FirebaseFirestore.instance
+        .collection('meeting_reports')
+        .doc(meetingId)
+        .get();
+    if (!context.mounted) return;
+    if (!snap.exists) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Aucun rapport disponible pour cette réunion.',
+            style: const TextStyle(color: Colors.white)),
+        backgroundColor: Colors.grey.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+      return;
+    }
+    final report = MeetingReportModel.fromJson(snap.data()!);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => MeetingReportScreen(report: report)),
+    );
+  }
+
   String _timeAgo() {
     final diff = DateTime.now().difference(timestamp);
     if (diff.inMinutes < 60) return 'Il y a ${diff.inMinutes} min';
@@ -1259,6 +1285,12 @@ class _RecentMeetingTile extends StatelessWidget {
           color: AppColors.textTertiary,
           onPressed: onCopy,
           tooltip: 'Copier l\'ID',
+        ),
+        IconButton(
+          icon: const Icon(Icons.bar_chart_rounded, size: 18),
+          color: AppColors.secondary,
+          onPressed: () => _openReport(context),
+          tooltip: 'Voir le rapport',
         ),
         GestureDetector(
           onTap: onJoin,

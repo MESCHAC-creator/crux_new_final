@@ -14,6 +14,8 @@ import '../theme/colors.dart';
 import '../services/meeting_service.dart';
 import '../services/pro_service.dart';
 import '../models/meeting_model.dart';
+import '../models/meeting_report_model.dart';
+import 'meeting_report_screen.dart';
 
 // ─────────────────────────────────────────────
 //  MODELS
@@ -122,6 +124,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   bool _isPro = false;
   bool _paywallShown = false;
   static const _freeMinutes = 30;
+
+  // ── Meeting metadata ─────────────────────────
+  String _meetingTitle = 'Réunion';
+  int _chatMessageCount = 0;
 
   // ── Live mode ────────────────────────────────
   bool _isLiveMode = false;
@@ -504,15 +510,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  String _formattedDuration2(int secs) {
-    final h = secs ~/ 3600;
-    final m = (secs % 3600) ~/ 60;
-    final s = secs % 60;
-    if (h > 0) return '${h}h${m.toString().padLeft(2, '0')}m';
-    if (m > 0) return '${m}min ${s}s';
-    return '${s}s';
-  }
-
   // ── STATS MONITOR ────────────────────────────
   void _startStatsMonitor() {
     _statsTimer?.cancel();
@@ -882,9 +879,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     try {
       final snap = await _db.collection('meetings').doc(widget.meetingId).get();
       if (!snap.exists) return;
-      final title = snap.data()?['title'] as String? ?? '';
+      final title = snap.data()?['title'] as String? ?? 'Réunion';
       if (mounted) {
-        setState(() => _isLiveMode = title.contains('[Live]') || title.contains('[LIVE]'));
+        setState(() {
+          _meetingTitle = title;
+          _isLiveMode = title.contains('[Live]') || title.contains('[LIVE]');
+        });
         if (_isLiveMode) {
           _listenLiveComments();
           _loadYouTubeSettings();
@@ -1313,9 +1313,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
     // Capture state BEFORE any async operation
     final navigator = Navigator.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final duration = _callSeconds;
-    final participantCount = _presenceList.length;
     final isHost = widget.isHost;
 
     // 1. Cancel ALL subscriptions synchronously
@@ -1331,27 +1329,32 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _reconnectTimer?.cancel();
     _hostWaitTimer?.cancel();
 
-    // 2. Navigate immediately
-    navigator.pop();
-
-    // 3. Show meeting summary to host (brief, non-blocking)
+    // 2. Build report before navigating (host only)
+    MeetingReportModel? report;
     if (isHost && duration > 5) {
-      Future.delayed(const Duration(milliseconds: 300), () {
-        scaffoldMessenger.showSnackBar(SnackBar(
-          content: Row(children: [
-            const Icon(Icons.check_circle, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Expanded(child: Text(
-              'Réunion terminée · ${_formattedDuration2(duration)} · $participantCount participant${participantCount > 1 ? 's' : ''}',
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-            )),
-          ]),
-          backgroundColor: const Color(0xFF6A1B9A),
-          duration: const Duration(seconds: 4),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ));
-      });
+      report = MeetingReportModel(
+        meetingId: widget.meetingId,
+        title: _meetingTitle,
+        hostName: widget.userName,
+        hostId: widget.userId,
+        durationSeconds: duration,
+        participantNames: List<String>.from(
+          _presenceList.map((p) => (p['name'] ?? p['userId'] ?? 'Inconnu').toString()),
+        ),
+        messageCount: _chatMessageCount,
+        endedAt: DateTime.now(),
+      );
+      // Save to Firestore (fire-and-forget)
+      _db.collection('meeting_reports').doc(widget.meetingId).set(report.toJson()).catchError((_) {});
+    }
+
+    // 3. Navigate: host → report screen, participant → home
+    if (isHost && report != null) {
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (_) => MeetingReportScreen(report: report!)),
+      );
+    } else {
+      navigator.pop();
     }
 
     // 3. Cleanup in background after navigation — each individually silenced
@@ -2530,14 +2533,17 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           .snapshots(),
       builder: (ctx, snap) {
         final docs = snap.data?.docs ?? [];
-        // Increment unread when chat is closed and new messages arrive
-        if (!_showChat && snap.hasData && docs.isNotEmpty) {
+        // Track total messages and unread count
+        if (snap.hasData && docs.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && !_showChat) {
-              setState(() => _unreadMessages = docs
-                  .where((d) => (d.data() as Map)['sender'] != widget.userName)
-                  .length
-                  .clamp(0, 99));
+            if (mounted) {
+              _chatMessageCount = docs.length;
+              if (!_showChat) {
+                setState(() => _unreadMessages = docs
+                    .where((d) => (d.data() as Map)['sender'] != widget.userName)
+                    .length
+                    .clamp(0, 99));
+              }
             }
           });
         }
