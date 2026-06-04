@@ -3763,8 +3763,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       'text': trimmed,
       'author': widget.userName,
       'ts': FieldValue.serverTimestamp(),
-      'clientTs': DateTime.now().millisecondsSinceEpoch, // local sort fallback
-    }).catchError((e) {
+      'clientTs': DateTime.now().millisecondsSinceEpoch,
+    }).then((_) {
+      // success — no-op, listener will update the list
+    }, onError: (e) {
       if (mounted) {
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
           content: Text('Erreur envoi note: $e', style: GoogleFonts.poppins(fontSize: 12)),

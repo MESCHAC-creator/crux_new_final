@@ -81,7 +81,7 @@ class AuthService {
   Future<void> signOut() async {
     try {
       _logger.i('👋 Déconnexion en cours...');
-      await _googleSignIn.signOut().catchError((_) {});
+      await _googleSignIn.signOut().then((_) {}, onError: (_) {});
       await _auth.signOut();
       _logger.i('✅ Déconnecté avec succès');
     } catch (e) {

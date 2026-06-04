@@ -4,7 +4,7 @@ class AppConstants {
 
   /// Free plan call duration limit in minutes.
   /// Set to 2 for testing, revert to 30 for production.
-  static const int freeMinutes = 2; // TEST — remettre à 30 après test
+  static const int freeMinutes = 30;
 
   /// Monthly CRUX Pro price in FCFA
   static const int proPriceFcfa = 25000;
