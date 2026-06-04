@@ -164,14 +164,15 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   final Map<String, bool> _participantCamOn = {};  // remote cam state
   final Map<String, StreamSubscription<Map<String, dynamic>?>> _profileSubs = {};
 
-  // ── Live transcription ───────────────────────
+  // ── Live transcription (UI stub — populated via speech_to_text in future) ─
   bool _showTranscript = false;
-  final List<String> _transcriptLines = [];
+  final List<Map<String, String>> _transcriptLines = []; // {speaker, text}
 
   // ── Collaborative whiteboard ─────────────────
   bool _showWhiteboard = false;
   final List<Map<String, dynamic>> _whiteboardStrokes = [];
   StreamSubscription? _whiteboardSub;
+  final _whiteboardInputController = TextEditingController();
 
   // ── Church mode ──────────────────────────────
   bool _isChurchMode = false;
@@ -303,6 +304,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _chatController.dispose();
     _chatScrollController.dispose();
     _notesController.dispose();
+    _whiteboardInputController.dispose();
     _screenStream?.dispose();
     _localStream?.dispose();
     _pc?.close();
@@ -3638,11 +3640,24 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               : ListView.builder(
                   padding: const EdgeInsets.all(12),
                   itemCount: _transcriptLines.length,
-                  itemBuilder: (_, i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(_transcriptLines[i],
-                        style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13, height: 1.5)),
-                  ),
+                  itemBuilder: (_, i) {
+                    final line = _transcriptLines[i];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: RichText(
+                        text: TextSpan(children: [
+                          TextSpan(
+                            text: '${line['speaker'] ?? ''}: ',
+                            style: GoogleFonts.poppins(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(
+                            text: line['text'] ?? '',
+                            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13, height: 1.5),
+                          ),
+                        ]),
+                      ),
+                    );
+                  },
                 ),
         ),
         // Info footer
@@ -3682,27 +3697,82 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         .collection('meetings')
         .doc(widget.meetingId)
         .collection('whiteboard')
-        .orderBy('ts')
+        // No orderBy — avoids requiring a composite Firestore index.
+        // Docs arrive in insertion order from cache; good enough for notes.
         .snapshots()
         .listen((snap) {
       if (!mounted) return;
+      final docs = snap.docs.map((d) => d.data()).toList()
+        ..sort((a, b) {
+          // Sort by client-side 'clientTs' millis fallback
+          final ta = a['clientTs'] as int? ?? 0;
+          final tb = b['clientTs'] as int? ?? 0;
+          return ta.compareTo(tb);
+        });
       setState(() {
-        _whiteboardStrokes.clear();
-        for (final doc in snap.docs) {
-          _whiteboardStrokes.add(doc.data());
-        }
+        _whiteboardStrokes
+          ..clear()
+          ..addAll(docs);
       });
+    }, onError: (e) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+          content: Text('Tableau: $e', style: GoogleFonts.poppins(fontSize: 12)),
+          backgroundColor: Colors.red.shade700,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
     });
   }
 
-  void _clearWhiteboard() {
-    _db.collection('meetings').doc(widget.meetingId).collection('whiteboard')
-        .get().then((snap) {
+  Future<void> _clearWhiteboard() async {
+    // Cancel listener before deleting so it doesn't re-populate during the batch
+    _whiteboardSub?.cancel();
+    _whiteboardSub = null;
+    setState(() => _whiteboardStrokes.clear());
+    try {
+      final snap = await _db
+          .collection('meetings')
+          .doc(widget.meetingId)
+          .collection('whiteboard')
+          .get();
       final batch = _db.batch();
       for (final doc in snap.docs) batch.delete(doc.reference);
-      batch.commit();
+      await batch.commit();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+          content: Text('Erreur effacement: $e', style: GoogleFonts.poppins(fontSize: 12)),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } finally {
+      // Re-attach listener after delete completes
+      _listenWhiteboard();
+    }
+  }
+
+  void _submitWhiteboardNote(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    _whiteboardInputController.clear();
+    _db.collection('meetings').doc(widget.meetingId)
+        .collection('whiteboard').add({
+      'text': trimmed,
+      'author': widget.userName,
+      'ts': FieldValue.serverTimestamp(),
+      'clientTs': DateTime.now().millisecondsSinceEpoch, // local sort fallback
+    }).catchError((e) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+          content: Text('Erreur envoi note: $e', style: GoogleFonts.poppins(fontSize: 12)),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
     });
-    setState(() => _whiteboardStrokes.clear());
   }
 
   Widget _buildWhiteboardPanel() {
@@ -3746,7 +3816,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                     const SizedBox(height: 8),
                     Text('Tableau vide', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
                     const SizedBox(height: 4),
-                    Text('Le tableau blanc collaboratif sera disponible\ndans une prochaine mise à jour',
+                    Text('Écrivez une note ci-dessous — visible\npar tous les participants en temps réel',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(color: Colors.white24, fontSize: 11, height: 1.5)),
                   ]),
@@ -3763,7 +3833,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                         color: Colors.white.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(s['text'] ?? '', style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(s['author'] ?? '', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 2),
+                          Text(s['text'] ?? '', style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13)),
+                        ],
+                      ),
                     );
                   },
                 ),
@@ -3774,6 +3851,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           child: Row(children: [
             Expanded(
               child: TextField(
+                controller: _whiteboardInputController,
                 style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
                 decoration: InputDecoration(
                   hintText: 'Ajouter une note au tableau...',
@@ -3782,16 +3860,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   fillColor: Colors.white.withValues(alpha: 0.08),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.send, color: Colors.white54, size: 18),
+                    onPressed: () => _submitWhiteboardNote(_whiteboardInputController.text),
+                  ),
                 ),
-                onSubmitted: (text) {
-                  if (text.trim().isEmpty) return;
-                  _db.collection('meetings').doc(widget.meetingId)
-                      .collection('whiteboard').add({
-                    'text': text.trim(),
-                    'author': widget.userName,
-                    'ts': FieldValue.serverTimestamp(),
-                  });
-                },
+                onSubmitted: _submitWhiteboardNote,
               ),
             ),
           ]),
