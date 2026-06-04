@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +14,7 @@ import '../providers/theme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../providers/color_provider.dart';
 import '../l10n/app_translations.dart';
+import '../services/user_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -68,17 +70,32 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   Future<void> _pickPhoto(ImageSource source) async {
     try {
-      final picked = await _picker.pickImage(source: source, imageQuality: 85, maxWidth: 600);
+      final picked = await _picker.pickImage(
+        source: source,
+        imageQuality: 70,
+        maxWidth: 400,
+        maxHeight: 400,
+      );
       if (picked == null) return;
       setState(() => _isUpdatingPhoto = true);
 
-      // Copy to app documents directory for persistence
+      // 1. Copy locally for this device
       final appDir = await _getAppDocDir();
       final dest = '$appDir/profile_photo.jpg';
-      await File(picked.path).copy(dest);
+      final file = await File(picked.path).copy(dest);
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_photoKey, dest);
+
+      // 2. Encode as base64 and publish to Firestore so others can see it
+      final uid = _auth.currentUser?.uid;
+      if (uid != null) {
+        final bytes = await file.readAsBytes();
+        final b64 = base64Encode(bytes);
+        UserService.instance
+            .saveProfile(uid: uid, photoBase64: b64)
+            .catchError((_) {});
+      }
 
       if (mounted) {
         setState(() {
@@ -105,6 +122,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     await prefs.remove(_photoKey);
     if (_localPhotoPath != null) {
       try { await File(_localPhotoPath!).delete(); } catch (_) {}
+    }
+    // Remove photo from Firestore too
+    final uid = _auth.currentUser?.uid;
+    if (uid != null) {
+      _db.collection('users').doc(uid)
+          .update({'photoBase64': FieldValue.delete()}).catchError((_) {});
     }
     if (mounted) {
       setState(() => _localPhotoPath = null);
@@ -212,6 +235,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     setState(() => _isSavingName = true);
     try {
       await _auth.currentUser!.updateDisplayName(newName);
+      // Publish new name to Firestore so other participants see it
+      final uid = _auth.currentUser?.uid;
+      if (uid != null) {
+        UserService.instance
+            .saveProfile(uid: uid, name: newName)
+            .catchError((_) {});
+      }
       if (mounted) {
         setState(() => _isSavingName = false);
         _snack(AppTranslations.t('name_updated', lang));

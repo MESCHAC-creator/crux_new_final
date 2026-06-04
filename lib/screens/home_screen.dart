@@ -15,6 +15,7 @@ import '../services/error_handler_service.dart';
 import '../screens/meeting_screen.dart';
 import '../screens/meeting_report_screen.dart';
 import '../models/meeting_report_model.dart';
+import '../services/user_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/locale_provider.dart';
 import '../providers/color_provider.dart';
@@ -58,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _checkPro();
     _setupAnimations();
     _loadLocalPhoto();
+    _syncProfileFromFirestore();
   }
 
   void _setupAnimations() {
@@ -92,6 +94,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final prefs = await SharedPreferences.getInstance();
     final path = prefs.getString('crux_local_photo_path');
     if (mounted) setState(() => _localPhotoPath = path);
+  }
+
+  /// Pull fresh name from Firestore and update Firebase Auth if it changed.
+  Future<void> _syncProfileFromFirestore() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+      final profile = await UserService.instance.getProfile(uid);
+      final firestoreName = profile?['name'] as String?;
+      if (firestoreName != null &&
+          firestoreName.isNotEmpty &&
+          firestoreName != FirebaseAuth.instance.currentUser?.displayName) {
+        await FirebaseAuth.instance.currentUser!.updateDisplayName(firestoreName);
+        if (mounted) setState(() {});
+      }
+    } catch (_) {}
+  }
+
+  /// Returns the freshest display name available.
+  String _freshUserName() {
+    return FirebaseAuth.instance.currentUser?.displayName?.trim().isNotEmpty == true
+        ? FirebaseAuth.instance.currentUser!.displayName!
+        : widget.user.name;
   }
 
   @override
@@ -133,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final meetingId = await _meetingService.createMeeting(
         title: name,
         description: '',
-        organizerName: widget.user.name,
+        organizerName: _freshUserName(),
         organizerId: widget.user.uid,
         password: password,
       );
@@ -149,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             meetingId: meetingId,
             meetingName: name,
             userId: widget.user.uid,
-            userName: widget.user.name,
+            userName: _freshUserName(),
             userEmail: widget.user.email,
             isHost: true,
           ),
@@ -207,7 +232,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           meetingId: id,
           meetingName: meeting?.title ?? 'Réunion',
           userId: widget.user.uid,
-          userName: widget.user.name,
+          userName: _freshUserName(),
           userEmail: widget.user.email,
           isHost: false,
         ),

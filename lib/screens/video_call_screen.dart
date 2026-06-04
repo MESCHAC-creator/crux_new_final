@@ -10,9 +10,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'dart:typed_data';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
 import '../services/pro_service.dart';
+import '../services/user_service.dart';
 import '../models/meeting_model.dart';
 import '../models/meeting_report_model.dart';
 import 'meeting_report_screen.dart';
@@ -128,6 +130,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── Meeting metadata ─────────────────────────
   String _meetingTitle = 'Réunion';
   int _chatMessageCount = 0;
+
+  // ── Participant profile cache ─────────────────
+  final Map<String, Uint8List?> _participantPhotos = {};
+  final Map<String, String> _participantNames = {};
 
   // ── Live mode ────────────────────────────────
   bool _isLiveMode = false;
@@ -648,6 +654,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         _presenceList = list;
         if (_isLiveMode) _liveViewers = list.length;
       });
+      // Load Firestore profiles for any new participants
+      _loadParticipantProfiles(list);
     });
   }
 
@@ -872,6 +880,22 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     final next = !_isLocked;
     await _meetingService.setLocked(widget.meetingId, next);
     if (mounted) setState(() => _isLocked = next);
+  }
+
+  // ── PARTICIPANT PROFILES ──────────────────────
+  Future<void> _loadParticipantProfiles(List<Map<String, dynamic>> list) async {
+    for (final p in list) {
+      final uid = p['userId'] as String? ?? '';
+      if (uid.isEmpty || _participantPhotos.containsKey(uid)) continue;
+      final profile = await UserService.instance.getProfile(uid);
+      if (!mounted) return;
+      final bytes = UserService.decodePhoto(profile?['photoBase64'] as String?);
+      final name = profile?['name'] as String?;
+      setState(() {
+        _participantPhotos[uid] = bytes;
+        if (name != null && name.isNotEmpty) _participantNames[uid] = name;
+      });
+    }
   }
 
   // ── LIVE MODE ────────────────────────────────
@@ -2417,15 +2441,20 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   itemBuilder: (ctx, i) {
                     final p = _presenceList[i];
                     final pId = p['userId'] as String? ?? '';
-                    final pName = p['name'] as String? ?? 'Participant';
+                    // Prefer Firestore profile name over presence name
+                    final pName = _participantNames[pId]
+                        ?? (p['name'] as String? ?? 'Participant');
                     final isMe = pId == widget.userId;
                     final initial = pName.isNotEmpty ? pName[0].toUpperCase() : '?';
+                    final photoBytes = _participantPhotos[pId];
                     return ListTile(
                       leading: Container(
                         width: 40, height: 40,
                         decoration: BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
-                        child: Center(child: Text(initial,
-                            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16))),
+                        child: photoBytes != null
+                            ? ClipOval(child: Image.memory(photoBytes, fit: BoxFit.cover, width: 40, height: 40))
+                            : Center(child: Text(initial,
+                                style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16))),
                       ),
                       title: Text(
                         '$pName${isMe ? ' (Moi)' : ''}',
