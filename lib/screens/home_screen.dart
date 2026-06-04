@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -93,7 +94,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _loadLocalPhoto() async {
     final prefs = await SharedPreferences.getInstance();
     final path = prefs.getString('crux_local_photo_path');
-    if (mounted) setState(() => _localPhotoPath = path);
+    // Verify the file still exists
+    if (path != null && File(path).existsSync()) {
+      if (mounted) setState(() => _localPhotoPath = path);
+    } else {
+      // Fallback: decode photo from Firestore if available
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final profile = await UserService.instance.getProfile(uid);
+        final b64 = profile?['photoBase64'] as String?;
+        if (b64 != null && b64.isNotEmpty && mounted) {
+          // Write it locally for future fast access
+          try {
+            final bytes = UserService.decodePhoto(b64);
+            if (bytes != null) {
+              final dir = await getApplicationDocumentsDirectory();
+              final dest = '${dir.path}/profile_photo.jpg';
+              await File(dest).writeAsBytes(bytes);
+              await prefs.setString('crux_local_photo_path', dest);
+              if (mounted) setState(() => _localPhotoPath = dest);
+            }
+          } catch (_) {}
+        }
+      }
+    }
   }
 
   /// Pull fresh name from Firestore and update Firebase Auth if it changed.

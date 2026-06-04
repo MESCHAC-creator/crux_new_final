@@ -131,9 +131,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   String _meetingTitle = 'Réunion';
   int _chatMessageCount = 0;
 
-  // ── Participant profile cache ─────────────────
+  // ── Participant profile cache (Zoom-like) ────
+  Uint8List? _ownPhotoBytes;             // local user's photo
   final Map<String, Uint8List?> _participantPhotos = {};
   final Map<String, String> _participantNames = {};
+  final Map<String, bool> _participantCamOn = {};  // remote cam state
+  final Map<String, StreamSubscription<Map<String, dynamic>?>> _profileSubs = {};
 
   // ── Live mode ────────────────────────────────
   bool _isLiveMode = false;
@@ -207,6 +210,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _listenMeetingDoc();
     _listenPresence();
     _listenProStatus();
+    _loadOwnPhoto();
   }
 
   @override
@@ -223,6 +227,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _reconnectTimer?.cancel();
     _hostWaitTimer?.cancel();
     _liveCommentSub?.cancel();
+    for (final sub in _profileSubs.values) { sub.cancel(); }
+    _profileSubs.clear();
     _liveCommentController.dispose();
     _liveCommentsScrollController.dispose();
     _chatController.dispose();
@@ -882,19 +888,54 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     if (mounted) setState(() => _isLocked = next);
   }
 
-  // ── PARTICIPANT PROFILES ──────────────────────
-  Future<void> _loadParticipantProfiles(List<Map<String, dynamic>> list) async {
-    for (final p in list) {
-      final uid = p['userId'] as String? ?? '';
-      if (uid.isEmpty || _participantPhotos.containsKey(uid)) continue;
-      final profile = await UserService.instance.getProfile(uid);
-      if (!mounted) return;
+  // ── OWN PROFILE PHOTO ────────────────────────
+  Future<void> _loadOwnPhoto() async {
+    try {
+      // 1. Try local file first (fast)
+      final prefs = await SharedPreferences.getInstance();
+      final path = prefs.getString('crux_local_photo_path');
+      if (path != null) {
+        final file = File(path);
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          if (mounted) setState(() => _ownPhotoBytes = bytes);
+          return;
+        }
+      }
+      // 2. Fallback to Firestore
+      final profile = await UserService.instance.getProfile(widget.userId);
       final bytes = UserService.decodePhoto(profile?['photoBase64'] as String?);
-      final name = profile?['name'] as String?;
+      if (mounted && bytes != null) setState(() => _ownPhotoBytes = bytes);
+    } catch (_) {}
+  }
+
+  // ── PARTICIPANT PROFILES (real-time stream) ───
+  void _subscribeToParticipantProfile(String uid) {
+    if (_profileSubs.containsKey(uid)) return; // already subscribed
+    final sub = _db.collection('users').doc(uid).snapshots()
+        .map((s) => s.exists ? s.data() : null)
+        .listen((data) {
+      if (!mounted || data == null) return;
+      final bytes = UserService.decodePhoto(data['photoBase64'] as String?);
+      final name = data['name'] as String?;
       setState(() {
         _participantPhotos[uid] = bytes;
         if (name != null && name.isNotEmpty) _participantNames[uid] = name;
       });
+    });
+    _profileSubs[uid] = sub;
+  }
+
+  void _loadParticipantProfiles(List<Map<String, dynamic>> list) {
+    for (final p in list) {
+      final uid = p['userId'] as String? ?? '';
+      if (uid.isEmpty) continue;
+      _subscribeToParticipantProfile(uid);
+      // Extract camOn from presence data
+      final camOn = p['camOn'] as bool?;
+      if (camOn != null) {
+        _participantCamOn[uid] = camOn;
+      }
     }
   }
 
@@ -1250,6 +1291,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         .collection('chat')
         .add({
       'sender': widget.userName,
+      'senderId': widget.userId,
       'message': text,
       'timestamp': FieldValue.serverTimestamp(),
     });
@@ -1348,6 +1390,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _presenceSub?.cancel();
     _proSub?.cancel();
     _liveCommentSub?.cancel();
+    for (final sub in _profileSubs.values) { sub.cancel(); }
+    _profileSubs.clear();
     _callTimer?.cancel();
     _statsTimer?.cancel();
     _reconnectTimer?.cancel();
@@ -1456,12 +1500,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 ? RTCVideoView(_localRenderer,
                     mirror: !_sharingScreen,
                     objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
-                : _buildInitialsAvatar(widget.userName, size: double.infinity))
+                : _buildVideoOff(widget.userName, _ownPhotoBytes))
             : (_waitingForHost
                 ? _buildWaitingForHost()
                 : hasRemote
-                    ? RTCVideoView(_remoteRenderer,
-                        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                    ? _buildRemoteVideo()
                     : _buildWaiting()),
       ),
 
@@ -1486,14 +1529,13 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   borderRadius: BorderRadius.circular(16),
                   child: showLocalBig
                       // Local big → show remote in PiP
-                      ? RTCVideoView(_remoteRenderer,
-                          objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                      ? _buildRemoteVideo(pip: true)
                       // Remote big → show local in PiP
                       : (_camOn
                           ? RTCVideoView(_localRenderer,
                               mirror: !_sharingScreen,
                               objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
-                          : _buildInitialsAvatar(widget.userName, size: 115)),
+                          : _buildVideoOff(widget.userName, _ownPhotoBytes, size: 115)),
                 ),
               ),
               // Name label
@@ -1554,7 +1596,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   ? RTCVideoView(_localRenderer,
                       mirror: !_sharingScreen,
                       objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
-                  : _buildInitialsAvatar(widget.userName, size: 115),
+                  : _buildVideoOff(widget.userName, _ownPhotoBytes, size: 115),
             ),
           ),
         ),
@@ -2154,36 +2196,71 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   // ── INITIALS AVATAR ──────────────────────────
-  Widget _buildInitialsAvatar(String name, {double size = 80}) {
+  /// Camera-off screen: shows photo if available, else gradient initials.
+  /// Used for both self (ownPhoto) and remote participants.
+  Widget _buildVideoOff(String name, Uint8List? photo, {double size = double.infinity}) {
     final parts = name.trim().split(' ');
     final initials = parts.length >= 2
         ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
         : name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
+    final isInfinite = size == double.infinity;
     return Container(
-      width: size,
-      height: size,
-      color: Colors.black87,
+      width: isInfinite ? null : size,
+      height: isInfinite ? null : size,
+      color: const Color(0xFF0F0A1E),
       child: Center(
-        child: Container(
-          width: size * 0.6,
-          height: size * 0.6,
-          decoration: BoxDecoration(
-            gradient: AppColors.primaryGradient,
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              initials,
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: size * 0.2,
+        child: photo != null
+            ? ClipOval(
+                child: Image.memory(
+                  photo,
+                  width: isInfinite ? 180 : size * 0.65,
+                  height: isInfinite ? 180 : size * 0.65,
+                  fit: BoxFit.cover,
+                ),
+              )
+            : Container(
+                width: isInfinite ? 130 : size * 0.6,
+                height: isInfinite ? 130 : size * 0.6,
+                decoration: const BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    initials,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: isInfinite ? 52 : size * 0.22,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
       ),
     );
+  }
+
+  // Keep old name as alias for callers outside this section
+  Widget _buildInitialsAvatar(String name, {double size = 80}) =>
+      _buildVideoOff(name, null, size: size);
+
+  /// Remote video: shows RTCVideoView normally, or camera-off screen with their photo.
+  Widget _buildRemoteVideo({bool pip = false}) {
+    final remoteParticipant = _presenceList
+        .where((p) => p['userId'] != widget.userId)
+        .firstOrNull;
+    final remoteId = remoteParticipant?['userId'] as String? ?? '';
+    final remoteName = _participantNames[remoteId]
+        ?? (remoteParticipant?['name'] as String? ?? 'Participant');
+    final remotePhoto = _participantPhotos[remoteId];
+    final remoteHasCam = _participantCamOn[remoteId] ?? true; // default to on
+
+    if (!remoteHasCam) {
+      return _buildVideoOff(remoteName, remotePhoto,
+          size: pip ? 115 : double.infinity);
+    }
+    return RTCVideoView(_remoteRenderer,
+        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover);
   }
 
   // ── TOP BAR ──────────────────────────────────
@@ -2596,42 +2673,67 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           itemBuilder: (ctx, i) {
             final d = docs[i].data()! as Map<String, dynamic>;
             final isMine = d['sender'] == widget.userName;
+            final senderId = d['senderId'] as String? ?? '';
+            final senderPhoto = isMine
+                ? _ownPhotoBytes
+                : (senderId.isNotEmpty ? _participantPhotos[senderId] : null);
+            final senderName = d['sender'] as String? ?? '';
+            final senderInitial = senderName.isNotEmpty ? senderName[0].toUpperCase() : '?';
+
+            Widget avatarWidget = Container(
+              width: 28, height: 28,
+              decoration: const BoxDecoration(
+                  gradient: AppColors.primaryGradient, shape: BoxShape.circle),
+              child: senderPhoto != null
+                  ? ClipOval(child: Image.memory(senderPhoto, fit: BoxFit.cover))
+                  : Center(child: Text(senderInitial,
+                      style: GoogleFonts.poppins(color: Colors.white,
+                          fontWeight: FontWeight.w700, fontSize: 11))),
+            );
+
             return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Align(
-                alignment:
-                    isMine ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(ctx).size.width * 0.72),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isMine
-                        ? AppColors.primary
-                        : Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (!isMine)
-                        Text(
-                          d['sender'] ?? '',
-                          style: GoogleFonts.poppins(
-                              color: Colors.white54,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      Text(
-                        d['message'] ?? '',
-                        style: GoogleFonts.poppins(
-                            color: Colors.white, fontSize: 13),
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment:
+                    isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (!isMine) ...[avatarWidget, const SizedBox(width: 6)],
+                  Flexible(
+                    child: Container(
+                      constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(ctx).size.width * 0.65),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isMine
+                            ? AppColors.primary
+                            : Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (!isMine)
+                            Text(
+                              senderName,
+                              style: GoogleFonts.poppins(
+                                  color: Colors.white54,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          Text(
+                            d['message'] ?? '',
+                            style: GoogleFonts.poppins(
+                                color: Colors.white, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  if (isMine) ...[const SizedBox(width: 6), avatarWidget],
+                ],
               ),
             );
           },
@@ -2789,10 +2891,15 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 active: _camOn,
                 onTap: () {
                   HapticFeedback.selectionClick();
+                  final newCamOn = !_camOn;
                   for (final t in _localStream?.getVideoTracks() ?? []) {
-                    t.enabled = !_camOn;
+                    t.enabled = newCamOn;
                   }
-                  setState(() => _camOn = !_camOn);
+                  setState(() => _camOn = newCamOn);
+                  // Broadcast cam state so others know to show your photo
+                  _db.collection('meetings').doc(widget.meetingId)
+                      .collection('presence').doc(widget.userId)
+                      .update({'camOn': newCamOn}).catchError((_) {});
                 },
               ),
             ),
