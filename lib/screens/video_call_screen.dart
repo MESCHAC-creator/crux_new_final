@@ -1692,13 +1692,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           child: GestureDetector(
             onTap: () => setState(() => _swappedView = !_swappedView),
             child: Stack(children: [
-              // Google Meet style PiP: rounded shadow, no thick border
+              // CRUX PiP: dark purple tint, subtle brand border
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3C4043),
+                  color: const Color(0xFF1A1529),
                   borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFF6A1B9A).withValues(alpha: 0.5),
+                    width: 1.5,
+                  ),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.55), blurRadius: 18, offset: const Offset(0, 6)),
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 20, offset: const Offset(0, 6)),
+                    BoxShadow(color: const Color(0xFF6A1B9A).withValues(alpha: 0.15), blurRadius: 30),
                   ],
                 ),
                 child: ClipRRect(
@@ -2395,20 +2400,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     final isInfinite = size == double.infinity;
     final avatarSize = isInfinite ? 100.0 : (size * 0.55).clamp(40.0, 120.0);
     final fontSize = isInfinite ? 38.0 : (avatarSize * 0.42).clamp(14.0, 46.0);
-    // Derive consistent color from name
-    const palette = [
-      Color(0xFF1565C0), Color(0xFF6A1B9A), Color(0xFF00695C),
-      Color(0xFF558B2F), Color(0xFF4527A0), Color(0xFFAD1457),
-    ];
-    final bgColor = name.isNotEmpty
-        ? palette[name.codeUnitAt(0) % palette.length]
-        : palette[0];
-
     return Container(
       width: isInfinite ? null : size,
       height: isInfinite ? null : size,
-      // Google Meet dark background
-      color: const Color(0xFF202124),
+      color: const Color(0xFF0F0C1A),
       child: Center(
         child: photo != null
             ? ClipOval(
@@ -2423,15 +2418,20 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 width: avatarSize,
                 height: avatarSize,
                 decoration: BoxDecoration(
-                  color: bgColor,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: _avatarGradient(name),
+                  ),
                   shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 14)],
                 ),
                 child: Center(
                   child: Text(
                     initial,
-                    style: GoogleFonts.roboto(
+                    style: GoogleFonts.poppins(
                       color: Colors.white,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                       fontSize: fontSize,
                     ),
                   ),
@@ -2663,10 +2663,15 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+                colors: [Color(0xFF7F0000), Color(0xFF6A1B9A)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
               ),
               borderRadius: BorderRadius.circular(30),
-              boxShadow: [BoxShadow(color: Colors.green.withValues(alpha: 0.4), blurRadius: 8)],
+              boxShadow: [
+                BoxShadow(color: const Color(0xFFB71C1C).withValues(alpha: 0.45), blurRadius: 12),
+                BoxShadow(color: const Color(0xFF6A1B9A).withValues(alpha: 0.3), blurRadius: 22),
+              ],
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               _buildSoundWave(small: true),
@@ -2696,7 +2701,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             height: h * _waveAnims[i].value,
             margin: EdgeInsets.symmetric(horizontal: small ? 1 : 2),
             decoration: BoxDecoration(
-              color: Colors.greenAccent,
+              color: Colors.white.withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(2),
             ),
           );
@@ -3141,15 +3146,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   Widget _buildControls() {
     final isPrivileged = widget.isHost || _isCoHost;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+      padding: const EdgeInsets.fromLTRB(4, 10, 4, 16),
       decoration: BoxDecoration(
-        gradient: (_showChat || _showParticipants)
-            ? null
-            : const LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [Colors.black87, Colors.transparent],
-              ),
+        color: const Color(0xF0141420),
+        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.07), width: 0.5)),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -3463,25 +3463,23 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     ]);
   }
 
-  // ── GALLERY VIEW (Google Meet style) ─────────
+  // ── GALLERY VIEW (CRUX: Meet + Zoom blend) ────
   Widget _buildGalleryView() {
-    // Google Meet dark background
-    const tileBg = Color(0xFF3C4043);
-    const speakingColor = Color(0xFF00E5FF);
+    const tileBg = Color(0xFF1A1529);  // CRUX dark purple tint
 
     return Container(
-      color: const Color(0xFF202124),
+      color: const Color(0xFF0F0C1A),
       child: SafeArea(
         bottom: false,
         child: Column(children: [
           const SizedBox(height: 60),
           Expanded(
             child: GridView.builder(
-              padding: const EdgeInsets.fromLTRB(6, 6, 6, 90),
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 90),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                crossAxisSpacing: 6,
-                mainAxisSpacing: 6,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
                 childAspectRatio: 4 / 3,
               ),
               itemCount: _presenceList.length,
@@ -3496,22 +3494,29 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 final camOn = isMe ? _camOn : (_participantCamOn[uid] ?? true);
                 final photo = isMe ? _ownPhotoBytes : _participantPhotos[uid];
                 final isSpeaking = _participantSpeaking[uid] == true;
-                final micMuted = isMe ? !_micOn : false; // only known for self
+                final micMuted = isMe ? !_micOn : false;
+                final handRaised = p['handRaised'] == true;
 
                 return AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
                   decoration: BoxDecoration(
                     color: tileBg,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                     border: isSpeaking
-                        ? Border.all(color: speakingColor, width: 3)
-                        : Border.all(color: Colors.transparent, width: 3),
+                        ? Border.all(color: const Color(0xFFB71C1C), width: 2.5)
+                        : isMe
+                            ? Border.all(color: const Color(0xFF6A1B9A).withValues(alpha: 0.5), width: 1.5)
+                            : Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1),
                     boxShadow: isSpeaking
-                        ? [BoxShadow(color: speakingColor.withValues(alpha: 0.45), blurRadius: 14, spreadRadius: 1)]
-                        : [],
+                        ? [
+                            BoxShadow(color: const Color(0xFFB71C1C).withValues(alpha: 0.3), blurRadius: 16, spreadRadius: 2),
+                            BoxShadow(color: const Color(0xFF6A1B9A).withValues(alpha: 0.2), blurRadius: 24),
+                          ]
+                        : [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 8)],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(14),
                     child: Stack(fit: StackFit.expand, children: [
 
                       // ── VIDEO or AVATAR ──────────────────────────
@@ -3523,20 +3528,33 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                             : RTCVideoView(_remoteRenderer,
                                 objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
                       else
-                        // Camera off: Google Meet style avatar centered on dark gray
                         Container(
                           color: tileBg,
                           child: Center(
                             child: photo != null
-                                ? ClipOval(
-                                    child: Image.memory(photo,
-                                        width: 64, height: 64, fit: BoxFit.cover),
-                                  )
-                                : Container(
-                                    width: 64, height: 64,
+                                ? Container(
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: _avatarColor(uid),
+                                      border: Border.all(
+                                        color: isSpeaking ? const Color(0xFFB71C1C) : Colors.white24,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: ClipOval(
+                                      child: Image.memory(photo,
+                                          width: 68, height: 68, fit: BoxFit.cover),
+                                    ),
+                                  )
+                                : Container(
+                                    width: 68, height: 68,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: _avatarGradient(uid),
+                                      ),
+                                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 8)],
                                     ),
                                     child: Center(
                                       child: Text(
@@ -3544,56 +3562,64 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                                         style: GoogleFonts.poppins(
                                             color: Colors.white,
                                             fontSize: 26,
-                                            fontWeight: FontWeight.w700),
+                                            fontWeight: FontWeight.w800),
                                       ),
                                     ),
                                   ),
                           ),
                         ),
 
-                      // ── BOTTOM BAR ───────────────────────────────
-                      Positioned(
-                        bottom: 0, left: 0, right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [Color(0xCC000000), Colors.transparent],
+                      // ── VIGNETTE on video ────────────────────────
+                      if (camOn)
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.6),
+                                ],
+                                stops: const [0, 0.55, 1],
+                              ),
                             ),
                           ),
+                        ),
+
+                      // ── BOTTOM INFO BAR ───────────────────────────
+                      Positioned(
+                        bottom: 0, left: 0, right: 0,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
                           child: Row(children: [
-                            // Mic status icon
-                            Container(
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
                               width: 22, height: 22,
                               decoration: BoxDecoration(
                                 color: micMuted
-                                    ? Colors.red.shade700
-                                    : Colors.black54,
+                                    ? const Color(0xFFEA4335)
+                                    : Colors.black.withValues(alpha: 0.5),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 micMuted ? Icons.mic_off : Icons.mic,
-                                color: Colors.white,
-                                size: 13,
+                                color: Colors.white, size: 13,
                               ),
                             ),
                             const SizedBox(width: 5),
-                            // Name chip
                             Expanded(
                               child: Text(
                                 isMe ? 'Vous' : firstName,
-                                style: GoogleFonts.roboto(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    shadows: [Shadow(color: Colors.black87, blurRadius: 4)]),
+                                style: GoogleFonts.poppins(
+                                    color: Colors.white, fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    shadows: [const Shadow(color: Colors.black, blurRadius: 6)]),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            // Speaking wave
                             if (isSpeaking) ...[
                               const SizedBox(width: 4),
                               _buildSoundWave(small: true),
@@ -3602,19 +3628,52 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                         ),
                       ),
 
-                      // ── "Présentateur" badge if screen sharing ────
+                      // ── HAND RAISED (Zoom-style orange badge) ────
+                      if (handRaised)
+                        Positioned(
+                          top: 7, left: 7,
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade700,
+                              shape: BoxShape.circle,
+                              boxShadow: [BoxShadow(color: Colors.orange.withValues(alpha: 0.5), blurRadius: 8)],
+                            ),
+                            child: const Text('✋', style: TextStyle(fontSize: 12)),
+                          ),
+                        ),
+
+                      // ── SCREEN SHARE BADGE ───────────────────────
                       if (isMe && _sharingScreen)
                         Positioned(
-                          top: 6, left: 6,
+                          top: 7, right: 7,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(colors: [Color(0xFF1565C0), Color(0xFF0D47A1)]),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.screen_share, color: Colors.white, size: 10),
+                              const SizedBox(width: 3),
+                              Text('Écran', style: GoogleFonts.poppins(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+                            ]),
+                          ),
+                        ),
+
+                      // ── "Moi" badge (Zoom-style) ─────────────────
+                      if (isMe && !_sharingScreen)
+                        Positioned(
+                          top: 7, right: 7,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade700,
+                              color: Colors.black.withValues(alpha: 0.55),
                               borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.white24, width: 0.5),
                             ),
-                            child: Text('Présentation',
-                                style: GoogleFonts.roboto(
-                                    color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+                            child: Text('Moi', style: GoogleFonts.poppins(
+                                color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w600)),
                           ),
                         ),
                     ]),
@@ -3628,15 +3687,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     );
   }
 
-  // Returns a consistent color per uid for the avatar circle
-  Color _avatarColor(String uid) {
-    const colors = [
-      Color(0xFF1565C0), Color(0xFF6A1B9A), Color(0xFF00695C),
-      Color(0xFF558B2F), Color(0xFF4527A0), Color(0xFFAD1457),
-      Color(0xFF37474F), Color(0xFFBF360C),
+  // CRUX gradient pairs per uid
+  List<Color> _avatarGradient(String uid) {
+    const gradients = [
+      [Color(0xFFB71C1C), Color(0xFF6A1B9A)],
+      [Color(0xFF6A1B9A), Color(0xFF1565C0)],
+      [Color(0xFF00695C), Color(0xFF4527A0)],
+      [Color(0xFF558B2F), Color(0xFF00695C)],
+      [Color(0xFFAD1457), Color(0xFFB71C1C)],
+      [Color(0xFF4527A0), Color(0xFFAD1457)],
     ];
-    if (uid.isEmpty) return colors[0];
-    return colors[uid.codeUnitAt(0) % colors.length];
+    if (uid.isEmpty) return gradients[0];
+    return gradients[uid.codeUnitAt(0) % gradients.length];
   }
 
   // ── INVITE SHARE SHEET ───────────────────────
@@ -3966,34 +4028,61 @@ class _Btn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color bg;
-    Color fg;
-    if (isEnd) {
-      bg = Colors.red;
-      fg = Colors.white;
-    } else if (isHighlight) {
-      bg = AppColors.primary;
-      fg = Colors.white;
-    } else if (active) {
-      bg = Colors.white.withValues(alpha: 0.2);
-      fg = Colors.white;
-    } else {
-      bg = Colors.white.withValues(alpha: 0.08);
-      fg = Colors.white38;
-    }
-
     return GestureDetector(
       onTap: onTap,
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-          child: Icon(icon, color: fg, size: 20),
+        if (isEnd)
+          Container(
+            width: 56, height: 46,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEA4335),
+              borderRadius: BorderRadius.circular(23),
+              boxShadow: [BoxShadow(color: const Color(0xFFEA4335).withValues(alpha: 0.45), blurRadius: 14, offset: const Offset(0, 4))],
+            ),
+            child: const Icon(Icons.call_end, color: Colors.white, size: 22),
+          )
+        else if (isHighlight)
+          Container(
+            width: 52, height: 52,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFB71C1C), Color(0xFF6A1B9A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: const Color(0xFF6A1B9A).withValues(alpha: 0.45), blurRadius: 12)],
+            ),
+            child: Icon(icon, color: Colors.white, size: 22),
+          )
+        else if (active)
+          Container(
+            width: 52, height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.10), width: 1),
+            ),
+            child: Icon(icon, color: Colors.white, size: 22),
+          )
+        else
+          Container(
+            width: 52, height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.06),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white.withValues(alpha: 0.38), size: 22),
+          ),
+        const SizedBox(height: 5),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            color: isEnd ? Colors.white70 : (active || isHighlight ? Colors.white : Colors.white38),
+            fontSize: 9.5,
+            fontWeight: FontWeight.w500,
+          ),
         ),
-        const SizedBox(height: 4),
-        Text(label,
-            style: GoogleFonts.poppins(color: Colors.white54, fontSize: 9)),
       ]),
     );
   }
