@@ -936,8 +936,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             _localRenderer.srcObject = _localStream;
           });
         }
-      } catch (e) {
-        // Ensure state is reset even on error
+      } catch (e, st) {
+        _log.e('Error stopping screen share: $e', stackTrace: st);
         await _screenStream?.dispose();
         _screenStream = null;
         if (mounted) setState(() => _sharingScreen = false);
@@ -945,30 +945,83 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     } else {
       // ── Start sharing ──
       try {
+        // Verify peer connection exists
+        if (_pc == null) {
+          _log.w('Screen share: Peer connection not initialized');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Connexion non établie. Veuillez réessayer.', style: GoogleFonts.poppins()),
+              backgroundColor: Colors.orange.shade700,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ));
+          }
+          return;
+        }
+
+        _log.i('Starting screen share - requesting display media');
         _screenStream = await navigator.mediaDevices.getDisplayMedia({
           'video': {'mandatory': {}, 'optional': []},
           'audio': false,
         });
 
+        if (_screenStream == null) {
+          _log.w('Screen share: getDisplayMedia returned null');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Partage d\'écran non disponible.', style: GoogleFonts.poppins()),
+              backgroundColor: Colors.orange.shade700,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ));
+          }
+          return;
+        }
+
         final tracks = _screenStream!.getVideoTracks();
+        _log.i('Screen share: Got ${tracks.length} video tracks');
         if (tracks.isEmpty) {
+          _log.w('Screen share: No video tracks in screen stream');
           await _screenStream?.dispose();
           _screenStream = null;
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Aucune piste vidéo trouvée.', style: GoogleFonts.poppins()),
+              backgroundColor: Colors.orange.shade700,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ));
+          }
           return;
         }
 
         final screenTrack = tracks.first;
+        _log.i('Screen share: Replacing video track with screen track');
 
-        if (_pc != null) {
-          final senders = await _pc!.getSenders();
-          for (final sender in senders) {
-            if (sender.track?.kind == 'video') {
+        // Replace video track in all senders
+        final senders = await _pc!.getSenders();
+        _log.i('Screen share: Found ${senders.length} senders');
+
+        bool trackReplaced = false;
+        for (final sender in senders) {
+          _log.i('Screen share: Sender track kind: ${sender.track?.kind}');
+          if (sender.track?.kind == 'video') {
+            try {
               await sender.replaceTrack(screenTrack);
+              _log.i('Screen share: Track replaced successfully');
+              trackReplaced = true;
+            } catch (e, st) {
+              _log.e('Screen share: Error replacing track: $e', stackTrace: st);
             }
           }
         }
 
+        if (!trackReplaced) {
+          _log.w('Screen share: No video track was replaced');
+        }
+
         screenTrack.onEnded = () {
+          _log.i('Screen share: Track ended callback triggered');
           if (mounted) _toggleScreenShare();
         };
 
@@ -977,8 +1030,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             _sharingScreen = true;
             _localRenderer.srcObject = _screenStream;
           });
+          _log.i('Screen share: State updated, sharing active');
         }
-      } catch (e) {
+      } catch (e, st) {
+        _log.e('Screen share error: $e\nStackTrace: $st', stackTrace: st);
         await _screenStream?.dispose();
         _screenStream = null;
         if (mounted) {
@@ -986,12 +1041,17 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               ? 'Permission refusée pour le partage d\'écran.'
               : e.toString().contains('cancel') || e.toString().contains('Cancel')
                   ? 'Partage d\'écran annulé.'
-                  : 'Partage d\'écran indisponible sur cet appareil.';
+                  : e.toString().contains('NotAllowedError')
+                      ? 'Partage d\'écran non autorisé.'
+                      : e.toString().contains('NotSupportedError')
+                          ? 'Partage d\'écran non supporté sur cet appareil.'
+                          : 'Erreur: ${e.toString().substring(0, 100)}';
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(msg, style: GoogleFonts.poppins()),
-            backgroundColor: Colors.orange.shade700,
+            backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 4),
           ));
         }
       }
