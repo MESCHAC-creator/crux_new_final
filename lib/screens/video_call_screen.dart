@@ -136,6 +136,17 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── Gallery view ─────────────────────────────
   bool _galleryView = false;
 
+  // ── Active Speaker (Google Meet-like) ────────
+  String? _activeSpeakerId;         // uid of current speaker
+  String? _activeSpeakerName;       // display name
+  bool _bannerVisible = false;
+  Timer? _bannerHideTimer;
+  Timer? _speakingTimer;
+  bool _localWasSpeaking = false;
+  final Map<String, bool> _participantSpeaking = {};
+  late AnimationController _waveController;
+  late List<Animation<double>> _waveAnims;
+
   // ── Participant profile cache (Zoom-like) ────
   Uint8List? _ownPhotoBytes;             // local user's photo
   final Map<String, Uint8List?> _participantPhotos = {};
@@ -209,6 +220,19 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    _waveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..repeat(reverse: true);
+    _waveAnims = List.generate(3, (i) {
+      final begin = 0.3 + i * 0.2;
+      return Tween<double>(begin: begin, end: 1.0).animate(
+        CurvedAnimation(
+          parent: _waveController,
+          curve: Interval(i * 0.2, 0.6 + i * 0.2, curve: Curves.easeInOut),
+        ),
+      );
+    });
     _init();
     _detectLiveMode();
     _listenReactions();
@@ -234,6 +258,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _liveCommentSub?.cancel();
     for (final sub in _profileSubs.values) { sub.cancel(); }
     _profileSubs.clear();
+    _bannerHideTimer?.cancel();
+    _speakingTimer?.cancel();
+    _waveController.dispose();
     _liveCommentController.dispose();
     _liveCommentsScrollController.dispose();
     _chatController.dispose();
@@ -316,6 +343,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           });
           _startCallTimer();
           _startStatsMonitor();
+          _startSpeakingDetection();
           _reconnectAttempts = 0;
         }
       };
@@ -326,6 +354,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           setState(() => _remoteConnected = true);
           _startCallTimer();
           _startStatsMonitor();
+          _startSpeakingDetection();
           _reconnectAttempts = 0;
         } else if (state ==
                 RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
@@ -563,6 +592,78 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     });
   }
 
+  // ── ACTIVE SPEAKER DETECTION ─────────────────
+  void _startSpeakingDetection() {
+    _speakingTimer?.cancel();
+    _speakingTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
+      if (!mounted) return;
+      await _updateLocalSpeaking();
+    });
+  }
+
+  Future<void> _updateLocalSpeaking() async {
+    if (_localStream == null || !_micOn) {
+      if (_localWasSpeaking) {
+        _localWasSpeaking = false;
+        _db.collection('meetings').doc(widget.meetingId)
+            .collection('presence').doc(widget.userId)
+            .update({'isSpeaking': false}).catchError((_) {});
+        if (mounted) setState(() {
+          _participantSpeaking[widget.userId] = false;
+          if (_activeSpeakerId == widget.userId) _activeSpeakerId = null;
+        });
+      }
+      return;
+    }
+    try {
+      final stats = await _pc?.getStats();
+      if (stats == null || !mounted) return;
+      double audioLevel = 0;
+      for (final report in stats) {
+        final values = report.values;
+        if (values['type'] == 'media-source' || values['type'] == 'track') {
+          final level = values['audioLevel'];
+          if (level != null) {
+            audioLevel = (level as num).toDouble();
+            break;
+          }
+        }
+        if (values['type'] == 'inbound-rtp' && values['mediaType'] == 'audio') {
+          final level = values['audioLevel'];
+          if (level != null) audioLevel = (level as num).toDouble();
+        }
+      }
+      // Fallback: treat mic-on as potentially speaking (level 0.05 threshold)
+      final isSpeaking = audioLevel > 0.01;
+      if (isSpeaking != _localWasSpeaking) {
+        _localWasSpeaking = isSpeaking;
+        _db.collection('meetings').doc(widget.meetingId)
+            .collection('presence').doc(widget.userId)
+            .update({'isSpeaking': isSpeaking}).catchError((_) {});
+        if (mounted) {
+          setState(() {
+            _participantSpeaking[widget.userId] = isSpeaking;
+            if (isSpeaking) {
+              _activeSpeakerId = widget.userId;
+              _activeSpeakerName = widget.userName;
+              _bannerVisible = true;
+              _scheduleBannerHide();
+            } else if (_activeSpeakerId == widget.userId) {
+              _activeSpeakerId = null;
+            }
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _scheduleBannerHide() {
+    _bannerHideTimer?.cancel();
+    _bannerHideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _bannerVisible = false);
+    });
+  }
+
   // ── AUTO-RECONNECT ───────────────────────────
   void _attemptReconnect() {
     if (_reconnectAttempts >= _maxReconnect) return;
@@ -664,6 +765,21 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       setState(() {
         _presenceList = list;
         if (_isLiveMode) _liveViewers = list.length;
+        // Sync remote speaking state
+        for (final p in list) {
+          final uid = p['userId'] as String? ?? '';
+          if (uid == widget.userId) continue;
+          final speaking = p['isSpeaking'] == true;
+          _participantSpeaking[uid] = speaking;
+          if (speaking) {
+            _activeSpeakerId = uid;
+            _activeSpeakerName = _participantNames[uid] ?? (p['name'] as String? ?? 'Participant');
+            _bannerVisible = true;
+            _scheduleBannerHide();
+          } else if (_activeSpeakerId == uid) {
+            _activeSpeakerId = null;
+          }
+        }
       });
       // Load Firestore profiles for any new participants
       _loadParticipantProfiles(list);
@@ -1383,6 +1499,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     if (_leaving) return;
     _leaving = true;
     HapticFeedback.heavyImpact();
+    _speakingTimer?.cancel();
+    _db.collection('meetings').doc(widget.meetingId)
+        .collection('presence').doc(widget.userId)
+        .update({'isSpeaking': false}).catchError((_) {});
 
     // Capture state BEFORE any async operation
     final navigator = Navigator.of(context);
@@ -1539,6 +1659,28 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                     ? _buildRemoteVideo()
                     : _buildWaiting()),
       ),
+      // ── SPEAKING RING on fullscreen remote ────────────────────────────
+      if (!showLocalBig && hasRemote)
+        Builder(builder: (_) {
+          final remoteId = _presenceList
+              .where((p) => p['userId'] != widget.userId)
+              .firstOrNull?['userId'] as String? ?? '';
+          final speaking = _participantSpeaking[remoteId] == true;
+          return AnimatedOpacity(
+            opacity: speaking ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: const Color(0xFF43A047),
+                    width: 4,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
 
       // ── PiP CARD (tap to swap) ────────────────────────────────────────
       if (hasRemote)
@@ -1643,6 +1785,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
       // ── TOP BAR ──────────────────────────────────────────────────────
       Positioned(top: 0, left: 0, right: 0, child: _buildTopBar()),
+
+      // ── ACTIVE SPEAKER BANNER ────────────────────────────────────────
+      Positioned(top: 58, left: 0, right: 0, child: _buildSpeakerBanner()),
 
       // ── FLOATING REACTIONS ───────────────────────────────────────────
       ..._reactions.map(
@@ -2487,6 +2632,64 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     );
   }
 
+  // ── ACTIVE SPEAKER BANNER ────────────────────
+  Widget _buildSpeakerBanner() {
+    final name = _activeSpeakerName ?? '';
+    final isMe = _activeSpeakerId == widget.userId;
+    final displayName = isMe ? 'Vous parlez' : '$name parle';
+    return AnimatedOpacity(
+      opacity: _bannerVisible ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: IgnorePointer(
+        ignoring: !_bannerVisible,
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+              ),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [BoxShadow(color: Colors.green.withValues(alpha: 0.4), blurRadius: 8)],
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              _buildSoundWave(small: true),
+              const SizedBox(width: 8),
+              Text(displayName,
+                  style: GoogleFonts.poppins(
+                      color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── SOUND WAVE ANIMATION ─────────────────────
+  Widget _buildSoundWave({bool small = false}) {
+    final h = small ? 12.0 : 18.0;
+    final w = small ? 3.0 : 4.0;
+    return AnimatedBuilder(
+      animation: _waveController,
+      builder: (_, __) => Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: List.generate(3, (i) {
+          return Container(
+            width: w,
+            height: h * _waveAnims[i].value,
+            margin: EdgeInsets.symmetric(horizontal: small ? 1 : 2),
+            decoration: BoxDecoration(
+              color: Colors.greenAccent,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
   // ── EMOJI BAR ────────────────────────────────
   Widget _buildEmojiBar() {
     const emojis = ['👍', '❤️', '😂', '🎉', '🙏', '👏', '🔥', '😮'];
@@ -3271,67 +3474,81 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               final camOn = isMe ? _camOn : (_participantCamOn[uid] ?? true);
               final photo = isMe ? _ownPhotoBytes : _participantPhotos[uid];
 
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Stack(fit: StackFit.expand, children: [
-                  // Video or avatar
-                  isMe
-                      ? (camOn
-                          ? RTCVideoView(_localRenderer,
-                              mirror: !_sharingScreen,
-                              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
-                          : _buildVideoOff(name, photo))
-                      : (camOn
-                          ? RTCVideoView(_remoteRenderer,
-                              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
-                          : _buildVideoOff(name, photo)),
-                  // CAM OFF badge
-                  if (!camOn)
+              final isSpeaking = _participantSpeaking[uid] == true;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSpeaking
+                        ? const Color(0xFF43A047)
+                        : (isMe ? AppColors.primary : Colors.white24),
+                    width: isSpeaking ? 3 : (isMe ? 2 : 1),
+                  ),
+                  boxShadow: isSpeaking
+                      ? [BoxShadow(color: Colors.green.withValues(alpha: 0.5), blurRadius: 12, spreadRadius: 2)]
+                      : [],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Stack(fit: StackFit.expand, children: [
+                    // Video or avatar
+                    isMe
+                        ? (camOn
+                            ? RTCVideoView(_localRenderer,
+                                mirror: !_sharingScreen,
+                                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                            : _buildVideoOff(name, photo))
+                        : (camOn
+                            ? RTCVideoView(_remoteRenderer,
+                                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                            : _buildVideoOff(name, photo)),
+                    // CAM OFF badge
+                    if (!camOn)
+                      Positioned(
+                        top: 8, right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('CAM OFF',
+                              style: GoogleFonts.poppins(
+                                  color: Colors.white54, fontSize: 9, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    // Name label at bottom
                     Positioned(
-                      top: 8, right: 8,
+                      bottom: 0, left: 0, right: 0,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.black87,
-                          borderRadius: BorderRadius.circular(8),
+                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [Colors.black87, Colors.transparent],
+                          ),
                         ),
-                        child: Text('CAM OFF',
-                            style: GoogleFonts.poppins(
-                                color: Colors.white54, fontSize: 9, fontWeight: FontWeight.w700)),
+                        child: Row(children: [
+                          Expanded(
+                            child: Text(
+                              '${name.split(' ').first}${isMe ? ' (Moi)' : ''}',
+                              style: GoogleFonts.poppins(
+                                  color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isSpeaking) ...[
+                            const SizedBox(width: 4),
+                            _buildSoundWave(small: true),
+                          ],
+                        ]),
                       ),
                     ),
-                  // Name label at bottom
-                  Positioned(
-                    bottom: 0, left: 0, right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [Colors.black87, Colors.transparent],
-                        ),
-                      ),
-                      child: Text(
-                        '${name.split(' ').first}${isMe ? ' (Moi)' : ''}',
-                        style: GoogleFonts.poppins(
-                            color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                  // Border
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: isMe ? AppColors.primary : Colors.white24,
-                        width: isMe ? 2 : 1,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ]),
+                  ]),
+                ),
               );
             },
           ),
