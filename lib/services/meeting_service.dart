@@ -31,6 +31,11 @@ class MeetingService {
     return true;
   }
 
+  /// Pre-generate a meeting ID (useful for displaying code before creation).
+  String generateMeetingCode() {
+    return const Uuid().v4().replaceAll('-', '').substring(0, 12).toUpperCase();
+  }
+
   /// Generates meeting ID locally so creation NEVER fails offline.
   Future<String> createMeeting({
     required String title,
@@ -38,13 +43,17 @@ class MeetingService {
     required String organizerName,
     required String organizerId,
     String? password,
+    DateTime? scheduledAt,
+    bool waitingRoom = false,
+    int? maxParticipants,
+    String? meetingMode,
+    String? existingCode,
   }) async {
-    final meetingId = const Uuid()
-        .v4()
-        .replaceAll('-', '')
-        .substring(0, 16)
-        .toUpperCase();
+    final meetingId = existingCode ??
+        const Uuid().v4().replaceAll('-', '').substring(0, 12).toUpperCase();
     final now = DateTime.now();
+    final isScheduled = scheduledAt != null && scheduledAt.isAfter(now);
+    final startTime = isScheduled ? scheduledAt : now;
 
     final meeting = MeetingModel(
       id: meetingId,
@@ -52,13 +61,18 @@ class MeetingService {
       description: description,
       organizer: organizerName,
       organizerId: organizerId,
-      startTime: now,
-      endTime: now.add(const Duration(hours: 1)),
+      startTime: startTime,
+      endTime: startTime.add(const Duration(hours: 1)),
       participants: [organizerId],
       channelName: meetingId,
       status: MeetingStatus.scheduled,
       createdAt: now,
       password: password?.isNotEmpty == true ? password : null,
+      isScheduled: isScheduled,
+      scheduledAt: isScheduled ? scheduledAt : null,
+      waitingRoom: waitingRoom,
+      maxParticipants: maxParticipants,
+      meetingMode: meetingMode,
     );
 
     // Save to history first (fast local operation)

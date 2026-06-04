@@ -222,7 +222,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return raw.split(' ').first;
   }
 
-  Future<void> _createMeeting({String description = ''}) async {
+  Future<void> _createMeeting({
+    String description = '',
+    DateTime? scheduledAt,
+    bool waitingRoom = false,
+    int? maxParticipants,
+    String? meetingMode,
+    String? existingCode,
+  }) async {
     final name = InputValidator.sanitize(_meetingNameController.text);
     final nameError = InputValidator.validateMeetingName(name);
     if (nameError != null) {
@@ -255,12 +262,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         organizerName: _freshUserName(),
         organizerId: widget.user.uid,
         password: password,
+        scheduledAt: scheduledAt,
+        waitingRoom: waitingRoom,
+        maxParticipants: maxParticipants,
+        meetingMode: meetingMode,
+        existingCode: existingCode,
       );
       _meetingNameController.clear();
       _passwordController.clear();
       setState(() => _showPassword = false);
-      // Don't reload history — it was just saved in createMeeting()
       if (!mounted) return;
+
+      // If scheduled for the future, show confirmation instead of joining
+      if (scheduledAt != null && scheduledAt.isAfter(DateTime.now())) {
+        _showScheduledConfirmation(meetingId, name, scheduledAt);
+        return;
+      }
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -282,6 +300,90 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } finally {
       if (mounted) setState(() => _isCreating = false);
     }
+  }
+
+  void _showScheduledConfirmation(String meetingId, String name, DateTime scheduledAt) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dateStr = '${scheduledAt.day}/${scheduledAt.month}/${scheduledAt.year}';
+    final timeStr = '${scheduledAt.hour.toString().padLeft(2, '0')}:${scheduledAt.minute.toString().padLeft(2, '0')}';
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64, height: 64,
+              decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(20)),
+              child: const Icon(Icons.event_available, color: Colors.white, size: 32),
+            ),
+            const SizedBox(height: 16),
+            Text('Réunion programmée !', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
+            const SizedBox(height: 8),
+            Text(name, style: GoogleFonts.poppins(fontSize: 14, color: isDark ? Colors.white70 : Colors.black54), textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(children: [
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.calendar_today, size: 14, color: AppColors.primary),
+                  const SizedBox(width: 6),
+                  Text('$dateStr à $timeStr', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                ]),
+                const SizedBox(height: 6),
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.vpn_key_outlined, size: 14, color: AppColors.secondary),
+                  const SizedBox(width: 6),
+                  Text('Code: $meetingId', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.secondary)),
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: meetingId));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Code copié !', style: GoogleFonts.poppins()),
+                        backgroundColor: AppColors.primary,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        duration: const Duration(seconds: 2),
+                      ));
+                    },
+                    child: const Icon(Icons.copy, size: 14, color: AppColors.secondary),
+                  ),
+                ]),
+              ]),
+            ),
+            const SizedBox(height: 12),
+            Text('Partagez ce code avec les participants.', style: GoogleFonts.poppins(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38), textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Fermer', style: GoogleFonts.poppins(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Clipboard.setData(ClipboardData(text: meetingId));
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Copier le code', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _joinById(String id) async {
@@ -1014,14 +1116,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         isCreating: _isCreating,
         onTogglePassword: () => setState(() => _showPassword = !_showPassword),
         onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
-        onSubmit: (MeetingMode mode, String description) {
-          // Prepend mode tag to the meeting name
+        onSubmit: (MeetingMode mode, String description, {
+          DateTime? scheduledAt,
+          bool waitingRoom = false,
+          int? maxParticipants,
+          String? preGeneratedCode,
+        }) {
           final tag = _modeTag(mode);
           if (tag.isNotEmpty && !_meetingNameController.text.startsWith('[')) {
             _meetingNameController.text = '$tag ${_meetingNameController.text}'.trim();
           }
           Navigator.pop(context);
-          _createMeeting(description: description);
+          _createMeeting(
+            description: description,
+            scheduledAt: scheduledAt,
+            waitingRoom: waitingRoom,
+            maxParticipants: maxParticipants,
+            meetingMode: mode.name,
+            existingCode: preGeneratedCode,
+          );
         },
       ),
     );
@@ -1256,7 +1369,14 @@ class _CreateMeetingSheet extends StatefulWidget {
   final TextEditingController passwordController;
   final bool showPassword, obscurePassword, isCreating;
   final VoidCallback onTogglePassword, onToggleObscure;
-  final void Function(MeetingMode mode, String description) onSubmit;
+  final void Function(
+    MeetingMode mode,
+    String description, {
+    DateTime? scheduledAt,
+    bool waitingRoom,
+    int? maxParticipants,
+    String? preGeneratedCode,
+  }) onSubmit;
 
   const _CreateMeetingSheet({
     required this.nameController, required this.passwordController,
@@ -1272,6 +1392,19 @@ class _CreateMeetingSheet extends StatefulWidget {
 class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
   MeetingMode _selectedMode = MeetingMode.standard;
   final _descriptionController = TextEditingController();
+  bool _isScheduled = false;
+  DateTime? _scheduledDate;
+  TimeOfDay? _scheduledTime;
+  bool _waitingRoom = false;
+  bool _showMaxParticipants = false;
+  int _maxParticipants = 50;
+  late String _preGeneratedCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _preGeneratedCode = MeetingService().generateMeetingCode();
+  }
 
   @override
   void dispose() {
@@ -1286,45 +1419,143 @@ class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
     (MeetingMode.live, Icons.live_tv, 'Live'),
   ];
 
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _scheduledDate ?? now.add(const Duration(hours: 1)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: AppColors.primary,
+            onPrimary: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _scheduledDate = picked);
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _scheduledTime ?? TimeOfDay.fromDateTime(DateTime.now().add(const Duration(hours: 1))),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: AppColors.primary,
+            onPrimary: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _scheduledTime = picked);
+  }
+
+  DateTime? get _scheduledDateTime {
+    if (!_isScheduled || _scheduledDate == null) return null;
+    final t = _scheduledTime ?? const TimeOfDay(hour: 9, minute: 0);
+    return DateTime(_scheduledDate!.year, _scheduledDate!.month, _scheduledDate!.day, t.hour, t.minute);
+  }
+
+  String _formatScheduled() {
+    final dt = _scheduledDateTime;
+    if (dt == null) return 'Choisir date & heure';
+    final d = '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
+    final t = '${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}';
+    return '$d à $t';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF12121E) : Colors.white;
+    final labelColor = isDark ? Colors.white54 : Colors.black45;
+    final fieldFill = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08);
+
+    InputDecoration _fieldDeco(String hint, IconData icon) => InputDecoration(
+      hintText: hint,
+      hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 13),
+      prefixIcon: Icon(icon, size: 20),
+      filled: true,
+      fillColor: fieldFill,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF12121E) : Colors.white,
+        color: bg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2))),
-          ),
-          const SizedBox(height: 20),
-          Row(children: [
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Handle ──
+            Center(child: Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 20),
+
+            // ── Header ──
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.videocam_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Text('Nouvelle réunion', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E)))),
+            ]),
+            const SizedBox(height: 20),
+
+            // ── Meeting code preview ──
             Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(12)),
-              child: const Icon(Icons.videocam_rounded, color: Colors.white, size: 22),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.secondary.withValues(alpha: 0.25)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.vpn_key_outlined, size: 16, color: AppColors.secondary),
+                const SizedBox(width: 8),
+                Text('Code: ', style: GoogleFonts.poppins(fontSize: 12, color: labelColor)),
+                Text(_preGeneratedCode, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.secondary, letterSpacing: 1.5)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Clipboard.setData(ClipboardData(text: _preGeneratedCode));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Code copié !', style: GoogleFonts.poppins()),
+                      backgroundColor: AppColors.secondary,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      duration: const Duration(seconds: 2),
+                    ));
+                  },
+                  child: const Icon(Icons.copy, size: 16, color: AppColors.secondary),
+                ),
+              ]),
             ),
-            const SizedBox(width: 12),
-            Text('Nouvelle réunion', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
-          ]),
-          const SizedBox(height: 16),
-          // ── Meeting mode selector ──
-          Text('Type de réunion', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white54 : Colors.black45)),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _modes.map((entry) {
-                final mode = entry.$1;
-                final icon = entry.$2;
-                final label = entry.$3;
+            const SizedBox(height: 16),
+
+            // ── Mode selector ──
+            Text('Type de réunion', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: labelColor)),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: _modes.map((entry) {
+                final mode = entry.$1; final icon = entry.$2; final label = entry.$3;
                 final selected = _selectedMode == mode;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -1335,112 +1566,300 @@ class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         gradient: selected ? AppColors.primaryGradient : null,
-                        color: selected ? null : (isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08)),
+                        color: selected ? null : fieldFill,
                         borderRadius: BorderRadius.circular(20),
-                        border: selected ? null : Border.all(
-                          color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.3),
-                        ),
+                        border: selected ? null : Border.all(color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.3)),
                       ),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(icon, size: 14, color: selected ? Colors.white : (isDark ? Colors.white54 : Colors.black45)),
+                        Icon(icon, size: 14, color: selected ? Colors.white : labelColor),
                         const SizedBox(width: 5),
-                        Text(label, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600,
-                            color: selected ? Colors.white : (isDark ? Colors.white54 : Colors.black45))),
+                        Text(label, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: selected ? Colors.white : labelColor)),
                       ]),
                     ),
                   ),
                 );
-              }).toList(),
+              }).toList()),
             ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: widget.nameController,
-            autofocus: true,
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black87),
-            decoration: InputDecoration(
-              hintText: 'Nom de la réunion',
-              hintStyle: GoogleFonts.poppins(color: Colors.grey),
-              prefixIcon: const Icon(Icons.edit_outlined, size: 20),
-              filled: true,
-              fillColor: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _descriptionController,
-            maxLines: 3,
-            style: GoogleFonts.poppins(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
-            decoration: InputDecoration(
-              hintText: 'Agenda / Description (optionnel)',
-              hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 13),
-              prefixIcon: const Icon(Icons.subject_outlined, size: 20),
-              filled: true,
-              fillColor: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              alignLabelWithHint: true,
-            ),
-          ),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: widget.onTogglePassword,
-            child: Row(children: [
-              Icon(widget.showPassword ? Icons.lock_outline : Icons.lock_open_outlined, size: 16, color: AppColors.primary),
-              const SizedBox(width: 6),
-              Text(widget.showPassword ? 'Supprimer le code d\'accès' : 'Ajouter un code d\'accès',
-                style: GoogleFonts.poppins(fontSize: 13, color: AppColors.primary, decoration: TextDecoration.underline, decorationColor: AppColors.primary)),
-            ]),
-          ),
-          if (widget.showPassword) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+
+            // ── Name ──
             TextField(
-              controller: widget.passwordController,
-              obscureText: widget.obscurePassword,
-              keyboardType: TextInputType.number,
-              style: GoogleFonts.poppins(color: isDark ? Colors.white : Colors.black87),
-              decoration: InputDecoration(
-                hintText: 'Code d\'accès',
-                hintStyle: GoogleFonts.poppins(color: Colors.grey),
-                prefixIcon: const Icon(Icons.lock_outline, size: 20),
-                suffixIcon: IconButton(
-                  icon: Icon(widget.obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
-                  onPressed: widget.onToggleObscure,
-                ),
-                filled: true,
-                fillColor: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+              controller: widget.nameController,
+              autofocus: true,
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black87),
+              decoration: _fieldDeco('Nom de la réunion', Icons.edit_outlined).copyWith(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                hintStyle: GoogleFonts.poppins(color: Colors.grey),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // ── Description ──
+            TextField(
+              controller: _descriptionController,
+              maxLines: 2,
+              style: GoogleFonts.poppins(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+              decoration: _fieldDeco('Agenda / Description (optionnel)', Icons.subject_outlined).copyWith(alignLabelWithHint: true),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Schedule toggle ──
+            Text('Planification', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: labelColor)),
+            const SizedBox(height: 8),
+            Row(children: [
+              _OptionChip(
+                label: 'Maintenant',
+                icon: Icons.rocket_launch,
+                selected: !_isScheduled,
+                onTap: () { HapticFeedback.selectionClick(); setState(() => _isScheduled = false); },
+                isDark: isDark,
+              ),
+              const SizedBox(width: 8),
+              _OptionChip(
+                label: 'Programmer',
+                icon: Icons.event,
+                selected: _isScheduled,
+                onTap: () { HapticFeedback.selectionClick(); setState(() => _isScheduled = true); },
+                isDark: isDark,
+              ),
+            ]),
+
+            // ── Date + Time pickers ──
+            if (_isScheduled) ...[
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _pickDate,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      decoration: BoxDecoration(
+                        color: fieldFill,
+                        borderRadius: BorderRadius.circular(14),
+                        border: _scheduledDate != null ? Border.all(color: AppColors.primary.withValues(alpha: 0.4)) : null,
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.calendar_today, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(_scheduledDate == null ? 'Date' : '${_scheduledDate!.day.toString().padLeft(2,'0')}/${_scheduledDate!.month.toString().padLeft(2,'0')}/${_scheduledDate!.year}',
+                          style: GoogleFonts.poppins(fontSize: 13, color: _scheduledDate == null ? Colors.grey : (isDark ? Colors.white : Colors.black87))),
+                      ]),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _pickTime,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      decoration: BoxDecoration(
+                        color: fieldFill,
+                        borderRadius: BorderRadius.circular(14),
+                        border: _scheduledTime != null ? Border.all(color: AppColors.primary.withValues(alpha: 0.4)) : null,
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.access_time, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(_scheduledTime == null ? 'Heure' : '${_scheduledTime!.hour.toString().padLeft(2,'0')}:${_scheduledTime!.minute.toString().padLeft(2,'0')}',
+                          style: GoogleFonts.poppins(fontSize: 13, color: _scheduledTime == null ? Colors.grey : (isDark ? Colors.white : Colors.black87))),
+                      ]),
+                    ),
+                  ),
+                ),
+              ]),
+              if (_scheduledDate != null && _scheduledTime != null) ...[
+                const SizedBox(height: 6),
+                Row(children: [
+                  const Icon(Icons.check_circle_outline, size: 14, color: Colors.green),
+                  const SizedBox(width: 4),
+                  Text('Programmée: ${_formatScheduled()}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.green)),
+                ]),
+              ],
+            ],
+            const SizedBox(height: 16),
+
+            // ── Options ──
+            Text('Options avancées', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: labelColor)),
+            const SizedBox(height: 8),
+
+            // Waiting room
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(color: fieldFill, borderRadius: BorderRadius.circular(14)),
+              child: Row(children: [
+                Icon(Icons.meeting_room_outlined, size: 18, color: _waitingRoom ? AppColors.primary : labelColor),
+                const SizedBox(width: 10),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Salle d\'attente', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87)),
+                  Text('Les participants attendent votre approbation', style: GoogleFonts.poppins(fontSize: 11, color: labelColor)),
+                ])),
+                Switch(
+                  value: _waitingRoom,
+                  onChanged: (v) { HapticFeedback.selectionClick(); setState(() => _waitingRoom = v); },
+                  activeColor: AppColors.primary,
+                ),
+              ]),
+            ),
+            const SizedBox(height: 8),
+
+            // Max participants
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(color: fieldFill, borderRadius: BorderRadius.circular(14)),
+              child: Column(children: [
+                Row(children: [
+                  Icon(Icons.people_outline, size: 18, color: _showMaxParticipants ? AppColors.primary : labelColor),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Limiter les participants', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black87)),
+                    Text(_showMaxParticipants ? '$_maxParticipants participants max' : 'Illimité par défaut',
+                        style: GoogleFonts.poppins(fontSize: 11, color: labelColor)),
+                  ])),
+                  Switch(
+                    value: _showMaxParticipants,
+                    onChanged: (v) { HapticFeedback.selectionClick(); setState(() => _showMaxParticipants = v); },
+                    activeColor: AppColors.primary,
+                  ),
+                ]),
+                if (_showMaxParticipants) ...[
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Expanded(child: Slider(
+                      value: _maxParticipants.toDouble(),
+                      min: 2, max: 200,
+                      divisions: 99,
+                      activeColor: AppColors.primary,
+                      label: '$_maxParticipants',
+                      onChanged: (v) => setState(() => _maxParticipants = v.round()),
+                    )),
+                    Container(
+                      width: 42, height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text('$_maxParticipants', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                    ),
+                  ]),
+                ],
+              ]),
+            ),
+            const SizedBox(height: 12),
+
+            // ── Password ──
+            GestureDetector(
+              onTap: widget.onTogglePassword,
+              child: Row(children: [
+                Icon(widget.showPassword ? Icons.lock_outline : Icons.lock_open_outlined, size: 16, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text(widget.showPassword ? 'Supprimer le code d\'accès' : 'Ajouter un code d\'accès',
+                  style: GoogleFonts.poppins(fontSize: 13, color: AppColors.primary,
+                      decoration: TextDecoration.underline, decorationColor: AppColors.primary)),
+              ]),
+            ),
+            if (widget.showPassword) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: widget.passwordController,
+                obscureText: widget.obscurePassword,
+                keyboardType: TextInputType.number,
+                style: GoogleFonts.poppins(color: isDark ? Colors.white : Colors.black87),
+                decoration: InputDecoration(
+                  hintText: 'Code d\'accès (PIN)',
+                  hintStyle: GoogleFonts.poppins(color: Colors.grey),
+                  prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                  suffixIcon: IconButton(
+                    icon: Icon(widget.obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
+                    onPressed: widget.onToggleObscure,
+                  ),
+                  filled: true, fillColor: fieldFill,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+
+            // ── Submit button ──
+            SizedBox(
+              width: double.infinity, height: 54,
+              child: ElevatedButton(
+                onPressed: widget.isCreating ? null : () {
+                  if (_isScheduled && _scheduledDateTime == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Veuillez choisir une date et une heure.', style: GoogleFonts.poppins()),
+                      backgroundColor: Colors.orange.shade700,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ));
+                    return;
+                  }
+                  widget.onSubmit(
+                    _selectedMode,
+                    _descriptionController.text.trim(),
+                    scheduledAt: _scheduledDateTime,
+                    waitingRoom: _waitingRoom,
+                    maxParticipants: _showMaxParticipants ? _maxParticipants : null,
+                    preGeneratedCode: _preGeneratedCode,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 8,
+                  shadowColor: AppColors.primary.withValues(alpha: 0.5),
+                ),
+                child: widget.isCreating
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                  : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(_isScheduled ? Icons.event_available : Icons.rocket_launch, size: 18),
+                      const SizedBox(width: 8),
+                      Text(_isScheduled ? 'Programmer' : 'Démarrer',
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 16)),
+                    ]),
               ),
             ),
           ],
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity, height: 54,
-            child: ElevatedButton(
-              onPressed: widget.isCreating ? null : () => widget.onSubmit(_selectedMode, _descriptionController.text.trim()),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 8,
-                shadowColor: AppColors.primary.withValues(alpha: 0.5),
-              ),
-              child: widget.isCreating
-                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Icon(Icons.rocket_launch, size: 18),
-                    const SizedBox(width: 8),
-                    Text('Démarrer', style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 16)),
-                  ]),
-            ),
-          ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OptionChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const _OptionChip({required this.label, required this.icon, required this.selected, required this.onTap, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: selected ? AppColors.primaryGradient : null,
+          color: selected ? null : (isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08)),
+          borderRadius: BorderRadius.circular(22),
+          border: selected ? null : Border.all(color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.3)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 14, color: selected ? Colors.white : (isDark ? Colors.white54 : Colors.black45)),
+          const SizedBox(width: 6),
+          Text(label, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : (isDark ? Colors.white54 : Colors.black45))),
+        ]),
       ),
     );
   }

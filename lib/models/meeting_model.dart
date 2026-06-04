@@ -17,6 +17,11 @@ class MeetingModel {
   final List<String> coHosts;
   final int muteAllCount;
   final String? offeringLink; // Lien de paiement pour offrandes (mode Église)
+  final bool isScheduled; // true = réunion future programmée
+  final DateTime? scheduledAt; // date/heure planifiée
+  final bool waitingRoom; // salle d'attente activée
+  final int? maxParticipants; // limite de participants (null = illimité)
+  final String? meetingMode; // standard, business, church, live
 
   MeetingModel({
     required this.id,
@@ -37,6 +42,11 @@ class MeetingModel {
     this.coHosts = const [],
     this.muteAllCount = 0,
     this.offeringLink,
+    this.isScheduled = false,
+    this.scheduledAt,
+    this.waitingRoom = false,
+    this.maxParticipants,
+    this.meetingMode,
   });
 
   Map<String, dynamic> toJson() => {
@@ -58,6 +68,11 @@ class MeetingModel {
         'coHosts': coHosts,
         'muteAllCount': muteAllCount,
         if (offeringLink != null) 'offeringLink': offeringLink,
+        'isScheduled': isScheduled,
+        if (scheduledAt != null) 'scheduledAt': scheduledAt!.toIso8601String(),
+        'waitingRoom': waitingRoom,
+        if (maxParticipants != null) 'maxParticipants': maxParticipants,
+        if (meetingMode != null) 'meetingMode': meetingMode,
       };
 
   factory MeetingModel.fromJson(Map<String, dynamic> json) => MeetingModel(
@@ -82,6 +97,11 @@ class MeetingModel {
         coHosts: List<String>.from(json['coHosts'] ?? []),
         muteAllCount: (json['muteAllCount'] ?? 0) as int,
         offeringLink: json['offeringLink'] as String?,
+        isScheduled: json['isScheduled'] ?? false,
+        scheduledAt: json['scheduledAt'] != null ? DateTime.parse(json['scheduledAt']) : null,
+        waitingRoom: json['waitingRoom'] ?? false,
+        maxParticipants: json['maxParticipants'] as int?,
+        meetingMode: json['meetingMode'] as String?,
       );
 
   static MeetingStatus _statusFromString(String s) {
@@ -114,6 +134,11 @@ class MeetingModel {
     List<String>? coHosts,
     int? muteAllCount,
     String? offeringLink,
+    bool? isScheduled,
+    DateTime? scheduledAt,
+    bool? waitingRoom,
+    int? maxParticipants,
+    String? meetingMode,
   }) =>
       MeetingModel(
         id: id ?? this.id,
@@ -134,6 +159,11 @@ class MeetingModel {
         coHosts: coHosts ?? this.coHosts,
         muteAllCount: muteAllCount ?? this.muteAllCount,
         offeringLink: offeringLink ?? this.offeringLink,
+        isScheduled: isScheduled ?? this.isScheduled,
+        scheduledAt: scheduledAt ?? this.scheduledAt,
+        waitingRoom: waitingRoom ?? this.waitingRoom,
+        maxParticipants: maxParticipants ?? this.maxParticipants,
+        meetingMode: meetingMode ?? this.meetingMode,
       );
 
   @override
