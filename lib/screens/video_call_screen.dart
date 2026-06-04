@@ -95,6 +95,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── Call timer ───────────────────────────────
   Timer? _callTimer;
   int _callSeconds = 0;
+  DateTime? _callStartTime;  // fixed start time, never reset
+  bool _warningShown = false; // 5-min warning shown?
 
   // ── Auto-reconnect ───────────────────────────
   int _reconnectAttempts = 0;
@@ -339,6 +341,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         });
       }
 
+      // Start call timer as soon as media is ready (not waiting for remote)
+      _startCallTimer();
+
       // Register presence now that we have media
       await _meetingService.registerPresence(
           widget.meetingId, widget.userId, widget.userName);
@@ -445,12 +450,35 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   void _startCallTimer() {
-    _callTimer?.cancel();
+    // Idempotent — only start once per call session
+    if (_callTimer != null) return;
+    _callStartTime = DateTime.now();
     _callTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      setState(() => _callSeconds++);
-      // Check 30-min free limit
-      if (!_isPro && !_paywallShown && _callSeconds >= _freeMinutes * 60) {
+      final elapsed = DateTime.now().difference(_callStartTime!).inSeconds;
+      setState(() => _callSeconds = elapsed);
+
+      // 5-min warning before paywall
+      if (!_isPro && !_warningShown && elapsed >= (_freeMinutes * 60 - 300)) {
+        _warningShown = true;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Row(children: [
+            const Icon(Icons.timer, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Expanded(child: Text(
+              '⏱ 5 minutes restantes sur votre version gratuite',
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
+            )),
+          ]),
+          backgroundColor: Colors.orange.shade800,
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+
+      // Paywall at 30 min
+      if (!_isPro && !_paywallShown && elapsed >= _freeMinutes * 60) {
         _paywallShown = true;
         _showPaywall();
       }
@@ -458,103 +486,41 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   void _showPaywall() {
+    // Pause the call visually — mute audio as signal
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => WillPopScope(
-        onWillPop: () async => false,
-        child: AlertDialog(
-          backgroundColor: const Color(0xFF1A1A2E),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.lock_clock, color: Colors.white, size: 36),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Limite gratuite atteinte',
-                style: GoogleFonts.poppins(
-                  color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '30 minutes gratuites écoulées.\nPassez à Crux Pro pour continuer.',
-                style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14, height: 1.5),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.4)),
-                ),
-                child: Column(
-                  children: [
-                    Text('Crux Pro', style: GoogleFonts.poppins(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 16)),
-                    const SizedBox(height: 4),
-                    Text('25 000 FCFA / mois', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 20)),
-                    const SizedBox(height: 8),
-                    Text('✓ Réunions illimitées\n✓ Tous les participants\n✓ Accès immédiat',
-                      style: GoogleFonts.poppins(color: Colors.white60, fontSize: 12, height: 1.6),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _leave();
-              },
-              child: Text('Quitter', style: GoogleFonts.poppins(color: Colors.white38)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-              onPressed: () async {
-                Navigator.pop(context);
-                try {
-                  await _proService.startPayment(
-                    userId: widget.userId,
-                    userName: widget.userName,
-                  );
-                  // After returning from payment, re-check Pro status
-                  final pro = await _proService.isPro(widget.userId);
-                  if (mounted && pro) {
-                    setState(() { _isPro = true; _paywallShown = false; });
-                  } else if (mounted) {
-                    // Not paid yet, show paywall again after 10s
-                    Future.delayed(const Duration(seconds: 10), () {
-                      if (mounted && !_isPro) _showPaywall();
-                    });
-                  }
-                } catch (_) {
-                  if (mounted) _showPaywall();
-                }
-              },
-              child: Text('Passer Pro', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
-            ),
-          ],
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (_) => PopScope(
+        canPop: false,
+        child: _PaywallDialog(
+          onUpgrade: () async {
+            try {
+              await _proService.startPayment(
+                userId: widget.userId,
+                userName: widget.userName,
+              );
+              // Re-check immediately after returning from payment
+              final pro = await _proService.isPro(widget.userId);
+              if (mounted && pro) {
+                setState(() { _isPro = true; _paywallShown = false; _warningShown = false; });
+              } else if (mounted) {
+                // Not yet confirmed — re-check in 5s then show again if still not pro
+                Future.delayed(const Duration(seconds: 5), () async {
+                  if (!mounted) return;
+                  final confirmed = await _proService.isPro(widget.userId);
+                  if (mounted && !confirmed) _showPaywall();
+                  if (mounted && confirmed) setState(() { _isPro = true; _paywallShown = false; });
+                });
+              }
+            } catch (_) {
+              if (mounted) _showPaywall();
+            }
+          },
+          onLeave: () {
+            Navigator.pop(context);
+            _leave();
+          },
         ),
       ),
     );
@@ -4106,6 +4072,197 @@ class _ChatTab extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               )),
         ]),
+      ),
+    );
+  }
+}
+
+class _PaywallDialog extends StatefulWidget {
+  final VoidCallback onUpgrade;
+  final VoidCallback onLeave;
+  const _PaywallDialog({required this.onUpgrade, required this.onLeave});
+  @override
+  State<_PaywallDialog> createState() => _PaywallDialogState();
+}
+
+class _PaywallDialogState extends State<_PaywallDialog> with SingleTickerProviderStateMixin {
+  late AnimationController _pulse;
+  late Animation<double> _scale;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
+      ..repeat(reverse: true);
+    _scale = Tween<double>(begin: 1.0, end: 1.06).animate(
+      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const grad = LinearGradient(
+      colors: [Color(0xFFB71C1C), Color(0xFF6A1B9A)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+    return Dialog(
+      backgroundColor: const Color(0xFF1A1529),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icon with pulse
+            ScaleTransition(
+              scale: _scale,
+              child: Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  gradient: grad,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFB71C1C).withValues(alpha: 0.4),
+                      blurRadius: 24,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.workspace_premium, color: Colors.white, size: 36),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'CRUX PRO',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Vos 30 minutes gratuites sont écoulées.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            // Price card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+              decoration: BoxDecoration(
+                gradient: grad,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Column(
+                children: [
+                  Text(
+                    '25 000 FCFA / mois',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Accès illimité — Sans publicité',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Features
+            ...[
+              ('Réunions illimitées', Icons.all_inclusive),
+              ('Jusqu\'à 100 participants', Icons.group),
+              ('Enregistrement cloud', Icons.cloud_upload),
+              ('Fond d\'écran virtuel', Icons.blur_on),
+              ('Support prioritaire', Icons.support_agent),
+            ].map((f) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(f.$2, color: const Color(0xFFB71C1C), size: 18),
+                  const SizedBox(width: 10),
+                  Text(f.$1, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                ],
+              ),
+            )),
+            const SizedBox(height: 24),
+            // Upgrade button
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: grad,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFB71C1C).withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                  ),
+                  onPressed: _loading ? null : () async {
+                    setState(() => _loading = true);
+                    await Future.microtask(widget.onUpgrade);
+                    if (mounted) setState(() => _loading = false);
+                  },
+                  child: _loading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Passer à CRUX PRO',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: widget.onLeave,
+              child: Text(
+                'Quitter la réunion',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 13),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
