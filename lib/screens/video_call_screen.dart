@@ -129,7 +129,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── Meeting metadata ─────────────────────────
   String _meetingTitle = 'Réunion';
+  String _meetingDescription = '';
+  String? _meetingPassword;
   int _chatMessageCount = 0;
+
+  // ── Gallery view ─────────────────────────────
+  bool _galleryView = false;
 
   // ── Participant profile cache (Zoom-like) ────
   Uint8List? _ownPhotoBytes;             // local user's photo
@@ -948,6 +953,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       if (mounted) {
         setState(() {
           _meetingTitle = title;
+          _meetingDescription = snap.data()?['description'] as String? ?? '';
+          _meetingPassword = snap.data()?['password'] as String?;
           _isLiveMode = title.contains('[Live]') || title.contains('[LIVE]');
         });
         if (_isLiveMode) {
@@ -1397,7 +1404,32 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _reconnectTimer?.cancel();
     _hostWaitTimer?.cancel();
 
-    // 2. Build report before navigating (host only)
+    // 2. Save chat snapshot (fire-and-forget)
+    _db.collection('meetings').doc(widget.meetingId)
+        .collection('chat')
+        .orderBy('timestamp', descending: false)
+        .limitToLast(50)
+        .get()
+        .then((snap) {
+      final msgs = snap.docs.map((d) {
+        final data = d.data();
+        final ts = data['timestamp'];
+        String tsStr = '';
+        if (ts is Timestamp) tsStr = ts.toDate().toIso8601String();
+        return {
+          'sender': data['sender'] ?? '',
+          'message': data['message'] ?? '',
+          'timestamp': tsStr,
+        };
+      }).toList();
+      if (msgs.isNotEmpty) {
+        _db.collection('meeting_reports').doc(widget.meetingId)
+            .set({'chatSnapshot': msgs}, SetOptions(merge: true))
+            .catchError((_) {});
+      }
+    }).catchError((_) {});
+
+    // 3. Build report before navigating (host only)
     MeetingReportModel? report;
     if (isHost && duration > 5) {
       report = MeetingReportModel(
@@ -1416,7 +1448,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       _db.collection('meeting_reports').doc(widget.meetingId).set(report.toJson()).catchError((_) {});
     }
 
-    // 3. Navigate: host → report screen, participant → home
+    // 4. Navigate: host → report screen, participant → home
     if (isHost && report != null) {
       navigator.pushReplacement(
         MaterialPageRoute(builder: (_) => MeetingReportScreen(report: report!)),
@@ -1425,7 +1457,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       navigator.pop();
     }
 
-    // 3. Cleanup in background after navigation — each individually silenced
+    // 5. Cleanup in background after navigation — each individually silenced
     try { await _meetingService.removePresence(widget.meetingId, widget.userId); } catch (_) {}
     if (isHost) {
       try { await _db.collection('webrtc_rooms').doc(_docId).delete(); } catch (_) {}
@@ -1550,7 +1582,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                     color: Colors.black54,
                     child: Text(
                       showLocalBig
-                          ? (_presenceList.where((p) => p['userId'] != widget.userId).map((p) => (p['name'] as String? ?? '').split(' ').first).firstOrNull ?? 'Participant')
+                          ? () {
+                              final remoteId = _presenceList.where((p) => p['userId'] != widget.userId).firstOrNull?['userId'] as String? ?? '';
+                              final presenceName = _presenceList.where((p) => p['userId'] != widget.userId).firstOrNull?['name'] as String? ?? 'Participant';
+                              return (_participantNames[remoteId] ?? presenceName).split(' ').first;
+                            }()
                           : widget.userName.split(' ').first,
                       textAlign: TextAlign.center,
                       maxLines: 1,
@@ -1600,6 +1636,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             ),
           ),
         ),
+
+      // ── GALLERY VIEW OVERLAY ─────────────────────────────────────────
+      if (_galleryView && _presenceList.length >= 3)
+        Positioned.fill(child: _buildGalleryView()),
 
       // ── TOP BAR ──────────────────────────────────────────────────────
       Positioned(top: 0, left: 0, right: 0, child: _buildTopBar()),
@@ -2112,6 +2152,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   GestureDetector(
                     onTap: () async {
                       await Clipboard.setData(ClipboardData(text: _youtubeUrl!));
+                      if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: Text('Lien YouTube copié !', style: GoogleFonts.poppins()),
                         backgroundColor: Colors.green.shade700,
@@ -2341,6 +2382,38 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ),
         ],
         const Spacer(),
+        // Gallery view toggle (show when 3+ participants)
+        if (_presenceList.length >= 3)
+          GestureDetector(
+            onTap: () => setState(() => _galleryView = !_galleryView),
+            child: Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: _galleryView ? AppColors.primary : Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(_galleryView ? Icons.view_stream : Icons.grid_view,
+                  color: Colors.white, size: 16),
+            ),
+          ),
+        // Invite share button
+        GestureDetector(
+          onTap: _showInviteSheet,
+          child: Container(
+            margin: const EdgeInsets.only(right: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            decoration: BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.share, color: Colors.white, size: 14),
+              const SizedBox(width: 4),
+              Text('Partager', style: GoogleFonts.poppins(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+            ]),
+          ),
+        ),
         // Video quality selector
         PopupMenuButton<_VideoQuality>(
           icon: const Icon(Icons.hd_outlined, color: Colors.white70, size: 18),
@@ -2544,6 +2617,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                               onSelected: (action) async {
                                 if (action == 'cohost') {
                                   await _meetingService.addCoHost(widget.meetingId, pId);
+                                  if (!mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                                     content: Text('$pName est maintenant co-hôte', style: GoogleFonts.poppins()),
                                     backgroundColor: AppColors.success,
@@ -3001,6 +3075,13 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 if (_showEmojiBar) _showChat = false;
               }),
             ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: Icons.info_outline,
+              label: 'Info',
+              active: true,
+              onTap: _showMeetingInfoPanel,
+            ),
             if (isPrivileged) ...[
               const SizedBox(width: 8),
               _Btn(
@@ -3162,6 +3243,282 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         ]),
       ),
     ]);
+  }
+
+  // ── GALLERY VIEW ─────────────────────────────
+  Widget _buildGalleryView() {
+    return Container(
+      color: Colors.black,
+      child: Column(children: [
+        const SizedBox(height: 60), // space for top bar
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 80),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 3 / 4,
+            ),
+            itemCount: _presenceList.length,
+            itemBuilder: (ctx, i) {
+              final p = _presenceList[i];
+              final uid = p['userId'] as String? ?? '';
+              final isMe = uid == widget.userId;
+              final name = isMe
+                  ? widget.userName
+                  : (_participantNames[uid] ?? (p['name'] as String? ?? 'Participant'));
+              final camOn = isMe ? _camOn : (_participantCamOn[uid] ?? true);
+              final photo = isMe ? _ownPhotoBytes : _participantPhotos[uid];
+
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(fit: StackFit.expand, children: [
+                  // Video or avatar
+                  isMe
+                      ? (camOn
+                          ? RTCVideoView(_localRenderer,
+                              mirror: !_sharingScreen,
+                              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                          : _buildVideoOff(name, photo))
+                      : (camOn
+                          ? RTCVideoView(_remoteRenderer,
+                              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                          : _buildVideoOff(name, photo)),
+                  // CAM OFF badge
+                  if (!camOn)
+                    Positioned(
+                      top: 8, right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text('CAM OFF',
+                            style: GoogleFonts.poppins(
+                                color: Colors.white54, fontSize: 9, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  // Name label at bottom
+                  Positioned(
+                    bottom: 0, left: 0, right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [Colors.black87, Colors.transparent],
+                        ),
+                      ),
+                      child: Text(
+                        '${name.split(' ').first}${isMe ? ' (Moi)' : ''}',
+                        style: GoogleFonts.poppins(
+                            color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  // Border
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: isMe ? AppColors.primary : Colors.white24,
+                        width: isMe ? 2 : 1,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ]),
+              );
+            },
+          ),
+        ),
+      ]),
+    );
+  }
+
+  // ── INVITE SHARE SHEET ───────────────────────
+  void _showInviteSheet() {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 20),
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.share, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text('Inviter des participants',
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+          ]),
+          const SizedBox(height: 24),
+          // Meeting ID display
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+            ),
+            child: Column(children: [
+              Text('ID de la réunion',
+                  style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
+              const SizedBox(height: 8),
+              Text(
+                widget.meetingId,
+                style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 3),
+              ),
+              if (_meetingTitle.isNotEmpty && _meetingTitle != 'Réunion') ...[
+                const SizedBox(height: 4),
+                Text(_meetingTitle,
+                    style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13)),
+              ],
+            ]),
+          ),
+          const SizedBox(height: 16),
+          // Copy link button
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () async {
+                final text = 'Rejoignez ma réunion CRUX\nID: ${widget.meetingId}';
+                await Clipboard.setData(ClipboardData(text: text));
+                if (!ctx.mounted) return;
+                Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Lien copié !', style: GoogleFonts.poppins()),
+                    backgroundColor: AppColors.success,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    duration: const Duration(seconds: 2),
+                  ));
+                }
+              },
+              icon: const Icon(Icons.copy, size: 18),
+              label: Text('Copier le lien',
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 15)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  // ── MEETING INFO PANEL ───────────────────────
+  void _showMeetingInfoPanel() {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 20),
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.info_outline, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text('Informations',
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+          ]),
+          const SizedBox(height: 20),
+          _InfoRow(icon: Icons.title, label: 'Titre', value: _meetingTitle),
+          _InfoRow(icon: Icons.tag, label: 'ID', value: widget.meetingId),
+          _InfoRow(
+            icon: Icons.person,
+            label: 'Hôte',
+            value: widget.isHost ? '${widget.userName} (vous)' : widget.userName,
+          ),
+          _InfoRow(
+            icon: Icons.timer,
+            label: 'Durée',
+            value: _callSeconds > 0 ? _formattedDuration : 'En attente',
+          ),
+          _InfoRow(
+            icon: Icons.people,
+            label: 'Participants',
+            value: '${_presenceList.length}',
+          ),
+          if (_meetingDescription.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Agenda', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text(_meetingDescription,
+                    style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13, height: 1.5)),
+              ]),
+            ),
+          ],
+          if (_meetingPassword != null && _meetingPassword!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.lock, color: Colors.amber, size: 16),
+                const SizedBox(width: 8),
+                Text('Réunion protégée par un code',
+                    style: GoogleFonts.poppins(color: Colors.amber, fontSize: 12)),
+              ]),
+            ),
+          ],
+          const SizedBox(height: 16),
+        ]),
+      ),
+    );
   }
 
   Widget _buildWaitingForHost() {
@@ -3411,6 +3768,41 @@ class _LiveBadgeState extends State<_LiveBadge> with SingleTickerProviderStateMi
           Text('LIVE', style: GoogleFonts.poppins(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
         ]),
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  INFO ROW (used in meeting info panel)
+// ─────────────────────────────────────────────
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoRow({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(children: [
+        Container(
+          width: 34, height: 34,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 16),
+        ),
+        const SizedBox(width: 12),
+        Text('$label : ', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13)),
+        Expanded(
+          child: Text(value,
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis),
+        ),
+      ]),
     );
   }
 }

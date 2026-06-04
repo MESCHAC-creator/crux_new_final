@@ -53,6 +53,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late Animation<Offset> _headerSlide;
   late Animation<double> _pulse;
 
+  bool _isOnline = false;
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _setupAnimations();
     _loadLocalPhoto();
     _syncProfileFromFirestore();
+    _setOnlineStatus(true);
   }
 
   void _setupAnimations() {
@@ -145,12 +148,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _setOnlineStatus(false);
     _headerAnim.dispose();
     _pulseAnim.dispose();
     _meetingNameController.dispose();
     _joinIdController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _setOnlineStatus(bool online) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    FirebaseFirestore.instance.collection('users').doc(uid).set({
+      'status': online ? 'online' : 'offline',
+      'lastSeen': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true)).catchError((_) {});
+    if (mounted) setState(() => _isOnline = online);
   }
 
   /// Returns the first name of the currently logged-in user.
@@ -164,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return raw.split(' ').first;
   }
 
-  Future<void> _createMeeting() async {
+  Future<void> _createMeeting({String description = ''}) async {
     final name = _meetingNameController.text.trim();
     if (name.isEmpty) {
       _errorHandler.showWarningSnackBar(context, '⚠️ Entrez le nom de la réunion');
@@ -181,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     try {
       final meetingId = await _meetingService.createMeeting(
         title: name,
-        description: '',
+        description: description,
         organizerName: _freshUserName(),
         organizerId: widget.user.uid,
         password: password,
@@ -538,23 +552,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.red)),
                                 ])),
                               ],
-                              child: Container(
-                                width: 44, height: 44,
-                                decoration: BoxDecoration(
-                                  gradient: cp.gradient,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [BoxShadow(color: cp.primary.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4))],
-                                ),
-                                child: Center(
-                                  child: _localPhotoPath != null && File(_localPhotoPath!).existsSync()
-                                      ? ClipOval(child: Image.file(File(_localPhotoPath!), fit: BoxFit.cover, width: 44, height: 44))
-                                      : FirebaseAuth.instance.currentUser?.photoURL != null
-                                          ? ClipOval(child: Image.network(FirebaseAuth.instance.currentUser!.photoURL!, fit: BoxFit.cover, width: 44, height: 44,
-                                              errorBuilder: (_, __, ___) => Text(firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
-                                                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18))))
-                                          : Text(firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
-                                              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
-                                ),
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Container(
+                                    width: 44, height: 44,
+                                    decoration: BoxDecoration(
+                                      gradient: cp.gradient,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [BoxShadow(color: cp.primary.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4))],
+                                    ),
+                                    child: Center(
+                                      child: _localPhotoPath != null && File(_localPhotoPath!).existsSync()
+                                          ? ClipOval(child: Image.file(File(_localPhotoPath!), fit: BoxFit.cover, width: 44, height: 44))
+                                          : FirebaseAuth.instance.currentUser?.photoURL != null
+                                              ? ClipOval(child: Image.network(FirebaseAuth.instance.currentUser!.photoURL!, fit: BoxFit.cover, width: 44, height: 44,
+                                                  errorBuilder: (_, __, ___) => Text(firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                                      style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18))))
+                                              : Text(firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
+                                    ),
+                                  ),
+                                  if (_isOnline)
+                                    Positioned(
+                                      bottom: 0, right: 0,
+                                      child: Container(
+                                        width: 12, height: 12,
+                                        decoration: BoxDecoration(
+                                          color: Colors.green,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: isDark ? const Color(0xFF12121E) : Colors.white, width: 2),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -821,14 +852,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         isCreating: _isCreating,
         onTogglePassword: () => setState(() => _showPassword = !_showPassword),
         onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
-        onSubmit: (MeetingMode mode) {
+        onSubmit: (MeetingMode mode, String description) {
           // Prepend mode tag to the meeting name
           final tag = _modeTag(mode);
           if (tag.isNotEmpty && !_meetingNameController.text.startsWith('[')) {
             _meetingNameController.text = '$tag ${_meetingNameController.text}'.trim();
           }
           Navigator.pop(context);
-          _createMeeting();
+          _createMeeting(description: description);
         },
       ),
     );
@@ -1065,7 +1096,7 @@ class _CreateMeetingSheet extends StatefulWidget {
   final TextEditingController passwordController;
   final bool showPassword, obscurePassword, isCreating;
   final VoidCallback onTogglePassword, onToggleObscure;
-  final void Function(MeetingMode mode) onSubmit;
+  final void Function(MeetingMode mode, String description) onSubmit;
 
   const _CreateMeetingSheet({
     required this.nameController, required this.passwordController,
@@ -1080,6 +1111,13 @@ class _CreateMeetingSheet extends StatefulWidget {
 
 class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
   MeetingMode _selectedMode = MeetingMode.standard;
+  final _descriptionController = TextEditingController();
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
 
   static const _modes = [
     (MeetingMode.standard, Icons.videocam, 'Standard'),
@@ -1174,6 +1212,23 @@ class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
             ),
           ),
           const SizedBox(height: 12),
+          TextField(
+            controller: _descriptionController,
+            maxLines: 3,
+            style: GoogleFonts.poppins(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+            decoration: InputDecoration(
+              hintText: 'Agenda / Description (optionnel)',
+              hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 13),
+              prefixIcon: const Icon(Icons.subject_outlined, size: 20),
+              filled: true,
+              fillColor: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: 12),
           GestureDetector(
             onTap: widget.onTogglePassword,
             child: Row(children: [
@@ -1210,7 +1265,7 @@ class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
           SizedBox(
             width: double.infinity, height: 54,
             child: ElevatedButton(
-              onPressed: widget.isCreating ? null : () => widget.onSubmit(_selectedMode),
+              onPressed: widget.isCreating ? null : () => widget.onSubmit(_selectedMode, _descriptionController.text.trim()),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
