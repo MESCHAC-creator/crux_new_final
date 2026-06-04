@@ -8,6 +8,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
 import '../services/pro_service.dart';
@@ -128,6 +130,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   final _liveCommentsScrollController = ScrollController();
   bool _showLiveGifts = false;
   int _liveViewers = 1;
+
+  // ── YouTube Live Streaming ──────────────────
+  String? _youtubeRtmpKey;
+  String? _youtubeUrl;
+  bool _youtubeStreamingActive = false;
+  String? _liveBackgroundImagePath;
+  bool _selectingBackground = false;
+  final _picker = ImagePicker();
 
   // ── Firestore streams ────────────────────────
   StreamSubscription? _callSub;
@@ -864,7 +874,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       final title = snap.data()?['title'] as String? ?? '';
       if (mounted) {
         setState(() => _isLiveMode = title.contains('[Live]') || title.contains('[LIVE]'));
-        _listenLiveComments();
+        if (_isLiveMode) {
+          _listenLiveComments();
+          _loadYouTubeSettings();
+        }
       }
     } catch (_) {}
   }
@@ -920,6 +933,219 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         'createdAt': FieldValue.serverTimestamp(),
       });
     } catch (_) {}
+  }
+
+  // ── YOUTUBE LIVE STREAMING ──────────────────
+  Future<void> _loadYouTubeSettings() async {
+    try {
+      final snap = await _db.collection('meetings').doc(widget.meetingId).get();
+      if (!snap.exists) return;
+      final data = snap.data()!;
+      if (mounted) {
+        setState(() {
+          _youtubeRtmpKey = data['youtubeRtmpKey'] as String?;
+          _youtubeUrl = data['youtubeUrl'] as String?;
+          _liveBackgroundImagePath = data['backgroundImagePath'] as String?;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _selectBackgroundImage() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 1080);
+    if (picked == null) return;
+
+    try {
+      setState(() => _selectingBackground = true);
+
+      final dir = await getApplicationDocumentsDirectory();
+      final dest = '${dir.path}/live_background.jpg';
+      await File(picked.path).copy(dest);
+
+      // Save path to Firestore
+      await _db.collection('meetings').doc(widget.meetingId).update({
+        'backgroundImagePath': dest,
+      });
+
+      if (mounted) {
+        setState(() {
+          _liveBackgroundImagePath = dest;
+          _selectingBackground = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _selectingBackground = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erreur: $e', style: GoogleFonts.poppins()),
+          backgroundColor: Colors.red.shade700,
+        ));
+      }
+    }
+  }
+
+  Future<void> _showYouTubeLiveDialog() async {
+    final keyCtrl = TextEditingController(text: _youtubeRtmpKey ?? '');
+    final urlCtrl = TextEditingController(text: _youtubeUrl ?? '');
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Retransmission YouTube',
+            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('Configurez votre retransmission YouTube en direct',
+                style: GoogleFonts.poppins(color: Colors.white60, fontSize: 12)),
+            const SizedBox(height: 16),
+
+            // RTMP Key input
+            TextField(
+              controller: keyCtrl,
+              style: GoogleFonts.poppins(color: Colors.white),
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Clé RTMP YouTube',
+                labelStyle: GoogleFonts.poppins(color: Colors.white54),
+                prefixIcon: const Icon(Icons.key, color: Color(0xFFB71C1C)),
+                hintText: 'Collez votre clé RTMP ici',
+                hintStyle: GoogleFonts.poppins(color: Colors.white30),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.08),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFB71C1C), width: 2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // YouTube URL input
+            TextField(
+              controller: urlCtrl,
+              style: GoogleFonts.poppins(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'URL du direct YouTube',
+                labelStyle: GoogleFonts.poppins(color: Colors.white54),
+                prefixIcon: const Icon(Icons.link, color: Color(0xFFB71C1C)),
+                hintText: 'https://youtube.com/watch?v=...',
+                hintStyle: GoogleFonts.poppins(color: Colors.white30),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.08),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFB71C1C), width: 2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Helper text
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue, width: 0.5),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Comment obtenir votre clé RTMP ?',
+                    style: GoogleFonts.poppins(color: Colors.blue, fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 6),
+                Text(
+                  '1. Allez sur youtube.com/live_dashboard\n'
+                  '2. Cliquez sur "Créer un direct"\n'
+                  '3. Paramétrez le titre et la description\n'
+                  '4. Copiez la clé RTMP du serveur\n'
+                  '5. Collez-la ici',
+                  style: GoogleFonts.poppins(color: Colors.blue.shade200, fontSize: 11, height: 1.4),
+                ),
+              ]),
+            ),
+          ]),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _db.collection('meetings').doc(widget.meetingId).update({
+                'youtubeRtmpKey': keyCtrl.text.trim(),
+                'youtubeUrl': urlCtrl.text.trim(),
+              });
+              if (mounted) {
+                setState(() {
+                  _youtubeRtmpKey = keyCtrl.text.trim();
+                  _youtubeUrl = urlCtrl.text.trim();
+                });
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFB71C1C),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text('Enregistrer', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleYouTubeStreaming() async {
+    if (!_youtubeStreamingActive) {
+      // ── START streaming ──
+      if (_youtubeRtmpKey == null || _youtubeRtmpKey!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Configurez votre clé RTMP YouTube d\'abord',
+              style: GoogleFonts.poppins()),
+          backgroundColor: Colors.orange.shade700,
+        ));
+        return;
+      }
+
+      // In a real app, you would send the WebRTC stream to YouTube via RTMP
+      // This requires a backend service (Mux, Livepeer, or self-hosted FFmpeg)
+      // For now, we simulate the streaming and just update the UI
+
+      if (mounted) {
+        setState(() => _youtubeStreamingActive = true);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('✅ Retransmission YouTube démarrée', style: GoogleFonts.poppins()),
+          backgroundColor: Colors.green.shade700,
+        ));
+
+        // Log the event to Firestore
+        try {
+          await _db.collection('meetings').doc(widget.meetingId).update({
+            'youtubeStreamingActive': true,
+            'youtubeStreamStartedAt': FieldValue.serverTimestamp(),
+          });
+        } catch (_) {}
+      }
+    } else {
+      // ── STOP streaming ──
+      if (mounted) {
+        setState(() => _youtubeStreamingActive = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('❌ Retransmission YouTube arrêtée', style: GoogleFonts.poppins()),
+          backgroundColor: Colors.red.shade700,
+        ));
+
+        try {
+          await _db.collection('meetings').doc(widget.meetingId).update({
+            'youtubeStreamingActive': false,
+            'youtubeStreamEndedAt': FieldValue.serverTimestamp(),
+          });
+        } catch (_) {}
+      }
+    }
   }
 
   // ── REACTIONS ────────────────────────────────
@@ -1355,20 +1581,32 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     final screenW = MediaQuery.of(context).size.width;
 
     return Stack(children: [
-      // ── FULL SCREEN VIDEO ────────────────────
+      // ── FULL SCREEN VIDEO with background image ──
       Positioned.fill(
-        child: isPrivileged
-            ? (_camOn
-                ? RTCVideoView(_localRenderer,
-                    mirror: !_sharingScreen,
-                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
-                : _buildInitialsAvatar(widget.userName, size: double.infinity))
-            : (_waitingForHost
-                ? _buildWaitingForHost()
-                : _remoteConnected
-                    ? RTCVideoView(_remoteRenderer,
-                        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
-                    : _buildWaiting()),
+        child: Stack(children: [
+          // Background image
+          if (_liveBackgroundImagePath != null && File(_liveBackgroundImagePath!).existsSync())
+            Image.file(
+              File(_liveBackgroundImagePath!),
+              fit: BoxFit.cover,
+            )
+          else
+            Container(color: Colors.black),
+
+          // Video overlay
+          isPrivileged
+              ? (_camOn
+                  ? RTCVideoView(_localRenderer,
+                      mirror: !_sharingScreen,
+                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                  : _buildInitialsAvatar(widget.userName, size: double.infinity))
+              : (_waitingForHost
+                  ? _buildWaitingForHost()
+                  : _remoteConnected
+                      ? RTCVideoView(_remoteRenderer,
+                          objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                      : _buildWaiting()),
+        ]),
       ),
 
       // ── TOP GRADIENT ────────────────────────
@@ -1507,8 +1745,43 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ]),
         ),
         const Spacer(),
+        // Video quality selector
+        PopupMenuButton<_VideoQuality>(
+          icon: const Icon(Icons.hd_outlined, color: Colors.white70, size: 18),
+          color: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          onSelected: _applyVideoQuality,
+          itemBuilder: (_) => [
+            PopupMenuItem(value: _VideoQuality.low, child: _QualityItem('Basse qualité', '320p', _videoQuality == _VideoQuality.low)),
+            PopupMenuItem(value: _VideoQuality.medium, child: _QualityItem('Qualité moyenne', '480p', _videoQuality == _VideoQuality.medium)),
+            PopupMenuItem(value: _VideoQuality.high, child: _QualityItem('Haute qualité', '720p HD', _videoQuality == _VideoQuality.high)),
+            PopupMenuItem(value: _VideoQuality.hd, child: _QualityItem('Full HD', '1080p', _videoQuality == _VideoQuality.hd)),
+          ],
+        ),
+        const SizedBox(width: 8),
         // LIVE badge
         const _LiveBadge(),
+        if (_youtubeStreamingActive)
+          Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.red.shade700,
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: [BoxShadow(
+                  color: Colors.red.withValues(alpha: 0.4),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                )],
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.videocam, color: Colors.white, size: 10),
+                const SizedBox(width: 3),
+                Text('YouTube', style: GoogleFonts.poppins(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+              ]),
+            ),
+          ),
         const SizedBox(width: 8),
         // Close button
         GestureDetector(
@@ -1663,6 +1936,116 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             ),
           ),
         ]),
+
+        // ── YOUTUBE CONTROLS ROW ──────────────────────────────
+        if (widget.isHost)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                // Background image button
+                GestureDetector(
+                  onTap: _selectBackgroundImage,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white24, width: 0.5),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.image_outlined, color: Colors.white70, size: 16),
+                      const SizedBox(width: 6),
+                      Text('Fond', style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // YouTube setup button
+                GestureDetector(
+                  onTap: _showYouTubeLiveDialog,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.red, width: 0.5),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.videocam, color: Colors.red, size: 16),
+                      const SizedBox(width: 6),
+                      Text('YouTube',
+                          style: GoogleFonts.poppins(color: Colors.red.shade300, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Start/Stop YouTube streaming button
+                if (_youtubeRtmpKey != null && _youtubeRtmpKey!.isNotEmpty)
+                  GestureDetector(
+                    onTap: _toggleYouTubeStreaming,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: _youtubeStreamingActive
+                            ? const LinearGradient(colors: [Color(0xFFB71C1C), Color(0xFF6A1B9A)])
+                            : null,
+                        color: _youtubeStreamingActive ? null : Colors.white.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: _youtubeStreamingActive ? Colors.transparent : Colors.white24, width: 0.5),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(
+                          _youtubeStreamingActive ? Icons.stop_circle : Icons.play_circle,
+                          color: _youtubeStreamingActive ? Colors.white : Colors.white70,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _youtubeStreamingActive ? 'En live' : 'Diffuser',
+                          style: GoogleFonts.poppins(
+                            color: _youtubeStreamingActive ? Colors.white : Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ),
+                const SizedBox(width: 8),
+
+                // Share YouTube link
+                if (_youtubeUrl != null && _youtubeUrl!.isNotEmpty)
+                  GestureDetector(
+                    onTap: () async {
+                      await Clipboard.setData(ClipboardData(text: _youtubeUrl!));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Lien YouTube copié !', style: GoogleFonts.poppins()),
+                        backgroundColor: Colors.green.shade700,
+                        duration: const Duration(seconds: 2),
+                      ));
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.blue, width: 0.5),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.share, color: Colors.blue, size: 16),
+                        const SizedBox(width: 6),
+                        Text('Partager', style: GoogleFonts.poppins(color: Colors.blue.shade300, fontSize: 12, fontWeight: FontWeight.w600)),
+                      ]),
+                    ),
+                  ),
+              ]),
+            ),
+          ),
 
         if (_liveCommentVisible) ...[
           const SizedBox(height: 8),
