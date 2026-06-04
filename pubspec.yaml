@@ -58,6 +58,9 @@ dependencies:
   # Google Sign-In
   google_sign_in: ^6.2.1
 
+  # Share
+  share_plus: ^10.0.0
+
   # Profile photo
   image_picker: ^1.1.2
   path_provider: ^2.1.4

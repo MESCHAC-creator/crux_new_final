@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -84,9 +85,18 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       });
     });
 
-    Future.delayed(const Duration(milliseconds: 3200), () {
-      if (mounted) Navigator.of(context).pushReplacementNamed('/login');
-    });
+    _navigateAfterReady();
+  }
+
+  Future<void> _navigateAfterReady() async {
+    // Wait at least 2s for animations, plus Firebase to confirm auth state
+    final results = await Future.wait([
+      Future.delayed(const Duration(milliseconds: 2000)),
+      FirebaseAuth.instance.authStateChanges().first,
+    ]);
+    if (!mounted) return;
+    final user = results[1] as User?;
+    Navigator.of(context).pushReplacementNamed(user != null ? '/home' : '/login');
   }
 
   @override

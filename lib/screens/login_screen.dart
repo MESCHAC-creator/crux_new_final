@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/colors.dart';
 import '../services/auth_service.dart';
 import '../services/error_handler_service.dart';
@@ -22,6 +23,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   bool _isLoading = false;
   bool _isGoogleLoading = false;
   bool _showPassword = false;
+  bool _rememberEmail = false;
+
+  static const _emailPrefKey = 'crux_remembered_email';
+  static const _rememberPrefKey = 'crux_remember_email';
 
   // Inline error states
   String? _emailError;
@@ -56,6 +61,32 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     _setupAnimations();
     _contentController.forward();
     _pulseController.repeat(reverse: true);
+    _loadRememberedEmail();
+  }
+
+  Future<void> _loadRememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final remember = prefs.getBool(_rememberPrefKey) ?? false;
+    if (remember) {
+      final email = prefs.getString(_emailPrefKey) ?? '';
+      if (mounted) {
+        setState(() {
+          _rememberEmail = true;
+          _emailController.text = email;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveRememberedEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberEmail) {
+      await prefs.setBool(_rememberPrefKey, true);
+      await prefs.setString(_emailPrefKey, email);
+    } else {
+      await prefs.remove(_rememberPrefKey);
+      await prefs.remove(_emailPrefKey);
+    }
   }
 
   void _setupAnimations() {
@@ -203,11 +234,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     await _buttonController.reverse();
 
     setState(() => _isLoading = true);
+    final email = _emailController.text.trim();
     try {
       await _authService.signIn(
-        email: _emailController.text.trim(),
+        email: email,
         password: _passwordController.text,
       );
+      await _saveRememberedEmail(email);
       if (mounted) Navigator.of(context).pushReplacementNamed('/home');
     } catch (e) {
       if (!mounted) return;
@@ -517,22 +550,48 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
 
-                        // Forgot password
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: _showForgotPasswordDialog,
-                            child: Text(
-                              'Mot de passe oublié ?',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
+                        // Remember email + Forgot password row
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () => setState(() => _rememberEmail = !_rememberEmail),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 20, height: 20,
+                                    child: Checkbox(
+                                      value: _rememberEmail,
+                                      onChanged: (v) => setState(() => _rememberEmail = v ?? false),
+                                      activeColor: Colors.white,
+                                      checkColor: const Color(0xFFB71C1C),
+                                      side: const BorderSide(color: Colors.white54, width: 1.5),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Se souvenir de moi',
+                                    style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: _showForgotPasswordDialog,
+                              style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                              child: Text(
+                                'Mot de passe oublié ?',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 8),
 

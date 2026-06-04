@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
 import '../models/meeting_model.dart';
@@ -57,6 +58,14 @@ class _MeetingScreenState extends State<MeetingScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
+  }
+
+  void _shareMeeting() {
+    final text = 'Rejoignez ma réunion CRUX !\n'
+        'Réunion : ${widget.meetingName}\n'
+        'Code : ${widget.meetingId}\n\n'
+        'Téléchargez CRUX et rejoignez avec ce code.';
+    Share.share(text, subject: 'Invitation CRUX - ${widget.meetingName}');
   }
 
   void _endMeeting() {
@@ -126,6 +135,12 @@ class _MeetingScreenState extends State<MeetingScreen> {
                           style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w700),
                         ),
                       ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _shareMeeting,
+                      icon: const Icon(Icons.share_rounded, color: Colors.white70, size: 22),
+                      tooltip: 'Partager',
+                    ),
                   ],
                 ),
 
