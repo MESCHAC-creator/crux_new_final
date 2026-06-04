@@ -12,24 +12,9 @@ class MeetingService {
   final _log = Logger();
 
   static const _historyKey = 'crux_recent_meetings';
-  static const Duration _minCallInterval = Duration(milliseconds: 200);
-  final Map<String, DateTime> _lastCallTime = {};
 
   factory MeetingService() => _instance;
   MeetingService._internal();
-
-  /// Rate limiting check — prevents API call spam
-  Future<bool> _checkRateLimit(String operation) async {
-    final now = DateTime.now();
-    final lastTime = _lastCallTime[operation];
-
-    if (lastTime != null && now.difference(lastTime) < _minCallInterval) {
-      return false; // Rate limited
-    }
-
-    _lastCallTime[operation] = now;
-    return true;
-  }
 
   /// Pre-generate a meeting ID (useful for displaying code before creation).
   String generateMeetingCode() {
