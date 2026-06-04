@@ -1143,14 +1143,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── YOUTUBE LIVE STREAMING ──────────────────
   Future<void> _loadYouTubeSettings() async {
     try {
-      final snap = await _db.collection('meetings').doc(widget.meetingId).get();
-      if (!snap.exists) return;
-      final data = snap.data()!;
+      final prefs = await SharedPreferences.getInstance();
+      // Load RTMP key from local secure storage only (never from Firestore)
+      final rtmpKey = prefs.getString('youtube_rtmp_key_${widget.meetingId}');
+      final youtubeUrl = prefs.getString('youtube_url_${widget.meetingId}');
       if (mounted) {
         setState(() {
-          _youtubeRtmpKey = data['youtubeRtmpKey'] as String?;
-          _youtubeUrl = data['youtubeUrl'] as String?;
-          _liveBackgroundImagePath = data['backgroundImagePath'] as String?;
+          _youtubeRtmpKey = rtmpKey;
+          _youtubeUrl = youtubeUrl;
         });
       }
     } catch (_) {}
@@ -1204,6 +1204,28 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text('Configurez votre retransmission YouTube en direct',
                 style: GoogleFonts.poppins(color: Colors.white60, fontSize: 12)),
+            const SizedBox(height: 12),
+            // Security warning
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.5), width: 1),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_outline, color: Colors.red, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Clé stockée localement seulement',
+                      style: GoogleFonts.poppins(color: Colors.red, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 16),
 
             // RTMP Key input
@@ -1281,10 +1303,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await _db.collection('meetings').doc(widget.meetingId).update({
-                'youtubeRtmpKey': keyCtrl.text.trim(),
-                'youtubeUrl': urlCtrl.text.trim(),
-              });
+              // Save RTMP credentials locally only (never to Firestore)
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('youtube_rtmp_key_${widget.meetingId}', keyCtrl.text.trim());
+              await prefs.setString('youtube_url_${widget.meetingId}', urlCtrl.text.trim());
               if (mounted) {
                 setState(() {
                   _youtubeRtmpKey = keyCtrl.text.trim();

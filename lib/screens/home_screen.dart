@@ -19,6 +19,7 @@ import '../screens/meeting_screen.dart';
 import '../screens/meeting_report_screen.dart';
 import '../models/meeting_report_model.dart';
 import '../services/user_service.dart';
+import '../services/input_validator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/locale_provider.dart';
 import '../providers/color_provider.dart';
@@ -189,25 +190,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _createMeeting({String description = ''}) async {
-    final name = _meetingNameController.text.trim();
-    if (name.isEmpty) {
-      _errorHandler.showWarningSnackBar(context, '⚠️ Entrez le nom de la réunion');
+    final name = InputValidator.sanitize(_meetingNameController.text);
+    final nameError = InputValidator.validateMeetingName(name);
+    if (nameError != null) {
+      _errorHandler.showWarningSnackBar(context, '⚠️ $nameError');
       return;
     }
-    if (name.length < 2) {
-      _errorHandler.showWarningSnackBar(context, '⚠️ Le nom doit faire au moins 2 caractères');
+
+    final sanitizedDesc = InputValidator.sanitize(description);
+    final descError = InputValidator.validateDescription(sanitizedDesc);
+    if (descError != null) {
+      _errorHandler.showWarningSnackBar(context, '⚠️ $descError');
       return;
     }
-    if (name.length > 60) {
-      _errorHandler.showWarningSnackBar(context, '⚠️ Le nom ne peut pas dépasser 60 caractères');
-      return;
-    }
+
     setState(() => _isCreating = true);
     final rawPassword = _showPassword ? _passwordController.text.trim() : null;
-    if (rawPassword != null && rawPassword.length < 4) {
-      _errorHandler.showWarningSnackBar(context, '⚠️ Le code d\'accès doit faire au moins 4 caractères');
-      setState(() => _isCreating = false);
-      return;
+    if (rawPassword != null) {
+      final pwdError = InputValidator.validatePassword(rawPassword);
+      if (pwdError != null) {
+        _errorHandler.showWarningSnackBar(context, '⚠️ $pwdError');
+        setState(() => _isCreating = false);
+        return;
+      }
     }
     final password = rawPassword != null ? _hashPassword(rawPassword) : null;
     try {

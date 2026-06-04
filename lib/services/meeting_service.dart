@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:logger/logger.dart';
 import '../models/meeting_model.dart';
+import 'error_logger.dart';
 
 class MeetingService {
   static final MeetingService _instance = MeetingService._internal();
@@ -98,7 +99,9 @@ class MeetingService {
     try {
       await _firestore.collection('meetings').doc(meetingId).update(
           {'status': status.toString().split('.').last});
-    } catch (_) {}
+    } catch (e) {
+      ErrorLogger().logFirestoreError('updateMeetingStatus', meetingId, e);
+    }
   }
 
   Future<void> setLocked(String meetingId, bool locked) async {
@@ -107,21 +110,27 @@ class MeetingService {
           .collection('meetings')
           .doc(meetingId)
           .update({'isLocked': locked});
-    } catch (_) {}
+    } catch (e) {
+      ErrorLogger().logFirestoreError('setLocked', meetingId, e);
+    }
   }
 
   Future<void> addParticipant(String meetingId, String userId) async {
     try {
       await _firestore.collection('meetings').doc(meetingId).update(
           {'participants': FieldValue.arrayUnion([userId])});
-    } catch (_) {}
+    } catch (e) {
+      ErrorLogger().logFirestoreError('addParticipant', '$meetingId/$userId', e);
+    }
   }
 
   Future<void> removeParticipant(String meetingId, String userId) async {
     try {
       await _firestore.collection('meetings').doc(meetingId).update(
           {'participants': FieldValue.arrayRemove([userId])});
-    } catch (_) {}
+    } catch (e) {
+      ErrorLogger().logFirestoreError('removeParticipant', '$meetingId/$userId', e);
+    }
   }
 
   // ── HISTORY ────────────────────────────────────────────────────────
@@ -172,21 +181,27 @@ class MeetingService {
     try {
       await _firestore.collection('meetings').doc(meetingId)
           .update({'coHosts': FieldValue.arrayUnion([userId])});
-    } catch (_) {}
+    } catch (e) {
+      ErrorLogger().logFirestoreError('addCoHost', '$meetingId/$userId', e);
+    }
   }
 
   Future<void> removeCoHost(String meetingId, String userId) async {
     try {
       await _firestore.collection('meetings').doc(meetingId)
           .update({'coHosts': FieldValue.arrayRemove([userId])});
-    } catch (_) {}
+    } catch (e) {
+      ErrorLogger().logFirestoreError('removeCoHost', '$meetingId/$userId', e);
+    }
   }
 
   Future<void> triggerMuteAll(String meetingId) async {
     try {
       await _firestore.collection('meetings').doc(meetingId)
           .update({'muteAllCount': FieldValue.increment(1)});
-    } catch (_) {}
+    } catch (e) {
+      ErrorLogger().logFirestoreError('triggerMuteAll', meetingId, e);
+    }
   }
 
   Future<void> registerPresence(String meetingId, String userId, String name) async {
@@ -201,7 +216,9 @@ class MeetingService {
         'camOn': true,
         'isSpeaking': false,
       });
-    } catch (_) {}
+    } catch (e) {
+      ErrorLogger().logFirestoreError('registerPresence', '$meetingId/presence/$userId', e);
+    }
   }
 
   Future<void> removePresence(String meetingId, String userId) async {
@@ -210,7 +227,9 @@ class MeetingService {
           .collection('meetings').doc(meetingId)
           .collection('presence').doc(userId)
           .delete();
-    } catch (_) {}
+    } catch (e) {
+      ErrorLogger().logFirestoreError('removePresence', '$meetingId/presence/$userId', e);
+    }
   }
 
   Stream<List<Map<String, dynamic>>> streamPresence(String meetingId) {
