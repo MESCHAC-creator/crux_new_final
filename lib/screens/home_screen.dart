@@ -217,6 +217,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(children: [
           Container(
@@ -230,25 +231,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           const SizedBox(width: 12),
           Text('Code d\'accès',
               style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w700, fontSize: 17)),
+                  fontWeight: FontWeight.w700, fontSize: 17, color: Colors.white)),
         ]),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           Text('Cette réunion est protégée par un code.',
               style: GoogleFonts.poppins(
-                  fontSize: 13, color: AppColors.textSecondary)),
+                  fontSize: 13, color: Colors.white70)),
           const SizedBox(height: 16),
           TextField(
             controller: ctrl,
             autofocus: true,
             obscureText: true,
             keyboardType: TextInputType.number,
+            style: GoogleFonts.poppins(color: Colors.white),
             decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.08),
               hintText: 'Code d\'accès',
-              hintStyle: GoogleFonts.poppins(color: AppColors.textTertiary),
-              prefixIcon:
-                  const Icon(Icons.lock_outline, color: AppColors.primary),
+              hintStyle: GoogleFonts.poppins(color: Colors.white38),
+              prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primary),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white24)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
@@ -261,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text('Annuler',
-                style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+                style: GoogleFonts.poppins(color: Colors.white38)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),

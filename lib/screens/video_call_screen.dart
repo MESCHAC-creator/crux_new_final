@@ -1311,10 +1311,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _leaving = true;
     HapticFeedback.heavyImpact();
 
-    // Capture navigator and scaffold messenger BEFORE any async operation
+    // Capture state BEFORE any async operation
     final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final duration = _callSeconds;
     final participantCount = _presenceList.length;
+    final isHost = widget.isHost;
 
     // 1. Cancel ALL subscriptions synchronously
     _callSub?.cancel();
@@ -1333,30 +1335,28 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     navigator.pop();
 
     // 3. Show meeting summary to host (brief, non-blocking)
-    if (widget.isHost && duration > 5) {
+    if (isHost && duration > 5) {
       Future.delayed(const Duration(milliseconds: 300), () {
-        if (navigator.context.mounted) {
-          ScaffoldMessenger.of(navigator.context).showSnackBar(SnackBar(
-            content: Row(children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 20),
-              const SizedBox(width: 10),
-              Expanded(child: Text(
-                'Réunion terminée · ${_formattedDuration2(duration)} · $participantCount participant${participantCount > 1 ? 's' : ''}',
-                style: GoogleFonts.poppins(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-              )),
-            ]),
-            backgroundColor: const Color(0xFF6A1B9A),
-            duration: const Duration(seconds: 4),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ));
-        }
+        scaffoldMessenger.showSnackBar(SnackBar(
+          content: Row(children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: Text(
+              'Réunion terminée · ${_formattedDuration2(duration)} · $participantCount participant${participantCount > 1 ? 's' : ''}',
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+            )),
+          ]),
+          backgroundColor: const Color(0xFF6A1B9A),
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
       });
     }
 
     // 3. Cleanup in background after navigation — each individually silenced
     try { await _meetingService.removePresence(widget.meetingId, widget.userId); } catch (_) {}
-    if (widget.isHost) {
+    if (isHost) {
       try { await _db.collection('webrtc_rooms').doc(_docId).delete(); } catch (_) {}
     }
     try { await _screenStream?.dispose(); } catch (_) {}
@@ -2786,18 +2786,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 } catch (_) {}
               },
             ),
-            if (!Platform.isAndroid) ...[
-              const SizedBox(width: 8),
-              _Btn(
-                icon: _sharingScreen
-                    ? Icons.stop_screen_share
-                    : Icons.screen_share,
-                label: _sharingScreen ? 'Stopper' : 'Écran',
-                active: !_sharingScreen,
-                isHighlight: _sharingScreen,
-                onTap: _toggleScreenShare,
-              ),
-            ],
+            const SizedBox(width: 8),
+            _Btn(
+              icon: _sharingScreen
+                  ? Icons.stop_screen_share
+                  : Icons.screen_share,
+              label: _sharingScreen ? 'Stopper' : 'Écran',
+              active: !_sharingScreen,
+              isHighlight: _sharingScreen,
+              onTap: _toggleScreenShare,
+            ),
             const SizedBox(width: 8),
             Stack(
               clipBehavior: Clip.none,
