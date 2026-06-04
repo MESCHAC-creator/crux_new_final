@@ -401,7 +401,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         }
       };
 
-      _pc!.onIceCandidate = (c) {
+      _pc?.onIceCandidate = (c) {
         if (c.candidate == null) return;
         final col = widget.isHost ? 'offerCandidates' : 'answerCandidates';
         _db
@@ -1719,6 +1719,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 style: GoogleFonts.poppins(
                     color: Colors.white70, fontSize: 14, height: 1.5)),
             const SizedBox(height: 24),
+            // Show "Open Settings" button for permission errors
+            if (_error?.toLowerCase().contains('autorisation') ?? false) ...[
+              ElevatedButton.icon(
+                onPressed: openAppSettings,
+                icon: const Icon(Icons.settings),
+                label: const Text('Ouvrir Paramètres'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange.shade700,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             ElevatedButton(
               onPressed: _leave,
               style:
