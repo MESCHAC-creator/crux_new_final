@@ -333,7 +333,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       final constraints = _videoConstraints(quality);
 
       _localStream = await navigator.mediaDevices.getUserMedia({
-        'audio': true,
+        'audio': {
+          'echoCancellation': true,
+          'noiseSuppression': true,
+          'autoGainControl': true,
+          'sampleRate': 48000,
+        },
         'video': constraints,
       }).timeout(
         const Duration(seconds: 20),
@@ -608,20 +613,29 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       double audioLevel = 0;
       for (final report in stats) {
         final values = report.values;
-        if (values['type'] == 'media-source' || values['type'] == 'track') {
+        // Prefer media-source (outbound local audio level) — most reliable
+        if (values['type'] == 'media-source') {
           final level = values['audioLevel'];
           if (level != null) {
             audioLevel = (level as num).toDouble();
             break;
           }
         }
+        // Fallback: track stats
+        if (values['type'] == 'track' && values['kind'] == 'audio') {
+          final level = values['audioLevel'];
+          if (level != null && audioLevel == 0) {
+            audioLevel = (level as num).toDouble();
+          }
+        }
+        // Fallback: inbound-rtp (for remote audio monitoring)
         if (values['type'] == 'inbound-rtp' && values['mediaType'] == 'audio') {
           final level = values['audioLevel'];
-          if (level != null) audioLevel = (level as num).toDouble();
+          if (level != null && audioLevel == 0) audioLevel = (level as num).toDouble();
         }
       }
-      // Fallback: treat mic-on as potentially speaking (level 0.05 threshold)
-      final isSpeaking = audioLevel > 0.01;
+      // Threshold: 0.02 avoids mic noise false-positives
+      final isSpeaking = audioLevel > 0.02;
       if (isSpeaking != _localWasSpeaking) {
         _localWasSpeaking = isSpeaking;
         _db.collection('meetings').doc(widget.meetingId)
