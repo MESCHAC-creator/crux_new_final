@@ -26,7 +26,7 @@ class MeetingService {
     final meetingId = const Uuid()
         .v4()
         .replaceAll('-', '')
-        .substring(0, 12)
+        .substring(0, 16)
         .toUpperCase();
     final now = DateTime.now();
 
@@ -45,13 +45,15 @@ class MeetingService {
       password: password?.isNotEmpty == true ? password : null,
     );
 
-    _firestore
-        .collection('meetings')
-        .doc(meetingId)
-        .set(meeting.toJson())
-        .then((_) => _log.i('✅ Réunion persistée: $meetingId'))
-        .catchError(
-            (e) => _log.w('⚠️ Firestore indisponible, local seulement: $e'));
+    try {
+      await _firestore
+          .collection('meetings')
+          .doc(meetingId)
+          .set(meeting.toJson());
+      _log.i('✅ Réunion persistée: $meetingId');
+    } catch (e) {
+      _log.w('⚠️ Firestore indisponible, local seulement: $e');
+    }
 
     await _saveToHistory(meetingId, title);
     return meetingId;
@@ -177,7 +179,13 @@ class MeetingService {
       await _firestore
           .collection('meetings').doc(meetingId)
           .collection('presence').doc(userId)
-          .set({'name': name, 'joinedAt': FieldValue.serverTimestamp()});
+          .set({
+        'name': name,
+        'joinedAt': FieldValue.serverTimestamp(),
+        'handRaised': false,
+        'camOn': true,
+        'isSpeaking': false,
+      });
     } catch (_) {}
   }
 

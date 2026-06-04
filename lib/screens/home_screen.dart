@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -44,6 +46,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _showPassword = false;
   bool _obscurePassword = true;
   bool _isPro = false;
+  int _passwordAttempts = 0;
+  DateTime? _passwordLockUntil;
   List<Map<String, dynamic>> _recentMeetings = [];
   String? _localPhotoPath;
 
@@ -139,6 +143,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } catch (_) {}
   }
 
+  static String _hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
   /// Returns the freshest display name available.
   String _freshUserName() {
     return FirebaseAuth.instance.currentUser?.displayName?.trim().isNotEmpty == true
@@ -188,10 +198,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _errorHandler.showWarningSnackBar(context, '⚠️ Le nom doit faire au moins 2 caractères');
       return;
     }
-    final password =
-        _showPassword ? _passwordController.text.trim() : null;
-
+    if (name.length > 60) {
+      _errorHandler.showWarningSnackBar(context, '⚠️ Le nom ne peut pas dépasser 60 caractères');
+      return;
+    }
     setState(() => _isCreating = true);
+    final rawPassword = _showPassword ? _passwordController.text.trim() : null;
+    if (rawPassword != null && rawPassword.length < 4) {
+      _errorHandler.showWarningSnackBar(context, '⚠️ Le code d\'accès doit faire au moins 4 caractères');
+      setState(() => _isCreating = false);
+      return;
+    }
+    final password = rawPassword != null ? _hashPassword(rawPassword) : null;
     try {
       final meetingId = await _meetingService.createMeeting(
         title: name,
@@ -230,9 +248,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _joinById(String id) async {
     if (id.isEmpty) return;
+    final cleanId = id.trim().toUpperCase();
+    if (cleanId.length < 8 || cleanId.length > 32) {
+      _errorHandler.showError(context, '🔍 L\'ID de réunion n\'est pas valide.');
+      return;
+    }
 
     // Check if meeting is locked or password-protected before navigating
-    final meeting = await _meetingService.getMeetingOnce(id);
+    final meeting = await _meetingService.getMeetingOnce(cleanId);
 
     if (!mounted) return;
 
@@ -248,18 +271,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     if (meeting.password != null && meeting.password!.isNotEmpty) {
+      // Brute-force lock
+      if (_passwordLockUntil != null && DateTime.now().isBefore(_passwordLockUntil!)) {
+        final remaining = _passwordLockUntil!.difference(DateTime.now()).inSeconds;
+        _errorHandler.showError(context, '🔒 Trop de tentatives. Réessayez dans ${remaining}s.');
+        return;
+      }
       final entered = await _showPasswordPrompt();
       if (!mounted) return;
-      if (entered == null) return; // user cancelled
+      if (entered == null) return;
       if (entered.isEmpty) {
         _errorHandler.showWarningSnackBar(context, '⚠️ Entrez le code d\'accès');
         return;
       }
-      if (entered != meeting.password) {
-        _errorHandler.showError(context,
-            '🔑 Code d\'accès incorrect. Vérifiez et réessayez.');
+      if (_hashPassword(entered) != meeting.password) {
+        _passwordAttempts++;
+        if (_passwordAttempts >= 5) {
+          _passwordLockUntil = DateTime.now().add(const Duration(minutes: 2));
+          _passwordAttempts = 0;
+          _errorHandler.showError(context, '🔒 5 tentatives échouées. Réessayez dans 2 minutes.');
+        } else {
+          final remaining = 5 - _passwordAttempts;
+          _errorHandler.showError(context, '🔑 Code incorrect. $remaining tentative(s) restante(s).');
+        }
         return;
       }
+      _passwordAttempts = 0; // reset on success
     }
 
     if (!mounted) return;
@@ -267,7 +304,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       context,
       MaterialPageRoute(
         builder: (_) => MeetingScreen(
-          meetingId: id,
+          meetingId: cleanId,
           meetingName: meeting?.title ?? 'Réunion',
           userId: widget.user.uid,
           userName: _freshUserName(),

@@ -2,18 +2,55 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── Meetings ──────────────────────────────────────────────────────────
     match /meetings/{meetingId} {
-      allow read, write: if request.auth != null;
+      // Anyone authenticated can read a meeting (to check if it exists / join)
+      allow read: if request.auth != null;
+      // Only the organizer can create or update the top-level meeting doc
+      allow create: if request.auth != null
+                    && request.resource.data.organizerId == request.auth.uid;
+      allow update: if request.auth != null
+                    && (resource.data.organizerId == request.auth.uid
+                        || resource.data.coHosts.hasAny([request.auth.uid]));
+      allow delete: if request.auth != null
+                    && resource.data.organizerId == request.auth.uid;
+
+      // Chat: any participant can write; all authenticated users can read
       match /chat/{messageId} {
-        allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+                      && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false; // messages are immutable
+      }
+
+      // Presence: each user writes only their own presence
+      match /presence/{userId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Meeting reports: only host can write
+      match /reports/{reportId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null;
       }
     }
 
+    // ── User profiles ─────────────────────────────────────────────────────
     match /users/{userId} {
+      // Any authenticated user can read profiles (needed for photo/name in calls)
       allow read: if request.auth != null;
+      // Users can only write their own profile
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // ── Meeting reports (top-level) ───────────────────────────────────────
+    match /meeting_reports/{reportId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── WebRTC signaling rooms ────────────────────────────────────────────
     match /webrtc_rooms/{roomId} {
       allow read, write: if request.auth != null;
       match /offerCandidates/{id} {
@@ -23,7 +60,9 @@ service cloud.firestore {
         allow read, write: if request.auth != null;
       }
       match /reactions/{id} {
-        allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow write: if request.auth != null
+                     && request.resource.data.userId == request.auth.uid;
       }
     }
   }

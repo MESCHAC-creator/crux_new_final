@@ -230,8 +230,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       ),
     );
     if (confirmed != true || !mounted) return;
-    final newName = ctrl.text.trim();
-    if (newName.isEmpty || newName == _auth.currentUser?.displayName) return;
+    var newName = ctrl.text.trim();
+    if (newName.isEmpty) {
+      // show error — can't set empty name
+      return;
+    }
+    if (newName.trim() == (_auth.currentUser?.displayName ?? '').trim()) return;
+    newName = newName.trim();
+    if (newName.length > 50) return; // silently cap
     setState(() => _isSavingName = true);
     try {
       await _auth.currentUser!.updateDisplayName(newName);
@@ -448,6 +454,18 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         await user.reauthenticateWithCredential(cred);
       }
       await _db.collection('users').doc(user.uid).delete();
+      // Clean up user's presence entries and hosted meetings
+      try {
+        // Remove from any active presence (best-effort)
+        final presenceQuery = await _db
+            .collectionGroup('presence')
+            .where('userId', isEqualTo: user.uid)
+            .limit(20)
+            .get();
+        for (final doc in presenceQuery.docs) {
+          doc.reference.delete().catchError((_) {});
+        }
+      } catch (_) {}
       await user.delete();
       if (mounted) Navigator.of(context).pushReplacementNamed('/login');
     } on FirebaseAuthException catch (e) {

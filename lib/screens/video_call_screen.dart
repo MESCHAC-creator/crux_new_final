@@ -103,6 +103,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── Waiting for host (participant side) ──────
   bool _waitingForHost = false;
   Timer? _hostWaitTimer;
+  int _hostWaitCount = 0;
 
   // ── Chat / Notes ─────────────────────────────
   int _chatTab = 0;
@@ -860,7 +861,19 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       if (mounted) {
         setState(() => _waitingForHost = true);
         _hostWaitTimer?.cancel();
-        _hostWaitTimer = Timer(const Duration(seconds: 3), _joinCall);
+        _hostWaitTimer = Timer(const Duration(seconds: 3), () {
+          _hostWaitCount++;
+          if (_hostWaitCount > 100) {
+            if (mounted) {
+              setState(() {
+                _error = 'L\'hôte n\'a pas démarré la réunion dans les délais. Réessayez plus tard.';
+                _loading = false;
+              });
+            }
+            return;
+          }
+          _joinCall();
+        });
       }
       return;
     }
@@ -1360,8 +1373,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       for (final ch in snap.docChanges) {
         if (ch.type == DocumentChangeType.added) {
           final emoji = ch.doc.data()?['emoji'] as String?;
-          final sender = ch.doc.data()?['sender'] as String?;
-          if (emoji != null && sender != widget.userName && mounted) {
+          if (emoji != null && mounted) {
             _spawnReaction(emoji);
           }
         }
@@ -1630,6 +1642,15 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
               child: Text('Retour',
                   style: GoogleFonts.poppins(color: Colors.white)),
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () {
+                setState(() { _error = null; _loading = true; });
+                _init();
+              },
+              icon: const Icon(Icons.refresh, color: Color(0xFFB71C1C)),
+              label: Text('Réessayer', style: GoogleFonts.poppins(color: Color(0xFFB71C1C))),
             ),
           ]),
         ),
