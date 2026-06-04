@@ -51,6 +51,12 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Required by flutter_webrtc for screen sharing on Android -->
+        <service
+            android:name="com.cloudwebrtc.webrtc.ScreenCaptureService"
+            android:foregroundServiceType="mediaProjection"
+            android:exported="false" />
     </application>
 
     <!-- Required for url_launcher on Android 11+ to open external links -->

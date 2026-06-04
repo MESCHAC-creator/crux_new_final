@@ -119,6 +119,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   bool _paywallShown = false;
   static const _freeMinutes = 30;
 
+  // ── Live mode ────────────────────────────────
+  bool _isLiveMode = false;
+  bool _liveCommentVisible = false;
+  final _liveCommentController = TextEditingController();
+  final List<Map<String, String>> _liveComments = [];
+  StreamSubscription? _liveCommentSub;
+  final _liveCommentsScrollController = ScrollController();
+  bool _showLiveGifts = false;
+  int _liveViewers = 1;
+
   // ── Firestore streams ────────────────────────
   StreamSubscription? _callSub;
   StreamSubscription? _candidateSub;
@@ -168,6 +178,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       DeviceOrientation.landscapeRight,
     ]);
     _init();
+    _detectLiveMode();
     _listenReactions();
     _listenMeetingDoc();
     _listenPresence();
@@ -187,6 +198,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _statsTimer?.cancel();
     _reconnectTimer?.cancel();
     _hostWaitTimer?.cancel();
+    _liveCommentSub?.cancel();
+    _liveCommentController.dispose();
+    _liveCommentsScrollController.dispose();
     _chatController.dispose();
     _chatScrollController.dispose();
     _notesController.dispose();
@@ -612,7 +626,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           }
         }
       }
-      setState(() => _presenceList = list);
+      setState(() {
+        _presenceList = list;
+        if (_isLiveMode) _liveViewers = list.length;
+      });
     });
   }
 
@@ -748,53 +765,59 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   Future<void> _toggleScreenShare() async {
     HapticFeedback.mediumImpact();
     if (_sharingScreen) {
-      final senders = await _pc!.getSenders();
-      for (final sender in senders) {
-        if (sender.track?.kind == 'video') {
-          final cam = _localStream?.getVideoTracks();
-          if (cam != null && cam.isNotEmpty) {
-            await sender.replaceTrack(cam.first);
+      // ── Stop sharing ──
+      try {
+        if (_pc != null) {
+          final senders = await _pc!.getSenders();
+          for (final sender in senders) {
+            if (sender.track?.kind == 'video') {
+              final cam = _localStream?.getVideoTracks();
+              if (cam != null && cam.isNotEmpty) {
+                await sender.replaceTrack(cam.first);
+              }
+            }
           }
         }
-      }
-      await _screenStream?.dispose();
-      _screenStream = null;
-      if (mounted) {
-        setState(() {
-          _sharingScreen = false;
-          _localRenderer.srcObject = _localStream;
-        });
+        await _screenStream?.dispose();
+        _screenStream = null;
+        if (mounted) {
+          setState(() {
+            _sharingScreen = false;
+            _localRenderer.srcObject = _localStream;
+          });
+        }
+      } catch (e) {
+        // Ensure state is reset even on error
+        await _screenStream?.dispose();
+        _screenStream = null;
+        if (mounted) setState(() => _sharingScreen = false);
       }
     } else {
+      // ── Start sharing ──
       try {
-        if (Platform.isAndroid) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(
-                  'Partage d\'écran non supporté sur Android. Utilisez la version web.',
-                  style: GoogleFonts.poppins()),
-              backgroundColor: Colors.orange.shade700,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ));
-          }
-          return;
-        }
         _screenStream = await navigator.mediaDevices.getDisplayMedia({
-          'video': true,
+          'video': {'mandatory': {}, 'optional': []},
           'audio': false,
         });
+
         final tracks = _screenStream!.getVideoTracks();
-        if (tracks.isEmpty) return;
+        if (tracks.isEmpty) {
+          await _screenStream?.dispose();
+          _screenStream = null;
+          return;
+        }
 
         final screenTrack = tracks.first;
-        final senders = await _pc!.getSenders();
-        for (final sender in senders) {
-          if (sender.track?.kind == 'video') {
-            await sender.replaceTrack(screenTrack);
+
+        if (_pc != null) {
+          final senders = await _pc!.getSenders();
+          for (final sender in senders) {
+            if (sender.track?.kind == 'video') {
+              await sender.replaceTrack(screenTrack);
+            }
           }
         }
+
         screenTrack.onEnded = () {
           if (mounted) _toggleScreenShare();
         };
@@ -806,14 +829,19 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           });
         }
       } catch (e) {
+        await _screenStream?.dispose();
+        _screenStream = null;
         if (mounted) {
+          final msg = e.toString().contains('Permission')
+              ? 'Permission refusée pour le partage d\'écran.'
+              : e.toString().contains('cancel') || e.toString().contains('Cancel')
+                  ? 'Partage d\'écran annulé.'
+                  : 'Partage d\'écran indisponible sur cet appareil.';
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Partage d\'écran indisponible: $e',
-                style: GoogleFonts.poppins()),
-            backgroundColor: Colors.red.shade700,
+            content: Text(msg, style: GoogleFonts.poppins()),
+            backgroundColor: Colors.orange.shade700,
             behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ));
         }
       }
@@ -826,6 +854,72 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     final next = !_isLocked;
     await _meetingService.setLocked(widget.meetingId, next);
     if (mounted) setState(() => _isLocked = next);
+  }
+
+  // ── LIVE MODE ────────────────────────────────
+  Future<void> _detectLiveMode() async {
+    try {
+      final snap = await _db.collection('meetings').doc(widget.meetingId).get();
+      if (!snap.exists) return;
+      final title = snap.data()?['title'] as String? ?? '';
+      if (mounted) {
+        setState(() => _isLiveMode = title.contains('[Live]') || title.contains('[LIVE]'));
+        _listenLiveComments();
+      }
+    } catch (_) {}
+  }
+
+  void _listenLiveComments() {
+    if (!_isLiveMode) return;
+    _liveCommentSub = _db
+        .collection('meetings')
+        .doc(widget.meetingId)
+        .collection('liveComments')
+        .orderBy('createdAt', descending: false)
+        .limitToLast(50)
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      const colors = ['#FF4444', '#FF8C00', '#FFD700', '#00FF88', '#00BFFF', '#FF69B4', '#DA70D6'];
+      for (final ch in snap.docChanges) {
+        if (ch.type == DocumentChangeType.added) {
+          final d = ch.doc.data()!;
+          setState(() {
+            _liveComments.add({
+              'name': d['name'] as String? ?? 'Anonyme',
+              'text': d['text'] as String? ?? '',
+              'color': colors[_liveComments.length % colors.length],
+            });
+            if (_liveComments.length > 100) _liveComments.removeAt(0);
+          });
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_liveCommentsScrollController.hasClients) {
+              _liveCommentsScrollController.animateTo(
+                _liveCommentsScrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            }
+          });
+        }
+      }
+    });
+  }
+
+  Future<void> _sendLiveComment(String text) async {
+    if (text.trim().isEmpty) return;
+    _liveCommentController.clear();
+    try {
+      await _db
+          .collection('meetings')
+          .doc(widget.meetingId)
+          .collection('liveComments')
+          .add({
+        'name': widget.userName,
+        'text': text.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
   }
 
   // ── REACTIONS ────────────────────────────────
@@ -1012,7 +1106,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             ? _buildLoading()
             : _error != null
                 ? _buildError()
-                : _buildCall(),
+                : _isLiveMode
+                    ? _buildLiveCall()
+                    : _buildCall(),
       ),
     );
   }
@@ -1251,6 +1347,380 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ),
         ),
     ]);
+  }
+
+  // ── LIVE CALL (TikTok Live style) ────────────
+  Widget _buildLiveCall() {
+    final isPrivileged = widget.isHost || _isCoHost;
+    final screenW = MediaQuery.of(context).size.width;
+
+    return Stack(children: [
+      // ── FULL SCREEN VIDEO ────────────────────
+      Positioned.fill(
+        child: isPrivileged
+            ? (_camOn
+                ? RTCVideoView(_localRenderer,
+                    mirror: !_sharingScreen,
+                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                : _buildInitialsAvatar(widget.userName, size: double.infinity))
+            : (_waitingForHost
+                ? _buildWaitingForHost()
+                : _remoteConnected
+                    ? RTCVideoView(_remoteRenderer,
+                        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                    : _buildWaiting()),
+      ),
+
+      // ── TOP GRADIENT ────────────────────────
+      Positioned(
+        top: 0, left: 0, right: 0, height: 140,
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.black87, Colors.transparent],
+            ),
+          ),
+        ),
+      ),
+
+      // ── BOTTOM GRADIENT ─────────────────────
+      Positioned(
+        bottom: 0, left: 0, right: 0, height: 200,
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [Colors.black87, Colors.transparent],
+            ),
+          ),
+        ),
+      ),
+
+      // ── TOP BAR ─────────────────────────────
+      Positioned(
+        top: 0, left: 0, right: 0,
+        child: _buildLiveTopBar(),
+      ),
+
+      // ── FLOATING REACTIONS ───────────────────
+      ..._reactions.map(
+        (r) => AnimatedPositioned(
+          duration: const Duration(milliseconds: 2000),
+          curve: Curves.easeOut,
+          bottom: r.bottomOffset,
+          right: 16,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 700),
+            opacity: r.opacity,
+            child: Text(r.emoji, style: const TextStyle(fontSize: 36)),
+          ),
+        ),
+      ),
+
+      // ── COMMENTS FEED ────────────────────────
+      Positioned(
+        bottom: _liveCommentVisible ? 120 : 80,
+        left: 12,
+        width: screenW * 0.65,
+        height: 220,
+        child: _buildLiveComments(),
+      ),
+
+      // ── GIFT BUTTONS ─────────────────────────
+      Positioned(
+        right: 12,
+        bottom: 200,
+        child: _buildLiveGiftButtons(),
+      ),
+
+      // ── BOTTOM BAR ──────────────────────────
+      Positioned(
+        bottom: 0, left: 0, right: 0,
+        child: _buildLiveBottomBar(),
+      ),
+
+      // ── PiP for host ─────────────────────────
+      if (isPrivileged && _remoteConnected)
+        Positioned(
+          top: 80, right: 12, width: 100, height: 140,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Stack(children: [
+              RTCVideoView(_remoteRenderer,
+                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white30, width: 1.5),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ]),
+          ),
+        ),
+    ]);
+  }
+
+  Widget _buildLiveTopBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Row(children: [
+        // Host avatar + name
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 32, height: 32,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: [Color(0xFFB71C1C), Color(0xFF6A1B9A)]),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'L',
+                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(widget.userName, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+          ]),
+        ),
+        const SizedBox(width: 8),
+        // Viewer count
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.remove_red_eye_outlined, color: Colors.white70, size: 14),
+            const SizedBox(width: 4),
+            Text('$_liveViewers', style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+          ]),
+        ),
+        const Spacer(),
+        // LIVE badge
+        const _LiveBadge(),
+        const SizedBox(width: 8),
+        // Close button
+        GestureDetector(
+          onTap: _confirmLeave,
+          child: Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.5),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.close, color: Colors.white, size: 20),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildLiveComments() {
+    if (_liveComments.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return ListView.builder(
+      controller: _liveCommentsScrollController,
+      itemCount: _liveComments.length,
+      padding: EdgeInsets.zero,
+      physics: const NeverScrollableScrollPhysics(),
+      itemBuilder: (_, i) {
+        final c = _liveComments[i];
+        final colorHex = c['color'] ?? '#FFFFFF';
+        final color = Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: RichText(
+              text: TextSpan(children: [
+                TextSpan(
+                  text: '${c['name']}  ',
+                  style: GoogleFonts.poppins(
+                    color: color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                TextSpan(
+                  text: c['text'] ?? '',
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLiveGiftButtons() {
+    final gifts = ['❤️', '🔥', '👏', '💎', '🎁', '⭐'];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: gifts.map((g) => GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          _sendReaction(g);
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          width: 46, height: 46,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.45),
+            shape: BoxShape.circle,
+          ),
+          child: Center(child: Text(g, style: const TextStyle(fontSize: 22))),
+        ),
+      )).toList(),
+    );
+  }
+
+  Widget _buildLiveBottomBar() {
+    return Container(
+      padding: EdgeInsets.fromLTRB(12, 8, 12, MediaQuery.of(context).viewInsets.bottom + 12),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Row(children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _liveCommentVisible = !_liveCommentVisible),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(color: Colors.white24, width: 0.5),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.chat_bubble_outline, color: Colors.white70, size: 16),
+                  const SizedBox(width: 8),
+                  Text('Commenter...', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13)),
+                ]),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => setState(() => _showEmojiBar = !_showEmojiBar),
+            child: Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.emoji_emotions_outlined, color: Colors.white70, size: 22),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () {
+              final tracks = _localStream?.getAudioTracks() ?? [];
+              if (tracks.isNotEmpty) {
+                setState(() {
+                  _micOn = !_micOn;
+                  tracks.first.enabled = _micOn;
+                });
+              }
+            },
+            child: Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                color: _micOn ? Colors.white.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.8),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(_micOn ? Icons.mic : Icons.mic_off, color: Colors.white, size: 20),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _confirmLeave,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFFB71C1C), Color(0xFF6A1B9A)]),
+                borderRadius: BorderRadius.circular(25),
+              ),
+              child: Text('Terminer', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+            ),
+          ),
+        ]),
+
+        if (_liveCommentVisible) ...[
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _liveCommentController,
+                autofocus: true,
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Écrire un commentaire...',
+                  hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.12),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(25),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(25),
+                    borderSide: const BorderSide(color: Colors.white24, width: 0.5),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(25),
+                    borderSide: const BorderSide(color: Color(0xFFB71C1C), width: 1.5),
+                  ),
+                ),
+                onSubmitted: (val) {
+                  _sendLiveComment(val);
+                  setState(() => _liveCommentVisible = false);
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () {
+                _sendLiveComment(_liveCommentController.text);
+                setState(() => _liveCommentVisible = false);
+              },
+              child: Container(
+                width: 42, height: 42,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(colors: [Color(0xFFB71C1C), Color(0xFF6A1B9A)]),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.send, color: Colors.white, size: 18),
+              ),
+            ),
+          ]),
+        ],
+
+        if (_showEmojiBar) ...[
+          const SizedBox(height: 8),
+          _buildEmojiBar(),
+        ],
+      ]),
+    );
   }
 
   // ── INITIALS AVATAR ──────────────────────────
@@ -2301,5 +2771,49 @@ class _QualityItem extends StatelessWidget {
         child: Text(badge, style: GoogleFonts.poppins(color: selected ? const Color(0xFFE53935) : Colors.white54, fontSize: 10, fontWeight: FontWeight.w600)),
       ),
     ]);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  LIVE BADGE
+// ─────────────────────────────────────────────
+class _LiveBadge extends StatefulWidget {
+  const _LiveBadge();
+  @override
+  State<_LiveBadge> createState() => _LiveBadgeState();
+}
+
+class _LiveBadgeState extends State<_LiveBadge> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(duration: const Duration(milliseconds: 900), vsync: this)..repeat(reverse: true);
+    _pulse = Tween<double>(begin: 0.85, end: 1.0).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _pulse,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFB71C1C),
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: [BoxShadow(color: const Color(0xFFB71C1C).withValues(alpha: 0.6), blurRadius: 8, spreadRadius: 1)],
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+          const SizedBox(width: 5),
+          Text('LIVE', style: GoogleFonts.poppins(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+        ]),
+      ),
+    );
   }
 }
