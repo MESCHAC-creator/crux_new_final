@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/error_handler_service.dart';
 import '../services/pro_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../l10n/app_translations.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -27,7 +28,12 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   bool _micDefault = true;
   bool _camDefault = true;
   bool _isPro = false;
+  DateTime? _proExpiry;
+  bool _loadingPro = true;
   String _videoQuality = 'HD (720p)';
+  bool _dndEnabled = false;
+  TimeOfDay _dndStart = const TimeOfDay(hour: 22, minute: 0);
+  TimeOfDay _dndEnd = const TimeOfDay(hour: 8, minute: 0);
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
 
@@ -53,7 +59,71 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       _micDefault = prefs.getBool('crux_mic_default') ?? true;
       _camDefault = prefs.getBool('crux_cam_default') ?? true;
       _notificationsEnabled = prefs.getBool('crux_notifications') ?? true;
+      _dndEnabled = prefs.getBool('crux_dnd') ?? false;
+      final dndStartH = prefs.getInt('crux_dnd_start_h') ?? 22;
+      final dndStartM = prefs.getInt('crux_dnd_start_m') ?? 0;
+      final dndEndH = prefs.getInt('crux_dnd_end_h') ?? 8;
+      final dndEndM = prefs.getInt('crux_dnd_end_m') ?? 0;
+      _dndStart = TimeOfDay(hour: dndStartH, minute: dndStartM);
+      _dndEnd = TimeOfDay(hour: dndEndH, minute: dndEndM);
     });
+    // Load pro status from Firestore
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isNotEmpty) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        if (doc.exists) {
+          final data = doc.data()!;
+          final isPro = data['isPro'] == true;
+          final expiry = data['proExpiry'] != null ? DateTime.tryParse(data['proExpiry']) : null;
+          final isValid = isPro && expiry != null && expiry.isAfter(DateTime.now());
+          if (mounted) setState(() { _isPro = isValid; _proExpiry = isValid ? expiry : null; _loadingPro = false; });
+        } else {
+          if (mounted) setState(() => _loadingPro = false);
+        }
+      } catch (_) {
+        if (mounted) setState(() => _loadingPro = false);
+      }
+    } else {
+      if (mounted) setState(() => _loadingPro = false);
+    }
+  }
+
+  Future<void> _pickDndTime({required bool isStart}) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: isStart ? _dndStart : _dndEnd,
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.dark(primary: AppColors.primary),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      final prefs = await SharedPreferences.getInstance();
+      if (isStart) {
+        setState(() => _dndStart = picked);
+        prefs.setInt('crux_dnd_start_h', picked.hour);
+        prefs.setInt('crux_dnd_start_m', picked.minute);
+      } else {
+        setState(() => _dndEnd = picked);
+        prefs.setInt('crux_dnd_end_h', picked.hour);
+        prefs.setInt('crux_dnd_end_m', picked.minute);
+      }
+    }
+  }
+
+  String _formatTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  String _proExpiryText() {
+    if (_proExpiry == null) return '';
+    final d = _proExpiry!;
+    final days = d.difference(DateTime.now()).inDays;
+    if (days <= 0) return 'Expire aujourd\'hui';
+    if (days == 1) return 'Expire demain';
+    return 'Expire dans $days jours (${d.day}/${d.month}/${d.year})';
   }
 
   @override
@@ -353,23 +423,93 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       _SectionLabel(AppTranslations.t('notifications', localeProvider.locale.languageCode), colorProvider.primary),
                       _GlassCard(
                         isDark: isDark,
-                        child: _GlassTile(
-                          icon: Icons.notifications_outlined,
-                          iconColor: const Color(0xFFF59E0B),
-                          title: AppTranslations.t('push_notifs', localeProvider.locale.languageCode),
-                          subtitle: _notificationsEnabled ? AppTranslations.t('enabled', localeProvider.locale.languageCode) : AppTranslations.t('disabled', localeProvider.locale.languageCode),
-                          isDark: isDark,
-                          trailing: _GlassSwitch(
-                            value: _notificationsEnabled,
-                            activeColor: colorProvider.primary,
-                            onChanged: (val) async {
-                              HapticFeedback.selectionClick();
-                              setState(() => _notificationsEnabled = val);
-                              final p = await SharedPreferences.getInstance();
-                              p.setBool('crux_notifications', val);
-                            },
+                        child: Column(children: [
+                          _GlassTile(
+                            icon: Icons.notifications_outlined,
+                            iconColor: const Color(0xFFF59E0B),
+                            title: AppTranslations.t('push_notifs', localeProvider.locale.languageCode),
+                            subtitle: _notificationsEnabled ? AppTranslations.t('enabled', localeProvider.locale.languageCode) : AppTranslations.t('disabled', localeProvider.locale.languageCode),
+                            isDark: isDark,
+                            trailing: _GlassSwitch(
+                              value: _notificationsEnabled,
+                              activeColor: colorProvider.primary,
+                              onChanged: (val) async {
+                                HapticFeedback.selectionClick();
+                                setState(() => _notificationsEnabled = val);
+                                final p = await SharedPreferences.getInstance();
+                                p.setBool('crux_notifications', val);
+                              },
+                            ),
                           ),
-                        ),
+                          _GlassDivider(isDark: isDark),
+                          // DND toggle
+                          _GlassTile(
+                            icon: Icons.do_not_disturb_on_outlined,
+                            iconColor: const Color(0xFF8B5CF6),
+                            title: 'Ne pas déranger',
+                            subtitle: _dndEnabled
+                                ? 'De ${_formatTime(_dndStart)} à ${_formatTime(_dndEnd)}'
+                                : 'Désactivé',
+                            isDark: isDark,
+                            trailing: _GlassSwitch(
+                              value: _dndEnabled,
+                              activeColor: const Color(0xFF8B5CF6),
+                              onChanged: (val) async {
+                                HapticFeedback.selectionClick();
+                                setState(() => _dndEnabled = val);
+                                final p = await SharedPreferences.getInstance();
+                                p.setBool('crux_dnd', val);
+                              },
+                            ),
+                          ),
+                          // DND time pickers — shown only when DND is on
+                          if (_dndEnabled) ...[
+                            _GlassDivider(isDark: isDark),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              child: Row(children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => _pickDndTime(isStart: true),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.04),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Column(children: [
+                                        Text('Début', style: GoogleFonts.poppins(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38)),
+                                        const SizedBox(height: 2),
+                                        Text(_formatTime(_dndStart), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: const Color(0xFF8B5CF6))),
+                                      ]),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  child: Text('→', style: GoogleFonts.poppins(color: isDark ? Colors.white38 : Colors.black38, fontSize: 16)),
+                                ),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => _pickDndTime(isStart: false),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.04),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Column(children: [
+                                        Text('Fin', style: GoogleFonts.poppins(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38)),
+                                        const SizedBox(height: 2),
+                                        Text(_formatTime(_dndEnd), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: const Color(0xFF8B5CF6))),
+                                      ]),
+                                    ),
+                                  ),
+                                ),
+                              ]),
+                            ),
+                          ],
+                        ]),
                       ),
 
                       const SizedBox(height: 24),
@@ -378,40 +518,58 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       _SectionLabel(AppTranslations.t('subscription', localeProvider.locale.languageCode), colorProvider.primary),
                       GestureDetector(
                         onTap: () async {
-                          final uid = (await SharedPreferences.getInstance()).getString('crux_uid') ?? '';
+                          HapticFeedback.mediumImpact();
+                          final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
                           if (_isPro) {
-                            _errorHandler.showInfoSnackBar(context, '✅ Vous êtes déjà Crux Pro !');
+                            _errorHandler.showInfoSnackBar(context, '✅ CRUX PRO actif — ${_proExpiryText()}');
                           } else {
                             try {
-                              await _proService.startPayment(userId: uid, userName: 'Utilisateur');
+                              await _proService.startPayment(userId: uid, userName: FirebaseAuth.instance.currentUser?.displayName ?? 'Utilisateur');
                             } catch (_) {}
                           }
                         },
-                        child: Container(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFFFD700), Color(0xFFFFA500), Color(0xFFFF6B35)],
-                              begin: Alignment.topLeft, end: Alignment.bottomRight,
-                            ),
+                            gradient: _isPro
+                                ? const LinearGradient(colors: [Color(0xFF1B5E20), Color(0xFF2E7D32), Color(0xFF43A047)], begin: Alignment.topLeft, end: Alignment.bottomRight)
+                                : const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFFA500), Color(0xFFFF6B35)], begin: Alignment.topLeft, end: Alignment.bottomRight),
                             borderRadius: BorderRadius.circular(20),
-                            boxShadow: [BoxShadow(color: const Color(0xFFFFD700).withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 8))],
+                            boxShadow: [
+                              BoxShadow(
+                                color: (_isPro ? const Color(0xFF43A047) : const Color(0xFFFFD700)).withValues(alpha: 0.4),
+                                blurRadius: 20, offset: const Offset(0, 8),
+                              )
+                            ],
                           ),
                           child: Row(children: [
-                            const Icon(Icons.workspace_premium, color: Colors.white, size: 32),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
+                              child: Icon(_isPro ? Icons.verified : Icons.workspace_premium, color: Colors.white, size: 26),
+                            ),
                             const SizedBox(width: 14),
                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(_isPro ? AppTranslations.t('pro_active', localeProvider.locale.languageCode) : AppTranslations.t('pro_inactive', localeProvider.locale.languageCode),
-                                style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
-                              Text(_isPro ? AppTranslations.t('pro_active_sub', localeProvider.locale.languageCode) : AppTranslations.t('pro_inactive_sub', localeProvider.locale.languageCode),
-                                style: GoogleFonts.poppins(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
+                              Text(
+                                _loadingPro ? 'Chargement...' : (_isPro ? '✓ CRUX PRO Actif' : 'Passer à CRUX PRO'),
+                                style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                              ),
+                              Text(
+                                _loadingPro ? '' : (_isPro ? _proExpiryText() : '25 000 FCFA/mois — Réunions illimitées'),
+                                style: GoogleFonts.poppins(color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
+                              ),
                             ])),
-                            if (!_isPro)
+                            if (_loadingPro)
+                              const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            else if (!_isPro)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                                child: Text(AppTranslations.t('activate', localeProvider.locale.languageCode), style: GoogleFonts.poppins(color: const Color(0xFFFFA500), fontWeight: FontWeight.w800, fontSize: 13)),
-                              ),
+                                child: Text('Activer', style: GoogleFonts.poppins(color: const Color(0xFFFFA500), fontWeight: FontWeight.w800, fontSize: 13)),
+                              )
+                            else
+                              const Icon(Icons.check_circle, color: Colors.white, size: 24),
                           ]),
                         ),
                       ),
