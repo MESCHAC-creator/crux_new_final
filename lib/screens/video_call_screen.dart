@@ -73,6 +73,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   bool _answerSet = false;
   bool _sharingScreen = false;
   bool _showChat = false;
+  int _unreadMessages = 0; // unread chat badge
   bool _showEmojiBar = false;
   bool _isLocked = false;
   bool _speakerOn = true;
@@ -501,6 +502,15 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
     }
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  String _formattedDuration2(int secs) {
+    final h = secs ~/ 3600;
+    final m = (secs % 3600) ~/ 60;
+    final s = secs % 60;
+    if (h > 0) return '${h}h${m.toString().padLeft(2, '0')}m';
+    if (m > 0) return '${m}min ${s}s';
+    return '${s}s';
   }
 
   // ── STATS MONITOR ────────────────────────────
@@ -1253,12 +1263,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 backgroundColor: Colors.red,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              onPressed: () async {
+              onPressed: () {
                 Navigator.pop(context);
-                try {
-                  await _meetingService.updateMeetingStatus(
-                      widget.meetingId, MeetingStatus.ended);
-                } catch (_) {}
+                // Fire-and-forget: don't await before _leave()
+                _meetingService.updateMeetingStatus(
+                    widget.meetingId, MeetingStatus.ended).catchError((_) {});
                 _leave();
               },
               child: Text('Terminer pour tous', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
@@ -1302,7 +1311,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _leaving = true;
     HapticFeedback.heavyImpact();
 
-    // 1. Cancel ALL subscriptions immediately
+    // Capture navigator and scaffold messenger BEFORE any async operation
+    final navigator = Navigator.of(context);
+    final duration = _callSeconds;
+    final participantCount = _presenceList.length;
+
+    // 1. Cancel ALL subscriptions synchronously
     _callSub?.cancel();
     _candidateSub?.cancel();
     _reactionSub?.cancel();
@@ -1315,10 +1329,32 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _reconnectTimer?.cancel();
     _hostWaitTimer?.cancel();
 
-    // 2. Navigate FIRST — before any async cleanup that could fail
-    if (mounted) Navigator.of(context).pop();
+    // 2. Navigate immediately
+    navigator.pop();
 
-    // 3. Cleanup asynchronously after navigation (errors silenced)
+    // 3. Show meeting summary to host (brief, non-blocking)
+    if (widget.isHost && duration > 5) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (navigator.context.mounted) {
+          ScaffoldMessenger.of(navigator.context).showSnackBar(SnackBar(
+            content: Row(children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(child: Text(
+                'Réunion terminée · ${_formattedDuration2(duration)} · $participantCount participant${participantCount > 1 ? 's' : ''}',
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+              )),
+            ]),
+            backgroundColor: const Color(0xFF6A1B9A),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ));
+        }
+      });
+    }
+
+    // 3. Cleanup in background after navigation — each individually silenced
     try { await _meetingService.removePresence(widget.meetingId, widget.userId); } catch (_) {}
     if (widget.isHost) {
       try { await _db.collection('webrtc_rooms').doc(_docId).delete(); } catch (_) {}
@@ -2333,12 +2369,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             const Spacer(),
             if (isPrivileged)
               GestureDetector(
-                onTap: () async {
+                onTap: () {
                   HapticFeedback.mediumImpact();
-                  await _meetingService.triggerMuteAll(widget.meetingId);
+                  for (final t in _localStream?.getAudioTracks() ?? []) { t.enabled = false; }
+                  if (mounted) setState(() => _micOn = false);
+                  _meetingService.triggerMuteAll(widget.meetingId).catchError((_) {});
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Tous les micros ont été coupés', style: GoogleFonts.poppins()),
-                    backgroundColor: Colors.orange.shade700,
+                    content: Text('🔇 Tous les micros ont été coupés', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                    backgroundColor: Colors.orange.shade800,
+                    duration: const Duration(seconds: 2),
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ));
@@ -2490,6 +2530,17 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           .snapshots(),
       builder: (ctx, snap) {
         final docs = snap.data?.docs ?? [];
+        // Increment unread when chat is closed and new messages arrive
+        if (!_showChat && snap.hasData && docs.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_showChat) {
+              setState(() => _unreadMessages = docs
+                  .where((d) => (d.data() as Map)['sender'] != widget.userName)
+                  .length
+                  .clamp(0, 99));
+            }
+          });
+        }
         if (docs.isEmpty) {
           return Center(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -2748,15 +2799,37 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               ),
             ],
             const SizedBox(width: 8),
-            _Btn(
-              icon: Icons.chat_bubble_outline,
-              label: 'Chat',
-              active: !_showChat,
-              isHighlight: _showChat,
-              onTap: () => setState(() {
-                _showChat = !_showChat;
-                if (_showChat) { _showEmojiBar = false; _showParticipants = false; }
-              }),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _Btn(
+                  icon: Icons.chat_bubble_outline,
+                  label: 'Chat',
+                  active: !_showChat,
+                  isHighlight: _showChat,
+                  onTap: () => setState(() {
+                    _showChat = !_showChat;
+                    if (_showChat) {
+                      _showEmojiBar = false;
+                      _showParticipants = false;
+                      _unreadMessages = 0;
+                    }
+                  }),
+                ),
+                if (_unreadMessages > 0)
+                  Positioned(
+                    top: -4, right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red, shape: BoxShape.circle),
+                      child: Text('$_unreadMessages',
+                          style: GoogleFonts.poppins(
+                              color: Colors.white, fontSize: 9,
+                              fontWeight: FontWeight.w800)),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 8),
             _Btn(
@@ -2802,9 +2875,26 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 icon: Icons.mic_off,
                 label: 'Couper tous',
                 active: true,
-                onTap: () async {
+                onTap: () {
                   HapticFeedback.mediumImpact();
-                  await _meetingService.triggerMuteAll(widget.meetingId);
+                  // Mute host's own mic immediately
+                  for (final t in _localStream?.getAudioTracks() ?? []) {
+                    t.enabled = false;
+                  }
+                  if (mounted) setState(() => _micOn = false);
+                  // Signal all participants via Firestore (fire-and-forget)
+                  _meetingService.triggerMuteAll(widget.meetingId).catchError((_) {});
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('🔇 Tous les micros ont été coupés',
+                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+                      backgroundColor: Colors.orange.shade800,
+                      duration: const Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ));
+                  }
                 },
               ),
             ],
