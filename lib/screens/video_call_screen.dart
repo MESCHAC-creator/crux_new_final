@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'dart:ui' show FontFeature;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
@@ -945,6 +946,22 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     } else {
       // ── Start sharing ──
       try {
+        // Check platform support
+        if (!kIsWeb && !Platform.isLinux) {
+          _log.w('Screen share: Not supported on ${Platform.operatingSystem}');
+          if (mounted) {
+            String osName = Platform.isAndroid ? 'Android' : Platform.isIOS ? 'iOS' : 'this platform';
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Partage d\'écran non supporté sur $osName.', style: GoogleFonts.poppins()),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              duration: const Duration(seconds: 4),
+            ));
+          }
+          return;
+        }
+
         // Verify peer connection exists
         if (_pc == null) {
           _log.w('Screen share: Peer connection not initialized');
