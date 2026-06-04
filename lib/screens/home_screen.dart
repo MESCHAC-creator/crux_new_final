@@ -919,7 +919,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           Expanded(child: _QuickAction(icon: Icons.share_outlined, label: AppTranslations.t('share', lang), color: const Color(0xFF27AE60),
                             onTap: () async {
                               final msg = '🎥 Rejoins-moi sur CRUX — la meilleure app de visioconférence !\n\nTélécharge ici : https://github.com/MESCHAC-creator/crux_new_final/releases\n\n📲 Gratuit · ${AppConstants.freeMinutes} min offertes · Disponible sur Android';
-                              await Clipboard.setData(const ClipboardData(text: msg));
+                              await Clipboard.setData(ClipboardData(text: msg));
                               if (context.mounted) _errorHandler.showInfoSnackBar(context, AppTranslations.t('copied', lang));
                             })),
                           const SizedBox(width: 10),
