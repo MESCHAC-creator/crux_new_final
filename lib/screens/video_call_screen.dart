@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:logger/logger.dart';
 import 'dart:typed_data';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
@@ -173,6 +174,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   bool _selectingBackground = false;
   final _picker = ImagePicker();
 
+  // ── Security & Rate Limiting ─────────────────
+  Timer? _inactivityTimer;
+  static const Duration _inactivityTimeout = Duration(minutes: 15);
+  static const int MAX_MESSAGE_LENGTH = 500;
+  static const int MAX_VIDEO_BITRATE = 4000; // kbps
+  final Map<String, DateTime> _lastCallTime = {};
+  static const Duration _minCallInterval = Duration(milliseconds: 200);
+
   // ── Firestore streams ────────────────────────
   StreamSubscription? _callSub;
   StreamSubscription? _candidateSub;
@@ -184,6 +193,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   final _db = FirebaseFirestore.instance;
   final _meetingService = MeetingService();
   final _proService = ProService();
+  final _log = Logger();
 
   String get _docId =>
       'room_${widget.meetingId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
@@ -241,6 +251,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _listenPresence();
     _listenProStatus();
     _loadOwnPhoto();
+    _resetInactivityTimer();
+    _monitorConnectionHealth();
   }
 
   @override
@@ -256,6 +268,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _statsTimer?.cancel();
     _reconnectTimer?.cancel();
     _hostWaitTimer?.cancel();
+    _inactivityTimer?.cancel();
     _liveCommentSub?.cancel();
     for (final sub in _profileSubs.values) { sub.cancel(); }
     _profileSubs.clear();
@@ -1417,8 +1430,22 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── CHAT ────────────────────────────────────
   void _sendMessage() {
     final text = _chatController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || text.length > MAX_MESSAGE_LENGTH) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Message: 1-$MAX_MESSAGE_LENGTH caractères', style: GoogleFonts.poppins()),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+    if (!_checkRateLimit('sendMessage')) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Trop de requêtes. Attendez un moment.', style: GoogleFonts.poppins()),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
     HapticFeedback.selectionClick();
+    _resetInactivityTimer();
     _chatController.clear();
     _db
         .collection('meetings')
@@ -1597,6 +1624,60 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     try { await _screenStream?.dispose(); } catch (_) {}
     try { await _localStream?.dispose(); } catch (_) {}
     try { await _pc?.close(); } catch (_) {}
+  }
+
+  // ── SECURITY & RATE LIMITING ────────────────
+  void _resetInactivityTimer() {
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer(_inactivityTimeout, () {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Session expirée par inactivité', style: GoogleFonts.poppins()),
+          backgroundColor: Colors.red,
+        ));
+        _leave();
+      }
+    });
+  }
+
+  bool _checkRateLimit(String operation) {
+    final now = DateTime.now();
+    final lastTime = _lastCallTime[operation];
+
+    if (lastTime != null && now.difference(lastTime) < _minCallInterval) {
+      return false; // Rate limited
+    }
+
+    _lastCallTime[operation] = now;
+    return true;
+  }
+
+  void _monitorConnectionHealth() {
+    Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      // Check if connection is still alive
+      _pc?.getStats().then((stats) {
+        for (final report in stats) {
+          final values = report.values;
+          if (values['type'] == 'inbound-rtp') {
+            final packetsLost = values['packetsLost'] ?? 0;
+            if (packetsLost > 100) {
+              // Connection unstable but don't force disconnect
+              // just log for debugging
+              _log.w('⚠️ Connection unstable: $packetsLost packets lost');
+            }
+          }
+        }
+      }).catchError((_) {
+        // Connection likely broken
+        timer.cancel();
+        if (mounted) _leave();
+      });
+    });
   }
 
   // ── BUILD ────────────────────────────────────

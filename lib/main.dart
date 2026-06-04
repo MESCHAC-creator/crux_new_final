@@ -10,6 +10,7 @@ import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/consent_screen.dart';
+import 'screens/device_verification_screen.dart';
 import 'models/user_model.dart';
 import 'providers/auth_provider.dart' show CruxAuthProvider;
 import 'providers/meeting_provider.dart';
@@ -73,8 +74,15 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool _deviceVerified = false;
 
   static Future<bool> _checkTermsAccepted() async {
     final prefs = await SharedPreferences.getInstance();
@@ -95,6 +103,11 @@ class AuthWrapper extends StatelessWidget {
           );
         }
         if (snapshot.hasData && snapshot.data != null) {
+          if (!_deviceVerified) {
+            return DeviceVerificationScreen(
+              onVerified: () => setState(() => _deviceVerified = true),
+            );
+          }
           final firebaseUser = snapshot.data!;
           final user = UserModel(
             uid: firebaseUser.uid,
