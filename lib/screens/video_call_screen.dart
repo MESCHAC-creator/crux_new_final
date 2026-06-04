@@ -114,6 +114,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   List<Map<String, dynamic>> _presenceList = [];
   bool _showParticipants = false;
   bool _handRaised = false;
+  bool _swappedView = false; // true = remote big, local small
   final Set<String> _raisedHands = {};
 
   // ── Pro / paywall ────────────────────────────
@@ -1300,26 +1301,31 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     if (_leaving) return;
     _leaving = true;
     HapticFeedback.heavyImpact();
-    // Cancel subscriptions first to prevent further callbacks
+
+    // 1. Cancel ALL subscriptions immediately
     _callSub?.cancel();
     _candidateSub?.cancel();
     _reactionSub?.cancel();
     _meetingDocSub?.cancel();
     _presenceSub?.cancel();
     _proSub?.cancel();
+    _liveCommentSub?.cancel();
     _callTimer?.cancel();
     _statsTimer?.cancel();
     _reconnectTimer?.cancel();
-    await _meetingService.removePresence(widget.meetingId, widget.userId);
-    if (widget.isHost) {
-      try {
-        await _db.collection('webrtc_rooms').doc(_docId).delete();
-      } catch (_) {}
-    }
-    await _screenStream?.dispose();
-    await _localStream?.dispose();
-    await _pc?.close();
+    _hostWaitTimer?.cancel();
+
+    // 2. Navigate FIRST — before any async cleanup that could fail
     if (mounted) Navigator.of(context).pop();
+
+    // 3. Cleanup asynchronously after navigation (errors silenced)
+    try { await _meetingService.removePresence(widget.meetingId, widget.userId); } catch (_) {}
+    if (widget.isHost) {
+      try { await _db.collection('webrtc_rooms').doc(_docId).delete(); } catch (_) {}
+    }
+    try { await _screenStream?.dispose(); } catch (_) {}
+    try { await _localStream?.dispose(); } catch (_) {}
+    try { await _pc?.close(); } catch (_) {}
   }
 
   // ── BUILD ────────────────────────────────────
@@ -1372,96 +1378,120 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   Widget _buildCall() {
     final isPrivileged = widget.isHost || _isCoHost;
+    final hasRemote = _remoteConnected;
+
+    // ── Which video goes fullscreen ──────────────────────────────────────
+    // Default: when remote connected → remote video fullscreen, local = PiP
+    // swappedView = true → local fullscreen, remote = PiP
+    final showLocalBig = !hasRemote || _swappedView;
 
     return Stack(children: [
       // ── MAIN VIDEO (full screen) ──────────────────────────────────────
       Positioned.fill(
-        child: isPrivileged
-            // Privileged: own camera big (TikTok Live style)
+        child: showLocalBig
             ? (_camOn
                 ? RTCVideoView(_localRenderer,
                     mirror: !_sharingScreen,
                     objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
                 : _buildInitialsAvatar(widget.userName, size: double.infinity))
-            // Participant: remote host camera big
             : (_waitingForHost
                 ? _buildWaitingForHost()
-                : _remoteConnected
+                : hasRemote
                     ? RTCVideoView(_remoteRenderer,
                         objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
                     : _buildWaiting()),
       ),
 
-      // ── REMOTE CARD (for host/cohost when someone joined) ─────────────
-      if (isPrivileged && _remoteConnected)
+      // ── PiP CARD (tap to swap) ────────────────────────────────────────
+      if (hasRemote)
         Positioned(
-          bottom: 85,
+          top: 90,
           right: 12,
-          width: 120,
-          height: 165,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+          width: 115,
+          height: 160,
+          child: GestureDetector(
+            onTap: () => setState(() => _swappedView = !_swappedView),
             child: Stack(children: [
+              // Gradient border frame
               Container(
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white30, width: 1.5),
-                  borderRadius: BorderRadius.circular(16),
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(18),
                 ),
-                child: RTCVideoView(_remoteRenderer,
-                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
+                padding: const EdgeInsets.all(2.5),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: showLocalBig
+                      // Local big → show remote in PiP
+                      ? RTCVideoView(_remoteRenderer,
+                          objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                      // Remote big → show local in PiP
+                      : (_camOn
+                          ? RTCVideoView(_localRenderer,
+                              mirror: !_sharingScreen,
+                              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                          : _buildInitialsAvatar(widget.userName, size: 115)),
+                ),
               ),
-              // participant label at bottom of their card
+              // Name label
               Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [Colors.black87, Colors.transparent],
+                bottom: 2,
+                left: 2,
+                right: 2,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    color: Colors.black54,
+                    child: Text(
+                      showLocalBig
+                          ? (_presenceList.where((p) => p['userId'] != widget.userId).map((p) => (p['name'] as String? ?? '').split(' ').first).firstOrNull ?? 'Participant')
+                          : widget.userName.split(' ').first,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
                     ),
-                    borderRadius: const BorderRadius.vertical(
-                        bottom: Radius.circular(16)),
                   ),
-                  child: Text(
-                    _presenceList
-                        .where((p) => p['userId'] != widget.userId)
-                        .map((p) => (p['name'] as String? ?? '').split(' ').first)
-                        .join(', '),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                ),
+              ),
+              // Swap icon hint
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(6),
                   ),
+                  child: const Icon(Icons.swap_calls, color: Colors.white70, size: 12),
                 ),
               ),
             ]),
           ),
         ),
 
-      // ── LOCAL PiP (for participants — their own camera, top-right) ────
-      if (!isPrivileged)
+      // ── PARTICIPANT-ONLY: local PiP when waiting for host ─────────────
+      if (!isPrivileged && !hasRemote && !_waitingForHost)
         Positioned(
-          top: 16,
-          right: 16,
-          width: 110,
-          height: 150,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.primary, width: 2),
-                borderRadius: BorderRadius.circular(14),
-              ),
+          top: 90,
+          right: 12,
+          width: 115,
+          height: 160,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            padding: const EdgeInsets.all(2.5),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
               child: _camOn
                   ? RTCVideoView(_localRenderer,
                       mirror: !_sharingScreen,
                       objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
-                  : _buildInitialsAvatar(widget.userName, size: 110),
+                  : _buildInitialsAvatar(widget.userName, size: 115),
             ),
           ),
         ),
@@ -1526,52 +1556,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         child: _buildControls(),
       ),
 
-      // ── HOST SOLO INVITE BANNER ──────────────────────────────────────
-      if (isPrivileged && !_remoteConnected)
-        Positioned(
-          bottom: 75,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                Clipboard.setData(ClipboardData(text: widget.meetingId));
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('ID copié !', style: GoogleFonts.poppins()),
-                  backgroundColor: AppColors.success,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ));
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.copy, color: Colors.white70, size: 15),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Inviter des participants',
-                          style: GoogleFonts.poppins(
-                              color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500)),
-                      Text(widget.meetingId,
-                          style: GoogleFonts.poppins(
-                              color: Colors.white, fontSize: 15,
-                              fontWeight: FontWeight.w800, letterSpacing: 2)),
-                    ],
-                  ),
-                ]),
-              ),
-            ),
-          ),
-        ),
     ]);
   }
 
