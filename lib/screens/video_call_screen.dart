@@ -565,6 +565,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           userId: widget.userId,
           userName: widget.userName,
           proService: _proService,
+          freeMinutes: _freeMinutes,
           onProConfirmed: () {
             _proConfirmSub?.cancel();
             _proConfirmSub = null;
@@ -4666,6 +4667,7 @@ class _PaywallDialog extends StatefulWidget {
   final ProService proService;
   final VoidCallback onProConfirmed;
   final VoidCallback onLeave;
+  final int freeMinutes;
 
   const _PaywallDialog({
     required this.userId,
@@ -4673,6 +4675,7 @@ class _PaywallDialog extends StatefulWidget {
     required this.proService,
     required this.onProConfirmed,
     required this.onLeave,
+    this.freeMinutes = 30,
   });
 
   @override
@@ -4768,7 +4771,7 @@ class _PaywallDialogState extends State<_PaywallDialog> with SingleTickerProvide
               const Text('CRUX PRO',
                 style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 2)),
               const SizedBox(height: 6),
-              Text('Vos ${_freeMinutes} minutes gratuites sont écoulées.\nL\'appel est en pause.',
+              Text('Vos ${widget.freeMinutes} minutes gratuites sont écoulées.\nL\'appel est en pause.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 13, height: 1.5)),
               const SizedBox(height: 16),
