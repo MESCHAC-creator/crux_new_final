@@ -60,17 +60,17 @@ class MeetingService {
       password: password?.isNotEmpty == true ? password : null,
     );
 
-    try {
-      await _firestore
-          .collection('meetings')
-          .doc(meetingId)
-          .set(meeting.toJson());
-      _log.i('✅ Réunion persistée: $meetingId');
-    } catch (e) {
-      _log.w('⚠️ Firestore indisponible, local seulement: $e');
-    }
-
+    // Save to history first (fast local operation)
     await _saveToHistory(meetingId, title);
+
+    // Fire-and-forget to Firestore (don't block meeting creation)
+    _firestore
+        .collection('meetings')
+        .doc(meetingId)
+        .set(meeting.toJson())
+        .then((_) => _log.i('✅ Réunion persistée: $meetingId'))
+        .catchError((e) => _log.w('⚠️ Firestore indisponible: $e'));
+
     return meetingId;
   }
 

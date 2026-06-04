@@ -221,7 +221,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _meetingNameController.clear();
       _passwordController.clear();
       setState(() => _showPassword = false);
-      await _loadHistory();
+      // Don't reload history — it was just saved in createMeeting()
       if (!mounted) return;
       Navigator.push(
         context,
