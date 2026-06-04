@@ -81,6 +81,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
       // 1. Copy locally for this device
       final appDir = await _getAppDocDir();
+      // Ensure directory exists
+      final dir = Directory(appDir);
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+
       final dest = '$appDir/profile_photo.jpg';
       final file = await File(picked.path).copy(dest);
 
@@ -92,9 +96,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       if (uid != null) {
         final bytes = await file.readAsBytes();
         final b64 = base64Encode(bytes);
-        UserService.instance
-            .saveProfile(uid: uid, photoBase64: b64)
-            .catchError((_) {});
+        await UserService.instance.saveProfile(uid: uid, photoBase64: b64);
       }
 
       if (mounted) {
@@ -107,7 +109,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     } catch (e) {
       if (mounted) {
         setState(() => _isUpdatingPhoto = false);
-        _snack('❌ Impossible de charger la photo');
+        _snack('❌ Erreur: ${e.toString().substring(0, 40)}');
       }
     }
   }

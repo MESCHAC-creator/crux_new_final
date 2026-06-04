@@ -1020,6 +1020,20 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       final bytes = UserService.decodePhoto(profile?['photoBase64'] as String?);
       if (mounted && bytes != null) setState(() => _ownPhotoBytes = bytes);
     } catch (_) {}
+    // Start real-time listener for own profile changes
+    _subscribeToOwnProfile();
+  }
+
+  void _subscribeToOwnProfile() {
+    if (_profileSubs.containsKey('own_${widget.userId}')) return;
+    final sub = _db.collection('users').doc(widget.userId).snapshots()
+        .map((s) => s.exists ? s.data() : null)
+        .listen((data) {
+      if (!mounted || data == null) return;
+      final bytes = UserService.decodePhoto(data['photoBase64'] as String?);
+      setState(() => _ownPhotoBytes = bytes);
+    });
+    _profileSubs['own_${widget.userId}'] = sub;
   }
 
   // ── PARTICIPANT PROFILES (real-time stream) ───
