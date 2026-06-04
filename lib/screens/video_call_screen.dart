@@ -133,7 +133,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   bool _paywallShown = false;
   bool _callFrozen = false;           // true = call frozen, waiting for upgrade
   StreamSubscription<bool>? _proConfirmSub; // listens for real-time pro activation
-  static const _freeMinutes = 30;
+  static const _freeMinutes = 2; // TEST — remettre à 30 après test
 
   // ── Meeting metadata ─────────────────────────
   String _meetingTitle = 'Réunion';
@@ -472,15 +472,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       final elapsed = DateTime.now().difference(_callStartTime!).inSeconds;
       setState(() => _callSeconds = elapsed);
 
-      // 10-min warning
-      if (!_isPro && !_warningShown && elapsed >= (_freeMinutes * 60 - 600)) {
+      // Warning at 2/3 of free time
+      if (!_isPro && !_warningShown && elapsed >= (_freeMinutes * 60 ~/ 2)) {
         _warningShown = true;
+        final remaining = _freeMinutes - elapsed ~/ 60;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Row(children: [
             const Icon(Icons.timer, color: Colors.white, size: 18),
             const SizedBox(width: 8),
             Expanded(child: Text(
-              '⏱ 10 minutes restantes sur votre version gratuite',
+              '⏱ $remaining minute${remaining > 1 ? 's' : ''} restante${remaining > 1 ? 's' : ''} sur votre version gratuite',
               style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
             )),
           ]),
@@ -491,15 +492,15 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         ));
       }
 
-      // 5-min warning
-      if (!_isPro && elapsed >= (_freeMinutes * 60 - 300) &&
-          elapsed < (_freeMinutes * 60 - 290)) {
+      // Warning at last 30 seconds
+      if (!_isPro && elapsed >= (_freeMinutes * 60 - 30) &&
+          elapsed < (_freeMinutes * 60 - 20)) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Row(children: [
             const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 18),
             const SizedBox(width: 8),
             Expanded(child: Text(
-              '⚠️ Plus que 5 minutes ! Passez à CRUX PRO pour continuer.',
+              '⚠️ 30 secondes restantes ! Passez à CRUX PRO pour continuer.',
               style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
             )),
           ]),
@@ -4767,7 +4768,7 @@ class _PaywallDialogState extends State<_PaywallDialog> with SingleTickerProvide
               const Text('CRUX PRO',
                 style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 2)),
               const SizedBox(height: 6),
-              Text('Vos 30 minutes gratuites sont écoulées.\nL\'appel est en pause.',
+              Text('Vos ${_freeMinutes} minutes gratuites sont écoulées.\nL\'appel est en pause.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 13, height: 1.5)),
               const SizedBox(height: 16),
