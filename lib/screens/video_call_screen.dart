@@ -152,6 +152,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   final Map<String, bool> _participantSpeaking = {};
   late AnimationController _waveController;
   late List<Animation<double>> _waveAnims;
+  bool _waveRunning = false; // only animate when someone speaks
 
   // ── Participant profile cache (Zoom-like) ────
   Uint8List? _ownPhotoBytes;             // local user's photo
@@ -241,14 +242,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     ]);
     _waveController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 700),
+    );
+    // Each bar animates between a minimum height and maximum height
     _waveAnims = List.generate(3, (i) {
-      final begin = 0.3 + i * 0.2;
-      return Tween<double>(begin: begin, end: 1.0).animate(
+      return Tween<double>(begin: 0.15, end: 1.0).animate(
         CurvedAnimation(
           parent: _waveController,
-          curve: Interval(i * 0.2, 0.6 + i * 0.2, curve: Curves.easeInOut),
+          curve: Interval(i * 0.15, 0.55 + i * 0.15, curve: Curves.easeInOut),
         ),
       );
     });
@@ -633,9 +634,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               _activeSpeakerId = widget.userId;
               _activeSpeakerName = widget.userName;
               _bannerVisible = true;
+              _startWaveAnimation();
               _scheduleBannerHide();
             } else if (_activeSpeakerId == widget.userId) {
               _activeSpeakerId = null;
+              _stopWaveAnimation();
             }
           });
         }
@@ -646,8 +649,28 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   void _scheduleBannerHide() {
     _bannerHideTimer?.cancel();
     _bannerHideTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _bannerVisible = false);
+      if (mounted) {
+        setState(() => _bannerVisible = false);
+        _stopWaveAnimation();
+      }
     });
+  }
+
+  void _startWaveAnimation() {
+    if (!_waveRunning) {
+      _waveRunning = true;
+      _waveController.repeat(reverse: true);
+    }
+  }
+
+  void _stopWaveAnimation() {
+    // Only stop if no one is speaking
+    final anyoneSpeaking = _participantSpeaking.values.any((v) => v);
+    if (!anyoneSpeaking) {
+      _waveRunning = false;
+      _waveController.stop();
+      _waveController.reset();
+    }
   }
 
   // ── AUTO-RECONNECT ───────────────────────────
@@ -761,9 +784,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             _activeSpeakerId = uid;
             _activeSpeakerName = _participantNames[uid] ?? (p['name'] as String? ?? 'Participant');
             _bannerVisible = true;
+            _startWaveAnimation();
             _scheduleBannerHide();
           } else if (_activeSpeakerId == uid) {
             _activeSpeakerId = null;
+            _stopWaveAnimation();
           }
         }
       });
@@ -2854,32 +2879,40 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     final displayName = isMe ? 'Vous parlez' : '$name parle';
     return AnimatedOpacity(
       opacity: _bannerVisible ? 1.0 : 0.0,
-      duration: const Duration(milliseconds: 300),
-      child: IgnorePointer(
-        ignoring: !_bannerVisible,
-        child: Center(
-          child: Container(
-            margin: const EdgeInsets.only(top: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7F0000), Color(0xFF6A1B9A)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
+      duration: const Duration(milliseconds: 250),
+      child: AnimatedScale(
+        scale: _bannerVisible ? 1.0 : 0.85,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutBack,
+        child: IgnorePointer(
+          ignoring: !_bannerVisible,
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF7F0000), Color(0xFF6A1B9A)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFFB71C1C).withValues(alpha: 0.5), blurRadius: 14, spreadRadius: 1),
+                  BoxShadow(color: const Color(0xFF6A1B9A).withValues(alpha: 0.35), blurRadius: 24),
+                ],
               ),
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(color: const Color(0xFFB71C1C).withValues(alpha: 0.45), blurRadius: 12),
-                BoxShadow(color: const Color(0xFF6A1B9A).withValues(alpha: 0.3), blurRadius: 22),
-              ],
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.mic, size: 13, color: Colors.white70),
+                const SizedBox(width: 6),
+                _buildSoundWave(small: true),
+                const SizedBox(width: 8),
+                Text(displayName,
+                    style: GoogleFonts.poppins(
+                        color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2)),
+              ]),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              _buildSoundWave(small: true),
-              const SizedBox(width: 8),
-              Text(displayName,
-                  style: GoogleFonts.poppins(
-                      color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-            ]),
           ),
         ),
       ),
@@ -2887,25 +2920,32 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   // ── SOUND WAVE ANIMATION ─────────────────────
-  Widget _buildSoundWave({bool small = false}) {
-    final h = small ? 12.0 : 18.0;
-    final w = small ? 3.0 : 4.0;
-    return AnimatedBuilder(
-      animation: _waveController,
-      builder: (_, __) => Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: List.generate(3, (i) {
-          return Container(
-            width: w,
-            height: h * _waveAnims[i].value,
-            margin: EdgeInsets.symmetric(horizontal: small ? 1 : 2),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          );
-        }),
+  Widget _buildSoundWave({bool small = false, Color? color}) {
+    final maxH = small ? 14.0 : 20.0;
+    final minH = small ? 3.0 : 4.0;
+    final w = small ? 3.0 : 4.5;
+    final barColor = color ?? Colors.white.withValues(alpha: 0.95);
+    return SizedBox(
+      height: maxH,
+      child: AnimatedBuilder(
+        animation: _waveController,
+        builder: (_, __) => Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: List.generate(3, (i) {
+            // barH goes from minH to maxH
+            final barH = minH + (maxH - minH) * _waveAnims[i].value;
+            return Container(
+              width: w,
+              height: barH,
+              margin: EdgeInsets.symmetric(horizontal: small ? 1.5 : 2),
+              decoration: BoxDecoration(
+                color: barColor,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -3862,9 +3902,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            if (isSpeaking) ...[
+                            if (isSpeaking && !micMuted) ...[
                               const SizedBox(width: 4),
-                              _buildSoundWave(small: true),
+                              _buildSoundWave(
+                                small: true,
+                                color: const Color(0xFF4CAF50),
+                              ),
                             ],
                           ]),
                         ),

@@ -47,9 +47,12 @@ class DeviceVerificationService {
 
       // 4. Check app signature (basic)
       final packageInfo = await PackageInfo.fromPlatform();
-      if (packageInfo.packageName != 'com.crux.videocall') {
-        _log.w('⚠️ Package name mismatch: ${packageInfo.packageName}');
-        // Don't block, but log
+      const expectedPackages = ['com.example.crux', 'com.crux.app', 'com.crux.videocall'];
+      if (!expectedPackages.contains(packageInfo.packageName)) {
+        _log.w('⚠️ Package name inattendu: ${packageInfo.packageName}');
+        // Don't block — log only
+      } else {
+        _log.i('✅ Package vérifié: ${packageInfo.packageName}');
       }
 
       _log.i('✅ Vérification device OK');
