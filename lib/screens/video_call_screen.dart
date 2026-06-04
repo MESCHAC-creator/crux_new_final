@@ -4345,14 +4345,30 @@ class _OfferingSheetState extends State<_OfferingSheet> {
   }
 
   Future<void> _saveLink() async {
-    final link = _linkCtrl.text.trim();
-    if (link.isEmpty) return;
+    final raw = _linkCtrl.text.trim();
+    if (raw.isEmpty) return;
+
+    // Auto-prepend https:// if needed
+    final link = raw.startsWith('http') ? raw : 'https://$raw';
+    final uri = Uri.tryParse(link);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Lien invalide. Ex: https://pay.djamo.com/votre-lien',
+            style: GoogleFonts.poppins(color: Colors.white, fontSize: 12)),
+        backgroundColor: Colors.orange.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       await FirebaseFirestore.instance
           .collection('meetings')
           .doc(widget.meetingId)
           .update({'offeringLink': link});
+      _linkCtrl.text = link; // normalize the displayed link
       widget.onLinkSaved(link);
       if (mounted) {
         setState(() { _saving = false; _editMode = false; });
@@ -4364,18 +4380,55 @@ class _OfferingSheetState extends State<_OfferingSheet> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ));
       }
-    } catch (_) {
-      if (mounted) setState(() => _saving = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erreur sauvegarde: $e',
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 12)),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      }
     }
   }
 
   Future<void> _openLink() async {
     final link = widget.initialLink ?? _linkCtrl.text.trim();
     if (link.isEmpty) return;
+
+    // Ensure valid URL — prepend https:// if missing
+    final safeLink = link.startsWith('http') ? link : 'https://$link';
+    final uri = Uri.tryParse(safeLink);
+    if (uri == null || !uri.hasScheme) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Lien invalide. Vérifiez l\'URL.',
+              style: GoogleFonts.poppins(color: Colors.white)),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      }
+      return;
+    }
     try {
-      await launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
-    } catch (_) {
-      await launchUrl(Uri.parse(link), mode: LaunchMode.platformDefault);
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Impossible d\'ouvrir le lien: $e',
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 12)),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 4),
+        ));
+      }
     }
   }
 
