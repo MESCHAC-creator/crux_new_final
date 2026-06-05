@@ -686,6 +686,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     )),
                   ]),
 
+                  const SizedBox(height: 32),
+
+                  // ── Versus comparison ───────────────────────────
+                  _VersusSection(isDark: isDark, lang: lang),
+
                   const SizedBox(height: 28),
 
                   // ── Info banner ─────────────────────────────────
@@ -740,6 +745,317 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  VERSUS COMPARISON SECTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _VersusSection extends StatefulWidget {
+  final bool isDark;
+  final String lang;
+  const _VersusSection({required this.isDark, required this.lang});
+  @override
+  State<_VersusSection> createState() => _VersusSectionState();
+}
+
+class _VersusSectionState extends State<_VersusSection> {
+  bool _expanded = false;
+
+  // (feature label, crux, zoom, gmeet)
+  static const List<(String, bool, bool, bool)> _features = [
+    // Video & Audio
+    ('HD / Full HD video',                true,  true,  true),
+    ('Picture-in-Picture (PiP)',          true,  true,  false),
+    ('Camera filters & effects',          true,  false, false),
+    ('Mirror / flip video',               true,  true,  false),
+    ('Hide self-view',                    true,  true,  true),
+    ('Low-light mode',                    true,  false, false),
+    ('Noise cancellation',                true,  true,  true),
+    ('Virtual backgrounds',               true,  true,  true),
+    ('Speaker / gallery / side-by-side',  true,  true,  true),
+    ('Church / Live broadcast layout',    true,  false, false),
+    // Participants
+    ('Kick participant',                  true,  true,  true),
+    ('Mute individual / mute all',        true,  true,  true),
+    ('Rename participant in meeting',     true,  true,  false),
+    ('Transfer host role',                true,  true,  true),
+    ('Co-host designation',               true,  true,  true),
+    ('Spotlight participant',             true,  true,  true),
+    ('Turn off participant\'s camera',    true,  true,  true),
+    ('Hand raise',                        true,  true,  true),
+    // Security
+    ('Meeting passcode',                  true,  true,  false),
+    ('Waiting room',                      true,  true,  true),
+    ('Room lock',                         true,  true,  true),
+    ('E2E encryption (DTLS-SRTP)',        true,  true,  true),
+    // Collaboration
+    ('Whiteboard with drawing tools',     true,  true,  true),
+    ('Polls',                             true,  true,  true),
+    ('Q&A panel',                         true,  true,  true),
+    ('Chat with emoji reactions',         true,  true,  true),
+    ('Private / direct messages',         true,  true,  false),
+    ('Message search & star',             true,  false, false),
+    ('Notes panel',                       true,  false, false),
+    ('Reactions / emojis during call',    true,  true,  true),
+    // AI & Transcription
+    ('Live transcription / subtitles',    true,  true,  true),
+    ('AI meeting summary',                true,  true,  false),
+    ('Speaker-aware STT (32 languages)',  true,  false, false),
+    // Recording & Streaming
+    ('Local recording',                   true,  true,  false),
+    ('YouTube Live streaming',            true,  false, false),
+    ('Live comments during stream',       true,  false, false),
+    // Attendance & Host
+    ('Attendance tracking / log',         true,  false, true),
+    ('Host permissions panel',            true,  true,  true),
+    ('Chat / emoji / screen-share perms', true,  true,  false),
+    ('Network quality monitoring',        true,  true,  false),
+    ('Call timer with warning',           true,  false, false),
+    ('Auto-reconnect',                    true,  true,  true),
+    // Profile & Identity
+    ('Profile photo in meeting',          true,  true,  true),
+    ('32 UI languages',                   true,  false, false),
+    ('Free — 45 min included',            true,  false, true),
+  ];
+
+  static const int _previewCount = 8;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final visible = _expanded ? _features : _features.take(_previewCount).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFE74C3C), Color(0xFF8E44AD)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text('CRUX', style: GoogleFonts.poppins(
+              color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1)),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text('vs', style: GoogleFonts.poppins(
+              fontSize: 13, fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white54 : Colors.black38)),
+          ),
+          _CompetitorBadge(label: 'Zoom', color: const Color(0xFF2D8CFF), isDark: isDark),
+          const SizedBox(width: 8),
+          _CompetitorBadge(label: 'G Meet', color: const Color(0xFF34A853), isDark: isDark),
+          const Spacer(),
+          Text(
+            '${_features.length} fonctionnalités',
+            style: GoogleFonts.poppins(fontSize: 11, color: isDark ? Colors.white38 : Colors.black38),
+          ),
+        ]),
+
+        const SizedBox(height: 12),
+
+        // Column headers
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFE74C3C), Color(0xFF8E44AD)],
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(children: [
+            Expanded(child: Text('Fonctionnalité', style: GoogleFonts.poppins(
+              color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12))),
+            _ColHeader('CRUX'),
+            _ColHeader('Zoom'),
+            _ColHeader('GMeet'),
+          ]),
+        ),
+
+        const SizedBox(height: 4),
+
+        // Rows
+        ...visible.asMap().entries.map((e) {
+          final idx = e.key;
+          final f = e.value;
+          final rowBg = isDark
+              ? (idx.isEven
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : Colors.white.withValues(alpha: 0.02))
+              : (idx.isEven
+                  ? Colors.white.withValues(alpha: 0.9)
+                  : const Color(0xFFF5F3FF).withValues(alpha: 0.8));
+          return Container(
+            margin: const EdgeInsets.only(bottom: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              color: rowBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.grey.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Row(children: [
+              Expanded(child: Text(f.$1, style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: isDark ? Colors.white.withValues(alpha: 0.87) : const Color(0xFF1A1A2E),
+                fontWeight: FontWeight.w500,
+              ))),
+              _CheckCell(has: f.$2, iscrux: true),
+              _CheckCell(has: f.$3),
+              _CheckCell(has: f.$4),
+            ]),
+          );
+        }),
+
+        const SizedBox(height: 10),
+
+        // Expand / collapse button
+        GestureDetector(
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : const Color(0xFFEDE7F6),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.secondary.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(
+                _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                color: AppColors.secondary, size: 20,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _expanded
+                    ? 'Réduire la comparaison'
+                    : 'Voir les ${_features.length - _previewCount} autres fonctionnalités',
+                style: GoogleFonts.poppins(
+                  color: AppColors.secondary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ]),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // CRUX advantage summary
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFFE74C3C).withValues(alpha: isDark ? 0.15 : 0.08),
+                const Color(0xFF8E44AD).withValues(alpha: isDark ? 0.15 : 0.08),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: const Color(0xFFE74C3C).withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE74C3C), Color(0xFF8E44AD)],
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.emoji_events, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('CRUX = Zoom + Google Meet', style: GoogleFonts.poppins(
+                    fontSize: 13, fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                  )),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_features.where((f) => f.$2 && !f.$3 && !f.$4).length} fonctionnalités exclusives CRUX • Gratuit',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: isDark ? Colors.white60 : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      ],
+    );
+  }
+}
+
+class _CompetitorBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool isDark;
+  const _CompetitorBadge({required this.label, required this.color, required this.isDark});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: isDark ? 0.2 : 0.12),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color.withValues(alpha: 0.5)),
+    ),
+    child: Text(label, style: GoogleFonts.poppins(
+      color: color, fontWeight: FontWeight.w700, fontSize: 11)),
+  );
+}
+
+class _ColHeader extends StatelessWidget {
+  final String text;
+  const _ColHeader(this.text);
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 52,
+    child: Center(child: Text(text, style: GoogleFonts.poppins(
+      color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11))),
+  );
+}
+
+class _CheckCell extends StatelessWidget {
+  final bool has;
+  final bool iscrux;
+  const _CheckCell({required this.has, this.iscrux = false});
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 52,
+    child: Center(
+      child: has
+          ? Icon(Icons.check_circle,
+              color: iscrux ? const Color(0xFFE74C3C) : const Color(0xFF27AE60),
+              size: 18)
+          : Icon(Icons.cancel_outlined,
+              color: Colors.grey.withValues(alpha: 0.4),
+              size: 18),
+    ),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ActionCard extends StatelessWidget {
   final IconData icon;
