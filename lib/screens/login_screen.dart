@@ -274,7 +274,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     }
   }
 
-  Future<void> _showForgotPasswordDialog() async {
+  Future<void> _showForgotPasswordDialog(String lang) async {
     final emailController = TextEditingController();
     String? dialogError;
     bool sending = false;
@@ -288,7 +288,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               backgroundColor: const Color(0xFF1A0030),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: Text(
-                'Mot de passe oublié',
+                AppTranslations.t('forgot_password', lang),
                 style: GoogleFonts.poppins(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
@@ -345,7 +345,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: Text('Annuler',
+                  child: Text(AppTranslations.t('cancel', lang),
                       style: GoogleFonts.poppins(color: Colors.white54, fontWeight: FontWeight.w600)),
                 ),
                 TextButton(
@@ -583,7 +583,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             ),
                             const Spacer(),
                             TextButton(
-                              onPressed: _showForgotPasswordDialog,
+                              onPressed: () => _showForgotPasswordDialog(lang),
                               style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
                               child: Text(
                                 AppTranslations.t('forgot_password', lang),
@@ -627,7 +627,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                           ),
                                         )
                                       : Text(
-                                          'Se connecter',
+                                          AppTranslations.t('login', lang),
                                           style: GoogleFonts.poppins(
                                             fontSize: 16,
                                             fontWeight: FontWeight.w800,
@@ -689,7 +689,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                       ),
                                       const SizedBox(width: 12),
                                       Text(
-                                        'Continuer avec Google',
+                                        AppTranslations.t('sign_in_google', lang),
                                         style: GoogleFonts.poppins(
                                           color: Colors.white,
                                           fontSize: 15,
@@ -714,7 +714,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'Pas encore de compte ? ',
+                            AppTranslations.t('no_account', lang),
                             style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
                           ),
                           GestureDetector(
@@ -734,7 +734,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               ),
                             ),
                             child: Text(
-                              'Créer un compte',
+                              AppTranslations.t('create_account', lang),
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
                                 fontSize: 14,

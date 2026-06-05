@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/error_handler_service.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/app_translations.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -242,6 +245,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
       body: AnimatedBuilder(
         animation: _bgController,
@@ -305,7 +309,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                           opacity: _headerFade,
                           child: ScaleTransition(
                             scale: _headerScale,
-                            child: _buildHeader(),
+                            child: _buildHeader(lang),
                           ),
                         ),
                         const SizedBox(height: 28),
@@ -332,7 +336,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                                 child: FadeTransition(opacity: _nameFade,
                                   child: _GlassTextField(
                                     controller: _nameController,
-                                    label: 'Nom complet',
+                                    label: AppTranslations.t('full_name', lang),
                                     hint: 'Jean Dupont',
                                     icon: Icons.person_outline,
                                     errorText: _nameError,
@@ -347,7 +351,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                                 child: FadeTransition(opacity: _emailFade,
                                   child: _GlassTextField(
                                     controller: _emailController,
-                                    label: 'Adresse e-mail',
+                                    label: AppTranslations.t('email', lang),
                                     hint: 'email@exemple.com',
                                     icon: Icons.email_outlined,
                                     keyboardType: TextInputType.emailAddress,
@@ -363,7 +367,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                                 child: FadeTransition(opacity: _passFade,
                                   child: _GlassTextField(
                                     controller: _passwordController,
-                                    label: 'Mot de passe',
+                                    label: AppTranslations.t('password', lang),
                                     hint: '••••••••',
                                     icon: Icons.lock_outline,
                                     obscureText: !_showPassword,
@@ -387,7 +391,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                                 child: FadeTransition(opacity: _confirmFade,
                                   child: _GlassTextField(
                                     controller: _confirmPasswordController,
-                                    label: 'Confirmer le mot de passe',
+                                    label: AppTranslations.t('confirm_password', lang),
                                     hint: '••••••••',
                                     icon: Icons.lock_outline,
                                     obscureText: !_showConfirmPassword,
@@ -413,7 +417,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                                   opacity: _buttonFade,
                                   child: ScaleTransition(
                                     scale: _buttonScale,
-                                    child: _buildSignUpButton(),
+                                    child: _buildSignUpButton(lang),
                                   ),
                                 ),
                               ),
@@ -427,7 +431,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                           position: _footerSlide,
                           child: FadeTransition(
                             opacity: _footerFade,
-                            child: _buildFooter(),
+                            child: _buildFooter(lang),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -443,7 +447,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(String lang) {
     return Column(
       children: [
         ScaleTransition(
@@ -471,7 +475,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
         ),
         const SizedBox(height: 16),
         Text(
-          'Créer un compte',
+          AppTranslations.t('create_account', lang),
           style: GoogleFonts.poppins(
             fontSize: 28,
             fontWeight: FontWeight.w800,
@@ -492,7 +496,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildSignUpButton() {
+  Widget _buildSignUpButton(String lang) {
     return SizedBox(
       width: double.infinity,
       height: 56,
@@ -523,7 +527,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                 )
               : Text(
-                  "S'inscrire",
+                  AppTranslations.t('signup', lang),
                   style: GoogleFonts.poppins(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -536,18 +540,18 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(String lang) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Déjà un compte ? ',
+          AppTranslations.t('have_account', lang),
           style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
         ),
         GestureDetector(
           onTap: () => Navigator.of(context).pop(),
           child: Text(
-            'Se connecter',
+            AppTranslations.t('login', lang),
             style: GoogleFonts.poppins(
               color: const Color(0xFFE53935),
               fontSize: 14,
