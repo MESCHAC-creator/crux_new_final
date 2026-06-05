@@ -77,7 +77,7 @@ class _DeviceBlockedApp extends StatelessWidget {
               children: [
                 const Icon(Icons.security, color: Colors.red, size: 72),
                 const SizedBox(height: 24),
-                Text(
+                const Text(
                   'Appareil non compatible',
                   style: TextStyle(
                     color: Colors.white,
@@ -160,10 +160,14 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   bool? _termsAccepted;
+  // Cache the stream to prevent StreamBuilder from re-subscribing on every
+  // rebuild (locale/theme change) which would flash the loading screen.
+  late final Stream<User?> _authStream;
 
   @override
   void initState() {
     super.initState();
+    _authStream = FirebaseAuth.instance.authStateChanges();
     _loadTerms();
   }
 
@@ -176,10 +180,20 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
+    // While SharedPreferences hasn't loaded yet, show spinner
+    if (_termsAccepted == null) {
+      return const Scaffold(
+        backgroundColor: AppColors.whiteBg,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
+        ),
+      );
+    }
+
     return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
+      stream: _authStream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting || _termsAccepted == null) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: AppColors.whiteBg,
             body: Center(
