@@ -1,15 +1,34 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math' as math;
+import 'package:crypto/crypto.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../theme/colors.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/meeting_service.dart';
+import '../services/pro_service.dart';
 import '../services/error_handler_service.dart';
 import '../screens/meeting_screen.dart';
+import '../screens/meeting_report_screen.dart';
+import '../models/meeting_report_model.dart';
+import '../services/user_service.dart';
+import '../services/input_validator.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/locale_provider.dart';
+import '../providers/color_provider.dart';
 import '../l10n/app_translations.dart';
-import 'package:provider/provider.dart';
+import '../constants/app_constants.dart';
+
+enum MeetingMode { standard, business, church, live }
 
 class HomeScreen extends StatefulWidget {
   final UserModel user;
@@ -19,109 +38,425 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final _authService = AuthService();
   final _meetingService = MeetingService();
+  final _proService = ProService();
   final _errorHandler = ErrorHandlerService();
   final _meetingNameController = TextEditingController();
   final _joinIdController = TextEditingController();
-  final _passcodeController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _isCreating = false;
-  bool _showPasscode = false;
-  bool _obscurePasscode = true;
+  bool _showPassword = false;
+  bool _obscurePassword = true;
+  bool _isPro = false;
+  int _passwordAttempts = 0;
+  DateTime? _passwordLockUntil;
+  List<Map<String, dynamic>> _recentMeetings = [];
+  String? _localPhotoPath;
+
+  late AnimationController _headerAnim;
+  late AnimationController _pulseAnim;
+  late Animation<double> _headerFade;
+  late Animation<Offset> _headerSlide;
+  late Animation<double> _pulse;
+
+  bool _isOnline = false;
+  bool _isRefreshing = false;
+  bool _hasNetwork = true;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+    _checkPro();
+    _setupAnimations();
+    _loadLocalPhoto();
+    _syncProfileFromFirestore();
+    _setOnlineStatus(true);
+    _listenConnectivity();
+  }
+
+  void _listenConnectivity() {
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      final connected = results.any((r) => r != ConnectivityResult.none);
+      if (mounted) setState(() => _hasNetwork = connected);
+      // Auto-refresh when reconnected
+      if (connected && !_hasNetwork) _onRefresh();
+    });
+    // Initial check
+    Connectivity().checkConnectivity().then((results) {
+      if (mounted) setState(() => _hasNetwork = results.any((r) => r != ConnectivityResult.none));
+    });
+  }
+
+  Future<void> _onRefresh() async {
+    if (_isRefreshing) return;
+    HapticFeedback.lightImpact();
+    setState(() => _isRefreshing = true);
+    await Future.wait([
+      _loadHistory(),
+      _checkPro(),
+      _syncProfileFromFirestore(),
+      _loadLocalPhoto(),
+    ]);
+    if (mounted) setState(() => _isRefreshing = false);
+  }
+
+  void _setupAnimations() {
+    _headerAnim = AnimationController(
+        duration: const Duration(milliseconds: 900), vsync: this);
+    _pulseAnim = AnimationController(
+        duration: const Duration(milliseconds: 2000), vsync: this)
+      ..repeat(reverse: true);
+
+    _headerFade = Tween<double>(begin: 0, end: 1).animate(
+        CurvedAnimation(parent: _headerAnim, curve: Curves.easeOut));
+    _headerSlide =
+        Tween<Offset>(begin: const Offset(0, -0.3), end: Offset.zero).animate(
+            CurvedAnimation(parent: _headerAnim, curve: Curves.easeOutCubic));
+    _pulse = Tween<double>(begin: 1.0, end: 1.05)
+        .animate(CurvedAnimation(parent: _pulseAnim, curve: Curves.easeInOut));
+
+    _headerAnim.forward();
+  }
+
+  Future<void> _checkPro() async {
+    final pro = await _proService.isPro(widget.user.uid);
+    if (mounted) setState(() => _isPro = pro);
+  }
+
+  Future<void> _loadHistory() async {
+    final history = await _meetingService.getRecentMeetings(widget.user.uid);
+    if (mounted) setState(() => _recentMeetings = history);
+  }
+
+  Future<void> _loadLocalPhoto() async {
+    final prefs = await SharedPreferences.getInstance();
+    final path = prefs.getString('crux_local_photo_path');
+    // Verify the file still exists
+    if (path != null && File(path).existsSync()) {
+      if (mounted) setState(() => _localPhotoPath = path);
+    } else {
+      // Fallback: decode photo from Firestore if available
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final profile = await UserService.instance.getProfile(uid);
+        final b64 = profile?['photoBase64'] as String?;
+        if (b64 != null && b64.isNotEmpty && mounted) {
+          // Write it locally for future fast access
+          try {
+            final bytes = UserService.decodePhoto(b64);
+            if (bytes != null) {
+              final dir = await getApplicationDocumentsDirectory();
+              final dest = '${dir.path}/profile_photo.jpg';
+              await File(dest).writeAsBytes(bytes);
+              await prefs.setString('crux_local_photo_path', dest);
+              if (mounted) setState(() => _localPhotoPath = dest);
+            }
+          } catch (_) {}
+        }
+      }
+    }
+  }
+
+  /// Pull fresh name from Firestore and update Firebase Auth if it changed.
+  Future<void> _syncProfileFromFirestore() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+      final profile = await UserService.instance.getProfile(uid);
+      final firestoreName = profile?['name'] as String?;
+      if (firestoreName != null &&
+          firestoreName.isNotEmpty &&
+          firestoreName != FirebaseAuth.instance.currentUser?.displayName) {
+        await FirebaseAuth.instance.currentUser!.updateDisplayName(firestoreName);
+        if (mounted) setState(() {});
+      }
+    } catch (_) {}
+  }
+
+  static String _hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  /// Returns the freshest display name available.
+  String _freshUserName() {
+    return FirebaseAuth.instance.currentUser?.displayName?.trim().isNotEmpty == true
+        ? FirebaseAuth.instance.currentUser!.displayName!
+        : widget.user.name;
+  }
 
   @override
   void dispose() {
+    _setOnlineStatus(false);
+    _connectivitySub?.cancel();
+    _headerAnim.dispose();
+    _pulseAnim.dispose();
     _meetingNameController.dispose();
     _joinIdController.dispose();
-    _passcodeController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _createMeeting() async {
-    final name = _meetingNameController.text.trim();
-    if (name.isEmpty) {
-      _errorHandler.showErrorDialog(context, '⚠️ Attention', 'Entrez le nom de la réunion');
+  void _setOnlineStatus(bool online) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    FirebaseFirestore.instance.collection('users').doc(uid).set({
+      'status': online ? 'online' : 'offline',
+      'lastSeen': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true)).catchError((_) {});
+    if (mounted) setState(() => _isOnline = online);
+  }
+
+  /// Returns the first name of the currently logged-in user.
+  String _displayFirstName() {
+    final fbUser = FirebaseAuth.instance.currentUser;
+    final raw = fbUser?.displayName?.trim().isNotEmpty == true
+        ? fbUser!.displayName!
+        : (fbUser?.email?.contains('@') == true
+            ? fbUser!.email!.split('@')[0]
+            : widget.user.name);
+    return raw.split(' ').first;
+  }
+
+  Future<void> _createMeeting({
+    String description = '',
+    DateTime? scheduledAt,
+    bool waitingRoom = false,
+    int? maxParticipants,
+    String? meetingMode,
+    String? existingCode,
+  }) async {
+    final name = InputValidator.sanitize(_meetingNameController.text);
+    final nameError = InputValidator.validateMeetingName(name);
+    if (nameError != null) {
+      _errorHandler.showWarningSnackBar(context, '⚠️ $nameError');
       return;
     }
 
-    final rawPasscode = _showPasscode ? _passcodeController.text.trim() : null;
-    if (rawPasscode != null && rawPasscode.isNotEmpty) {
-      if (rawPasscode.length < 4 || rawPasscode.length > 6) {
-        _errorHandler.showErrorDialog(context, '⚠️ Code invalide', 'Le code d\'accès doit contenir entre 4 et 6 chiffres.');
-        return;
-      }
-      if (!RegExp(r'^\d+$').hasMatch(rawPasscode)) {
-        _errorHandler.showErrorDialog(context, '⚠️ Code invalide', 'Le code d\'accès doit contenir uniquement des chiffres.');
-        return;
-      }
+    final sanitizedDesc = InputValidator.sanitize(description);
+    final descError = InputValidator.validateDescription(sanitizedDesc);
+    if (descError != null) {
+      _errorHandler.showWarningSnackBar(context, '⚠️ $descError');
+      return;
     }
 
     setState(() => _isCreating = true);
+    final rawPassword = _showPassword ? _passwordController.text.trim() : null;
+    if (rawPassword != null) {
+      final pwdError = InputValidator.validatePassword(rawPassword);
+      if (pwdError != null) {
+        _errorHandler.showWarningSnackBar(context, '⚠️ $pwdError');
+        setState(() => _isCreating = false);
+        return;
+      }
+    }
+    final password = rawPassword != null ? _hashPassword(rawPassword) : null;
     try {
       final meetingId = await _meetingService.createMeeting(
         title: name,
-        description: '',
-        organizerName: widget.user.name,
+        description: description,
+        organizerName: _freshUserName(),
         organizerId: widget.user.uid,
-        passcode: rawPasscode?.isNotEmpty == true ? rawPasscode : null,
+        password: password,
+        scheduledAt: scheduledAt,
+        waitingRoom: waitingRoom,
+        maxParticipants: maxParticipants,
+        meetingMode: meetingMode,
+        existingCode: existingCode,
       );
       _meetingNameController.clear();
-      _passcodeController.clear();
-      setState(() => _showPasscode = false);
+      _passwordController.clear();
+      setState(() => _showPassword = false);
       if (!mounted) return;
-      Navigator.push(context, MaterialPageRoute(
-        builder: (_) => MeetingScreen(
-          meetingId: meetingId,
-          meetingName: name,
-          userId: widget.user.uid,
-          userName: widget.user.name,
-          userEmail: widget.user.email,
-          isHost: true,
+
+      // If scheduled for the future, show confirmation instead of joining
+      if (scheduledAt != null && scheduledAt.isAfter(DateTime.now())) {
+        _showScheduledConfirmation(meetingId, name, scheduledAt);
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MeetingScreen(
+            meetingId: meetingId,
+            meetingName: name,
+            userId: widget.user.uid,
+            userName: _freshUserName(),
+            userEmail: widget.user.email,
+            isHost: true,
+          ),
         ),
-      ));
+      );
     } catch (e) {
-      if (mounted) _errorHandler.showErrorDialog(context, '❌ Erreur', e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        _errorHandler.showError(context,
+            _errorHandler.getMeetingErrorMessage(e.toString()));
+      }
     } finally {
       if (mounted) setState(() => _isCreating = false);
     }
   }
 
+  void _showScheduledConfirmation(String meetingId, String name, DateTime scheduledAt) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dateStr = '${scheduledAt.day}/${scheduledAt.month}/${scheduledAt.year}';
+    final timeStr = '${scheduledAt.hour.toString().padLeft(2, '0')}:${scheduledAt.minute.toString().padLeft(2, '0')}';
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64, height: 64,
+              decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(20)),
+              child: const Icon(Icons.event_available, color: Colors.white, size: 32),
+            ),
+            const SizedBox(height: 16),
+            Text('Réunion programmée !', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
+            const SizedBox(height: 8),
+            Text(name, style: GoogleFonts.poppins(fontSize: 14, color: isDark ? Colors.white70 : Colors.black54), textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(children: [
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.calendar_today, size: 14, color: AppColors.primary),
+                  const SizedBox(width: 6),
+                  Text('$dateStr à $timeStr', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                ]),
+                const SizedBox(height: 6),
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.vpn_key_outlined, size: 14, color: AppColors.secondary),
+                  const SizedBox(width: 6),
+                  Text('Code: $meetingId', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.secondary)),
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: meetingId));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Code copié !', style: GoogleFonts.poppins()),
+                        backgroundColor: AppColors.primary,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        duration: const Duration(seconds: 2),
+                      ));
+                    },
+                    child: const Icon(Icons.copy, size: 14, color: AppColors.secondary),
+                  ),
+                ]),
+              ]),
+            ),
+            const SizedBox(height: 12),
+            Text('Partagez ce code avec les participants.', style: GoogleFonts.poppins(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38), textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Fermer', style: GoogleFonts.poppins(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Clipboard.setData(ClipboardData(text: meetingId));
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Copier le code', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _joinById(String id) async {
     if (id.isEmpty) return;
     final cleanId = id.trim().toUpperCase();
+    if (cleanId.length < 8 || cleanId.length > 32) {
+      _errorHandler.showError(context, '🔍 L\'ID de réunion n\'est pas valide.');
+      return;
+    }
 
-    // Check Firestore for passcode protection
+    // Check if meeting is locked or password-protected before navigating
     final meeting = await _meetingService.getMeetingOnce(cleanId);
 
     if (!mounted) return;
 
-    if (meeting != null && meeting.passcode != null && meeting.passcode!.isNotEmpty) {
-      final entered = await _showPasscodePrompt();
+    if (meeting == null) {
+      _errorHandler.showError(context, '🔍 Réunion introuvable. Vérifiez l\'ID saisi.');
+      return;
+    }
+
+    if (meeting.isLocked) {
+      _errorHandler.showWarningSnackBar(context,
+          '🔒 Cette réunion est verrouillée par l\'hôte. Réessayez plus tard.');
+      return;
+    }
+
+    if (meeting.passcode != null && meeting.passcode!.isNotEmpty) {
+      // Brute-force lock
+      if (_passwordLockUntil != null && DateTime.now().isBefore(_passwordLockUntil!)) {
+        final remaining = _passwordLockUntil!.difference(DateTime.now()).inSeconds;
+        _errorHandler.showError(context, '🔒 Trop de tentatives. Réessayez dans ${remaining}s.');
+        return;
+      }
+      final entered = await _showPasswordPrompt();
       if (!mounted) return;
-      if (entered == null) return; // user cancelled
+      if (entered == null) return;
+      if (entered.isEmpty) {
+        _errorHandler.showWarningSnackBar(context, '⚠️ Entrez le code d\'accès');
+        return;
+      }
       if (entered != meeting.passcode) {
-        if (mounted) {
-          _errorHandler.showErrorDialog(context, '🔒 Code incorrect', 'Code incorrect. Vérifiez le code et réessayez.');
+        _passwordAttempts++;
+        if (_passwordAttempts >= 5) {
+          _passwordLockUntil = DateTime.now().add(const Duration(minutes: 2));
+          _passwordAttempts = 0;
+          _errorHandler.showError(context, '🔒 5 tentatives échouées. Réessayez dans 2 minutes.');
+        } else {
+          final remaining = 5 - _passwordAttempts;
+          _errorHandler.showError(context, '🔑 Code incorrect. $remaining tentative(s) restante(s).');
         }
         return;
       }
+      _passwordAttempts = 0; // reset on success
     }
 
     if (!mounted) return;
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => MeetingScreen(
-        meetingId: cleanId,
-        meetingName: meeting?.title ?? 'Réunion',
-        userId: widget.user.uid,
-        userName: widget.user.name,
-        userEmail: widget.user.email,
-        isHost: false,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MeetingScreen(
+          meetingId: cleanId,
+          meetingName: meeting.title,
+          userId: widget.user.uid,
+          userName: _freshUserName(),
+          userEmail: widget.user.email,
+          isHost: false,
+        ),
       ),
-    ));
+    );
   }
 
-  Future<String?> _showPasscodePrompt() async {
+  Future<String?> _showPasswordPrompt() async {
     final ctrl = TextEditingController();
     return showDialog<String>(
       context: context,
@@ -138,40 +473,34 @@ class _HomeScreenState extends State<HomeScreen> {
             child: const Icon(Icons.lock_outline, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
-          Text(
-            'Code d\'accès',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 17, color: Colors.white),
-          ),
+          Text('Code d\'accès',
+              style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700, fontSize: 17, color: Colors.white)),
         ]),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(
-            'Cette réunion est protégée par un code.',
-            style: GoogleFonts.poppins(fontSize: 13, color: Colors.white70),
-          ),
+          Text('Cette réunion est protégée par un code.',
+              style: GoogleFonts.poppins(
+                  fontSize: 13, color: Colors.white70)),
           const SizedBox(height: 16),
           TextField(
             controller: ctrl,
             autofocus: true,
             obscureText: true,
             keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(6),
-            ],
-            style: GoogleFonts.poppins(color: Colors.white, letterSpacing: 4, fontWeight: FontWeight.w700),
+            style: GoogleFonts.poppins(color: Colors.white),
             decoration: InputDecoration(
               filled: true,
-              fillColor: Colors.white.withOpacity(0.08),
-              hintText: 'Code d\'accès (optionnel)',
-              hintStyle: GoogleFonts.poppins(color: Colors.white38, letterSpacing: 0),
+              fillColor: Colors.white.withValues(alpha: 0.08),
+              hintText: 'Code d\'accès',
+              hintStyle: GoogleFonts.poppins(color: Colors.white38),
               prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primary),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.white24),
-              ),
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white24)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                borderSide:
+                    const BorderSide(color: AppColors.primary, width: 2),
               ),
             ),
           ),
@@ -179,15 +508,19 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white38)),
+            child: Text('Annuler',
+                style: GoogleFonts.poppins(color: Colors.white38)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
-            child: Text('Entrer', style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: Colors.white)),
+            child: Text('Entrer',
+                style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700, color: Colors.white)),
           ),
         ],
       ),
@@ -200,49 +533,51 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(10),
+        title: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.link, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Text('Rejoindre',
+              style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700, fontSize: 18)),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('Entrez l\'ID de la réunion partagé par l\'hôte',
+              style: GoogleFonts.poppins(
+                  fontSize: 13, color: AppColors.textSecondary)),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _joinIdController,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(
+              hintText: 'ID de la réunion',
+              hintStyle:
+                  GoogleFonts.poppins(color: AppColors.textTertiary),
+              prefixIcon:
+                  const Icon(Icons.tag, color: AppColors.secondary),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: AppColors.secondary, width: 2),
               ),
-              child: const Icon(Icons.link, color: Colors.white, size: 20),
             ),
-            const SizedBox(width: 12),
-            Text('Rejoindre', style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 18)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Entrez l\'ID de la réunion partagé par l\'hôte',
-              style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _joinIdController,
-              autofocus: true,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(
-                hintText: 'ID de la réunion',
-                hintStyle: GoogleFonts.poppins(color: AppColors.textTertiary),
-                prefixIcon: const Icon(Icons.tag, color: AppColors.secondary),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.secondary, width: 2),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ]),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Annuler', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+            child: Text('Annuler',
+                style:
+                    GoogleFonts.poppins(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -253,9 +588,12 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.secondary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
-            child: Text('Rejoindre', style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: Colors.white)),
+            child: Text('Rejoindre',
+                style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700, color: Colors.white)),
           ),
         ],
       ),
@@ -267,18 +605,27 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Déconnexion', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
-        content: Text('Voulez-vous vraiment vous déconnecter ?', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+        title: Text('Déconnexion',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+        content: Text('Voulez-vous vraiment vous déconnecter ?',
+            style: GoogleFonts.poppins(color: AppColors.textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annuler')),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
               await _authService.signOut();
-              if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+              if (mounted) {
+                Navigator.of(context).pushReplacementNamed('/login');
+              }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: Text('Déconnecter', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error),
+            child: Text('Déconnecter',
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -288,462 +635,1196 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF5F3FF);
-    final fieldFill = isDark ? Colors.white.withOpacity(0.07) : Colors.white.withOpacity(0.15);
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    final cp = context.watch<ColorProvider>();
+    final firstName = _displayFirstName();
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? AppTranslations.t('good_morning', lang)
+        : hour < 18
+            ? AppTranslations.t('good_afternoon', lang)
+            : AppTranslations.t('good_evening', lang);
 
     return Scaffold(
-      backgroundColor: bgColor,
-      body: CustomScrollView(
-        slivers: [
-          // App bar with gradient
-          SliverAppBar(
-            expandedHeight: 140,
-            floating: false,
-            pinned: true,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFE74C3C), Color(0xFF8E44AD)],
+      backgroundColor: isDark ? const Color(0xFF0A0A0F) : const Color(0xFFF0F2FF),
+      body: Stack(
+        children: [
+          // Animated background orbs
+          _AnimatedOrbs(isDark: isDark),
+
+          // Offline badge
+          if (!_hasNetwork)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 4,
+              left: 0, right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade800,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8)],
                   ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'CRUX',
-                              style: GoogleFonts.poppins(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: 2,
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.settings_outlined, color: Colors.white70),
-                                  onPressed: () => Navigator.pushNamed(context, '/settings'),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.logout, color: Colors.white70),
-                                  onPressed: _logout,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        Text(
-                          '${AppTranslations.t('hello', context.watch<LocaleProvider>().locale.languageCode)}, ${widget.user.name.split(' ').first} 👋',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          'Prêt pour votre prochaine réunion ?',
-                          style: GoogleFonts.poppins(fontSize: 13, color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.wifi_off, color: Colors.white, size: 14),
+                    const SizedBox(width: 6),
+                    Text('Hors ligne — les données peuvent être obsolètes',
+                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                  ]),
                 ),
               ),
             ),
-          ),
 
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-
-                  // Create meeting card
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFFE74C3C), Color(0xFF9B59B6), Color(0xFF8E44AD)],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFE74C3C).withOpacity(0.35),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(22),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+          // Main content
+          SafeArea(
+            child: RefreshIndicator(
+              onRefresh: _onRefresh,
+              color: AppColors.primary,
+              backgroundColor: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+              displacement: 60,
+              strokeWidth: 2.5,
+              child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              slivers: [
+                // ── Header ──────────────────────────────────
+                SliverToBoxAdapter(
+                  child: SlideTransition(
+                    position: _headerSlide,
+                    child: FadeTransition(
+                      opacity: _headerFade,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(22, 16, 22, 0),
+                        child: Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.video_call, color: Colors.white, size: 22),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Nouvelle réunion',
-                              style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        // Meeting name field
-                        TextField(
-                          controller: _meetingNameController,
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: 'Nom de la réunion...',
-                            hintStyle: GoogleFonts.poppins(color: Colors.white54),
-                            prefixIcon: const Icon(Icons.edit, color: Colors.white60, size: 20),
-                            filled: true,
-                            fillColor: Colors.white.withOpacity(0.15),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: Colors.white, width: 2),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Toggle passcode field
-                        GestureDetector(
-                          onTap: () => setState(() {
-                            _showPasscode = !_showPasscode;
-                            if (!_showPasscode) _passcodeController.clear();
-                          }),
-                          child: Row(children: [
-                            Icon(
-                              _showPasscode ? Icons.lock_outline : Icons.lock_open_outlined,
-                              size: 15,
-                              color: Colors.white70,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _showPasscode ? 'Supprimer le code d\'accès' : 'Ajouter un code d\'accès',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                color: Colors.white70,
-                                decoration: TextDecoration.underline,
-                                decorationColor: Colors.white70,
-                              ),
-                            ),
-                          ]),
-                        ),
-
-                        // Passcode field (conditional)
-                        if (_showPasscode) ...[
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: _passcodeController,
-                            obscureText: _obscurePasscode,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(6),
-                            ],
-                            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600, letterSpacing: 4),
-                            decoration: InputDecoration(
-                              hintText: 'Code d\'accès (optionnel)',
-                              hintStyle: GoogleFonts.poppins(color: Colors.white38, letterSpacing: 0),
-                              prefixIcon: const Icon(Icons.lock_outline, color: Colors.white60, size: 20),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePasscode ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                  color: Colors.white54,
-                                  size: 18,
-                                ),
-                                onPressed: () => setState(() => _obscurePasscode = !_obscurePasscode),
-                              ),
-                              filled: true,
-                              fillColor: fieldFill,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(color: Colors.white, width: 2),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '4 à 6 chiffres',
-                            style: GoogleFonts.poppins(fontSize: 10, color: Colors.white38),
-                          ),
-                        ],
-
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: _isCreating ? null : _createMeeting,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFFE74C3C),
-                              disabledBackgroundColor: Colors.white60,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                            child: _isCreating
-                                ? const SizedBox(
-                                    width: 22, height: 22,
-                                    child: CircularProgressIndicator(color: Color(0xFFE74C3C), strokeWidth: 2.5),
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '$greeting,',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      color: isDark ? Colors.white54 : Colors.black45,
+                                    ),
+                                  ),
+                                  Row(
                                     children: [
-                                      const Icon(Icons.rocket_launch, size: 18),
-                                      const SizedBox(width: 8),
                                       Text(
-                                        'Démarrer la réunion',
+                                        firstName,
                                         style: GoogleFonts.poppins(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 15,
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.w800,
+                                          color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                                         ),
                                       ),
+                                      const SizedBox(width: 8),
+                                      if (_isPro)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFFA500)]),
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Text('PRO', style: GoogleFonts.poppins(
+                                            fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white,
+                                          )),
+                                        ),
                                     ],
                                   ),
-                          ),
+                                ],
+                              ),
+                            ),
+                            // Avatar → profile menu
+                            PopupMenuButton<String>(
+                              tooltip: 'Profil et déconnexion',
+                              offset: const Offset(0, 52),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+                              onSelected: (val) {
+                                if (val == 'profile') Navigator.pushNamed(context, '/profile').then((_) => _loadLocalPhoto());
+                                if (val == 'logout') _logout();
+                              },
+                              itemBuilder: (_) => [
+                                PopupMenuItem(value: 'profile', child: Row(children: [
+                                  Icon(Icons.person_outline, color: cp.primary, size: 18),
+                                  const SizedBox(width: 10),
+                                  Text(AppTranslations.t('profile', lang),
+                                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600,
+                                          color: isDark ? Colors.white : Colors.black87)),
+                                ])),
+                                PopupMenuItem(value: 'logout', child: Row(children: [
+                                  const Icon(Icons.logout, color: Colors.red, size: 18),
+                                  const SizedBox(width: 10),
+                                  Text(AppTranslations.t('logout', lang),
+                                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.red)),
+                                ])),
+                              ],
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Container(
+                                    width: 44, height: 44,
+                                    decoration: BoxDecoration(
+                                      gradient: cp.gradient,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [BoxShadow(color: cp.primary.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4))],
+                                    ),
+                                    child: Center(
+                                      child: _localPhotoPath != null && File(_localPhotoPath!).existsSync()
+                                          ? ClipOval(child: Image.file(File(_localPhotoPath!), fit: BoxFit.cover, width: 44, height: 44))
+                                          : FirebaseAuth.instance.currentUser?.photoURL != null
+                                              ? ClipOval(child: Image.network(FirebaseAuth.instance.currentUser!.photoURL!, fit: BoxFit.cover, width: 44, height: 44,
+                                                  errorBuilder: (_, __, ___) => Text(firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                                      style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18))))
+                                              : Text(firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
+                                    ),
+                                  ),
+                                  if (_isOnline)
+                                    Positioned(
+                                      bottom: 0, right: 0,
+                                      child: Container(
+                                        width: 12, height: 12,
+                                        decoration: BoxDecoration(
+                                          color: Colors.green,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: isDark ? const Color(0xFF12121E) : Colors.white, width: 2),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Tooltip(
+                              message: 'Paramètres',
+                              child: GestureDetector(
+                                onTap: () => Navigator.pushNamed(context, '/settings'),
+                                child: Container(
+                                  width: 44, height: 44,
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(Icons.settings_outlined,
+                                    color: isDark ? Colors.white70 : Colors.black54, size: 20),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // Section title
-                  Text(
-                    'Actions rapides',
-                    style: GoogleFonts.poppins(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Quick actions grid
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ActionCard(
-                          icon: Icons.group_add,
-                          title: 'Rejoindre',
-                          subtitle: 'Via un ID',
-                          gradientColors: const [Color(0xFF8E44AD), Color(0xFF6C3483)],
-                          onTap: _showJoinDialog,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _ActionCard(
-                          icon: Icons.tune,
-                          title: 'Paramètres',
-                          subtitle: 'Préférences',
-                          gradientColors: const [Color(0xFF3498DB), Color(0xFF2980B9)],
-                          onTap: () => Navigator.pushNamed(context, '/settings'),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ActionCard(
-                          icon: Icons.share,
-                          title: 'Partager',
-                          subtitle: 'Inviter',
-                          gradientColors: const [Color(0xFF27AE60), Color(0xFF1E8449)],
-                          onTap: () {
-                            _errorHandler.showInfoSnackBar(context, '📱 Partagez l\'app CRUX avec vos contacts');
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _ActionCard(
-                          icon: Icons.help_outline,
-                          title: 'Aide',
-                          subtitle: 'Support',
-                          gradientColors: const [Color(0xFFF39C12), Color(0xFFD68910)],
-                          onTap: () {
-                            _errorHandler.showInfoSnackBar(context, '📧 support@crux.app');
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // Info banner
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white.withOpacity(0.05)
-                          : const Color(0xFFEDE7F6),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppColors.secondary.withOpacity(0.3),
                       ),
                     ),
+                  ),
+                ),
+
+                SliverToBoxAdapter(child: const SizedBox(height: 24)),
+
+                // ── Two big action buttons ───────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
                     child: Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.info_outline, color: AppColors.secondary, size: 20),
-                        ),
-                        const SizedBox(width: 12),
+                        // NEW MEETING
                         Expanded(
-                          child: Text(
-                            'Les réunions s\'ouvrent dans votre navigateur via Jitsi Meet — gratuit et sécurisé.',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: isDark ? Colors.white70 : AppColors.textSecondary,
-                              height: 1.4,
+                          child: Semantics(
+                            label: 'Nouvelle réunion — créer une réunion vidéo',
+                            button: true,
+                            child: ScaleTransition(
+                              scale: _pulse,
+                              child: _BigActionButton(
+                                icon: Icons.videocam_rounded,
+                                label: AppTranslations.t('new_meeting', lang),
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFFE74C3C), Color(0xFF9B59B6)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                onTap: _showCreateBottomSheet,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        // JOIN MEETING
+                        Expanded(
+                          child: Semantics(
+                            label: 'Rejoindre une réunion existante',
+                            button: true,
+                            child: _BigActionButton(
+                              icon: Icons.add_link_rounded,
+                              label: AppTranslations.t('join_meeting', lang),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF5B5FFF), Color(0xFF8E44AD)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              onTap: _showJoinDialog,
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                ],
-              ),
+                ),
+
+                SliverToBoxAdapter(child: const SizedBox(height: 28)),
+
+                // ── Quick stats bar ──────────────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.12),
+                        ),
+                        boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 4))],
+                      ),
+                      child: Row(
+                        children: [
+                          _StatItem(label: AppTranslations.t('meetings', lang), value: '${_recentMeetings.length}', icon: Icons.videocam_outlined, color: const Color(0xFFE74C3C)),
+                          _Divider(),
+                          _StatItem(label: AppTranslations.t('status', lang), value: _isPro ? AppTranslations.t('pro_label', lang) : AppTranslations.t('free', lang), icon: Icons.workspace_premium_outlined, color: _isPro ? const Color(0xFFFFD700) : Colors.grey),
+                          _Divider(),
+                          _StatItem(label: AppTranslations.t('limit', lang), value: _isPro ? '∞' : '${AppConstants.freeMinutes}min', icon: Icons.timer_outlined, color: const Color(0xFF5B5FFF)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                SliverToBoxAdapter(child: const SizedBox(height: 28)),
+
+                // ── Quick actions grid ───────────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(AppTranslations.t('quick_actions', lang),
+                          style: GoogleFonts.poppins(
+                            fontSize: 16, fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                          )),
+                        const SizedBox(height: 14),
+                        Row(children: [
+                          Expanded(child: _QuickAction(icon: Icons.link, label: AppTranslations.t('join', lang), color: const Color(0xFF5B5FFF), onTap: _showJoinDialog)),
+                          const SizedBox(width: 10),
+                          Expanded(child: _QuickAction(icon: Icons.share_outlined, label: AppTranslations.t('share', lang), color: const Color(0xFF27AE60),
+                            onTap: () async {
+                              final msg = '🎥 Rejoins-moi sur CRUX — la meilleure app de visioconférence !\n\nTélécharge ici : https://github.com/MESCHAC-creator/crux_new_final/releases\n\n📲 Gratuit · ${AppConstants.freeMinutes} min offertes · Disponible sur Android';
+                              await Clipboard.setData(ClipboardData(text: msg));
+                              if (context.mounted) _errorHandler.showInfoSnackBar(context, AppTranslations.t('copied', lang));
+                            })),
+                          const SizedBox(width: 10),
+                          Expanded(child: _QuickAction(icon: Icons.tune, label: AppTranslations.t('settings_short', lang), color: const Color(0xFF3498DB),
+                            onTap: () => Navigator.pushNamed(context, '/settings'))),
+                          const SizedBox(width: 10),
+                          Expanded(child: _QuickAction(icon: Icons.person_outline, label: AppTranslations.t('profile', lang), color: const Color(0xFFF39C12),
+                            onTap: () => Navigator.pushNamed(context, '/profile').then((_) => _loadLocalPhoto()))),
+                        ]),
+                      ],
+                    ),
+                  ),
+                ),
+
+                SliverToBoxAdapter(child: const SizedBox(height: 28)),
+
+                // ── Pro banner (if not Pro) ──────────────────
+                if (!_isPro)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 22),
+                      child: GestureDetector(
+                        onTap: () async {
+                          try {
+                            await _proService.startPayment(userId: widget.user.uid, userName: widget.user.name);
+                          } catch (_) {}
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFD700), Color(0xFFFFA500), Color(0xFFFF6B35)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [BoxShadow(color: const Color(0xFFFFD700).withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6))],
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.workspace_premium, color: Colors.white, size: 36),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(AppTranslations.t('go_pro', lang), style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                                    Text(AppTranslations.t('go_pro_sub', lang), style: GoogleFonts.poppins(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                                child: Text(AppTranslations.t('activate', lang), style: GoogleFonts.poppins(color: const Color(0xFFFFA500), fontWeight: FontWeight.w800, fontSize: 13)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                if (!_isPro) SliverToBoxAdapter(child: const SizedBox(height: 28)),
+
+                // ── Recent meetings ──────────────────────────
+                // Section titre "Réunions récentes"
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(AppTranslations.t('recent', lang),
+                          style: GoogleFonts.poppins(
+                            fontSize: 16, fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                          )),
+                        if (_recentMeetings.isNotEmpty)
+                          TextButton(
+                            onPressed: () async {
+                              HapticFeedback.lightImpact();
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.remove('crux_recent_meetings');
+                              await _loadHistory();
+                            },
+                            child: Text(AppTranslations.t('clear_all', lang), style: GoogleFonts.poppins(fontSize: 12, color: Colors.red.shade400)),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                if (_recentMeetings.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+                      child: Container(
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1A1A2E).withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.15),
+                          ),
+                        ),
+                        child: Column(children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.videocam_off_outlined, color: Colors.white, size: 32),
+                          ),
+                          const SizedBox(height: 16),
+                          Text('Aucune réunion récente',
+                              style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 15,
+                                  color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
+                          const SizedBox(height: 6),
+                          Text('Crée ta première réunion ou rejoins-en une !',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.poppins(fontSize: 12,
+                                  color: isDark ? Colors.white54 : Colors.black45)),
+                          const SizedBox(height: 20),
+                          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            ElevatedButton.icon(
+                              onPressed: _showCreateBottomSheet,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(Icons.add, size: 16, color: Colors.white),
+                              label: Text('Créer', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+                            ),
+                          ]),
+                        ]),
+                      ),
+                    ),
+                  )
+                else
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (ctx, i) {
+                        final m = _recentMeetings[i];
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+                          child: _RecentMeetingTile(
+                            title: m['title'] ?? 'Réunion',
+                            meetingId: m['id'] ?? '',
+                            timestamp: m['ts'] is int
+                                ? DateTime.fromMillisecondsSinceEpoch(m['ts'] as int)
+                                : DateTime.now(),
+                            isDark: isDark,
+                            onJoin: () => _joinById(m['id'] ?? ''),
+                            onCopy: () {
+                              Clipboard.setData(ClipboardData(text: m['id'] ?? ''));
+                              _errorHandler.showInfoSnackBar(context, '📋 ID copié !');
+                            },
+                            onShare: () {
+                              final id = m['id'] ?? '';
+                              final title = m['title'] ?? 'Réunion';
+                              Clipboard.setData(ClipboardData(
+                                  text: '🎥 Rejoins ma réunion CRUX "$title"\nID: $id\n\nTélécharge CRUX pour nous rejoindre!'));
+                              _errorHandler.showInfoSnackBar(context, '📤 Lien copié — partage-le !');
+                            },
+                          ),
+                        );
+                      },
+                      childCount: _recentMeetings.length,
+                    ),
+                  ),
+
+                SliverToBoxAdapter(child: const SizedBox(height: 32)),
+              ],
             ),
           ),
+        ),
         ],
+      ),
+    );
+  }
+
+  void _showCreateBottomSheet() {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CreateMeetingSheet(
+        nameController: _meetingNameController,
+        passwordController: _passwordController,
+        showPassword: _showPassword,
+        obscurePassword: _obscurePassword,
+        isCreating: _isCreating,
+        onTogglePassword: () => setState(() => _showPassword = !_showPassword),
+        onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+        onSubmit: (MeetingMode mode, String description, {
+          DateTime? scheduledAt,
+          bool waitingRoom = false,
+          int? maxParticipants,
+          String? preGeneratedCode,
+        }) {
+          final tag = _modeTag(mode);
+          if (tag.isNotEmpty && !_meetingNameController.text.startsWith('[')) {
+            _meetingNameController.text = '$tag ${_meetingNameController.text}'.trim();
+          }
+          Navigator.pop(context);
+          _createMeeting(
+            description: description,
+            scheduledAt: scheduledAt,
+            waitingRoom: waitingRoom,
+            maxParticipants: maxParticipants,
+            meetingMode: mode.name,
+            existingCode: preGeneratedCode,
+          );
+        },
+      ),
+    );
+  }
+
+  String _modeTag(MeetingMode mode) {
+    switch (mode) {
+      case MeetingMode.standard: return '';
+      case MeetingMode.business: return '[Business]';
+      case MeetingMode.church: return '[Église]';
+      case MeetingMode.live: return '[Live]';
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+//  ANIMATED BACKGROUND ORBS
+// ─────────────────────────────────────────────
+class _AnimatedOrbs extends StatefulWidget {
+  final bool isDark;
+  const _AnimatedOrbs({required this.isDark});
+  @override
+  State<_AnimatedOrbs> createState() => _AnimatedOrbsState();
+}
+
+class _AnimatedOrbsState extends State<_AnimatedOrbs> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(duration: const Duration(seconds: 8), vsync: this)..repeat();
+  }
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final t = _ctrl.value;
+        return Stack(children: [
+          Positioned(
+            top: -60 + math.sin(t * 2 * math.pi) * 30,
+            right: -40 + math.cos(t * 2 * math.pi) * 20,
+            child: _Orb(size: 220, color: const Color(0xFFE74C3C), opacity: widget.isDark ? 0.12 : 0.08),
+          ),
+          Positioned(
+            bottom: 100 + math.cos(t * 2 * math.pi) * 20,
+            left: -60 + math.sin(t * 2 * math.pi) * 15,
+            child: _Orb(size: 180, color: const Color(0xFF5B5FFF), opacity: widget.isDark ? 0.1 : 0.06),
+          ),
+          Positioned(
+            top: 300 + math.sin((t + 0.5) * 2 * math.pi) * 20,
+            right: 20 + math.cos((t + 0.3) * 2 * math.pi) * 15,
+            child: _Orb(size: 120, color: const Color(0xFF9B59B6), opacity: widget.isDark ? 0.08 : 0.05),
+          ),
+        ]);
+      },
+    );
+  }
+}
+
+class _Orb extends StatelessWidget {
+  final double size;
+  final Color color;
+  final double opacity;
+  const _Orb({required this.size, required this.color, required this.opacity});
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size, height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: RadialGradient(colors: [color.withValues(alpha: opacity), color.withValues(alpha: 0)]),
+    ),
+  );
+}
+
+// ─────────────────────────────────────────────
+//  BIG ACTION BUTTON
+// ─────────────────────────────────────────────
+class _BigActionButton extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final LinearGradient gradient;
+  final VoidCallback onTap;
+  const _BigActionButton({required this.icon, required this.label, required this.gradient, required this.onTap});
+  @override
+  State<_BigActionButton> createState() => _BigActionButtonState();
+}
+
+class _BigActionButtonState extends State<_BigActionButton> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(duration: const Duration(milliseconds: 120), vsync: this);
+    _scale = Tween<double>(begin: 1, end: 0.95).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) { HapticFeedback.lightImpact(); _ctrl.forward(); },
+      onTapUp: (_) { _ctrl.reverse(); widget.onTap(); },
+      onTapCancel: () => _ctrl.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: Container(
+          height: 130,
+          decoration: BoxDecoration(
+            gradient: widget.gradient,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [BoxShadow(color: widget.gradient.colors.first.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 8))],
+          ),
+          child: Stack(
+            children: [
+              // Background decoration circle
+              Positioned(
+                right: -20, bottom: -20,
+                child: Container(
+                  width: 100, height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(widget.icon, color: Colors.white, size: 26),
+                    ),
+                    const Spacer(),
+                    Text(widget.label,
+                      style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15, height: 1.2),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _ActionCard extends StatelessWidget {
+// ─────────────────────────────────────────────
+//  STAT ITEM
+// ─────────────────────────────────────────────
+class _StatItem extends StatelessWidget {
+  final String label, value;
   final IconData icon;
-  final String title;
-  final String subtitle;
-  final List<Color> gradientColors;
+  final Color color;
+  const _StatItem({required this.label, required this.value, required this.icon, required this.color});
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Expanded(
+      child: Semantics(
+        label: '$value $label',
+        child: Column(children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 4),
+          Text(value, style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
+          Text(label, style: GoogleFonts.poppins(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38)),
+        ]),
+      ),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(width: 1, height: 40, color: isDark ? Colors.white12 : Colors.black12, margin: const EdgeInsets.symmetric(horizontal: 4));
+  }
+}
+
+// ─────────────────────────────────────────────
+//  QUICK ACTION CHIP
+// ─────────────────────────────────────────────
+class _QuickAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
   final VoidCallback onTap;
-
-  const _ActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.gradientColors,
-    required this.onTap,
-  });
-
+  const _QuickAction({required this.icon, required this.label, required this.color, required this.onTap});
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
-      onTap: onTap,
+      onTap: () { HapticFeedback.selectionClick(); onTap(); },
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.08)
-                : Colors.grey.withOpacity(0.15),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.1)),
+          boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12)],
         ),
-        child: Row(
+        child: Column(children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 6),
+          Text(label, style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black54)),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  CREATE MEETING BOTTOM SHEET
+// ─────────────────────────────────────────────
+class _CreateMeetingSheet extends StatefulWidget {
+  final TextEditingController nameController;
+  final TextEditingController passwordController;
+  final bool showPassword, obscurePassword, isCreating;
+  final VoidCallback onTogglePassword, onToggleObscure;
+  final void Function(
+    MeetingMode mode,
+    String description, {
+    DateTime? scheduledAt,
+    bool waitingRoom,
+    int? maxParticipants,
+    String? preGeneratedCode,
+  }) onSubmit;
+
+  const _CreateMeetingSheet({
+    required this.nameController, required this.passwordController,
+    required this.showPassword, required this.obscurePassword,
+    required this.isCreating, required this.onTogglePassword,
+    required this.onToggleObscure, required this.onSubmit,
+  });
+
+  @override
+  State<_CreateMeetingSheet> createState() => _CreateMeetingSheetState();
+}
+
+class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
+  MeetingMode _selectedMode = MeetingMode.standard;
+  final _descriptionController = TextEditingController();
+  bool _isScheduled = false;
+  DateTime? _scheduledDate;
+  TimeOfDay? _scheduledTime;
+  bool _waitingRoom = false;
+  bool _showMaxParticipants = false;
+  int _maxParticipants = 50;
+  late String _preGeneratedCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _preGeneratedCode = MeetingService().generateMeetingCode();
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  static const _modes = [
+    (MeetingMode.standard, Icons.videocam, 'Standard'),
+    (MeetingMode.business, Icons.business_center, 'Business'),
+    (MeetingMode.church, Icons.church, 'Église'),
+    (MeetingMode.live, Icons.live_tv, 'Live'),
+  ];
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _scheduledDate ?? now.add(const Duration(hours: 1)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: AppColors.primary,
+            onPrimary: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _scheduledDate = picked);
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _scheduledTime ?? TimeOfDay.fromDateTime(DateTime.now().add(const Duration(hours: 1))),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: AppColors.primary,
+            onPrimary: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _scheduledTime = picked);
+  }
+
+  DateTime? get _scheduledDateTime {
+    if (!_isScheduled || _scheduledDate == null) return null;
+    final t = _scheduledTime ?? const TimeOfDay(hour: 9, minute: 0);
+    return DateTime(_scheduledDate!.year, _scheduledDate!.month, _scheduledDate!.day, t.hour, t.minute);
+  }
+
+  String _formatScheduled() {
+    final dt = _scheduledDateTime;
+    if (dt == null) return 'Choisir date & heure';
+    final d = '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
+    final t = '${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}';
+    return '$d à $t';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF12121E) : Colors.white;
+    final labelColor = isDark ? Colors.white54 : Colors.black45;
+    final fieldFill = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08);
+
+    InputDecoration _fieldDeco(String hint, IconData icon) => InputDecoration(
+      hintText: hint,
+      hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 13),
+      prefixIcon: Icon(icon, size: 20),
+      filled: true,
+      fillColor: fieldFill,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 32),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: gradientColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
+            // ── Handle ──
+            Center(child: Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 20),
+
+            // ── Header ──
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.videocam_rounded, color: Colors.white, size: 22),
               ),
-              child: Icon(icon, color: Colors.white, size: 22),
+              const SizedBox(width: 12),
+              Expanded(child: Text('Nouvelle réunion', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A2E)))),
+            ]),
+            const SizedBox(height: 20),
+
+            // ── Meeting code preview ──
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.secondary.withValues(alpha: 0.25)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.vpn_key_outlined, size: 16, color: AppColors.secondary),
+                const SizedBox(width: 8),
+                Text('Code: ', style: GoogleFonts.poppins(fontSize: 12, color: labelColor)),
+                Text(_preGeneratedCode, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.secondary, letterSpacing: 1.5)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Clipboard.setData(ClipboardData(text: _preGeneratedCode));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Code copié !', style: GoogleFonts.poppins()),
+                      backgroundColor: AppColors.secondary,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      duration: const Duration(seconds: 2),
+                    ));
+                  },
+                  child: const Icon(Icons.copy, size: 16, color: AppColors.secondary),
+                ),
+              ]),
             ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : AppColors.textPrimary,
+            const SizedBox(height: 16),
+
+            // ── Mode selector ──
+            Text('Type de réunion', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: labelColor)),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: _modes.map((entry) {
+                final mode = entry.$1; final icon = entry.$2; final label = entry.$3;
+                final selected = _selectedMode == mode;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () { HapticFeedback.selectionClick(); setState(() => _selectedMode = mode); },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: selected ? AppColors.primaryGradient : null,
+                        color: selected ? null : fieldFill,
+                        borderRadius: BorderRadius.circular(20),
+                        border: selected ? null : Border.all(color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(icon, size: 14, color: selected ? Colors.white : labelColor),
+                        const SizedBox(width: 5),
+                        Text(label, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: selected ? Colors.white : labelColor)),
+                      ]),
+                    ),
+                  ),
+                );
+              }).toList()),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Name ──
+            TextField(
+              controller: widget.nameController,
+              autofocus: true,
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black87),
+              decoration: _fieldDeco('Nom de la réunion', Icons.edit_outlined).copyWith(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                hintStyle: GoogleFonts.poppins(color: Colors.grey),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // ── Description ──
+            TextField(
+              controller: _descriptionController,
+              maxLines: 2,
+              style: GoogleFonts.poppins(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+              decoration: _fieldDeco('Agenda / Description (optionnel)', Icons.subject_outlined).copyWith(alignLabelWithHint: true),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Schedule toggle ──
+            Text('Planification', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: labelColor)),
+            const SizedBox(height: 8),
+            Row(children: [
+              _OptionChip(
+                label: 'Maintenant',
+                icon: Icons.rocket_launch,
+                selected: !_isScheduled,
+                onTap: () { HapticFeedback.selectionClick(); setState(() => _isScheduled = false); },
+                isDark: isDark,
+              ),
+              const SizedBox(width: 8),
+              _OptionChip(
+                label: 'Programmer',
+                icon: Icons.event,
+                selected: _isScheduled,
+                onTap: () { HapticFeedback.selectionClick(); setState(() => _isScheduled = true); },
+                isDark: isDark,
+              ),
+            ]),
+
+            // ── Date + Time pickers ──
+            if (_isScheduled) ...[
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _pickDate,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      decoration: BoxDecoration(
+                        color: fieldFill,
+                        borderRadius: BorderRadius.circular(14),
+                        border: _scheduledDate != null ? Border.all(color: AppColors.primary.withValues(alpha: 0.4)) : null,
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.calendar_today, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(_scheduledDate == null ? 'Date' : '${_scheduledDate!.day.toString().padLeft(2,'0')}/${_scheduledDate!.month.toString().padLeft(2,'0')}/${_scheduledDate!.year}',
+                          style: GoogleFonts.poppins(fontSize: 13, color: _scheduledDate == null ? Colors.grey : (isDark ? Colors.white : Colors.black87))),
+                      ]),
+                    ),
                   ),
                 ),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    color: AppColors.textTertiary,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _pickTime,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      decoration: BoxDecoration(
+                        color: fieldFill,
+                        borderRadius: BorderRadius.circular(14),
+                        border: _scheduledTime != null ? Border.all(color: AppColors.primary.withValues(alpha: 0.4)) : null,
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.access_time, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(_scheduledTime == null ? 'Heure' : '${_scheduledTime!.hour.toString().padLeft(2,'0')}:${_scheduledTime!.minute.toString().padLeft(2,'0')}',
+                          style: GoogleFonts.poppins(fontSize: 13, color: _scheduledTime == null ? Colors.grey : (isDark ? Colors.white : Colors.black87))),
+                      ]),
+                    ),
                   ),
                 ),
+              ]),
+              if (_scheduledDate != null && _scheduledTime != null) ...[
+                const SizedBox(height: 6),
+                Row(children: [
+                  const Icon(Icons.check_circle_outline, size: 14, color: Colors.green),
+                  const SizedBox(width: 4),
+                  Text('Programmée: ${_formatScheduled()}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.green)),
+                ]),
               ],
+            ],
+            const SizedBox(height: 16),
+
+            // ── Options ──
+            Text('Options avancées', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: labelColor)),
+            const SizedBox(height: 8),
+
+            // Waiting room
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(color: fieldFill, borderRadius: BorderRadius.circular(14)),
+              child: Row(children: [
+                Icon(Icons.meeting_room_outlined, size: 18, color: _waitingRoom ? AppColors.primary : labelColor),
+                const SizedBox(width: 10),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Salle d\'attente', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87)),
+                  Text('Les participants attendent votre approbation', style: GoogleFonts.poppins(fontSize: 11, color: labelColor)),
+                ])),
+                Switch(
+                  value: _waitingRoom,
+                  onChanged: (v) { HapticFeedback.selectionClick(); setState(() => _waitingRoom = v); },
+                  activeTrackColor: AppColors.primary,
+                ),
+              ]),
+            ),
+            const SizedBox(height: 8),
+
+            // Max participants
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(color: fieldFill, borderRadius: BorderRadius.circular(14)),
+              child: Column(children: [
+                Row(children: [
+                  Icon(Icons.people_outline, size: 18, color: _showMaxParticipants ? AppColors.primary : labelColor),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Limiter les participants', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black87)),
+                    Text(_showMaxParticipants ? '$_maxParticipants participants max' : 'Illimité par défaut',
+                        style: GoogleFonts.poppins(fontSize: 11, color: labelColor)),
+                  ])),
+                  Switch(
+                    value: _showMaxParticipants,
+                    onChanged: (v) { HapticFeedback.selectionClick(); setState(() => _showMaxParticipants = v); },
+                    activeTrackColor: AppColors.primary,
+                  ),
+                ]),
+                if (_showMaxParticipants) ...[
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Expanded(child: Slider(
+                      value: _maxParticipants.toDouble(),
+                      min: 2, max: 200,
+                      divisions: 99,
+                      activeColor: AppColors.primary,
+                      label: '$_maxParticipants',
+                      onChanged: (v) => setState(() => _maxParticipants = v.round()),
+                    )),
+                    Container(
+                      width: 42, height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text('$_maxParticipants', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                    ),
+                  ]),
+                ],
+              ]),
+            ),
+            const SizedBox(height: 12),
+
+            // ── Password ──
+            GestureDetector(
+              onTap: widget.onTogglePassword,
+              child: Row(children: [
+                Icon(widget.showPassword ? Icons.lock_outline : Icons.lock_open_outlined, size: 16, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text(widget.showPassword ? 'Supprimer le code d\'accès' : 'Ajouter un code d\'accès',
+                  style: GoogleFonts.poppins(fontSize: 13, color: AppColors.primary,
+                      decoration: TextDecoration.underline, decorationColor: AppColors.primary)),
+              ]),
+            ),
+            if (widget.showPassword) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: widget.passwordController,
+                obscureText: widget.obscurePassword,
+                keyboardType: TextInputType.number,
+                style: GoogleFonts.poppins(color: isDark ? Colors.white : Colors.black87),
+                decoration: InputDecoration(
+                  hintText: 'Code d\'accès (PIN)',
+                  hintStyle: GoogleFonts.poppins(color: Colors.grey),
+                  prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                  suffixIcon: IconButton(
+                    icon: Icon(widget.obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
+                    onPressed: widget.onToggleObscure,
+                  ),
+                  filled: true, fillColor: fieldFill,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+
+            // ── Submit button ──
+            SizedBox(
+              width: double.infinity, height: 54,
+              child: ElevatedButton(
+                onPressed: widget.isCreating ? null : () {
+                  if (_isScheduled && _scheduledDateTime == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Veuillez choisir une date et une heure.', style: GoogleFonts.poppins()),
+                      backgroundColor: Colors.orange.shade700,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ));
+                    return;
+                  }
+                  widget.onSubmit(
+                    _selectedMode,
+                    _descriptionController.text.trim(),
+                    scheduledAt: _scheduledDateTime,
+                    waitingRoom: _waitingRoom,
+                    maxParticipants: _showMaxParticipants ? _maxParticipants : null,
+                    preGeneratedCode: _preGeneratedCode,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 8,
+                  shadowColor: AppColors.primary.withValues(alpha: 0.5),
+                ),
+                child: widget.isCreating
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                  : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(_isScheduled ? Icons.event_available : Icons.rocket_launch, size: 18),
+                      const SizedBox(width: 8),
+                      Text(_isScheduled ? 'Programmer' : 'Démarrer',
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 16)),
+                    ]),
+              ),
             ),
           ],
         ),
@@ -751,3 +1832,175 @@ class _ActionCard extends StatelessWidget {
     );
   }
 }
+
+class _OptionChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const _OptionChip({required this.label, required this.icon, required this.selected, required this.onTap, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: selected ? AppColors.primaryGradient : null,
+          color: selected ? null : (isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey.withValues(alpha: 0.08)),
+          borderRadius: BorderRadius.circular(22),
+          border: selected ? null : Border.all(color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.3)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 14, color: selected ? Colors.white : (isDark ? Colors.white54 : Colors.black45)),
+          const SizedBox(width: 6),
+          Text(label, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : (isDark ? Colors.white54 : Colors.black45))),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  RECENT MEETING TILE
+// ─────────────────────────────────────────────
+class _RecentMeetingTile extends StatelessWidget {
+  final String title;
+  final String meetingId;
+  final DateTime timestamp;
+  final bool isDark;
+  final VoidCallback onJoin;
+  final VoidCallback onCopy;
+  final VoidCallback? onShare;
+
+  const _RecentMeetingTile({
+    required this.title,
+    required this.meetingId,
+    required this.timestamp,
+    required this.isDark,
+    required this.onJoin,
+    required this.onCopy,
+    this.onShare,
+  });
+
+  Future<void> _openReport(BuildContext context) async {
+    final snap = await FirebaseFirestore.instance
+        .collection('meeting_reports')
+        .doc(meetingId)
+        .get();
+    if (!context.mounted) return;
+    if (!snap.exists) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Aucun rapport disponible pour cette réunion.',
+            style: const TextStyle(color: Colors.white)),
+        backgroundColor: Colors.grey.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+      return;
+    }
+    final report = MeetingReportModel.fromJson(snap.data()!);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => MeetingReportScreen(report: report)),
+    );
+  }
+
+  String _timeAgo() {
+    final diff = DateTime.now().difference(timestamp);
+    if (diff.inMinutes < 60) return 'Il y a ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'Il y a ${diff.inHours}h';
+    if (diff.inDays == 1) return 'Hier';
+    return 'Il y a ${diff.inDays} jours';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.07)
+              : Colors.grey.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Row(children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            gradient: AppColors.primaryGradient,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(Icons.videocam, color: Colors.white, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color:
+                          isDark ? Colors.white : AppColors.textPrimary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+              Text(
+                '${meetingId.length > 10 ? meetingId.substring(0, 10) : meetingId}  •  ${_timeAgo()}',
+                style: GoogleFonts.poppins(
+                    fontSize: 11, color: AppColors.textTertiary),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.copy_outlined, size: 18),
+          color: AppColors.textTertiary,
+          onPressed: onCopy,
+          tooltip: 'Copier l\'ID',
+        ),
+        if (onShare != null)
+          IconButton(
+            icon: const Icon(Icons.share_outlined, size: 18),
+            color: AppColors.secondary,
+            onPressed: onShare,
+            tooltip: 'Partager',
+          ),
+        IconButton(
+          icon: const Icon(Icons.bar_chart_rounded, size: 18),
+          color: AppColors.secondary,
+          onPressed: () => _openReport(context),
+          tooltip: 'Voir le rapport',
+        ),
+        GestureDetector(
+          onTap: onJoin,
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text('Rejoindre',
+                style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700)),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+

@@ -64,9 +64,9 @@ class LocaleProvider extends ChangeNotifier {
     if (loc != null) {
       _locale = loc;
       _languageLabel = label;
+      notifyListeners(); // Immediate UI update — no grey screen
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('crux_language', loc.languageCode);
-      notifyListeners();
     }
   }
 }

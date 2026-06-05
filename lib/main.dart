@@ -103,6 +103,9 @@ class _DeviceBlockedApp extends StatelessWidget {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // Stable navigator key — prevents navigation reset when locale/theme rebuilds
+  static final _navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -116,6 +119,7 @@ class MyApp extends StatelessWidget {
       child: Consumer2<ThemeProvider, LocaleProvider>(
         builder: (context, themeProvider, localeProvider, _) {
           return MaterialApp(
+            navigatorKey: MyApp._navigatorKey,
             title: 'CRUX - Premium Video Conference',
             debugShowCheckedModeBanner: false,
             supportedLocales: const [
@@ -146,12 +150,28 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+// StatefulWidget so terms & auth are cached — no re-run on locale/theme rebuild
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
-  static Future<bool> _checkTermsAccepted() async {
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool? _termsAccepted;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTerms();
+  }
+
+  Future<void> _loadTerms() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('crux_terms_accepted') ?? false;
+    if (mounted) {
+      setState(() => _termsAccepted = prefs.getBool('crux_terms_accepted') ?? false);
+    }
   }
 
   @override
@@ -159,7 +179,7 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting || _termsAccepted == null) {
           return const Scaffold(
             backgroundColor: AppColors.whiteBg,
             body: Center(
@@ -169,30 +189,16 @@ class AuthWrapper extends StatelessWidget {
         }
 
         final user = snapshot.data;
-        if (user == null) {
-          // Not logged in — show splash/login flow
-          return const SplashScreen();
-        }
+        if (user == null) return const SplashScreen();
 
-        // Logged in — check terms then show home
         final userModel = UserModel(
           uid: user.uid,
           name: user.displayName ?? user.email?.split('@')[0] ?? 'Utilisateur',
           email: user.email ?? '',
         );
 
-        return FutureBuilder<bool>(
-          future: _checkTermsAccepted(),
-          builder: (ctx, snap) {
-            if (!snap.hasData) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
-              );
-            }
-            if (snap.data == true) return HomeScreen(user: userModel);
-            return ConsentScreen(user: userModel);
-          },
-        );
+        if (_termsAccepted == true) return HomeScreen(user: userModel);
+        return ConsentScreen(user: userModel);
       },
     );
   }
