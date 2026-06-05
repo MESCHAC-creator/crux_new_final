@@ -622,7 +622,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       _GlassCard(
                         isDark: isDark,
                         child: Column(children: [
-                          _GlassTile(icon: Icons.info_outline, iconColor: Colors.grey, title: AppTranslations.t('version', localeProvider.locale.languageCode), subtitle: '2.3.0', isDark: isDark, trailing: const SizedBox()),
+                          _GlassTile(icon: Icons.info_outline, iconColor: Colors.grey, title: AppTranslations.t('version', localeProvider.locale.languageCode), subtitle: '2.34.10', isDark: isDark, trailing: const SizedBox()),
                           _GlassDivider(isDark: isDark),
                           _GlassTile(icon: Icons.code, iconColor: colorProvider.primary, title: AppTranslations.t('built_by', localeProvider.locale.languageCode), subtitle: 'MESCHAC_</>', isDark: isDark, trailing: const SizedBox()),
                         ]),
@@ -700,44 +700,90 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) {
         final isDark = context.read<ThemeProvider>().isDark;
+        final screenH = MediaQuery.of(context).size.height;
         return ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              color: isDark ? Colors.black.withValues(alpha: 0.8) : Colors.white.withValues(alpha: 0.92),
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+              color: isDark ? Colors.black.withValues(alpha: 0.88) : Colors.white.withValues(alpha: 0.95),
+              // Fixed header + scrollable list, capped at 80% screen height
+              constraints: BoxConstraints(maxHeight: screenH * 0.80),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2)))),
-                  const SizedBox(height: 20),
-                  Text('Langue', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
-                  const SizedBox(height: 16),
-                  ...LocaleProvider.languages.keys.map((lang) => GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      context.read<LocaleProvider>().setLanguage(lang);
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: lp.languageLabel == lang ? cp.primary.withValues(alpha: 0.15) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: lp.languageLabel == lang ? cp.primary : Colors.transparent, width: 2),
-                      ),
-                      child: Row(children: [
-                        Text(lang, style: GoogleFonts.poppins(fontWeight: lp.languageLabel == lang ? FontWeight.w700 : FontWeight.w500, color: lp.languageLabel == lang ? cp.primary : (isDark ? Colors.white70 : Colors.black54))),
-                        const Spacer(),
-                        if (lp.languageLabel == lang) Icon(Icons.check_circle, color: cp.primary, size: 20),
-                      ]),
+                  // Drag handle + title (non-scrollable)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2)))),
+                        const SizedBox(height: 20),
+                        Row(children: [
+                          Icon(Icons.language_rounded, color: cp.primary, size: 22),
+                          const SizedBox(width: 10),
+                          Text(
+                            AppTranslations.t('language', lp.locale.languageCode),
+                            style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${LocaleProvider.languages.length} langues',
+                            style: GoogleFonts.poppins(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38),
+                          ),
+                        ]),
+                        const SizedBox(height: 12),
+                      ],
                     ),
-                  )),
+                  ),
+                  // Scrollable language list
+                  Flexible(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(24, 4, 24, 40),
+                      itemCount: LocaleProvider.languages.length,
+                      itemBuilder: (ctx, i) {
+                        final lang = LocaleProvider.languages.keys.elementAt(i);
+                        final isSelected = lp.languageLabel == lang;
+                        return GestureDetector(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            context.read<LocaleProvider>().setLanguage(lang);
+                            Navigator.pop(context);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: isSelected ? cp.primary.withValues(alpha: 0.15) : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03)),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isSelected ? cp.primary : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
+                            child: Row(children: [
+                              Text(
+                                lang,
+                                style: GoogleFonts.poppins(
+                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                  fontSize: 15,
+                                  color: isSelected ? cp.primary : (isDark ? Colors.white70 : Colors.black54),
+                                ),
+                              ),
+                              const Spacer(),
+                              if (isSelected) Icon(Icons.check_circle, color: cp.primary, size: 20),
+                            ]),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
