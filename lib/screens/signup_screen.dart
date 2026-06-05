@@ -485,7 +485,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
         ),
         const SizedBox(height: 6),
         Text(
-          'Rejoignez CRUX dès maintenant',
+          AppTranslations.t('welcome_sub', lang),
           style: GoogleFonts.poppins(
             fontSize: 14,
             color: Colors.white70,
