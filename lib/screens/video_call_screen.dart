@@ -14,6 +14,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:logger/logger.dart';
+import 'package:provider/provider.dart';
+import '../providers/locale_provider.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
 import '../services/pro_service.dart';
@@ -846,6 +848,46 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   // ── SPEECH-TO-TEXT (live transcription) ──────
+
+  /// Maps a BCP-47 language code to a speech_to_text locale identifier.
+  static String _sttLocaleFor(String langCode) {
+    const map = <String, String>{
+      'fr': 'fr_FR',
+      'en': 'en_US',
+      'es': 'es_ES',
+      'de': 'de_DE',
+      'ru': 'ru_RU',
+      'pt': 'pt_BR',
+      'it': 'it_IT',
+      'ar': 'ar_SA',
+      'zh': 'zh_CN',
+      'hi': 'hi_IN',
+      'ja': 'ja_JP',
+      'ko': 'ko_KR',
+      'tr': 'tr_TR',
+      'vi': 'vi_VN',
+      'id': 'id_ID',
+      'nl': 'nl_NL',
+      'pl': 'pl_PL',
+      'uk': 'uk_UA',
+      'sv': 'sv_SE',
+      'ha': 'ha_NG',
+      'yo': 'yo_NG',
+      'sw': 'sw_KE',
+      'am': 'am_ET',
+      'fa': 'fa_IR',
+      'ro': 'ro_RO',
+      'el': 'el_GR',
+      'cs': 'cs_CZ',
+      'hu': 'hu_HU',
+      'bn': 'bn_IN',
+      'th': 'th_TH',
+      'mg': 'fr_FR', // fallback to French
+      'wo': 'fr_FR', // fallback to French
+    };
+    return map[langCode] ?? 'fr_FR';
+  }
+
   Future<void> _initStt() async {
     _sttAvailable = await _sttService.initialize(
       onError: (_) {},
@@ -866,8 +908,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   void _restartSttListening() {
     if (!mounted || !_sttListening || !_sttAvailable) return;
+    final langCode = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+    final localeId = _sttLocaleFor(langCode);
     _sttService.listen(
-      localeId: 'fr_FR',
+      localeId: localeId,
       listenFor: const Duration(seconds: 30),
       pauseFor: const Duration(seconds: 3),
       partialResults: false,
