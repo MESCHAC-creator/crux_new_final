@@ -446,7 +446,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       MaterialPageRoute(
         builder: (_) => MeetingScreen(
           meetingId: cleanId,
-          meetingName: meeting?.title ?? 'Réunion',
+          meetingName: meeting.title,
           userId: widget.user.uid,
           userName: _freshUserName(),
           userEmail: widget.user.email,
@@ -1699,7 +1699,7 @@ class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
                 Switch(
                   value: _waitingRoom,
                   onChanged: (v) { HapticFeedback.selectionClick(); setState(() => _waitingRoom = v); },
-                  activeColor: AppColors.primary,
+                  activeTrackColor: AppColors.primary,
                 ),
               ]),
             ),
@@ -1722,7 +1722,7 @@ class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
                   Switch(
                     value: _showMaxParticipants,
                     onChanged: (v) { HapticFeedback.selectionClick(); setState(() => _showMaxParticipants = v); },
-                    activeColor: AppColors.primary,
+                    activeTrackColor: AppColors.primary,
                   ),
                 ]),
                 if (_showMaxParticipants) ...[

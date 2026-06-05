@@ -126,7 +126,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.3),
+                          color: AppColors.primary.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: AppColors.primary, width: 1),
                         ),
@@ -150,9 +150,9 @@ class _MeetingScreenState extends State<MeetingScreen> {
                 Container(
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
+                    color: Colors.white.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
                   ),
                   child: Column(
                     children: [
@@ -163,7 +163,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                           gradient: AppColors.primaryGradient,
                           borderRadius: BorderRadius.circular(45),
                           boxShadow: [
-                            BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 8)),
+                            BoxShadow(color: AppColors.primary.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 8)),
                           ],
                         ),
                         child: const Icon(Icons.videocam, color: Colors.white, size: 44),
@@ -187,9 +187,9 @@ class _MeetingScreenState extends State<MeetingScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.08),
+                            color: Colors.white.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white.withOpacity(0.15)),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -233,7 +233,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       elevation: 8,
-                      shadowColor: AppColors.primary.withOpacity(0.5),
+                      shadowColor: AppColors.primary.withValues(alpha: 0.5),
                     ),
                   ),
                 ),

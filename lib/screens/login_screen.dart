@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../theme/colors.dart';
 import '../services/auth_service.dart';
 import '../services/error_handler_service.dart';
 import 'signup_screen.dart';
@@ -311,16 +310,16 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                       hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
                       prefixIcon: const Icon(Icons.email_outlined, color: Colors.white60, size: 20),
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.1),
+                      fillColor: Colors.white.withValues(alpha: 0.1),
                       errorText: dialogError,
                       errorStyle: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -456,7 +455,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             borderRadius: BorderRadius.circular(30),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.25),
+                                color: Colors.black.withValues(alpha: 0.25),
                                 blurRadius: 30,
                                 offset: const Offset(0, 10),
                               ),
@@ -504,9 +503,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.12),
+                      color: Colors.white.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
                     ),
                     child: Column(
                       children: [
@@ -655,9 +654,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                           child: OutlinedButton(
                             onPressed: (_isLoading || _isGoogleLoading) ? null : _handleGoogleLogin,
                             style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: Colors.white.withOpacity(0.4), width: 1.5),
+                              side: BorderSide(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              backgroundColor: Colors.white.withOpacity(0.08),
+                              backgroundColor: Colors.white.withValues(alpha: 0.08),
                             ),
                             child: _isGoogleLoading
                                 ? const SizedBox(
@@ -788,8 +787,8 @@ class _FloatingCircle extends StatelessWidget {
             height: sizes[index],
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.06),
-              border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
+              color: Colors.white.withValues(alpha: 0.06),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1),
             ),
           ),
         );
@@ -842,13 +841,13 @@ class _GlassTextField extends StatelessWidget {
             : Colors.white.withValues(alpha: 0.12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: hasError
               ? const BorderSide(color: Colors.redAccent, width: 1.5)
-              : BorderSide(color: Colors.white.withOpacity(0.25)),
+              : BorderSide(color: Colors.white.withValues(alpha: 0.25)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),

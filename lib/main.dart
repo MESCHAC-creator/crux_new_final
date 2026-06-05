@@ -6,13 +6,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'services/error_handler_service.dart';
 import 'services/notification_service.dart';
+import 'services/device_verification_service.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/consent_screen.dart';
-import 'screens/device_verification_screen.dart';
 import 'models/user_model.dart';
 import 'providers/auth_provider.dart' show CruxAuthProvider;
 import 'providers/meeting_provider.dart';
@@ -24,27 +23,81 @@ import 'theme/colors.dart';
 import 'theme/theme.dart';
 
 final logger = Logger();
-final errorHandlerService = ErrorHandlerService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ── 1. Firebase ─────────────────────────────
   try {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     logger.i('✅ Firebase initialisé');
-
-    // Enable Firestore offline persistence (40MB cache)
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
       cacheSizeBytes: 40 * 1024 * 1024,
     );
-    logger.i('✅ Firestore offline persistence enabled');
+  } catch (e) {
+    logger.e('❌ Firebase init error: $e');
+  }
 
-    // Initialize notifications
+  // ── 2. Device verification (before runApp — cannot be bypassed) ─
+  final (isSecure, blockReason) =
+      await DeviceVerificationService.instance.verifyDeviceSecurity();
+
+  // ── 3. Notifications ─────────────────────────
+  try {
     await NotificationService().initialize();
   } catch (e) {
-    logger.e('❌ Init error: $e');
+    logger.e('Notification init error: $e');
   }
+
+  if (!isSecure) {
+    runApp(_DeviceBlockedApp(reason: blockReason));
+    return;
+  }
+
   runApp(const MyApp());
+}
+
+/// Shown when the device fails security checks.
+class _DeviceBlockedApp extends StatelessWidget {
+  final String reason;
+  const _DeviceBlockedApp({required this.reason});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFF0F0C1A),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.security, color: Colors.red, size: 72),
+                const SizedBox(height: 24),
+                Text(
+                  'Appareil non compatible',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  reason,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.6),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -86,15 +139,8 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatefulWidget {
+class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
-
-  @override
-  State<AuthWrapper> createState() => _AuthWrapperState();
-}
-
-class _AuthWrapperState extends State<AuthWrapper> {
-  bool _deviceVerified = false;
 
   static Future<bool> _checkTermsAccepted() async {
     final prefs = await SharedPreferences.getInstance();
@@ -114,29 +160,32 @@ class _AuthWrapperState extends State<AuthWrapper> {
             ),
           );
         }
-        if (snapshot.hasData && snapshot.data != null) {
-          if (!_deviceVerified) {
-            return DeviceVerificationScreen(
-              onVerified: () => setState(() => _deviceVerified = true),
-            );
-          }
-          final firebaseUser = snapshot.data!;
-          final user = UserModel(
-            uid: firebaseUser.uid,
-            name: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'Utilisateur',
-            email: firebaseUser.email ?? '',
-          );
-          // Check terms accepted
-          return FutureBuilder<bool>(
-            future: _checkTermsAccepted(),
-            builder: (ctx, snap) {
-              if (!snap.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-              if (snap.data == true) return HomeScreen(user: user);
-              return ConsentScreen(user: user);
-            },
-          );
+
+        final user = snapshot.data;
+        if (user == null) {
+          // Not logged in — show splash/login flow
+          return const SplashScreen();
         }
-        return const SplashScreen();
+
+        // Logged in — check terms then show home
+        final userModel = UserModel(
+          uid: user.uid,
+          name: user.displayName ?? user.email?.split('@')[0] ?? 'Utilisateur',
+          email: user.email ?? '',
+        );
+
+        return FutureBuilder<bool>(
+          future: _checkTermsAccepted(),
+          builder: (ctx, snap) {
+            if (!snap.hasData) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+              );
+            }
+            if (snap.data == true) return HomeScreen(user: userModel);
+            return ConsentScreen(user: userModel);
+          },
+        );
       },
     );
   }

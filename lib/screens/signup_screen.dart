@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../theme/colors.dart';
 import '../services/auth_service.dart';
 import '../services/error_handler_service.dart';
 
@@ -290,9 +289,9 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                               child: Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.15),
+                                  color: Colors.white.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                                 ),
                                 child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
                               ),
@@ -315,12 +314,12 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
+                            color: Colors.white.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(28),
-                            border: Border.all(color: Colors.white.withOpacity(0.25)),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
+                                color: Colors.black.withValues(alpha: 0.3),
                                 blurRadius: 30,
                                 offset: const Offset(0, 10),
                               ),
@@ -664,13 +663,13 @@ class _GlassTextField extends StatelessWidget {
             : Colors.white.withValues(alpha: 0.12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: hasError
               ? const BorderSide(color: Colors.redAccent, width: 1.5)
-              : BorderSide(color: Colors.white.withOpacity(0.25)),
+              : BorderSide(color: Colors.white.withValues(alpha: 0.25)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),

@@ -838,7 +838,7 @@ class _GlassSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Switch(
     value: value, onChanged: onChanged,
-    activeColor: Colors.white, activeTrackColor: activeColor,
+    activeThumbColor: Colors.white, activeTrackColor: activeColor,
     inactiveThumbColor: Colors.white, inactiveTrackColor: Colors.grey.shade300,
   );
 }

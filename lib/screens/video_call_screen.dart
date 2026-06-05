@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart';
-import 'dart:ui' show FontFeature;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,7 +13,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:logger/logger.dart';
-import 'dart:typed_data';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
 import '../services/pro_service.dart';
@@ -41,6 +40,8 @@ class _Reaction {
 enum _NetQuality { good, fair, poor, unknown }
 
 enum _VideoQuality { low, medium, high, hd }
+
+enum _CameraFilter { natural, warm, cool, vivid, bw, soft }
 
 // ─────────────────────────────────────────────
 //  WIDGET
@@ -94,6 +95,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── Video quality ────────────────────────────
   _VideoQuality _videoQuality = _VideoQuality.medium;
+
+  // ── Camera filters ───────────────────────────
+  _CameraFilter _cameraFilter = _CameraFilter.natural;
+  bool _autoQuality = true;
 
   // ── Call timer ───────────────────────────────
   Timer? _callTimer;
@@ -185,7 +190,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   final List<Map<String, String>> _liveComments = [];
   StreamSubscription? _liveCommentSub;
   final _liveCommentsScrollController = ScrollController();
-  bool _showLiveGifts = false;
   int _liveViewers = 1;
 
   // ── YouTube Live Streaming ──────────────────
@@ -193,14 +197,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   String? _youtubeUrl;
   bool _youtubeStreamingActive = false;
   String? _liveBackgroundImagePath;
-  bool _selectingBackground = false;
   final _picker = ImagePicker();
 
   // ── Security & Rate Limiting ─────────────────
   Timer? _inactivityTimer;
   static const Duration _inactivityTimeout = Duration(minutes: 15);
-  static const int MAX_MESSAGE_LENGTH = 500;
-  static const int MAX_VIDEO_BITRATE = 4000; // kbps
+  static const int _maxMessageLength = 500;
   final Map<String, DateTime> _lastCallTime = {};
   static const Duration _minCallInterval = Duration(milliseconds: 200);
 
@@ -715,6 +717,19 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             _netQuality = _NetQuality.poor;
           }
         });
+        // Auto-adaptive quality
+        if (_autoQuality) {
+          if (_netQuality == _NetQuality.poor && _videoQuality != _VideoQuality.low) {
+            setState(() => _videoQuality = _VideoQuality.low);
+            _applyVideoQuality(_videoQuality);
+          } else if (_netQuality == _NetQuality.fair && _videoQuality == _VideoQuality.high) {
+            setState(() => _videoQuality = _VideoQuality.medium);
+            _applyVideoQuality(_videoQuality);
+          } else if (_netQuality == _NetQuality.good && _videoQuality == _VideoQuality.low) {
+            setState(() => _videoQuality = _VideoQuality.medium);
+            _applyVideoQuality(_videoQuality);
+          }
+        }
       } catch (_) {}
     });
   }
@@ -737,7 +752,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             .update({'isSpeaking': false}).catchError((_) {});
         if (mounted) setState(() {
           _participantSpeaking[widget.userId] = false;
-          if (_activeSpeakerId == widget.userId) _activeSpeakerId = null;
+          if (_activeSpeakerId == widget.userId) { _activeSpeakerId = null; }
         });
       }
       return;
@@ -1419,8 +1434,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     if (picked == null) return;
 
     try {
-      setState(() => _selectingBackground = true);
-
       final dir = await getApplicationDocumentsDirectory();
       final dest = '${dir.path}/live_background.jpg';
       await File(picked.path).copy(dest);
@@ -1433,12 +1446,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       if (mounted) {
         setState(() {
           _liveBackgroundImagePath = dest;
-          _selectingBackground = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _selectingBackground = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Erreur: $e', style: GoogleFonts.poppins()),
           backgroundColor: Colors.red.shade700,
@@ -1690,9 +1701,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── CHAT ────────────────────────────────────
   void _sendMessage() {
     final text = _chatController.text.trim();
-    if (text.isEmpty || text.length > MAX_MESSAGE_LENGTH) {
+    if (text.isEmpty || text.length > _maxMessageLength) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Message: 1-$MAX_MESSAGE_LENGTH caractères', style: GoogleFonts.poppins()),
+        content: Text('Message: 1-$_maxMessageLength caractères', style: GoogleFonts.poppins()),
         backgroundColor: Colors.orange,
       ));
       return;
@@ -2023,9 +2034,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       Positioned.fill(
         child: showLocalBig
             ? (_camOn
-                ? RTCVideoView(_localRenderer,
-                    mirror: !_sharingScreen,
-                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                ? _buildLocalVideoView()
                 : _buildVideoOff(widget.userName, _ownPhotoBytes))
             : (_waitingForHost
                 ? _buildWaitingForHost()
@@ -2087,9 +2096,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                       ? _buildRemoteVideo(pip: true)
                       // Remote big → show local in PiP
                       : (_camOn
-                          ? RTCVideoView(_localRenderer,
-                              mirror: !_sharingScreen,
-                              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                          ? _buildLocalVideoView()
                           : _buildVideoOff(widget.userName, _ownPhotoBytes, size: 115)),
                 ),
               ),
@@ -3181,13 +3188,24 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── PARTICIPANTS PANEL ────────────────────────
   Widget _buildParticipantsPanel() {
     final isPrivileged = widget.isHost || _isCoHost;
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: _buildParticipantsPanelContent(isPrivileged),
+      ),
+    );
+  }
+
+  Widget _buildParticipantsPanelContent(bool isPrivileged) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF181818),
+        color: const Color(0xCC181828),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.7), blurRadius: 20)
         ],
+        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 0.5)),
       ),
       child: Column(children: [
         const SizedBox(height: 8),
@@ -3324,15 +3342,17 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── CHAT PANEL ───────────────────────────────
   Widget _buildChatPanel() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF181818),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.7), blurRadius: 20)
-        ],
-      ),
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xCC181828),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.7), blurRadius: 20)],
+            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 0.5)),
+          ),
       child: Column(children: [
         const SizedBox(height: 8),
         Container(
@@ -3369,6 +3389,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         ),
         if (_chatTab == 0) _buildChatInput(),
       ]),
+        ),
+      ),
     );
   }
 
@@ -3591,11 +3613,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── TRANSCRIPT PANEL ─────────────────────────
   Widget _buildTranscriptPanel() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xF0141420),
-        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
-      ),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xCC141420),
+            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.12))),
+          ),
       child: Column(children: [
         // Header
         Container(
@@ -3687,6 +3712,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ]),
         ),
       ]),
+        ),
+      ),
     );
   }
 
@@ -3738,7 +3765,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           .collection('whiteboard')
           .get();
       final batch = _db.batch();
-      for (final doc in snap.docs) batch.delete(doc.reference);
+      for (final doc in snap.docs) { batch.delete(doc.reference); }
       await batch.commit();
     } catch (e) {
       if (mounted) {
@@ -3778,11 +3805,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   Widget _buildWhiteboardPanel() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xF0141420),
-        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
-      ),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xCC141420),
+            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.12))),
+          ),
       child: Column(children: [
         // Header
         Container(
@@ -3873,6 +3903,141 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ]),
         ),
       ]),
+        ),
+      ),
+    );
+  }
+
+  // ── CAMERA FILTER HELPERS ─────────────────────
+
+  static List<double> _filterMatrix(_CameraFilter f) {
+    switch (f) {
+      case _CameraFilter.warm:
+        return [
+          1.2, 0.0, 0.0, 0.0, 10,
+          0.0, 1.05, 0.0, 0.0, 5,
+          0.0, 0.0, 0.85, 0.0, -10,
+          0.0, 0.0, 0.0, 1.0, 0,
+        ];
+      case _CameraFilter.cool:
+        return [
+          0.85, 0.0, 0.0, 0.0, -5,
+          0.0, 1.0, 0.0, 0.0, 5,
+          0.0, 0.0, 1.2, 0.0, 15,
+          0.0, 0.0, 0.0, 1.0, 0,
+        ];
+      case _CameraFilter.vivid:
+        return [
+          1.4, -0.1, -0.1, 0.0, 10,
+          -0.1, 1.4, -0.1, 0.0, 10,
+          -0.1, -0.1, 1.4, 0.0, 10,
+          0.0, 0.0, 0.0, 1.0, 0,
+        ];
+      case _CameraFilter.bw:
+        return [
+          0.33, 0.59, 0.11, 0.0, 0,
+          0.33, 0.59, 0.11, 0.0, 0,
+          0.33, 0.59, 0.11, 0.0, 0,
+          0.0, 0.0, 0.0, 1.0, 0,
+        ];
+      case _CameraFilter.soft:
+        return [
+          0.9, 0.05, 0.05, 0.0, 10,
+          0.05, 0.9, 0.05, 0.0, 10,
+          0.05, 0.05, 0.9, 0.0, 10,
+          0.0, 0.0, 0.0, 1.0, 0,
+        ];
+      case _CameraFilter.natural:
+        return [
+          1, 0, 0, 0, 0,
+          0, 1, 0, 0, 0,
+          0, 0, 1, 0, 0,
+          0, 0, 0, 1, 0,
+        ];
+    }
+  }
+
+  Widget _buildLocalVideoView({RTCVideoViewObjectFit objectFit = RTCVideoViewObjectFit.RTCVideoViewObjectFitCover}) {
+    final view = RTCVideoView(_localRenderer, mirror: true, objectFit: objectFit);
+    if (_cameraFilter == _CameraFilter.natural) return view;
+    return ColorFiltered(
+      colorFilter: ColorFilter.matrix(_filterMatrix(_cameraFilter)),
+      child: view,
+    );
+  }
+
+  void _showFiltersPanel() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final filters = [
+            (_CameraFilter.natural, '🌿', 'Naturel'),
+            (_CameraFilter.warm, '🌅', 'Chaud'),
+            (_CameraFilter.cool, '❄️', 'Froid'),
+            (_CameraFilter.vivid, '🌈', 'Vivid'),
+            (_CameraFilter.bw, '⬛', 'N&B'),
+            (_CameraFilter.soft, '🌸', 'Doux'),
+          ];
+          return Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            decoration: const BoxDecoration(
+              color: Color(0xFF1A1A2E),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(height: 16),
+              Text('Filtres Caméra',
+                style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: filters.map((t) {
+                  final (filter, emoji, label) = t;
+                  final selected = _cameraFilter == filter;
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _cameraFilter = filter);
+                      setLocal(() {});
+                    },
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: selected ? const Color(0xFFFF4081).withValues(alpha: 0.25) : Colors.white10,
+                          border: Border.all(
+                            color: selected ? const Color(0xFFFF4081) : Colors.white24,
+                            width: selected ? 2 : 1,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(label,
+                        style: GoogleFonts.poppins(
+                          color: selected ? const Color(0xFFFF4081) : Colors.white60,
+                          fontSize: 11,
+                          fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                        )),
+                    ]),
+                  );
+                }).toList(),
+              ),
+            ]),
+          );
+        },
+      ),
     );
   }
 
@@ -3940,6 +4105,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   await Helper.switchCamera(t);
                 }
               },
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: Icons.auto_fix_high,
+              label: 'Filtres',
+              active: _cameraFilter == _CameraFilter.natural,
+              isHighlight: _cameraFilter != _CameraFilter.natural,
+              onTap: _showFiltersPanel,
             ),
             const SizedBox(width: 8),
             _Btn(
