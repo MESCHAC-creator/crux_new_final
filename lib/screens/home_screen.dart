@@ -305,6 +305,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _showScheduledConfirmation(String meetingId, String name, DateTime scheduledAt) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     final dateStr = '${scheduledAt.day}/${scheduledAt.month}/${scheduledAt.year}';
     final timeStr = '${scheduledAt.hour.toString().padLeft(2, '0')}:${scheduledAt.minute.toString().padLeft(2, '0')}';
 
@@ -323,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: const Icon(Icons.event_available, color: Colors.white, size: 32),
             ),
             const SizedBox(height: 16),
-            Text('Réunion programmée !', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
+            Text(AppTranslations.t('scheduled_created', lang), style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF1A1A2E))),
             const SizedBox(height: 8),
             Text(name, style: GoogleFonts.poppins(fontSize: 14, color: isDark ? Colors.white70 : Colors.black54), textAlign: TextAlign.center),
             const SizedBox(height: 12),
@@ -349,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: meetingId));
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('Code copié !', style: GoogleFonts.poppins()),
+                        content: Text(AppTranslations.t('id_copied', lang), style: GoogleFonts.poppins()),
                         backgroundColor: AppColors.primary,
                         behavior: SnackBarBehavior.floating,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -361,14 +362,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ]),
               ]),
             ),
-            const SizedBox(height: 12),
-            Text('Partagez ce code avec les participants.', style: GoogleFonts.poppins(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38), textAlign: TextAlign.center),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Fermer', style: GoogleFonts.poppins(color: Colors.grey)),
+            child: Text(AppTranslations.t('cancel', lang), style: GoogleFonts.poppins(color: Colors.grey)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -380,7 +379,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: Text('Copier le code', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+            child: Text(AppTranslations.t('copier_code', lang), style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -425,7 +424,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _errorHandler.showWarningSnackBar(context, '⚠️ Entrez le code d\'accès');
         return;
       }
-      if (entered != meeting.passcode) {
+      if (_hashPassword(entered) != meeting.passcode) {
         _passwordAttempts++;
         if (_passwordAttempts >= 5) {
           _passwordLockUntil = DateTime.now().add(const Duration(minutes: 2));
@@ -458,6 +457,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<String?> _showPasswordPrompt() async {
     final ctrl = TextEditingController();
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -473,14 +473,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: const Icon(Icons.lock_outline, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
-          Text('Code d\'accès',
-              style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w700, fontSize: 17, color: Colors.white)),
+          Text(AppTranslations.t('passcode_title', lang),
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 17, color: Colors.white)),
         ]),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('Cette réunion est protégée par un code.',
-              style: GoogleFonts.poppins(
-                  fontSize: 13, color: Colors.white70)),
+          Text(AppTranslations.t('passcode_protected', lang),
+              style: GoogleFonts.poppins(fontSize: 13, color: Colors.white70)),
           const SizedBox(height: 16),
           TextField(
             controller: ctrl,
@@ -491,7 +489,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white.withValues(alpha: 0.08),
-              hintText: 'Code d\'accès',
+              hintText: AppTranslations.t('passcode_hint', lang),
               hintStyle: GoogleFonts.poppins(color: Colors.white38),
               prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primary),
               border: OutlineInputBorder(
@@ -499,8 +497,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   borderSide: const BorderSide(color: Colors.white24)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: AppColors.primary, width: 2),
+                borderSide: const BorderSide(color: AppColors.primary, width: 2),
               ),
             ),
           ),
@@ -508,19 +505,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Annuler',
+            child: Text(AppTranslations.t('cancel', lang),
                 style: GoogleFonts.poppins(color: Colors.white38)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: Text('Entrer',
-                style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w700, color: Colors.white)),
+            child: Text(AppTranslations.t('enter_btn', lang),
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: Colors.white)),
           ),
         ],
       ),
@@ -529,6 +524,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _showJoinDialog() {
     _joinIdController.clear();
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -543,31 +539,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: const Icon(Icons.link, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
-          Text('Rejoindre',
-              style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w700, fontSize: 18)),
+          Text(AppTranslations.t('join', lang),
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 18)),
         ]),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('Entrez l\'ID de la réunion partagé par l\'hôte',
-              style: GoogleFonts.poppins(
-                  fontSize: 13, color: AppColors.textSecondary)),
+          Text(AppTranslations.t('join_hint', lang),
+              style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
           const SizedBox(height: 16),
           TextField(
             controller: _joinIdController,
             autofocus: true,
             textCapitalization: TextCapitalization.characters,
             decoration: InputDecoration(
-              hintText: 'ID de la réunion',
-              hintStyle:
-                  GoogleFonts.poppins(color: AppColors.textTertiary),
-              prefixIcon:
-                  const Icon(Icons.tag, color: AppColors.secondary),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12)),
+              hintText: AppTranslations.t('meeting_id', lang),
+              hintStyle: GoogleFonts.poppins(color: AppColors.textTertiary),
+              prefixIcon: const Icon(Icons.tag, color: AppColors.secondary),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: AppColors.secondary, width: 2),
+                borderSide: const BorderSide(color: AppColors.secondary, width: 2),
               ),
             ),
           ),
@@ -575,9 +565,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Annuler',
-                style:
-                    GoogleFonts.poppins(color: AppColors.textSecondary)),
+            child: Text(AppTranslations.t('cancel', lang),
+                style: GoogleFonts.poppins(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -588,12 +577,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.secondary,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: Text('Rejoindre',
-                style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w700, color: Colors.white)),
+            child: Text(AppTranslations.t('join', lang),
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: Colors.white)),
           ),
         ],
       ),
@@ -601,18 +588,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _logout() async {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Déconnexion',
+        title: Text(AppTranslations.t('logout', lang),
             style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
-        content: Text('Voulez-vous vraiment vous déconnecter ?',
+        content: Text(AppTranslations.t('logout_confirm', lang),
             style: GoogleFonts.poppins(color: AppColors.textSecondary)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Annuler')),
+              child: Text(AppTranslations.t('cancel', lang))),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
@@ -621,11 +609,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 Navigator.of(context).pushReplacementNamed('/login');
               }
             },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error),
-            child: Text('Déconnecter',
-                style: GoogleFonts.poppins(
-                    color: Colors.white, fontWeight: FontWeight.w700)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: Text(AppTranslations.t('disconnect', lang),
+                style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -668,7 +654,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     const Icon(Icons.wifi_off, color: Colors.white, size: 14),
                     const SizedBox(width: 6),
-                    Text('Hors ligne — les données peuvent être obsolètes',
+                    Text(AppTranslations.t('offline_msg', lang),
                         style: GoogleFonts.poppins(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
                   ]),
                 ),
