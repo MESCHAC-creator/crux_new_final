@@ -642,12 +642,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
                         // Divider
                         Row(children: [
-                          Expanded(child: Divider(color: Colors.white24, thickness: 1)),
+                          const Expanded(child: Divider(color: Colors.white24, thickness: 1)),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Text('ou', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
                           ),
-                          Expanded(child: Divider(color: Colors.white24, thickness: 1)),
+                          const Expanded(child: Divider(color: Colors.white24, thickness: 1)),
                         ]),
                         const SizedBox(height: 16),
 

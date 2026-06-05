@@ -297,7 +297,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   Set<String> _myQAUpvotes = {};
 
   // ── Feature N2: Attendance ───────────────────
-  bool _showAttendance = false;
   List<Map<String, dynamic>> _attendanceLog = [];
 
   // ── Feature N3: Cam off signal ───────────────
@@ -892,7 +891,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.timer_outlined, color: Colors.white, size: 11),
+          const Icon(Icons.timer_outlined, color: Colors.white, size: 11),
           const SizedBox(width: 4),
           Text(
             label,
@@ -983,10 +982,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         _db.collection('meetings').doc(widget.meetingId)
             .collection('presence').doc(widget.userId)
             .update({'isSpeaking': false}).catchError((_) {});
-        if (mounted) setState(() {
-          _participantSpeaking[widget.userId] = false;
-          if (_activeSpeakerId == widget.userId) { _activeSpeakerId = null; }
-        });
+        if (mounted) {
+          setState(() {
+            _participantSpeaking[widget.userId] = false;
+            if (_activeSpeakerId == widget.userId) { _activeSpeakerId = null; }
+          });
+        }
       }
       return;
     }
@@ -1134,10 +1135,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     final langCode = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     final localeId = _sttLocaleFor(langCode);
     _sttService.listen(
-      localeId: localeId,
-      listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 3),
-      partialResults: false,
+      listenOptions: stt.SpeechListenOptions(
+        localeId: localeId,
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 3),
+        partialResults: false,
+      ),
       onResult: (result) {
         if (!mounted) return;
         if (result.finalResult && result.recognizedWords.isNotEmpty) {
@@ -1234,19 +1237,21 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       final muteOnEntry = data['muteOnEntry'] as bool? ?? false;
       // Feature N6: agenda
       final agenda = data['agenda'] as String? ?? '';
-      if (mounted) setState(() {
-        _isCoHost = nowCoHost;
-        _isLocked = locked as bool;
-        _remoteRecording = isRecording;
-        _waitingRoomEnabled = waitingRoomEnabled;
-        _meetingPasscode = passcode;
-        _allowParticipantChat = allowChat;
-        _allowParticipantReactions = allowReactions;
-        _allowParticipantScreenShare = allowScreenShare;
-        _muteOnEntry = muteOnEntry;
-        _meetingAgenda = agenda;
-        _agendaController.text = agenda;
-      });
+      if (mounted) {
+        setState(() {
+          _isCoHost = nowCoHost;
+          _isLocked = locked as bool;
+          _remoteRecording = isRecording;
+          _waitingRoomEnabled = waitingRoomEnabled;
+          _meetingPasscode = passcode;
+          _allowParticipantChat = allowChat;
+          _allowParticipantReactions = allowReactions;
+          _allowParticipantScreenShare = allowScreenShare;
+          _muteOnEntry = muteOnEntry;
+          _meetingAgenda = agenda;
+          _agendaController.text = agenda;
+        });
+      }
 
       // Feature N14: auto-mute on entry (applied once after init)
     });
@@ -2074,38 +2079,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     });
   }
 
-  // ── CHAT ────────────────────────────────────
-  void _sendMessage() {
-    final text = _chatController.text.trim();
-    if (text.isEmpty || text.length > _maxMessageLength) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Message: 1-$_maxMessageLength caractères', style: GoogleFonts.poppins()),
-        backgroundColor: Colors.orange,
-      ));
-      return;
-    }
-    if (!_checkRateLimit('sendMessage')) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Trop de requêtes. Attendez un moment.', style: GoogleFonts.poppins()),
-        backgroundColor: Colors.red,
-      ));
-      return;
-    }
-    HapticFeedback.selectionClick();
-    _resetInactivityTimer();
-    _chatController.clear();
-    _db
-        .collection('meetings')
-        .doc(widget.meetingId)
-        .collection('chat')
-        .add({
-      'sender': widget.userName,
-      'senderId': widget.userId,
-      'message': text,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
-  }
-
   // ── LEAVE ───────────────────────────────────
   Future<void> _confirmLeave() async {
     if (_leaving) return;
@@ -2440,7 +2413,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 _init();
               },
               icon: const Icon(Icons.refresh, color: Color(0xFFB71C1C)),
-              label: Text('Réessayer', style: GoogleFonts.poppins(color: Color(0xFFB71C1C))),
+              label: Text('Réessayer', style: GoogleFonts.poppins(color: const Color(0xFFB71C1C))),
             ),
           ]),
         ),
@@ -3480,9 +3453,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         ],
         if (_meetingPasscode != null && _meetingPasscode!.isNotEmpty) ...[
           const SizedBox(width: 6),
-          Tooltip(
+          const Tooltip(
             message: 'Réunion protégée par un code',
-            child: const Icon(Icons.lock_outline, color: Colors.lightBlue, size: 14),
+            child: Icon(Icons.lock_outline, color: Colors.lightBlue, size: 14),
           ),
         ],
         if (_remoteRecording || _isRecordingLocally) ...[
@@ -3961,7 +3934,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                     return ListTile(
                       leading: Container(
                         width: 40, height: 40,
-                        decoration: BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
+                        decoration: const BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
                         child: photoBytes != null
                             ? ClipOval(child: Image.memory(photoBytes, fit: BoxFit.cover, width: 40, height: 40))
                             : Center(child: Text(initial,
@@ -4694,7 +4667,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               final points = rawPts.map((p) => Offset((p['x'] as num).toDouble(), (p['y'] as num).toDouble())).toList();
               _wbElements.add(_WbStroke(
                 points: points,
-                color: Color(d['color'] as int? ?? Colors.black.value),
+                color: Color(d['color'] as int? ?? Colors.black.toARGB32()),
                 width: (d['width'] as num? ?? 4).toDouble(),
                 isErase: d['isErase'] as bool? ?? false,
               ));
@@ -4706,7 +4679,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   start: Offset((s['x'] as num).toDouble(), (s['y'] as num).toDouble()),
                   end: Offset((e['x'] as num).toDouble(), (e['y'] as num).toDouble()),
                   shapeType: _WbShapeType.values.firstWhere((v) => v.name == (d['shapeType'] as String? ?? 'rect'), orElse: () => _WbShapeType.rect),
-                  color: Color(d['color'] as int? ?? Colors.black.value),
+                  color: Color(d['color'] as int? ?? Colors.black.toARGB32()),
                   width: (d['width'] as num? ?? 2).toDouble(),
                   filled: d['filled'] as bool? ?? false,
                 ));
@@ -4717,7 +4690,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 _wbElements.add(_WbText(
                   position: Offset((pos['x'] as num).toDouble(), (pos['y'] as num).toDouble()),
                   text: d['text'] as String? ?? '',
-                  color: Color(d['color'] as int? ?? Colors.black.value),
+                  color: Color(d['color'] as int? ?? Colors.black.toARGB32()),
                   fontSize: (d['fontSize'] as num? ?? 16).toDouble(),
                 ));
               }
@@ -4760,7 +4733,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         if (element.points.isEmpty) return;
         data['elementType'] = 'stroke';
         data['points'] = element.points.map((p) => {'x': p.dx, 'y': p.dy}).toList();
-        data['color'] = element.color.value;
+        data['color'] = element.color.toARGB32();
         data['width'] = element.width;
         data['isErase'] = element.isErase;
       } else if (element is _WbShape) {
@@ -4768,14 +4741,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         data['start'] = {'x': element.start.dx, 'y': element.start.dy};
         data['end'] = {'x': element.end.dx, 'y': element.end.dy};
         data['shapeType'] = element.shapeType.name;
-        data['color'] = element.color.value;
+        data['color'] = element.color.toARGB32();
         data['width'] = element.width;
         data['filled'] = element.filled;
       } else if (element is _WbText) {
         data['elementType'] = 'text';
         data['position'] = {'x': element.position.dx, 'y': element.position.dy};
         data['text'] = element.text;
-        data['color'] = element.color.value;
+        data['color'] = element.color.toARGB32();
         data['fontSize'] = element.fontSize;
       }
       await _db.collection('meetings').doc(widget.meetingId).collection('whiteboard').add(data);
@@ -5232,7 +5205,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                                 child: Stack(children: [
                                   if (myVote != null) FractionallySizedBox(
                                     widthFactor: pct,
-                                    child: Container(height: 36, decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.3), borderRadius: BorderRadius.circular(8))),
+                                    child: Container(height: 36, decoration: BoxDecoration(color: Colors.blueAccent.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(8))),
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -5792,38 +5765,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               },
             );
           }),
-        ]),
-      ),
-    );
-  }
-
-  // ── FEATURE 13: Message reaction picker ──────
-  void _showMessageReactionPicker(String docId) {
-    const quickEmojis = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(
-          color: Color(0xFF1A1A2E),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: quickEmojis.map((e) => GestureDetector(
-              onTap: () {
-                Navigator.pop(context);
-                _toggleMessageReaction(docId, e);
-              },
-              child: Text(e, style: const TextStyle(fontSize: 32)),
-            )).toList(),
-          ),
-          const SizedBox(height: 8),
         ]),
       ),
     );
@@ -6582,7 +6523,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               title: Text('Autoriser le chat', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
               subtitle: Text('Les participants peuvent envoyer des messages', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
               value: _allowParticipantChat,
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
               onChanged: (v) async {
                 setState(() => _allowParticipantChat = v);
                 setLocal(() {});
@@ -6593,7 +6534,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               title: Text('Autoriser les réactions', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
               subtitle: Text('Les participants peuvent envoyer des emojis', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
               value: _allowParticipantReactions,
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
               onChanged: (v) async {
                 setState(() => _allowParticipantReactions = v);
                 setLocal(() {});
@@ -6604,7 +6545,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               title: Text('Autoriser le partage d\'écran', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
               subtitle: Text('Les participants peuvent partager leur écran', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
               value: _allowParticipantScreenShare,
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
               onChanged: (v) async {
                 setState(() => _allowParticipantScreenShare = v);
                 setLocal(() {});
@@ -6615,7 +6556,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               title: Text('Couper micro à l\'entrée', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
               subtitle: Text('Les nouveaux participants arrivent muets', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
               value: _muteOnEntry,
-              activeColor: Colors.orange,
+              activeThumbColor: Colors.orange,
               onChanged: (v) async {
                 setState(() => _muteOnEntry = v);
                 setLocal(() {});
@@ -7259,7 +7200,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 title: Text('Miroir vidéo', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
                 subtitle: Text('Inverser l\'image de votre caméra', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _mirrorVideo,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 onChanged: (v) {
                   setState(() => _mirrorVideo = v);
                   setLocal(() {});
@@ -7271,7 +7212,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 title: Text('Masquer ma vue', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
                 subtitle: Text('Cacher votre propre vidéo dans l\'interface', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _hideSelfView,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 onChanged: (v) {
                   setState(() => _hideSelfView = v);
                   setLocal(() {});
@@ -7291,7 +7232,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 ]),
                 subtitle: Text('1080p Full HD', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _hdEnabled,
-                activeColor: Colors.blue,
+                activeThumbColor: Colors.blue,
                 onChanged: (v) async {
                   setLocal(() {});
                   await _toggleHD();
@@ -7304,7 +7245,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 title: Text('Salle d\'attente', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
                 subtitle: Text('Admettre manuellement les participants', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _waitingRoomEnabled,
-                activeColor: Colors.orange,
+                activeThumbColor: Colors.orange,
                 onChanged: (v) async {
                   setLocal(() {});
                   await _toggleWaitingRoom();
@@ -7333,7 +7274,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 title: Text('Mode faible luminosité', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
                 subtitle: Text('Améliore la visibilité dans l\'obscurité', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _lowLightMode,
-                activeColor: Colors.amber,
+                activeThumbColor: Colors.amber,
                 secondary: const Icon(Icons.brightness_6, color: Colors.amber),
                 onChanged: (v) {
                   setState(() => _lowLightMode = v);

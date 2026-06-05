@@ -668,7 +668,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           title: AppTranslations.t('email_password', lang),
                           subtitle: user?.email ?? '',
                           isDark: isDark,
-                          trailing: _Badge('Actif', Colors.green),
+                          trailing: const _Badge('Actif', Colors.green),
                         ),
                         if (hasGoogleProvider) _ProfileDivider(isDark: isDark),
                       ],
@@ -678,7 +678,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           title: AppTranslations.t('google_account', lang),
                           subtitle: user?.email ?? '',
                           isDark: isDark,
-                          trailing: _Badge('Google', const Color(0xFF4285F4)),
+                          trailing: const _Badge('Google', Color(0xFF4285F4)),
                         ),
                     ])),
 
@@ -698,7 +698,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ],
 
                     // ── Danger Zone ──
-                    _SectionLabel('Zone dangereuse', Colors.red),
+                    const _SectionLabel('Zone dangereuse', Colors.red),
                     _GlassCard(isDark: isDark, child: _ProfileTile(
                       icon: Icons.delete_forever_outlined, iconColor: Colors.red,
                       title: AppTranslations.t('delete_account', lang),

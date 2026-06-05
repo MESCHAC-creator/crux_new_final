@@ -16,7 +16,7 @@ class PremiumButton extends StatefulWidget {
   final EdgeInsets? padding;
 
   const PremiumButton({
-    Key? key,
+    super.key,
     required this.label,
     required this.onPressed,
     this.backgroundColor,
@@ -28,7 +28,7 @@ class PremiumButton extends StatefulWidget {
     this.width,
     this.height,
     this.padding,
-  }) : super(key: key);
+  });
 
   @override
   State<PremiumButton> createState() => _PremiumButtonState();
@@ -78,10 +78,10 @@ class _PremiumButtonState extends State<PremiumButton> {
                 offset: Offset(0, _isPressed ? 4 : 8),
               ),
               if (widget.isPrimary)
-                BoxShadow(
+                const BoxShadow(
                   color: PremiumColors.fireGlow,
                   blurRadius: 16,
-                  offset: const Offset(0, 0),
+                  offset: Offset(0, 0),
                 ),
             ],
           ),

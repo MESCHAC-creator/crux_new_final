@@ -6,9 +6,9 @@ class ReactionEmojis extends StatelessWidget {
   final Function(String emoji) onReactionSelected;
 
   const ReactionEmojis({
-    Key? key,
+    super.key,
     required this.onReactionSelected,
-  }) : super(key: key);
+  });
 
   static const List<Map<String, String>> reactions = [
     {'emoji': '👍', 'label': 'Like'},
@@ -78,10 +78,10 @@ class FloatingReaction extends StatefulWidget {
   final Offset position;
 
   const FloatingReaction({
-    Key? key,
+    super.key,
     required this.emoji,
     required this.position,
-  }) : super(key: key);
+  });
 
   @override
   State<FloatingReaction> createState() => _FloatingReactionState();

@@ -298,7 +298,7 @@ class _ParticipantChip extends StatelessWidget {
         Container(
           width: 28,
           height: 28,
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: AppColors.primaryGradient,
             shape: BoxShape.circle,
           ),

@@ -6,7 +6,7 @@ import '../theme/premium_colors.dart';
 class MeetingChat extends StatefulWidget {
   final String meetingId;
 
-  const MeetingChat({Key? key, required this.meetingId}) : super(key: key);
+  const MeetingChat({super.key, required this.meetingId});
 
   @override
   State<MeetingChat> createState() => _MeetingChatState();
@@ -15,7 +15,7 @@ class MeetingChat extends StatefulWidget {
 class _MeetingChatState extends State<MeetingChat> {
   late TextEditingController _messageController;
   final _db = FirebaseFirestore.instance;
-  String _userName = 'You';
+  final String _userName = 'You';
 
   @override
   void initState() {

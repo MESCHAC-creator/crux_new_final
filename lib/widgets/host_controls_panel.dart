@@ -11,14 +11,14 @@ class HostControlsPanel extends StatelessWidget {
   final int participantCount;
 
   const HostControlsPanel({
-    Key? key,
+    super.key,
     required this.isRecording,
     required this.onToggleRecording,
     required this.onMuteAll,
     required this.onRemoveParticipant,
     required this.onEndMeeting,
     required this.participantCount,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
