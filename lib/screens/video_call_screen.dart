@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter/foundation.dart';
@@ -181,13 +182,35 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── Drawing whiteboard ────────────────────────
   bool _showWhiteboard = false;
-  final List<_WbStroke> _wbStrokes = [];           // synced from Firestore
+  final List<_WbElement> _wbElements = [];          // synced from Firestore
   final List<Offset?> _wbCurrentPoints = [];        // stroke in progress
-  Color _wbColor = Colors.black;
+  Offset? _wbShapeStart;                            // shape drag start
+  Color _wbColor = const Color(0xFF1A1A2E);
   double _wbWidth = 4.0;
-  bool _wbErasing = false;
+  _WbTool _wbTool = _WbTool.pen;
+  bool _wbFilled = false;
+  final List<List<_WbElement>> _wbUndoHistory = [];
+  final List<List<_WbElement>> _wbRedoHistory = [];
+  Offset? _wbLaserPos;
+  Timer? _wbLaserTimer;
   bool _wbSyncEnabled = false;
   StreamSubscription? _whiteboardSub;
+
+  // ── Polls ────────────────────────────────────
+  bool _showPolls = false;
+  List<Map<String, dynamic>> _activePolls = [];
+  StreamSubscription? _pollsSub;
+  Map<String, String> _myPollVotes = {};
+
+  // ── Recording & Noise ────────────────────────
+  bool _isRecordingLocally = false;
+  Timer? _recordingBlinkTimer;
+  bool _recordingBlink = false;
+  bool _noiseCancellation = true;
+
+  // ── Spotlight & Summary ──────────────────────
+  String? _spotlightUserId;
+  String? _meetingSummary;
 
   // ── Church mode ──────────────────────────────
   bool _isChurchMode = false;
@@ -281,6 +304,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _init();
     _detectLiveMode();
     _listenReactions();
+    _listenPolls();
     _listenMeetingDoc();
     _listenPresence();
     _listenProStatus();
@@ -304,7 +328,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _hostWaitTimer?.cancel();
     _inactivityTimer?.cancel();
     _liveCommentSub?.cancel();
+    _pollsSub?.cancel();
     _whiteboardSub?.cancel();
+    _wbLaserTimer?.cancel();
+    _recordingBlinkTimer?.cancel();
     for (final sub in _profileSubs.values) { sub.cancel(); }
     _profileSubs.clear();
     _bannerHideTimer?.cancel();
@@ -2339,11 +2366,42 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         child: _buildWhiteboardPanel(),
       ),
 
+      // ── POLLS PANEL ──────────────────────────────────────────────────
+      AnimatedPositioned(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOut,
+        bottom: _showPolls ? 0 : -400,
+        left: 0,
+        right: 0,
+        height: 400,
+        child: _buildPollsPanel(),
+      ),
+
+      // ── RECORDING INDICATOR ──────────────────────────────────────────
+      if (_isRecordingLocally)
+        Positioned(
+          top: 60,
+          right: 12,
+          child: AnimatedOpacity(
+            opacity: _recordingBlink ? 1.0 : 0.3,
+            duration: const Duration(milliseconds: 400),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(6)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.fiber_manual_record, color: Colors.white, size: 10),
+                const SizedBox(width: 4),
+                Text('REC', style: GoogleFonts.poppins(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+              ]),
+            ),
+          ),
+        ),
+
       // ── CONTROLS ─────────────────────────────────────────────────────
       AnimatedPositioned(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeInOut,
-        bottom: (_showChat || _showParticipants || _showTranscript || _showWhiteboard) ? 400 : 0,
+        bottom: (_showChat || _showParticipants || _showTranscript || _showWhiteboard || _showPolls) ? 400 : 0,
         left: 0,
         right: 0,
         child: _buildControls(),
@@ -3824,7 +3882,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     );
   }
 
-  // ── DRAWING WHITEBOARD ────────────────────────
+// ── DRAWING WHITEBOARD ────────────────────────
   void _listenWhiteboard() {
     if (_wbSyncEnabled) return;
     _wbSyncEnabled = true;
@@ -3839,20 +3897,43 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       final docs = snap.docs.map((d) => d.data()).toList()
         ..sort((a, b) => ((a['clientTs'] as int? ?? 0).compareTo(b['clientTs'] as int? ?? 0)));
       setState(() {
-        _wbStrokes.clear();
+        _wbElements.clear();
         for (final d in docs) {
           try {
-            final rawPts = d['points'] as List<dynamic>? ?? [];
-            final points = rawPts.map((p) => Offset(
-              (p['x'] as num).toDouble(),
-              (p['y'] as num).toDouble(),
-            )).toList();
-            _wbStrokes.add(_WbStroke(
-              points: points,
-              color: Color(d['color'] as int? ?? Colors.black.value),
-              width: (d['width'] as num? ?? 4).toDouble(),
-              isErase: d['isErase'] as bool? ?? false,
-            ));
+            final type = d['elementType'] as String? ?? 'stroke';
+            if (type == 'stroke') {
+              final rawPts = d['points'] as List<dynamic>? ?? [];
+              final points = rawPts.map((p) => Offset((p['x'] as num).toDouble(), (p['y'] as num).toDouble())).toList();
+              _wbElements.add(_WbStroke(
+                points: points,
+                color: Color(d['color'] as int? ?? Colors.black.value),
+                width: (d['width'] as num? ?? 4).toDouble(),
+                isErase: d['isErase'] as bool? ?? false,
+              ));
+            } else if (type == 'shape') {
+              final s = d['start'] as Map?;
+              final e = d['end'] as Map?;
+              if (s != null && e != null) {
+                _wbElements.add(_WbShape(
+                  start: Offset((s['x'] as num).toDouble(), (s['y'] as num).toDouble()),
+                  end: Offset((e['x'] as num).toDouble(), (e['y'] as num).toDouble()),
+                  shapeType: _WbShapeType.values.firstWhere((v) => v.name == (d['shapeType'] as String? ?? 'rect'), orElse: () => _WbShapeType.rect),
+                  color: Color(d['color'] as int? ?? Colors.black.value),
+                  width: (d['width'] as num? ?? 2).toDouble(),
+                  filled: d['filled'] as bool? ?? false,
+                ));
+              }
+            } else if (type == 'text') {
+              final pos = d['position'] as Map?;
+              if (pos != null) {
+                _wbElements.add(_WbText(
+                  position: Offset((pos['x'] as num).toDouble(), (pos['y'] as num).toDouble()),
+                  text: d['text'] as String? ?? '',
+                  color: Color(d['color'] as int? ?? Colors.black.value),
+                  fontSize: (d['fontSize'] as num? ?? 16).toDouble(),
+                ));
+              }
+            }
           } catch (_) {}
         }
       });
@@ -3863,7 +3944,13 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _whiteboardSub?.cancel();
     _whiteboardSub = null;
     _wbSyncEnabled = false;
-    setState(() { _wbStrokes.clear(); _wbCurrentPoints.clear(); });
+    setState(() {
+      _wbElements.clear();
+      _wbCurrentPoints.clear();
+      _wbShapeStart = null;
+      _wbUndoHistory.clear();
+      _wbRedoHistory.clear();
+    });
     try {
       final snap = await _db.collection('meetings').doc(widget.meetingId).collection('whiteboard').get();
       final batch = _db.batch();
@@ -3874,150 +3961,605 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     }
   }
 
-  Future<void> _saveDrawingStroke(_WbStroke stroke) async {
-    if (stroke.points.isEmpty) return;
+  Future<void> _saveWbElement(_WbElement element) async {
     try {
-      await _db.collection('meetings').doc(widget.meetingId).collection('whiteboard').add({
-        'points': stroke.points.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
-        'color': stroke.color.value,
-        'width': stroke.width,
-        'isErase': stroke.isErase,
+      Map<String, dynamic> data = {
         'author': widget.userName,
         'clientTs': DateTime.now().millisecondsSinceEpoch,
         'ts': FieldValue.serverTimestamp(),
-      });
+      };
+      if (element is _WbStroke) {
+        if (element.points.isEmpty) return;
+        data['elementType'] = 'stroke';
+        data['points'] = element.points.map((p) => {'x': p.dx, 'y': p.dy}).toList();
+        data['color'] = element.color.value;
+        data['width'] = element.width;
+        data['isErase'] = element.isErase;
+      } else if (element is _WbShape) {
+        data['elementType'] = 'shape';
+        data['start'] = {'x': element.start.dx, 'y': element.start.dy};
+        data['end'] = {'x': element.end.dx, 'y': element.end.dy};
+        data['shapeType'] = element.shapeType.name;
+        data['color'] = element.color.value;
+        data['width'] = element.width;
+        data['filled'] = element.filled;
+      } else if (element is _WbText) {
+        data['elementType'] = 'text';
+        data['position'] = {'x': element.position.dx, 'y': element.position.dy};
+        data['text'] = element.text;
+        data['color'] = element.color.value;
+        data['fontSize'] = element.fontSize;
+      }
+      await _db.collection('meetings').doc(widget.meetingId).collection('whiteboard').add(data);
     } catch (_) {}
   }
 
+  void _wbUndo() {
+    if (_wbUndoHistory.isEmpty) return;
+    setState(() {
+      _wbRedoHistory.add(List.from(_wbElements));
+      _wbElements.clear();
+      _wbElements.addAll(_wbUndoHistory.removeLast());
+    });
+  }
+
+  void _wbRedo() {
+    if (_wbRedoHistory.isEmpty) return;
+    setState(() {
+      _wbUndoHistory.add(List.from(_wbElements));
+      _wbElements.clear();
+      _wbElements.addAll(_wbRedoHistory.removeLast());
+    });
+  }
+
   Widget _buildWhiteboardPanel() {
+    final isPrivileged = widget.isHost || _isCoHost;
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xCC141420),
-            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.12))),
+            color: const Color(0xF0F5F5F5),
+            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.15))),
           ),
-      child: Column(children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Row(children: [
-            const Icon(Icons.draw, color: Colors.white70, size: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text('Tableau collaboratif',
-                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-            ),
-            if (widget.isHost || _isCoHost)
-              GestureDetector(
-                onTap: _clearWhiteboard,
-                child: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
+          child: Column(children: [
+            // ── HEADER ──────────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [const Color(0xFF1A1A2E), const Color(0xFF16213E)],
+                ),
               ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: () => setState(() { _showWhiteboard = false; }),
-              icon: const Icon(Icons.close, color: Colors.white54, size: 18),
-              padding: EdgeInsets.zero, constraints: const BoxConstraints(),
+              child: Row(children: [
+                const Icon(Icons.draw_rounded, color: Colors.white70, size: 16),
+                const SizedBox(width: 8),
+                Text('Tableau collaboratif', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                // Undo
+                _WbIconBtn(icon: Icons.undo_rounded, active: _wbUndoHistory.isNotEmpty, onTap: _wbUndo),
+                // Redo
+                _WbIconBtn(icon: Icons.redo_rounded, active: _wbRedoHistory.isNotEmpty, onTap: _wbRedo),
+                // Export (save as image — shows snackbar since flutter_screenshot not available)
+                _WbIconBtn(icon: Icons.download_rounded, active: true, onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Capture d\'écran disponible avec la touche screenshot', style: GoogleFonts.poppins(fontSize: 12)),
+                    backgroundColor: const Color(0xFF1A1A2E),
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ));
+                }),
+                if (isPrivileged) ...[
+                  const SizedBox(width: 4),
+                  _WbIconBtn(icon: Icons.delete_outline, active: true, onTap: _clearWhiteboard, color: Colors.redAccent),
+                ],
+                const SizedBox(width: 4),
+                _WbIconBtn(icon: Icons.close, active: true, onTap: () => setState(() => _showWhiteboard = false)),
+              ]),
             ),
-          ]),
-        ),
-        // ── TOOLBAR (colors + tools) ──────────────────────────────────
-        Container(
-          color: Colors.black26,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Row(children: [
-            // Color chips
-            for (final c in [Colors.black, Colors.white, Colors.red, Colors.blue, Colors.green, Colors.yellow, Colors.orange])
-              GestureDetector(
-                onTap: () => setState(() { _wbColor = c; _wbErasing = false; }),
-                child: Container(
-                  width: 24, height: 24,
-                  margin: const EdgeInsets.only(right: 6),
-                  decoration: BoxDecoration(
-                    color: c,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: (_wbColor == c && !_wbErasing) ? Colors.white : Colors.white24,
-                      width: (_wbColor == c && !_wbErasing) ? 2.5 : 1,
+
+            // ── TOOL BAR ROW 1: Tools ────────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              color: const Color(0xFF1A1A2E),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: [
+                  _WbToolBtn(icon: Icons.pan_tool_alt_outlined, label: 'Sel', tool: _WbTool.select, current: _wbTool, onTap: (t) => setState(() => _wbTool = t)),
+                  _WbToolBtn(icon: Icons.edit_rounded, label: 'Stylo', tool: _WbTool.pen, current: _wbTool, onTap: (t) => setState(() => _wbTool = t)),
+                  _WbToolBtn(icon: Icons.horizontal_rule_rounded, label: 'Ligne', tool: _WbTool.line, current: _wbTool, onTap: (t) => setState(() => _wbTool = t)),
+                  _WbToolBtn(icon: Icons.arrow_right_alt_rounded, label: 'Flèche', tool: _WbTool.arrow, current: _wbTool, onTap: (t) => setState(() => _wbTool = t)),
+                  _WbToolBtn(icon: Icons.rectangle_outlined, label: 'Rect', tool: _WbTool.rect, current: _wbTool, onTap: (t) => setState(() => _wbTool = t)),
+                  _WbToolBtn(icon: Icons.circle_outlined, label: 'Cercle', tool: _WbTool.circle, current: _wbTool, onTap: (t) => setState(() => _wbTool = t)),
+                  _WbToolBtn(icon: Icons.change_history_outlined, label: 'Tri', tool: _WbTool.triangle, current: _wbTool, onTap: (t) => setState(() => _wbTool = t)),
+                  _WbToolBtn(icon: Icons.text_fields_rounded, label: 'Texte', tool: _WbTool.text, current: _wbTool, onTap: (t) => setState(() { _wbTool = t; _showTextInput(); })),
+                  _WbToolBtn(icon: Icons.auto_fix_high_rounded, label: 'Efface', tool: _WbTool.eraser, current: _wbTool, onTap: (t) => setState(() => _wbTool = t)),
+                  _WbToolBtn(icon: Icons.highlight_rounded, label: 'Laser', tool: _WbTool.laser, current: _wbTool, onTap: (t) => setState(() => _wbTool = t)),
+                  // Fill toggle (for shapes)
+                  if ([_WbTool.rect, _WbTool.circle, _WbTool.triangle].contains(_wbTool))
+                    GestureDetector(
+                      onTap: () => setState(() => _wbFilled = !_wbFilled),
+                      child: Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _wbFilled ? Colors.white.withValues(alpha: 0.2) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.white38),
+                        ),
+                        child: Text('Rempli', style: GoogleFonts.poppins(color: Colors.white70, fontSize: 10)),
+                      ),
+                    ),
+                ]),
+              ),
+            ),
+
+            // ── TOOL BAR ROW 2: Colors + Width ───────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              color: const Color(0xFF16213E),
+              child: Row(children: [
+                // Colors
+                for (final c in const [
+                  Color(0xFF000000), Color(0xFFFFFFFF), Color(0xFFEF4444), Color(0xFF3B82F6),
+                  Color(0xFF22C55E), Color(0xFFF59E0B), Color(0xFFEC4899), Color(0xFF8B5CF6),
+                  Color(0xFF06B6D4), Color(0xFFFF6B35), Color(0xFF84CC16), Color(0xFF6B7280),
+                ])
+                  GestureDetector(
+                    onTap: () => setState(() { _wbColor = c; if (_wbTool == _WbTool.eraser) _wbTool = _WbTool.pen; }),
+                    child: Container(
+                      width: 20, height: 20,
+                      margin: const EdgeInsets.only(right: 5),
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _wbColor == c ? Colors.white : Colors.white24,
+                          width: _wbColor == c ? 2.5 : 1,
+                        ),
+                        boxShadow: _wbColor == c ? [BoxShadow(color: c.withValues(alpha: 0.6), blurRadius: 6)] : null,
+                      ),
                     ),
                   ),
-                ),
-              ),
-            const Spacer(),
-            // Stroke width
-            GestureDetector(
-              onTap: () => setState(() => _wbWidth = _wbWidth < 8 ? _wbWidth + 2 : 2),
-              child: Container(
-                width: 28, height: 28,
-                decoration: BoxDecoration(
-                  color: Colors.white12,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white24),
-                ),
-                child: Center(
-                  child: Container(
-                    width: _wbWidth.clamp(2, 10), height: _wbWidth.clamp(2, 10),
-                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                const Spacer(),
+                // Stroke widths
+                for (final w in [2.0, 4.0, 6.0, 10.0, 16.0])
+                  GestureDetector(
+                    onTap: () => setState(() => _wbWidth = w),
+                    child: Container(
+                      width: 24, height: 24,
+                      margin: const EdgeInsets.only(left: 4),
+                      decoration: BoxDecoration(
+                        color: _wbWidth == w ? Colors.white.withValues(alpha: 0.2) : Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _wbWidth == w ? Colors.white : Colors.white24),
+                      ),
+                      child: Center(child: Container(
+                        width: w.clamp(2, 14), height: w.clamp(2, 14),
+                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      )),
+                    ),
+                  ),
+              ]),
+            ),
+
+            // ── CANVAS ──────────────────────────────────────────────
+            Expanded(
+              child: ClipRect(
+                child: GestureDetector(
+                  onPanStart: (d) {
+                    if (_wbTool == _WbTool.pen || _wbTool == _WbTool.eraser) {
+                      setState(() => _wbCurrentPoints.add(d.localPosition));
+                    } else if (_wbTool == _WbTool.laser) {
+                      _wbLaserTimer?.cancel();
+                      setState(() => _wbLaserPos = d.localPosition);
+                    } else if ([_WbTool.line, _WbTool.arrow, _WbTool.rect, _WbTool.circle, _WbTool.triangle].contains(_wbTool)) {
+                      setState(() { _wbShapeStart = d.localPosition; _wbCurrentPoints.add(d.localPosition); });
+                    }
+                  },
+                  onPanUpdate: (d) {
+                    if (_wbTool == _WbTool.pen || _wbTool == _WbTool.eraser) {
+                      setState(() => _wbCurrentPoints.add(d.localPosition));
+                    } else if (_wbTool == _WbTool.laser) {
+                      setState(() => _wbLaserPos = d.localPosition);
+                    } else if ([_WbTool.line, _WbTool.arrow, _WbTool.rect, _WbTool.circle, _WbTool.triangle].contains(_wbTool)) {
+                      setState(() {
+                        if (_wbCurrentPoints.isNotEmpty) _wbCurrentPoints[_wbCurrentPoints.length - 1] = d.localPosition;
+                        else _wbCurrentPoints.add(d.localPosition);
+                      });
+                    }
+                  },
+                  onPanEnd: (_) {
+                    if (_wbTool == _WbTool.pen || _wbTool == _WbTool.eraser) {
+                      final pts = _wbCurrentPoints.whereType<Offset>().toList();
+                      if (pts.isNotEmpty) {
+                        final el = _WbStroke(
+                          points: pts,
+                          color: _wbTool == _WbTool.eraser ? Colors.white : _wbColor,
+                          width: _wbTool == _WbTool.eraser ? 24.0 : _wbWidth,
+                          isErase: _wbTool == _WbTool.eraser,
+                        );
+                        setState(() {
+                          _wbUndoHistory.add(List.from(_wbElements));
+                          _wbRedoHistory.clear();
+                          _wbElements.add(el);
+                          _wbCurrentPoints.clear();
+                        });
+                        _saveWbElement(el);
+                      }
+                    } else if (_wbTool == _WbTool.laser) {
+                      _wbLaserTimer?.cancel();
+                      _wbLaserTimer = Timer(const Duration(milliseconds: 800), () {
+                        if (mounted) setState(() => _wbLaserPos = null);
+                      });
+                    } else if ([_WbTool.line, _WbTool.arrow, _WbTool.rect, _WbTool.circle, _WbTool.triangle].contains(_wbTool)) {
+                      if (_wbShapeStart != null && _wbCurrentPoints.isNotEmpty) {
+                        final end = _wbCurrentPoints.last;
+                        final shapeType = _wbTool == _WbTool.line ? _WbShapeType.line
+                          : _wbTool == _WbTool.arrow ? _WbShapeType.arrow
+                          : _wbTool == _WbTool.rect ? _WbShapeType.rect
+                          : _wbTool == _WbTool.circle ? _WbShapeType.circle
+                          : _WbShapeType.triangle;
+                        final el = _WbShape(
+                          start: _wbShapeStart!,
+                          end: end is Offset ? end : _wbShapeStart!,
+                          shapeType: shapeType,
+                          color: _wbColor,
+                          width: _wbWidth,
+                          filled: _wbFilled,
+                        );
+                        setState(() {
+                          _wbUndoHistory.add(List.from(_wbElements));
+                          _wbRedoHistory.clear();
+                          _wbElements.add(el);
+                          _wbCurrentPoints.clear();
+                          _wbShapeStart = null;
+                        });
+                        _saveWbElement(el);
+                      }
+                    }
+                  },
+                  child: CustomPaint(
+                    painter: _WhiteboardPainter(
+                      elements: _wbElements,
+                      currentPoints: _wbCurrentPoints,
+                      currentColor: _wbTool == _WbTool.eraser ? Colors.white : _wbColor,
+                      currentWidth: _wbTool == _WbTool.eraser ? 24.0 : _wbWidth,
+                      currentTool: _wbTool,
+                      shapeStart: _wbShapeStart,
+                      laserPos: _wbLaserPos,
+                    ),
+                    child: const SizedBox.expand(),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            // Eraser
-            GestureDetector(
-              onTap: () => setState(() => _wbErasing = !_wbErasing),
-              child: Container(
-                width: 28, height: 28,
-                decoration: BoxDecoration(
-                  color: _wbErasing ? Colors.white : Colors.white12,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: _wbErasing ? Colors.white : Colors.white24),
-                ),
-                child: Icon(Icons.auto_fix_high, size: 14, color: _wbErasing ? Colors.black : Colors.white54),
-              ),
-            ),
           ]),
         ),
-        const Divider(color: Colors.white10, height: 1),
-        // ── DRAWING CANVAS ────────────────────────────────────────────
-        Expanded(
-          child: ClipRect(
-            child: GestureDetector(
-              onPanStart: (d) => setState(() => _wbCurrentPoints.add(d.localPosition)),
-              onPanUpdate: (d) => setState(() => _wbCurrentPoints.add(d.localPosition)),
-              onPanEnd: (_) {
-                if (_wbCurrentPoints.isNotEmpty) {
-                  final pts = _wbCurrentPoints.whereType<Offset>().toList();
-                  if (pts.isNotEmpty) {
-                    final stroke = _WbStroke(
-                      points: pts,
-                      color: _wbErasing ? Colors.white : _wbColor,
-                      width: _wbErasing ? 24.0 : _wbWidth,
-                      isErase: _wbErasing,
-                    );
-                    setState(() {
-                      _wbStrokes.add(stroke);
-                      _wbCurrentPoints.clear();
-                    });
-                    _saveDrawingStroke(stroke);
-                  }
-                }
-              },
-              child: CustomPaint(
-                painter: _WhiteboardPainter(
-                  strokes: _wbStrokes,
-                  currentPoints: _wbCurrentPoints,
-                  currentColor: _wbErasing ? Colors.white : _wbColor,
-                  currentWidth: _wbErasing ? 24.0 : _wbWidth,
-                ),
-                child: const SizedBox.expand(),
-              ),
-            ),
+      ),
+    );
+  }
+
+  void _showTextInput() {
+    String inputText = '';
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Ajouter du texte', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+        content: TextField(
+          autofocus: true,
+          style: GoogleFonts.poppins(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Entrez votre texte...',
+            hintStyle: GoogleFonts.poppins(color: Colors.white38),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.white24)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white24)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFFF4081))),
           ),
+          onChanged: (v) => inputText = v,
+        ),
+        actions: [
+          TextButton(onPressed: () { setState(() => _wbTool = _WbTool.pen); Navigator.pop(context); },
+            child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white54))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4081), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            onPressed: () {
+              if (inputText.trim().isNotEmpty) {
+                final el = _WbText(
+                  position: const Offset(100, 100),
+                  text: inputText.trim(),
+                  color: _wbColor,
+                  fontSize: _wbWidth * 4 + 12,
+                );
+                setState(() {
+                  _wbUndoHistory.add(List.from(_wbElements));
+                  _wbRedoHistory.clear();
+                  _wbElements.add(el);
+                  _wbTool = _WbTool.pen;
+                });
+                _saveWbElement(el);
+              }
+              Navigator.pop(context);
+            },
+            child: Text('Ajouter', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── POLLS ─────────────────────────────────────
+
+  void _listenPolls() {
+    _pollsSub?.cancel();
+    _pollsSub = _db
+        .collection('meetings')
+        .doc(widget.meetingId)
+        .collection('polls')
+        .where('isActive', isEqualTo: true)
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      setState(() {
+        _activePolls = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      });
+    });
+  }
+
+  Future<void> _createPoll(String question, List<String> options) async {
+    await _db
+        .collection('meetings')
+        .doc(widget.meetingId)
+        .collection('polls')
+        .add({
+      'question': question,
+      'options': options.map((o) => {'text': o, 'votes': []}).toList(),
+      'isActive': true,
+      'createdBy': widget.userId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> _votePoll(String pollId, int optionIndex) async {
+    if (_myPollVotes[pollId] != null) return;
+    setState(() => _myPollVotes[pollId] = optionIndex.toString()); // optimistic
+    final ref = _db.collection('meetings').doc(widget.meetingId).collection('polls').doc(pollId);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final opts = List<Map<String, dynamic>>.from(snap['options'] as List);
+      final votes = List<String>.from(opts[optionIndex]['votes'] as List);
+      if (!votes.contains(widget.userId)) votes.add(widget.userId);
+      opts[optionIndex] = {...opts[optionIndex], 'votes': votes};
+      tx.update(ref, {'options': opts});
+    });
+  }
+
+  Future<void> _endPoll(String pollId) async {
+    await _db.collection('meetings').doc(widget.meetingId).collection('polls').doc(pollId).update({'isActive': false});
+  }
+
+  void _showCreatePollDialog() {
+    final questionCtrl = TextEditingController();
+    final opts = [TextEditingController(), TextEditingController()];
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx2, setSt) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title: Text('Créer un sondage', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(
+              controller: questionCtrl,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(labelText: 'Question', labelStyle: const TextStyle(color: Colors.white60), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)), enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white24), borderRadius: BorderRadius.circular(8))),
+            ),
+            const SizedBox(height: 12),
+            ...opts.asMap().entries.map((e) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TextField(
+                controller: e.value,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(labelText: 'Option ${e.key + 1}', labelStyle: const TextStyle(color: Colors.white60), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)), enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white24), borderRadius: BorderRadius.circular(8))),
+              ),
+            )),
+            if (opts.length < 4)
+              TextButton.icon(
+                onPressed: () => setSt(() => opts.add(TextEditingController())),
+                icon: const Icon(Icons.add, color: Colors.blueAccent, size: 16),
+                label: Text('Ajouter une option', style: GoogleFonts.poppins(color: Colors.blueAccent, fontSize: 13)),
+              ),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white60))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+            onPressed: () {
+              final q = questionCtrl.text.trim();
+              final os = opts.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList();
+              if (q.isEmpty || os.length < 2) return;
+              _createPoll(q, os);
+              Navigator.pop(ctx);
+            },
+            child: Text('Lancer', style: GoogleFonts.poppins(color: Colors.white)),
+          ),
+        ],
+      )),
+    );
+  }
+
+  Widget _buildPollsPanel() {
+    return Container(
+      color: const Color(0xFF0F0F1E),
+      child: Column(children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(children: [
+            Text('Sondages', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+            const Spacer(),
+            if (widget.isHost) IconButton(icon: const Icon(Icons.add_circle_outline, color: Colors.blueAccent), onPressed: _showCreatePollDialog),
+            IconButton(icon: const Icon(Icons.close, color: Colors.white60), onPressed: () => setState(() => _showPolls = false)),
+          ]),
+        ),
+        const Divider(color: Colors.white12),
+        Expanded(
+          child: _activePolls.isEmpty
+              ? Center(child: Text('Aucun sondage actif', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(8),
+                  itemCount: _activePolls.length,
+                  itemBuilder: (_, i) {
+                    final poll = _activePolls[i];
+                    final pollId = poll['id'] as String;
+                    final opts = List<Map<String, dynamic>>.from(poll['options'] as List);
+                    final totalVotes = opts.fold<int>(0, (acc, o) => acc + (o['votes'] as List).length);
+                    final myVote = _myPollVotes[pollId];
+                    return Card(
+                      color: const Color(0xFF1A1A2E),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(children: [
+                            Expanded(child: Text(poll['question'] as String, style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600))),
+                            if (widget.isHost) IconButton(icon: const Icon(Icons.stop_circle_outlined, color: Colors.redAccent, size: 18), onPressed: () => _endPoll(pollId), tooltip: 'Terminer'),
+                          ]),
+                          const SizedBox(height: 8),
+                          ...opts.asMap().entries.map((e) {
+                            final votes = (e.value['votes'] as List).length;
+                            final pct = totalVotes == 0 ? 0.0 : votes / totalVotes;
+                            final selected = myVote == e.key.toString();
+                            return GestureDetector(
+                              onTap: myVote == null ? () => _votePoll(pollId, e.key) : null,
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: selected ? Colors.blueAccent : Colors.white24),
+                                ),
+                                child: Stack(children: [
+                                  if (myVote != null) FractionallySizedBox(
+                                    widthFactor: pct,
+                                    child: Container(height: 36, decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.3), borderRadius: BorderRadius.circular(8))),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    child: Row(children: [
+                                      Expanded(child: Text(e.value['text'] as String, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13))),
+                                      if (myVote != null) Text('$votes (${(pct * 100).round()}%)', style: GoogleFonts.poppins(color: Colors.white60, fontSize: 11)),
+                                    ]),
+                                  ),
+                                ]),
+                              ),
+                            );
+                          }),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
         ),
       ]),
+    );
+  }
+
+  // ── RECORDING & NOISE ─────────────────────────
+
+  void _toggleLocalRecording() {
+    setState(() {
+      _isRecordingLocally = !_isRecordingLocally;
+      if (_isRecordingLocally) {
+        _recordingBlinkTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
+          if (mounted) setState(() => _recordingBlink = !_recordingBlink);
+        });
+      } else {
+        _recordingBlinkTimer?.cancel();
+        _recordingBlink = false;
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(_isRecordingLocally ? 'Enregistrement démarré' : 'Enregistrement arrêté', style: GoogleFonts.poppins()),
+      backgroundColor: _isRecordingLocally ? Colors.redAccent : Colors.grey,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      duration: const Duration(seconds: 2),
+    ));
+  }
+
+  Future<void> _toggleNoiseCancellation() async {
+    setState(() => _noiseCancellation = !_noiseCancellation);
+    try {
+      final tracks = _localStream?.getAudioTracks() ?? [];
+      for (final track in tracks) {
+        await track.applyConstraints({'noiseSuppression': _noiseCancellation, 'echoCancellation': _noiseCancellation});
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(_noiseCancellation ? 'Réduction de bruit activée' : 'Réduction de bruit désactivée', style: GoogleFonts.poppins()),
+      backgroundColor: _noiseCancellation ? Colors.green : Colors.orange,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      duration: const Duration(seconds: 2),
+    ));
+  }
+
+  void _toggleSpotlight(String userId) {
+    setState(() => _spotlightUserId = _spotlightUserId == userId ? null : userId);
+  }
+
+  // ── AI SUMMARY ────────────────────────────────
+
+  void _generateMeetingSummary() {
+    if (_transcriptLines.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Aucune transcription disponible', style: GoogleFonts.poppins()),
+        backgroundColor: Colors.orange,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+      return;
+    }
+    final summary = StringBuffer('Résumé IA de la réunion\n\n');
+    summary.writeln('Durée: ${_callSeconds ~/ 60} min');
+    summary.writeln('Participants: ${_participantNames.length + 1}');
+    summary.writeln('');
+    summary.writeln('Points clés abordés:');
+    final words = <String, int>{};
+    for (final line in _transcriptLines) {
+      for (final w in (line['text'] ?? '').split(' ')) {
+        final wl = w.toLowerCase().replaceAll(RegExp(r'[^\w]'), '');
+        if (wl.length > 4) words[wl] = (words[wl] ?? 0) + 1;
+      }
+    }
+    final topWords = words.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final keywords = topWords.take(5).map((e) => e.key).join(', ');
+    summary.writeln('• Sujets principaux: $keywords');
+    summary.writeln('• ${_transcriptLines.length} interventions enregistrées');
+    setState(() => _meetingSummary = summary.toString());
+    _showSummaryDialog();
+  }
+
+  void _showSummaryDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title: Row(children: [
+          const Icon(Icons.auto_awesome, color: Colors.amber, size: 20),
+          const SizedBox(width: 8),
+          Text('Résumé IA', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+        ]),
+        content: SingleChildScrollView(
+          child: Text(_meetingSummary ?? '', style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13, height: 1.6)),
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Fermer', style: GoogleFonts.poppins(color: Colors.white60))),
+        ],
       ),
     );
   }
@@ -4399,10 +4941,51 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   _showChat = false;
                   _showParticipants = false;
                   _showTranscript = false;
+                  _showPolls = false;
                   _listenWhiteboard();
                 }
               }),
             ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: Icons.poll_outlined,
+              label: 'Sondage',
+              active: !_showPolls,
+              isHighlight: _showPolls,
+              onTap: () => setState(() {
+                _showPolls = !_showPolls;
+                if (_showPolls) {
+                  _showChat = false;
+                  _showParticipants = false;
+                  _showTranscript = false;
+                  _showWhiteboard = false;
+                }
+              }),
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: _isRecordingLocally ? Icons.stop_circle_outlined : Icons.fiber_manual_record,
+              label: _isRecordingLocally ? 'Stop REC' : 'Enreg.',
+              active: !_isRecordingLocally,
+              isHighlight: _isRecordingLocally,
+              onTap: _toggleLocalRecording,
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: _noiseCancellation ? Icons.noise_aware : Icons.noise_control_off,
+              label: 'Bruit',
+              active: _noiseCancellation,
+              isHighlight: !_noiseCancellation,
+              onTap: _toggleNoiseCancellation,
+            ),
+            const SizedBox(width: 8),
+            if (_transcriptLines.isNotEmpty)
+              _Btn(
+                icon: Icons.auto_awesome,
+                label: 'Résumé',
+                active: true,
+                onTap: _generateMeetingSummary,
+              ),
             const SizedBox(width: 8),
             Semantics(
               label: 'Quitter la réunion',
@@ -5831,10 +6414,64 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-//  WHITEBOARD DRAWING MODELS
-// ─────────────────────────────────────────────
-class _WbStroke {
+// ── WHITEBOARD HELPER WIDGETS ──────────────────
+class _WbToolBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final _WbTool tool;
+  final _WbTool current;
+  final void Function(_WbTool) onTap;
+  const _WbToolBtn({required this.icon, required this.label, required this.tool, required this.current, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final active = tool == current;
+    return GestureDetector(
+      onTap: () => onTap(tool),
+      child: Container(
+        margin: const EdgeInsets.only(right: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFFFF4081).withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: active ? const Color(0xFFFF4081) : Colors.white24, width: active ? 1.5 : 1),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, color: active ? const Color(0xFFFF4081) : Colors.white70, size: 16),
+          Text(label, style: GoogleFonts.poppins(color: active ? const Color(0xFFFF4081) : Colors.white54, fontSize: 8, fontWeight: active ? FontWeight.w700 : FontWeight.w400)),
+        ]),
+      ),
+    );
+  }
+}
+
+class _WbIconBtn extends StatelessWidget {
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+  final Color? color;
+  const _WbIconBtn({required this.icon, required this.active, required this.onTap, this.color});
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: active ? onTap : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Icon(icon, color: color ?? (active ? Colors.white70 : Colors.white24), size: 18),
+      ),
+    );
+  }
+}
+
+// ── WHITEBOARD TOOL ENUM ───────────────────────
+enum _WbTool { pen, line, arrow, rect, circle, triangle, text, eraser, laser, select }
+enum _WbShapeType { line, arrow, rect, circle, triangle }
+
+// ── WHITEBOARD ELEMENT TYPES ──────────────────
+abstract class _WbElement {
+  const _WbElement();
+}
+
+class _WbStroke extends _WbElement {
   final List<Offset> points;
   final Color color;
   final double width;
@@ -5842,58 +6479,197 @@ class _WbStroke {
   const _WbStroke({required this.points, required this.color, required this.width, this.isErase = false});
 }
 
+class _WbShape extends _WbElement {
+  final Offset start;
+  final Offset end;
+  final _WbShapeType shapeType;
+  final Color color;
+  final double width;
+  final bool filled;
+  const _WbShape({required this.start, required this.end, required this.shapeType, required this.color, required this.width, this.filled = false});
+}
+
+class _WbText extends _WbElement {
+  final Offset position;
+  final String text;
+  final Color color;
+  final double fontSize;
+  const _WbText({required this.position, required this.text, required this.color, required this.fontSize});
+}
+
+// ── WHITEBOARD PAINTER ─────────────────────────
 class _WhiteboardPainter extends CustomPainter {
-  final List<_WbStroke> strokes;
+  final List<_WbElement> elements;
   final List<Offset?> currentPoints;
   final Color currentColor;
   final double currentWidth;
+  final _WbTool currentTool;
+  final Offset? shapeStart;
+  final Offset? laserPos;
 
   const _WhiteboardPainter({
-    required this.strokes,
+    required this.elements,
     required this.currentPoints,
     required this.currentColor,
     required this.currentWidth,
+    required this.currentTool,
+    this.shapeStart,
+    this.laserPos,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     // White background
     canvas.drawRect(Offset.zero & size, Paint()..color = Colors.white);
-    // Draw synced strokes
-    for (final s in strokes) {
-      _drawPoints(canvas, s.points, s.isErase ? Colors.white : s.color, s.isErase ? s.width : s.width, s.isErase);
+
+    // Draw all committed elements
+    for (final el in elements) {
+      _drawElement(canvas, el);
     }
-    // Draw current in-progress stroke
-    final pts = currentPoints.whereType<Offset>().toList();
-    if (pts.isNotEmpty) {
-      _drawPoints(canvas, pts, currentColor, currentWidth, currentColor == Colors.white);
+
+    // Draw in-progress stroke/shape
+    if (currentPoints.isNotEmpty) {
+      if (currentTool == _WbTool.pen || currentTool == _WbTool.eraser) {
+        _drawStrokePath(canvas, currentPoints.whereType<Offset>().toList(), currentColor, currentWidth, currentTool == _WbTool.eraser);
+      } else if ([_WbTool.line, _WbTool.arrow, _WbTool.rect, _WbTool.circle, _WbTool.triangle].contains(currentTool) && shapeStart != null) {
+        final previewEnd = currentPoints.whereType<Offset>().lastOrNull ?? shapeStart!;
+        final previewShapeType = currentTool == _WbTool.line ? _WbShapeType.line
+          : currentTool == _WbTool.arrow ? _WbShapeType.arrow
+          : currentTool == _WbTool.rect ? _WbShapeType.rect
+          : currentTool == _WbTool.circle ? _WbShapeType.circle
+          : _WbShapeType.triangle;
+        _drawShape(canvas, _WbShape(
+          start: shapeStart!,
+          end: previewEnd,
+          shapeType: previewShapeType,
+          color: currentColor.withValues(alpha: 0.6),
+          width: currentWidth,
+          filled: false,
+        ));
+      }
+    }
+
+    // Laser pointer
+    if (laserPos != null) {
+      final laserPaint = Paint()
+        ..color = Colors.red.withValues(alpha: 0.85)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      canvas.drawCircle(laserPos!, 10, laserPaint);
+      canvas.drawCircle(laserPos!, 5, Paint()..color = Colors.red);
     }
   }
 
-  void _drawPoints(Canvas canvas, List<Offset> pts, Color color, double width, bool isErase) {
-    if (pts.isEmpty) return;
+  void _drawElement(Canvas canvas, _WbElement el) {
+    if (el is _WbStroke) {
+      _drawStrokePath(canvas, el.points, el.color, el.width, el.isErase);
+    } else if (el is _WbShape) {
+      _drawShape(canvas, el);
+    } else if (el is _WbText) {
+      _drawText(canvas, el);
+    }
+  }
+
+  void _drawStrokePath(Canvas canvas, List<Offset> points, Color color, double width, bool isErase) {
+    if (points.isEmpty) return;
     final paint = Paint()
-      ..color = color
+      ..color = isErase ? Colors.white : color
       ..strokeWidth = width
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..blendMode = isErase ? BlendMode.clear : BlendMode.srcOver
       ..style = PaintingStyle.stroke;
-    if (pts.length == 1) {
-      canvas.drawCircle(pts.first, width / 2, paint..style = PaintingStyle.fill);
+
+    if (isErase) {
+      paint.blendMode = BlendMode.src;
+      paint.color = Colors.white;
+    }
+
+    final path = Path();
+    path.moveTo(points.first.dx, points.first.dy);
+    if (points.length == 1) {
+      canvas.drawCircle(points.first, width / 2, Paint()..color = color..style = PaintingStyle.fill);
       return;
     }
-    final path = Path()..moveTo(pts.first.dx, pts.first.dy);
-    for (int i = 1; i < pts.length; i++) {
-      // Smooth curve via quadratic bezier
-      if (i < pts.length - 1) {
-        final mid = Offset((pts[i].dx + pts[i + 1].dx) / 2, (pts[i].dy + pts[i + 1].dy) / 2);
-        path.quadraticBezierTo(pts[i].dx, pts[i].dy, mid.dx, mid.dy);
-      } else {
-        path.lineTo(pts[i].dx, pts[i].dy);
-      }
+    for (int i = 1; i < points.length - 1; i++) {
+      final mid = Offset((points[i].dx + points[i + 1].dx) / 2, (points[i].dy + points[i + 1].dy) / 2);
+      path.quadraticBezierTo(points[i].dx, points[i].dy, mid.dx, mid.dy);
     }
+    path.lineTo(points.last.dx, points.last.dy);
     canvas.drawPath(path, paint);
+  }
+
+  void _drawShape(Canvas canvas, _WbShape shape) {
+    final paint = Paint()
+      ..color = shape.color
+      ..strokeWidth = shape.width
+      ..strokeCap = StrokeCap.round
+      ..style = shape.filled ? PaintingStyle.fill : PaintingStyle.stroke;
+
+    final rect = Rect.fromPoints(shape.start, shape.end);
+
+    switch (shape.shapeType) {
+      case _WbShapeType.rect:
+        canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(4)), paint);
+        if (shape.filled) {
+          canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(4)),
+              Paint()..color = shape.color..style = PaintingStyle.stroke..strokeWidth = shape.width * 0.5);
+        }
+        break;
+      case _WbShapeType.circle:
+        canvas.drawOval(rect, paint);
+        break;
+      case _WbShapeType.triangle:
+        final path = Path();
+        final cx = (shape.start.dx + shape.end.dx) / 2;
+        path.moveTo(cx, shape.start.dy);
+        path.lineTo(shape.end.dx, shape.end.dy);
+        path.lineTo(shape.start.dx, shape.end.dy);
+        path.close();
+        canvas.drawPath(path, paint);
+        break;
+      case _WbShapeType.line:
+        canvas.drawLine(shape.start, shape.end, paint..style = PaintingStyle.stroke);
+        break;
+      case _WbShapeType.arrow:
+        canvas.drawLine(shape.start, shape.end, paint..style = PaintingStyle.stroke);
+        // Arrowhead
+        final dx = shape.end.dx - shape.start.dx;
+        final dy = shape.end.dy - shape.start.dy;
+        final len = math.sqrt(dx * dx + dy * dy);
+        if (len > 10) {
+          final arrowLen = shape.width * 4 + 8;
+          final angle = math.atan2(dy, dx);
+          final arrowPath = Path();
+          arrowPath.moveTo(shape.end.dx, shape.end.dy);
+          arrowPath.lineTo(
+            shape.end.dx - arrowLen * math.cos(angle - 0.45),
+            shape.end.dy - arrowLen * math.sin(angle - 0.45),
+          );
+          arrowPath.moveTo(shape.end.dx, shape.end.dy);
+          arrowPath.lineTo(
+            shape.end.dx - arrowLen * math.cos(angle + 0.45),
+            shape.end.dy - arrowLen * math.sin(angle + 0.45),
+          );
+          canvas.drawPath(arrowPath, paint..style = PaintingStyle.stroke..strokeWidth = shape.width);
+        }
+        break;
+    }
+  }
+
+  void _drawText(Canvas canvas, _WbText el) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: el.text,
+        style: TextStyle(
+          color: el.color,
+          fontSize: el.fontSize,
+          fontWeight: FontWeight.w600,
+          decoration: TextDecoration.none,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    tp.layout();
+    tp.paint(canvas, el.position);
   }
 
   @override
