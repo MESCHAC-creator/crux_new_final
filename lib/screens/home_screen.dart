@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
@@ -677,11 +678,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       title: AppTranslations.t('share', lang),
                       subtitle: AppTranslations.t('invite', lang),
                       gradientColors: const [Color(0xFF27AE60), Color(0xFF1E8449)],
-                      onTap: () async {
-                        const releasesUrl = 'https://github.com/MESCHAC-creator/crux_new_final/releases';
-                        try {
-                          await launchUrl(Uri.parse(releasesUrl), mode: LaunchMode.externalApplication);
-                        } catch (_) {}
+                      onTap: () {
+                        const apkUrl = 'https://github.com/MESCHAC-creator/crux_new_final/releases/latest/download/crux-release.apk';
+                        Share.share(
+                          '🎥 Rejoins-moi sur CRUX — visioconférence premium !\n\n📲 Télécharge l\'app directement ici :\n$apkUrl\n\nGratuit · Android',
+                        );
                       },
                     )),
                   ]),
