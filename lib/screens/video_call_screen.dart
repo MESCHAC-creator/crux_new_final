@@ -2160,9 +2160,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: _camOn
-                  ? RTCVideoView(_localRenderer,
-                      mirror: !_sharingScreen,
-                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                  ? _buildLocalVideoView()
                   : _buildVideoOff(widget.userName, _ownPhotoBytes, size: 115),
             ),
           ),
@@ -2281,9 +2279,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           // Video overlay
           isPrivileged
               ? (_camOn
-                  ? RTCVideoView(_localRenderer,
-                      mirror: !_sharingScreen,
-                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                  ? _buildLocalVideoView()
                   : _buildInitialsAvatar(widget.userName, size: double.infinity))
               : (_waitingForHost
                   ? _buildWaitingForHost()
@@ -4491,9 +4487,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                       // ── VIDEO or AVATAR ──────────────────────────
                       if (camOn)
                         isMe
-                            ? RTCVideoView(_localRenderer,
-                                mirror: !_sharingScreen,
-                                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                            ? _buildLocalVideoView()
                             : RTCVideoView(_remoteRenderer,
                                 objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
                       else
