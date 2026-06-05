@@ -283,6 +283,54 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   final _proService = ProService();
   final _log = Logger();
 
+  // ── Feature N1: Q&A ──────────────────────────
+  bool _showQA = false;
+  List<Map<String, dynamic>> _qaList = [];
+  StreamSubscription? _qaSub;
+  Set<String> _myQAUpvotes = {};
+
+  // ── Feature N2: Attendance ───────────────────
+  bool _showAttendance = false;
+  List<Map<String, dynamic>> _attendanceLog = [];
+
+  // ── Feature N3: Cam off signal ───────────────
+  StreamSubscription? _camOffSub;
+
+  // ── Feature N4: Host permissions ─────────────
+  bool _allowParticipantChat = true;
+  bool _allowParticipantReactions = true;
+  bool _allowParticipantScreenShare = true;
+  bool _muteOnEntry = false;
+
+  // ── Feature N5: Side-by-side ─────────────────
+  bool _sideBySide = false;
+
+  // ── Feature N6: Agenda ───────────────────────
+  String _meetingAgenda = '';
+  bool _showAgendaPanel = false;
+  final _agendaController = TextEditingController();
+
+  // ── Feature N7: Low-light ─────────────────────
+  bool _lowLightMode = false;
+
+  // ── Feature N8: Star messages ─────────────────
+  Set<String> _starredMessageIds = {};
+
+  // ── Feature N9: Chat search ───────────────────
+  bool _chatSearchActive = false;
+  String _chatSearchQuery = '';
+  final _chatSearchController = TextEditingController();
+
+  // ── Feature N10: Join/leave sounds ───────────
+  bool _joinLeaveSounds = true;
+  int _prevPresenceCount = 0;
+
+  // ── Feature N11: Hand raise queue ────────────
+  List<String> _handRaiseOrder = [];
+
+  // ── Feature N15: Activities panel ────────────
+  bool _showActivities = false;
+
   String get _docId =>
       'room_${widget.meetingId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
 
@@ -342,6 +390,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _loadOwnPhoto();
     _resetInactivityTimer();
     _monitorConnectionHealth();
+    _listenQA();
+    _loadStarredMessages();
   }
 
   @override
@@ -371,12 +421,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _bannerHideTimer?.cancel();
     _speakingTimer?.cancel();
     _proConfirmSub?.cancel();
+    _qaSub?.cancel();
+    _camOffSub?.cancel();
     _waveController.dispose();
     _liveCommentController.dispose();
     _liveCommentsScrollController.dispose();
     _chatController.dispose();
     _chatScrollController.dispose();
     _notesController.dispose();
+    _agendaController.dispose();
+    _chatSearchController.dispose();
     // whiteboard controller removed — drawing canvas has no text input
     _screenStream?.dispose();
     _localStream?.dispose();
@@ -448,6 +502,65 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       // Register presence now that we have media
       await _meetingService.registerPresence(
           widget.meetingId, widget.userId, widget.userName);
+
+      // Feature N2: Record attendance join
+      try {
+        await _db.collection('meetings').doc(widget.meetingId)
+            .collection('attendance').doc(widget.userId).set({
+          'userId': widget.userId,
+          'name': widget.userName,
+          'joinedAt': FieldValue.serverTimestamp(),
+          'leftAt': null,
+        });
+      } catch (_) {}
+
+      // Feature N14: Auto-mute on entry (participants only)
+      if (!widget.isHost) {
+        try {
+          final meetingSnap = await _db.collection('meetings').doc(widget.meetingId).get();
+          if (meetingSnap.exists) {
+            final autoMute = meetingSnap.data()?['muteOnEntry'] as bool? ?? false;
+            if (autoMute && mounted) {
+              _localStream?.getAudioTracks().forEach((t) => t.enabled = false);
+              setState(() => _micOn = false);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('Votre micro a été désactivé automatiquement à l\'entrée',
+                    style: GoogleFonts.poppins(color: Colors.white)),
+                backgroundColor: Colors.orange.shade700,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                duration: const Duration(seconds: 3),
+              ));
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Feature N3: Listen for cam-off signal
+      _camOffSub = _db.collection('meetings').doc(widget.meetingId)
+          .collection('camOffSignals').doc(widget.userId)
+          .snapshots().listen((snap) {
+        if (!snap.exists || !mounted) return;
+        final data = snap.data();
+        if (data != null && data['camOff'] == true) {
+          _localStream?.getVideoTracks().forEach((t) => t.enabled = false);
+          if (mounted) {
+            setState(() => _camOn = false);
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Votre caméra a été désactivée par l\'hôte',
+                  style: GoogleFonts.poppins(color: Colors.white)),
+              backgroundColor: Colors.orange.shade700,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              duration: const Duration(seconds: 3),
+            ));
+          }
+          // Clear the signal
+          _db.collection('meetings').doc(widget.meetingId)
+              .collection('camOffSignals').doc(widget.userId)
+              .delete().catchError((_) {});
+        }
+      });
 
       _pc = await createPeerConnection(_iceConfig);
 
@@ -1068,13 +1181,28 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       final waitingRoomEnabled = data['waitingRoomEnabled'] as bool? ?? false;
       // Feature 6: passcode
       final passcode = data['passcode'] as String?;
+      // Feature N4: host permissions
+      final allowChat = data['allowChat'] as bool? ?? true;
+      final allowReactions = data['allowReactions'] as bool? ?? true;
+      final allowScreenShare = data['allowScreenShare'] as bool? ?? true;
+      final muteOnEntry = data['muteOnEntry'] as bool? ?? false;
+      // Feature N6: agenda
+      final agenda = data['agenda'] as String? ?? '';
       if (mounted) setState(() {
         _isCoHost = nowCoHost;
         _isLocked = locked as bool;
         _remoteRecording = isRecording;
         _waitingRoomEnabled = waitingRoomEnabled;
         _meetingPasscode = passcode;
+        _allowParticipantChat = allowChat;
+        _allowParticipantReactions = allowReactions;
+        _allowParticipantScreenShare = allowScreenShare;
+        _muteOnEntry = muteOnEntry;
+        _meetingAgenda = agenda;
+        _agendaController.text = agenda;
       });
+
+      // Feature N14: auto-mute on entry (applied once after init)
     });
   }
 
@@ -1103,8 +1231,37 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           }
         }
       }
+      // Feature N10: join/leave sounds
+      final newCount = list.length;
+      if (_joinLeaveSounds && _prevPresenceCount > 0) {
+        if (newCount > _prevPresenceCount) {
+          SystemSound.play(SystemSoundType.click);
+        } else if (newCount < _prevPresenceCount) {
+          HapticFeedback.lightImpact();
+        }
+      }
+      _prevPresenceCount = newCount;
+
+      // Feature N11: hand raise queue
+      final newQueue = <String>[];
+      for (final p in list) {
+        final uid = p['userId'] as String? ?? '';
+        if (p['handRaised'] == true && uid.isNotEmpty) {
+          if (!newQueue.contains(uid)) newQueue.add(uid);
+        }
+      }
+      // Preserve original order of existing entries, add new ones at end
+      final updatedQueue = <String>[];
+      for (final uid in _handRaiseOrder) {
+        if (newQueue.contains(uid)) updatedQueue.add(uid);
+      }
+      for (final uid in newQueue) {
+        if (!updatedQueue.contains(uid)) updatedQueue.add(uid);
+      }
+
       setState(() {
         _presenceList = list;
+        _handRaiseOrder = updatedQueue;
         if (_isLiveMode) _liveViewers = list.length;
         // Sync remote speaking state
         for (final p in list) {
@@ -1982,6 +2139,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _db.collection('meetings').doc(widget.meetingId)
         .collection('presence').doc(widget.userId)
         .update({'isSpeaking': false}).catchError((_) {});
+    // Feature N2: Record leftAt
+    _db.collection('meetings').doc(widget.meetingId)
+        .collection('attendance').doc(widget.userId)
+        .update({'leftAt': FieldValue.serverTimestamp()}).catchError((_) {});
 
     // Capture state BEFORE any async operation
     final navigator = Navigator.of(context);
@@ -1999,6 +2160,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _muteSub?.cancel();
     _waitingSub?.cancel();
     _liveCommentSub?.cancel();
+    _qaSub?.cancel();
+    _camOffSub?.cancel();
     for (final sub in _profileSubs.values) { sub.cancel(); }
     _profileSubs.clear();
     _callTimer?.cancel();
@@ -2449,6 +2612,39 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         child: _buildPollsPanel(),
       ),
 
+      // ── Q&A PANEL ────────────────────────────────────────────────────
+      AnimatedPositioned(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOut,
+        bottom: _showQA ? 0 : -400,
+        left: 0,
+        right: 0,
+        height: 400,
+        child: _buildQAPanel(),
+      ),
+
+      // ── AGENDA PANEL ─────────────────────────────────────────────────
+      AnimatedPositioned(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOut,
+        bottom: _showAgendaPanel ? 0 : -400,
+        left: 0,
+        right: 0,
+        height: 400,
+        child: _buildAgendaPanel(),
+      ),
+
+      // ── ACTIVITIES PANEL ─────────────────────────────────────────────
+      AnimatedPositioned(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOut,
+        bottom: _showActivities ? 0 : -400,
+        left: 0,
+        right: 0,
+        height: 400,
+        child: _buildActivitiesPanel(),
+      ),
+
       // ── RECORDING INDICATOR ──────────────────────────────────────────
       if (_isRecordingLocally)
         Positioned(
@@ -2473,7 +2669,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       AnimatedPositioned(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeInOut,
-        bottom: (_showChat || _showParticipants || _showTranscript || _showWhiteboard || _showPolls) ? 400 : 0,
+        bottom: (_showChat || _showParticipants || _showTranscript || _showWhiteboard || _showPolls || _showQA || _showAgendaPanel || _showActivities) ? 400 : 0,
         left: 0,
         right: 0,
         child: _buildControls(),
@@ -3122,12 +3318,48 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       child: Row(children: [
         if (_callSeconds > 0) ...[
           const SizedBox(width: 8),
-          Text(
-            _formattedDuration,
-            style: GoogleFonts.poppins(
-                color: Colors.white60,
-                fontSize: 12,
-                fontFeatures: [const FontFeature.tabularFigures()]),
+          // Feature N13: Color-coded tappable timer
+          GestureDetector(
+            onTap: () {
+              // Show meeting stats dialog
+              showDialog(context: context, builder: (ctx) => AlertDialog(
+                backgroundColor: const Color(0xFF1A1A2E),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                title: Text('Statistiques', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+                content: Column(mainAxisSize: MainAxisSize.min, children: [
+                  _InfoRow(icon: Icons.timer, label: 'Durée', value: _formattedDuration),
+                  _InfoRow(icon: Icons.people, label: 'Participants', value: '${_presenceList.length}'),
+                  _InfoRow(icon: Icons.fiber_manual_record, label: 'Enregistrement', value: _isRecordingLocally ? 'Actif' : 'Inactif'),
+                ]),
+                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Fermer', style: GoogleFonts.poppins(color: Colors.white60)))],
+              ));
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: _callSeconds < 1800
+                    ? Colors.green.withValues(alpha: 0.15)
+                    : _callSeconds < 5400
+                        ? Colors.orange.withValues(alpha: 0.15)
+                        : Colors.red.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _callSeconds < 1800 ? Colors.green.withValues(alpha: 0.4) : _callSeconds < 5400 ? Colors.orange.withValues(alpha: 0.4) : Colors.red.withValues(alpha: 0.5)),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.timer_outlined,
+                    color: _callSeconds < 1800 ? Colors.green : _callSeconds < 5400 ? Colors.orange : Colors.red,
+                    size: 11),
+                const SizedBox(width: 4),
+                Text(
+                  _formattedDuration,
+                  style: GoogleFonts.poppins(
+                      color: _callSeconds < 1800 ? Colors.green : _callSeconds < 5400 ? Colors.orange : Colors.red,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: [const FontFeature.tabularFigures()]),
+                ),
+              ]),
+            ),
           ),
         ],
         // Free-time countdown pill — visible to all free users
@@ -3478,6 +3710,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             Text('Participants (${_presenceList.length})',
                 style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
             const Spacer(),
+            // Feature N11: hand raise queue count badge
+            if (_handRaiseOrder.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange.withValues(alpha: 0.6)),
+                ),
+                child: Text('✋ ${_handRaiseOrder.length}', style: GoogleFonts.poppins(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.w700)),
+              ),
             if (isPrivileged)
               GestureDetector(
                 onTap: () {
@@ -3566,6 +3810,38 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               const Divider(color: Colors.white12, height: 1),
             ]),
           ),
+        // Feature N11: Hand raise queue
+        if (_handRaiseOrder.isNotEmpty)
+          Container(
+            color: Colors.orange.withValues(alpha: 0.06),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                child: Text('✋ File d\'attente (${_handRaiseOrder.length})',
+                    style: GoogleFonts.poppins(color: Colors.orange, fontSize: 13, fontWeight: FontWeight.w700)),
+              ),
+              ..._handRaiseOrder.asMap().entries.map((entry) {
+                final idx = entry.key + 1;
+                final uid = entry.value;
+                final name = _participantNames[uid] ?? uid;
+                return ListTile(
+                  dense: true,
+                  leading: Text('$idx.', style: GoogleFonts.poppins(color: Colors.orange, fontWeight: FontWeight.w700, fontSize: 14)),
+                  title: Text(name, style: GoogleFonts.poppins(color: Colors.white, fontSize: 12)),
+                  trailing: isPrivileged ? GestureDetector(
+                    onTap: () => _toggleSpotlight(uid),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: Colors.purple.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.purple.withValues(alpha: 0.5))),
+                      child: Text('Appeler', style: GoogleFonts.poppins(color: Colors.purple, fontSize: 11, fontWeight: FontWeight.w700)),
+                    ),
+                  ) : null,
+                );
+              }),
+              const Divider(color: Colors.white12, height: 1),
+            ]),
+          ),
         Expanded(
           child: _presenceList.isEmpty
               ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -3630,6 +3906,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                                   await _transferHost(pId, pName);
                                 } else if (action == 'spotlight') {
                                   _toggleSpotlight(pId);
+                                } else if (action == 'turn_off_cam') {
+                                  await _sendCamOffSignal(pId);
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                    content: Text('Caméra désactivée pour $pName', style: GoogleFonts.poppins()),
+                                    backgroundColor: Colors.orange.shade700,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    duration: const Duration(seconds: 2),
+                                  ));
                                 }
                               },
                               itemBuilder: (_) => [
@@ -3669,6 +3955,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                                       const Icon(Icons.swap_horiz, color: Colors.amber, size: 16),
                                       const SizedBox(width: 8),
                                       Text('Transférer le rôle hôte', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                                    ])),
+                                PopupMenuItem(value: 'turn_off_cam',
+                                    child: Row(children: [
+                                      const Icon(Icons.videocam_off, color: Colors.orange, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text('Éteindre la caméra', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
                                     ])),
                                 PopupMenuItem(value: 'kick',
                                     child: Row(children: [
@@ -3711,31 +4003,90 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(height: 4),
-        Row(children: [
-          _ChatTab(
-            icon: Icons.chat_bubble_outline,
-            label: 'Chat',
-            selected: _chatTab == 0,
-            onTap: () => setState(() => _chatTab = 0),
-          ),
-          _ChatTab(
-            icon: Icons.notes,
-            label: 'Notes',
-            selected: _chatTab == 1,
-            onTap: () => setState(() => _chatTab = 1),
-          ),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down,
-                color: Colors.white54, size: 22),
-            onPressed: () => setState(() => _showChat = false),
-          ),
-        ]),
+        // Feature N9: search bar or tab row
+        if (_chatSearchActive)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: _chatSearchController,
+                  autofocus: true,
+                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+                  onChanged: (v) => setState(() => _chatSearchQuery = v),
+                  decoration: InputDecoration(
+                    hintText: 'Rechercher dans le chat...',
+                    hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 12),
+                    prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 18),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.08),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white54),
+                onPressed: () => setState(() {
+                  _chatSearchActive = false;
+                  _chatSearchQuery = '';
+                  _chatSearchController.clear();
+                }),
+              ),
+            ]),
+          )
+        else
+          Row(children: [
+            _ChatTab(
+              icon: Icons.chat_bubble_outline,
+              label: 'Chat',
+              selected: _chatTab == 0,
+              onTap: () => setState(() => _chatTab = 0),
+            ),
+            _ChatTab(
+              icon: Icons.notes,
+              label: 'Notes',
+              selected: _chatTab == 1,
+              onTap: () => setState(() => _chatTab = 1),
+            ),
+            // Feature N8: starred tab
+            _ChatTab(
+              icon: Icons.star_outline,
+              label: '★',
+              selected: _chatTab == 2,
+              onTap: () => setState(() => _chatTab = 2),
+            ),
+            const Spacer(),
+            // Feature N9: search button
+            IconButton(
+              icon: const Icon(Icons.search, color: Colors.white54, size: 20),
+              onPressed: () => setState(() => _chatSearchActive = true),
+            ),
+            IconButton(
+              icon: const Icon(Icons.keyboard_arrow_down,
+                  color: Colors.white54, size: 22),
+              onPressed: () => setState(() => _showChat = false),
+            ),
+          ]),
         const Divider(color: Colors.white12, height: 1),
         Expanded(
-          child: _chatTab == 0 ? _buildChatMessages() : _buildNotes(),
+          child: _chatTab == 0
+              ? _buildChatMessages()
+              : _chatTab == 1
+                  ? _buildNotes()
+                  : _buildStarredMessages(),
         ),
-        if (_chatTab == 0) _buildChatInput(),
+        if (_chatTab == 0 && (_allowParticipantChat || widget.isHost || _isCoHost)) _buildChatInput(),
+        if (_chatTab == 0 && !_allowParticipantChat && !widget.isHost && !_isCoHost)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+              child: Center(child: Text('Le chat est désactivé par l\'hôte',
+                  style: GoogleFonts.poppins(color: Colors.red, fontSize: 12))),
+            ),
+          ),
       ]),
         ),
       ),
@@ -3768,13 +4119,22 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           });
         }
         // Filter: show public messages and DMs involving this user
-        final visibleDocs = docs.where((doc) {
+        var visibleDocs = docs.where((doc) {
           final data = doc.data()! as Map<String, dynamic>;
           final recipientId = data['recipientId'] as String?;
           final senderId = data['senderId'] as String? ?? '';
           if (recipientId == null) return true; // public
           return recipientId == widget.userId || senderId == widget.userId;
         }).toList();
+
+        // Feature N9: search filter
+        if (_chatSearchQuery.isNotEmpty) {
+          final q = _chatSearchQuery.toLowerCase();
+          visibleDocs = visibleDocs.where((doc) {
+            final msg = ((doc.data()! as Map<String, dynamic>)['message'] as String? ?? '').toLowerCase();
+            return msg.contains(q);
+          }).toList();
+        }
 
         if (visibleDocs.isEmpty) {
           return Center(
@@ -3819,10 +4179,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                           fontWeight: FontWeight.w700, fontSize: 11))),
             );
 
+            final isStarred = _starredMessageIds.contains(doc.id);
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: GestureDetector(
-                onLongPress: () => _showMessageReactionPicker(doc.id),
+                onLongPress: () => _showMessageActionSheet(doc.id),
                 child: Column(
                   crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                   children: [
@@ -3888,6 +4249,20 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                         if (isMine) ...[const SizedBox(width: 6), avatarWidget],
                       ],
                     ),
+                    // Feature N8: Star indicator
+                    if (isStarred)
+                      Padding(
+                        padding: EdgeInsets.only(top: 2, left: isMine ? 0 : 40, right: isMine ? 40 : 0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.star, color: Colors.amber, size: 11),
+                            const SizedBox(width: 3),
+                            Text('Sauvegardé', style: GoogleFonts.poppins(color: Colors.amber, fontSize: 9)),
+                          ],
+                        ),
+                      ),
                     // Reaction counts
                     if (reactions.isNotEmpty)
                       Padding(
@@ -5329,6 +5704,112 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     );
   }
 
+  // ── Feature N8+N13: Message action sheet ─────
+  void _showMessageActionSheet(String docId) {
+    const quickEmojis = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+    final isStarred = _starredMessageIds.contains(docId);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: quickEmojis.map((e) => GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+                _toggleMessageReaction(docId, e);
+              },
+              child: Text(e, style: const TextStyle(fontSize: 32)),
+            )).toList(),
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            leading: Icon(isStarred ? Icons.star : Icons.star_outline, color: Colors.amber),
+            title: Text(isStarred ? 'Retirer des sauvegardés' : 'Sauvegarder le message',
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+            onTap: () {
+              Navigator.pop(context);
+              _toggleStarMessage(docId);
+            },
+          ),
+        ]),
+      ),
+    );
+  }
+
+  // ── Feature N8: Starred messages view ────────
+  Widget _buildStarredMessages() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _db.collection('meetings').doc(widget.meetingId)
+          .collection('chat').orderBy('timestamp', descending: true).limit(100).snapshots(),
+      builder: (ctx, snap) {
+        final docs = snap.data?.docs ?? [];
+        final starred = docs.where((d) => _starredMessageIds.contains(d.id)).toList();
+        if (starred.isEmpty) {
+          return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.star_outline, color: Colors.white24, size: 40),
+            const SizedBox(height: 8),
+            Text('Aucun message sauvegardé', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
+            const SizedBox(height: 4),
+            Text('Appuyez longuement sur un message pour le sauvegarder',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(color: Colors.white24, fontSize: 11)),
+          ]));
+        }
+        return ListView.builder(
+          reverse: true,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          itemCount: starred.length,
+          itemBuilder: (_, i) {
+            final doc = starred[i];
+            final d = doc.data()! as Map<String, dynamic>;
+            final isMine = d['sender'] == widget.userName;
+            final text = d['message'] as String? ?? '';
+            final sender = d['sender'] as String? ?? '';
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+                children: [
+                  Flexible(
+                    child: Container(
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(ctx).size.width * 0.65),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isMine ? AppColors.primary : Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                        if (!isMine) Text(sender, style: GoogleFonts.poppins(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.w600)),
+                        Text(text, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                        const SizedBox(height: 2),
+                        const Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.star, color: Colors.amber, size: 10),
+                          SizedBox(width: 3),
+                          Text('Sauvegardé', style: TextStyle(color: Colors.amber, fontSize: 9)),
+                        ]),
+                      ]),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   // ── FEATURE 16: Full emoji picker ─────────────
   void _showFullEmojiPicker() {
     const allEmojis = [
@@ -5484,6 +5965,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     Widget filtered = _cameraFilter == _CameraFilter.natural
         ? view
         : ColorFiltered(colorFilter: ColorFilter.matrix(_filterMatrix(_cameraFilter)), child: view);
+    // Feature N7: Low-light brightness boost
+    if (_lowLightMode) {
+      filtered = ColorFiltered(
+        colorFilter: const ColorFilter.matrix([
+          1.5, 0, 0, 0, 30,
+          0, 1.5, 0, 0, 30,
+          0, 0, 1.5, 0, 30,
+          0, 0, 0, 1, 0,
+        ]),
+        child: filtered,
+      );
+    }
     if (!_hdEnabled) return filtered;
     // HD badge overlay
     return Stack(children: [
@@ -5574,6 +6067,579 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     );
   }
 
+  // ════════════════════════════════════════════
+  // FEATURE N1: Q&A
+  // ════════════════════════════════════════════
+
+  void _listenQA() {
+    _qaSub?.cancel();
+    _qaSub = _db
+        .collection('meetings')
+        .doc(widget.meetingId)
+        .collection('qa')
+        .orderBy('votes', descending: true)
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      setState(() {
+        _qaList = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      });
+    });
+  }
+
+  Future<void> _submitQuestion(String text) async {
+    if (text.trim().isEmpty) return;
+    try {
+      await _db.collection('meetings').doc(widget.meetingId).collection('qa').add({
+        'question': text.trim(),
+        'askedBy': widget.userName,
+        'askedById': widget.userId,
+        'votes': 0,
+        'voterIds': <String>[],
+        'answered': false,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _upvoteQuestion(String qaId) async {
+    if (_myQAUpvotes.contains(qaId)) return;
+    setState(() => _myQAUpvotes.add(qaId));
+    try {
+      final ref = _db.collection('meetings').doc(widget.meetingId).collection('qa').doc(qaId);
+      await _db.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        if (!snap.exists) return;
+        final voterIds = List<String>.from(snap['voterIds'] as List? ?? []);
+        if (voterIds.contains(widget.userId)) return;
+        voterIds.add(widget.userId);
+        tx.update(ref, {'votes': (snap['votes'] as int? ?? 0) + 1, 'voterIds': voterIds});
+      });
+    } catch (_) {
+      setState(() => _myQAUpvotes.remove(qaId));
+    }
+  }
+
+  Future<void> _markAnswered(String qaId) async {
+    try {
+      await _db.collection('meetings').doc(widget.meetingId).collection('qa').doc(qaId)
+          .update({'answered': true});
+    } catch (_) {}
+  }
+
+  Widget _buildQAPanel() {
+    final isPrivileged = widget.isHost || _isCoHost;
+    final qCtrl = TextEditingController();
+    final unanswered = _qaList.where((q) => q['answered'] != true).toList();
+    final answered = _qaList.where((q) => q['answered'] == true).toList();
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xCC181828),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 0.5)),
+        ),
+        child: Column(children: [
+          const SizedBox(height: 8),
+          Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(children: [
+              const Icon(Icons.quiz_outlined, color: Colors.white70, size: 18),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Questions & Réponses',
+                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15))),
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white54, size: 22),
+                onPressed: () => setState(() => _showQA = false),
+              ),
+            ]),
+          ),
+          // Input row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: StatefulBuilder(builder: (ctx, setLocal) {
+              return Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: qCtrl,
+                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Posez votre question...',
+                      hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 12),
+                      filled: true,
+                      fillColor: Colors.white.withValues(alpha: 0.08),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () {
+                    _submitQuestion(qCtrl.text);
+                    qCtrl.clear();
+                  },
+                  child: Container(
+                    width: 38, height: 38,
+                    decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                    child: const Icon(Icons.send, color: Colors.white, size: 16),
+                  ),
+                ),
+              ]);
+            }),
+          ),
+          const Divider(color: Colors.white12, height: 1),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(8),
+              children: [
+                ...unanswered.map((q) => _buildQACard(q, isPrivileged, false)),
+                if (answered.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text('Répondues', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w600)),
+                  ),
+                  ...answered.map((q) => _buildQACard(q, isPrivileged, true)),
+                ],
+              ],
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildQACard(Map<String, dynamic> q, bool isPrivileged, bool isAnswered) {
+    final qaId = q['id'] as String? ?? '';
+    final question = q['question'] as String? ?? '';
+    final askedBy = q['askedBy'] as String? ?? '';
+    final votes = q['votes'] as int? ?? 0;
+    final alreadyUpvoted = _myQAUpvotes.contains(qaId);
+    return Opacity(
+      opacity: isAnswered ? 0.55 : 1.0,
+      child: Card(
+        color: const Color(0xFF1E1E30),
+        margin: const EdgeInsets.only(bottom: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(question, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
+              if (isAnswered)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.green.withValues(alpha: 0.5))),
+                  child: Text('✓ Répondu', style: GoogleFonts.poppins(color: Colors.green, fontSize: 10, fontWeight: FontWeight.w700)),
+                ),
+            ]),
+            const SizedBox(height: 4),
+            Text('— $askedBy', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+            const SizedBox(height: 8),
+            Row(children: [
+              GestureDetector(
+                onTap: alreadyUpvoted ? null : () => _upvoteQuestion(qaId),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: alreadyUpvoted ? AppColors.primary.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: alreadyUpvoted ? AppColors.primary : Colors.white24),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.thumb_up_outlined, color: alreadyUpvoted ? AppColors.primary : Colors.white54, size: 13),
+                    const SizedBox(width: 5),
+                    Text('$votes', style: GoogleFonts.poppins(color: alreadyUpvoted ? AppColors.primary : Colors.white54, fontSize: 12, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+              ),
+              const Spacer(),
+              if (isPrivileged && !isAnswered)
+                GestureDetector(
+                  onTap: () => _markAnswered(qaId),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.green.withValues(alpha: 0.5))),
+                    child: Text('Marquer répondu', style: GoogleFonts.poppins(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+            ]),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  // ════════════════════════════════════════════
+  // FEATURE N2: Attendance
+  // ════════════════════════════════════════════
+
+  void _listenAttendance() {
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx2, setLocal) {
+        _db.collection('meetings').doc(widget.meetingId)
+            .collection('attendance').snapshots().listen((snap) {
+          if (!ctx2.mounted) return;
+          setLocal(() {
+            _attendanceLog = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+          });
+        });
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1A1A2E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(children: [
+            const Icon(Icons.checklist, color: Colors.white70, size: 20),
+            const SizedBox(width: 8),
+            Text('Présences', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+          ]),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: _attendanceLog.isEmpty
+                ? Text('Aucune présence enregistrée', style: GoogleFonts.poppins(color: Colors.white38))
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _attendanceLog.length,
+                    itemBuilder: (_, i) {
+                      final entry = _attendanceLog[i];
+                      final name = entry['name'] as String? ?? 'Inconnu';
+                      final joinedTs = entry['joinedAt'];
+                      final leftTs = entry['leftAt'];
+                      final joined = joinedTs is Timestamp ? joinedTs.toDate() : null;
+                      final left = leftTs is Timestamp ? leftTs.toDate() : null;
+                      Duration? dur;
+                      if (joined != null && left != null) dur = left.difference(joined);
+                      final durStr = dur != null
+                          ? '${dur.inMinutes}m ${dur.inSeconds.remainder(60)}s'
+                          : (joined != null ? 'En réunion' : '');
+                      return ListTile(
+                        dense: true,
+                        leading: Container(
+                          width: 32, height: 32,
+                          decoration: BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
+                          child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13))),
+                        ),
+                        title: Text(name, style: GoogleFonts.poppins(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                        subtitle: Text(
+                          joined != null
+                              ? 'Entrée: ${joined.hour}:${joined.minute.toString().padLeft(2, '0')}'
+                              : '',
+                          style: GoogleFonts.poppins(color: Colors.white38, fontSize: 10),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: left != null ? Colors.grey.withValues(alpha: 0.2) : Colors.green.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(durStr, style: GoogleFonts.poppins(color: left != null ? Colors.grey : Colors.green, fontSize: 10, fontWeight: FontWeight.w700)),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Fermer', style: GoogleFonts.poppins(color: Colors.white60))),
+          ],
+        );
+      }),
+    );
+  }
+
+  // ════════════════════════════════════════════
+  // FEATURE N3: Turn off participant camera
+  // ════════════════════════════════════════════
+
+  Future<void> _sendCamOffSignal(String participantId) async {
+    try {
+      await _db.collection('meetings').doc(widget.meetingId)
+          .collection('camOffSignals').doc(participantId)
+          .set({'camOff': true, 'timestamp': FieldValue.serverTimestamp()});
+    } catch (_) {}
+  }
+
+  // ════════════════════════════════════════════
+  // FEATURE N4: Host controls sheet
+  // ════════════════════════════════════════════
+
+  void _showHostControlsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => StatefulBuilder(builder: (ctx, setLocal) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          decoration: const BoxDecoration(
+            color: Color(0xFF181828),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 12),
+            Row(children: [
+              const Icon(Icons.shield_outlined, color: Colors.purple, size: 20),
+              const SizedBox(width: 8),
+              Text('Contrôles de la réunion', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              title: Text('Autoriser le chat', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+              subtitle: Text('Les participants peuvent envoyer des messages', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+              value: _allowParticipantChat,
+              activeColor: AppColors.primary,
+              onChanged: (v) async {
+                setState(() => _allowParticipantChat = v);
+                setLocal(() {});
+                try { await _db.collection('meetings').doc(widget.meetingId).update({'allowChat': v}); } catch (_) {}
+              },
+            ),
+            SwitchListTile(
+              title: Text('Autoriser les réactions', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+              subtitle: Text('Les participants peuvent envoyer des emojis', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+              value: _allowParticipantReactions,
+              activeColor: AppColors.primary,
+              onChanged: (v) async {
+                setState(() => _allowParticipantReactions = v);
+                setLocal(() {});
+                try { await _db.collection('meetings').doc(widget.meetingId).update({'allowReactions': v}); } catch (_) {}
+              },
+            ),
+            SwitchListTile(
+              title: Text('Autoriser le partage d\'écran', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+              subtitle: Text('Les participants peuvent partager leur écran', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+              value: _allowParticipantScreenShare,
+              activeColor: AppColors.primary,
+              onChanged: (v) async {
+                setState(() => _allowParticipantScreenShare = v);
+                setLocal(() {});
+                try { await _db.collection('meetings').doc(widget.meetingId).update({'allowScreenShare': v}); } catch (_) {}
+              },
+            ),
+            SwitchListTile(
+              title: Text('Couper micro à l\'entrée', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+              subtitle: Text('Les nouveaux participants arrivent muets', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+              value: _muteOnEntry,
+              activeColor: Colors.orange,
+              onChanged: (v) async {
+                setState(() => _muteOnEntry = v);
+                setLocal(() {});
+                try { await _db.collection('meetings').doc(widget.meetingId).update({'muteOnEntry': v}); } catch (_) {}
+              },
+            ),
+          ]),
+        );
+      }),
+    );
+  }
+
+  // ════════════════════════════════════════════
+  // FEATURE N6: Agenda panel
+  // ════════════════════════════════════════════
+
+  Widget _buildAgendaPanel() {
+    final isPrivileged = widget.isHost || _isCoHost;
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xCC181828),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 0.5)),
+        ),
+        child: Column(children: [
+          const SizedBox(height: 8),
+          Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(children: [
+              const Icon(Icons.notes, color: Colors.white70, size: 18),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Ordre du jour',
+                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15))),
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white54, size: 22),
+                onPressed: () => setState(() => _showAgendaPanel = false),
+              ),
+            ]),
+          ),
+          const Divider(color: Colors.white12, height: 1),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: isPrivileged
+                  ? Column(children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _agendaController,
+                          style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, height: 1.6),
+                          maxLines: null,
+                          expands: true,
+                          textAlignVertical: TextAlignVertical.top,
+                          decoration: InputDecoration(
+                            hintText: 'Entrez l\'ordre du jour de la réunion...',
+                            hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
+                            filled: true,
+                            fillColor: Colors.white.withValues(alpha: 0.05),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.primary)),
+                            contentPadding: const EdgeInsets.all(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            try {
+                              await _db.collection('meetings').doc(widget.meetingId)
+                                  .update({'agenda': _agendaController.text});
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text('Ordre du jour enregistré', style: GoogleFonts.poppins()),
+                                backgroundColor: AppColors.success,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                duration: const Duration(seconds: 2),
+                              ));
+                            } catch (_) {}
+                          },
+                          icon: const Icon(Icons.save_outlined, size: 16),
+                          label: Text('Enregistrer', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ])
+                  : SingleChildScrollView(
+                      child: Text(
+                        _meetingAgenda.isEmpty ? 'Aucun ordre du jour défini.' : _meetingAgenda,
+                        style: GoogleFonts.poppins(color: _meetingAgenda.isEmpty ? Colors.white38 : Colors.white70, fontSize: 13, height: 1.6),
+                      ),
+                    ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  // ════════════════════════════════════════════
+  // FEATURE N8: Star messages
+  // ════════════════════════════════════════════
+
+  Future<void> _loadStarredMessages() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getStringList('starred_${widget.meetingId}') ?? [];
+      if (mounted) setState(() => _starredMessageIds = Set<String>.from(raw));
+    } catch (_) {}
+  }
+
+  Future<void> _toggleStarMessage(String msgId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final newSet = Set<String>.from(_starredMessageIds);
+      if (newSet.contains(msgId)) {
+        newSet.remove(msgId);
+      } else {
+        newSet.add(msgId);
+      }
+      setState(() => _starredMessageIds = newSet);
+      await prefs.setStringList('starred_${widget.meetingId}', newSet.toList());
+    } catch (_) {}
+  }
+
+  // ════════════════════════════════════════════
+  // FEATURE N15: Activities panel
+  // ════════════════════════════════════════════
+
+  Widget _buildActivitiesPanel() {
+    return DefaultTabController(
+      length: 3,
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xCC181828),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 0.5)),
+          ),
+          child: Column(children: [
+            const SizedBox(height: 8),
+            Container(width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(children: [
+                const Icon(Icons.grid_view, color: Colors.white70, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Activités',
+                    style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15))),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white54, size: 22),
+                  onPressed: () => setState(() => _showActivities = false),
+                ),
+              ]),
+            ),
+            TabBar(
+              labelColor: AppColors.primary,
+              unselectedLabelColor: Colors.white38,
+              indicatorColor: AppColors.primary,
+              labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 13),
+              tabs: const [
+                Tab(text: 'Sondages'),
+                Tab(text: 'Q&R'),
+                Tab(text: 'Tableau'),
+              ],
+            ),
+            Expanded(
+              child: TabBarView(children: [
+                _buildPollsPanel(),
+                _buildQAPanel(),
+                Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.draw_outlined, color: Colors.white38, size: 48),
+                    const SizedBox(height: 12),
+                    Text('Ouvrir le tableau blanc', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 14)),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _showActivities = false;
+                          _showWhiteboard = true;
+                          _listenWhiteboard();
+                        });
+                      },
+                      icon: const Icon(Icons.draw_outlined),
+                      label: Text('Ouvrir', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ]),
+                ),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   // ── CONTROLS BAR ─────────────────────────────
   Widget _buildControls() {
     final isPrivileged = widget.isHost || _isCoHost;
@@ -5648,15 +6714,32 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               onTap: _showFiltersPanel,
             ),
             const SizedBox(width: 8),
-            _Btn(
-              icon: _sharingScreen
-                  ? Icons.stop_screen_share
-                  : Icons.screen_share,
-              label: _sharingScreen ? 'Stopper' : 'Écran',
-              active: !_sharingScreen,
-              isHighlight: _sharingScreen,
-              onTap: _toggleScreenShare,
-            ),
+            // Feature N12: Screen share with permission check
+            if (!_allowParticipantScreenShare && !isPrivileged)
+              _Btn(
+                icon: Icons.screen_share,
+                label: 'Écran',
+                active: false,
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('L\'hôte a désactivé le partage d\'écran', style: GoogleFonts.poppins()),
+                    backgroundColor: Colors.orange.shade700,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    duration: const Duration(seconds: 3),
+                  ));
+                },
+              )
+            else
+              _Btn(
+                icon: _sharingScreen
+                    ? Icons.stop_screen_share
+                    : Icons.screen_share,
+                label: _sharingScreen ? 'Stopper' : 'Écran',
+                active: !_sharingScreen,
+                isHighlight: _sharingScreen,
+                onTap: _toggleScreenShare,
+              ),
             const SizedBox(width: 8),
             Stack(
               clipBehavior: Clip.none,
@@ -5880,6 +6963,62 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 onTap: _generateMeetingSummary,
               ),
             const SizedBox(width: 8),
+            // Feature N1: Q&A button
+            _Btn(
+              icon: Icons.quiz_outlined,
+              label: 'Q&R',
+              active: !_showQA,
+              isHighlight: _showQA,
+              onTap: () => setState(() {
+                _showQA = !_showQA;
+                if (_showQA) { _showChat = false; _showParticipants = false; _showWhiteboard = false; _showPolls = false; _showActivities = false; }
+              }),
+            ),
+            const SizedBox(width: 8),
+            // Feature N6: Agenda button
+            _Btn(
+              icon: Icons.notes,
+              label: 'Agenda',
+              active: !_showAgendaPanel,
+              isHighlight: _showAgendaPanel,
+              onTap: () => setState(() {
+                _showAgendaPanel = !_showAgendaPanel;
+                if (_showAgendaPanel) { _showChat = false; _showParticipants = false; _showWhiteboard = false; _showPolls = false; _showActivities = false; }
+              }),
+            ),
+            const SizedBox(width: 8),
+            // Feature N15: Activities panel
+            _Btn(
+              icon: Icons.grid_view,
+              label: 'Activités',
+              active: !_showActivities,
+              isHighlight: _showActivities,
+              onTap: () => setState(() {
+                _showActivities = !_showActivities;
+                if (_showActivities) { _showChat = false; _showParticipants = false; _showWhiteboard = false; _showPolls = false; _showQA = false; }
+              }),
+            ),
+            // Feature N2: Attendance button (host/cohost only)
+            if (isPrivileged) ...[
+              const SizedBox(width: 8),
+              _Btn(
+                icon: Icons.checklist,
+                label: 'Présences',
+                active: true,
+                onTap: _listenAttendance,
+              ),
+            ],
+            // Feature N4: Host controls (host/cohost only)
+            if (isPrivileged) ...[
+              const SizedBox(width: 8),
+              _Btn(
+                icon: Icons.shield_outlined,
+                label: 'Contrôles',
+                active: true,
+                onTap: _showHostControlsSheet,
+              ),
+            ],
+            const SizedBox(width: 8),
             Semantics(
               label: 'Quitter la réunion',
               button: true,
@@ -5990,6 +7129,45 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 onTap: () {
                   Navigator.pop(ctx);
                   _showSetPasscodeDialog();
+                },
+              ),
+
+              // Feature N7: Low-light mode
+              SwitchListTile(
+                title: Text('Mode faible luminosité', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                subtitle: Text('Améliore la visibilité dans l\'obscurité', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                value: _lowLightMode,
+                activeColor: Colors.amber,
+                secondary: const Icon(Icons.brightness_6, color: Colors.amber),
+                onChanged: (v) {
+                  setState(() => _lowLightMode = v);
+                  setLocal(() {});
+                },
+              ),
+
+              // Feature N5: Side-by-side mode
+              if (_sharingScreen) SwitchListTile(
+                title: Text('Mode côte à côte', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                subtitle: Text('Partage + caméra côte à côte', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                value: _sideBySide,
+                activeColor: Colors.blue,
+                secondary: const Icon(Icons.view_column_outlined, color: Colors.blue),
+                onChanged: (v) {
+                  setState(() => _sideBySide = v);
+                  setLocal(() {});
+                },
+              ),
+
+              // Feature N10: Join/leave sounds
+              SwitchListTile(
+                title: Text('Sons d\'entrée/sortie', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                subtitle: Text('Sons quand quelqu\'un rejoint ou quitte', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                value: _joinLeaveSounds,
+                activeColor: AppColors.primary,
+                secondary: const Icon(Icons.notifications_outlined, color: Colors.white54),
+                onChanged: (v) {
+                  setState(() => _joinLeaveSounds = v);
+                  setLocal(() {});
                 },
               ),
             ]),
