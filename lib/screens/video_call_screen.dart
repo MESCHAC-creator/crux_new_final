@@ -103,7 +103,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── Camera filters ───────────────────────────
   _CameraFilter _cameraFilter = _CameraFilter.natural;
-  bool _autoQuality = true;
+  final bool _autoQuality = true;
 
   // ── Call timer ───────────────────────────────
   Timer? _callTimer;
@@ -201,7 +201,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   bool _showPolls = false;
   List<Map<String, dynamic>> _activePolls = [];
   StreamSubscription? _pollsSub;
-  Map<String, String> _myPollVotes = {};
+  final Map<String, String> _myPollVotes = {};
 
   // ── Recording & Noise ────────────────────────
   bool _isRecordingLocally = false;
@@ -294,7 +294,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   bool _showQA = false;
   List<Map<String, dynamic>> _qaList = [];
   StreamSubscription? _qaSub;
-  Set<String> _myQAUpvotes = {};
+  final Set<String> _myQAUpvotes = {};
 
   // ── Feature N2: Attendance ───────────────────
   List<Map<String, dynamic>> _attendanceLog = [];
@@ -1992,6 +1992,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         try { await launchUrl(ytUrl, mode: LaunchMode.externalApplication); } catch (_) {}
 
         setState(() => _youtubeStreamingActive = true);
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('🔴 Live activé — ouverture YouTube Studio', style: GoogleFonts.poppins()),
           backgroundColor: Colors.red.shade700,
@@ -4485,7 +4486,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary),
+                borderSide: const BorderSide(color: AppColors.primary),
               ),
               contentPadding: const EdgeInsets.all(12),
             ),
@@ -4787,9 +4788,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             // ── HEADER ──────────────────────────────────────────────────
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [const Color(0xFF1A1A2E), const Color(0xFF16213E)],
+                  colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
                 ),
               ),
               child: Row(children: [
@@ -4926,8 +4927,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                       setState(() => _wbLaserPos = d.localPosition);
                     } else if ([_WbTool.line, _WbTool.arrow, _WbTool.rect, _WbTool.circle, _WbTool.triangle].contains(_wbTool)) {
                       setState(() {
-                        if (_wbCurrentPoints.isNotEmpty) _wbCurrentPoints[_wbCurrentPoints.length - 1] = d.localPosition;
-                        else _wbCurrentPoints.add(d.localPosition);
+                        if (_wbCurrentPoints.isNotEmpty) { _wbCurrentPoints[_wbCurrentPoints.length - 1] = d.localPosition; }
+                        else { _wbCurrentPoints.add(d.localPosition); }
                       });
                     }
                   },
@@ -5016,7 +5017,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           decoration: InputDecoration(
             hintText: 'Entrez votre texte...',
             hintStyle: GoogleFonts.poppins(color: Colors.white38),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.white24)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white24)),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white24)),
             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFFF4081))),
           ),
@@ -5740,7 +5741,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             leading: const Icon(Icons.people, color: Colors.white70),
             title: Text('Tout le monde', style: GoogleFonts.poppins(color: Colors.white)),
             trailing: _chatRecipientId == null
-                ? Icon(Icons.check_circle, color: AppColors.primary) : null,
+                ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
             onTap: () {
               setState(() { _chatRecipient = null; _chatRecipientId = null; });
               Navigator.pop(context);
@@ -5752,13 +5753,13 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             return ListTile(
               leading: Container(
                 width: 36, height: 36,
-                decoration: BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
+                decoration: const BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
                 child: Center(child: Text(pName[0].toUpperCase(),
                     style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700))),
               ),
               title: Text(pName, style: GoogleFonts.poppins(color: Colors.white)),
               trailing: _chatRecipientId == pId
-                  ? Icon(Icons.check_circle, color: AppColors.primary) : null,
+                  ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
               onTap: () {
                 setState(() { _chatRecipient = pName; _chatRecipientId = pId; });
                 Navigator.pop(context);
@@ -5940,7 +5941,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
     final durationMin = _callSeconds ~/ 60;
     final durationSec = _callSeconds % 60;
-    final allText = _transcriptLines.map((l) => '${l['text'] ?? ''}').join(' ');
+    final allText = _transcriptLines.map((l) => (l['text'] ?? '').toString()).join(' ');
 
     // Word frequency analysis (stop-words excluded)
     final stopWords = {'le','la','les','de','du','un','une','des','et','en','est','à','que','qui','je','tu','il','elle','nous','vous','ils','elles','pas','plus','par','sur','avec','pour','dans','se','ce','ne','on','au','aux','son','sa','ses','leur','mais','ou','donc','or','ni','si','très','bien','comme','tout','tous','toutes','être','avoir','faire','dit','dire','aussi','même','encore','quand','puis','après','avant','sous','entre','sans','lors','dont','quoi','quel','quelle','était','été','peut','cette','cela','lui','ceci'};
@@ -5972,7 +5973,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     // Per-speaker word count
     final speakerCounts = <String, int>{};
     for (final l in _transcriptLines) {
-      final spk = '${l['speaker'] ?? 'Inconnu'}';
+      final spk = (l['speaker'] ?? 'Inconnu').toString();
       speakerCounts[spk] = (speakerCounts[spk] ?? 0) + 1;
     }
     final sortedSpeakers = speakerCounts.entries.toList()
@@ -6313,7 +6314,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   },
                   child: Container(
                     width: 38, height: 38,
-                    decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                     child: const Icon(Icons.send, color: Colors.white, size: 16),
                   ),
                 ),
@@ -6450,7 +6451,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                         dense: true,
                         leading: Container(
                           width: 32, height: 32,
-                          decoration: BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
+                          decoration: const BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
                           child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
                               style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13))),
                         ),
@@ -6620,7 +6621,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                             fillColor: Colors.white.withValues(alpha: 0.05),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.primary)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary)),
                             contentPadding: const EdgeInsets.all(12),
                           ),
                         ),
@@ -7287,7 +7288,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 title: Text('Mode côte à côte', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
                 subtitle: Text('Partage + caméra côte à côte', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _sideBySide,
-                activeColor: Colors.blue,
+                activeThumbColor: Colors.blue,
                 secondary: const Icon(Icons.view_column_outlined, color: Colors.blue),
                 onChanged: (v) {
                   setState(() => _sideBySide = v);
@@ -7300,7 +7301,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 title: Text('Sons d\'entrée/sortie', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
                 subtitle: Text('Sons quand quelqu\'un rejoint ou quitte', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _joinLeaveSounds,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 secondary: const Icon(Icons.notifications_outlined, color: Colors.white54),
                 onChanged: (v) {
                   setState(() => _joinLeaveSounds = v);
@@ -8358,10 +8359,12 @@ class _PaywallDialogState extends State<_PaywallDialog> with SingleTickerProvide
         });
       }
     } catch (e) {
-      if (mounted) setState(() {
-        _verifying = false;
-        _statusMessage = 'Erreur vérification. Réessayez.';
-      });
+      if (mounted) {
+        setState(() {
+          _verifying = false;
+          _statusMessage = 'Erreur vérification. Réessayez.';
+        });
+      }
     }
   }
 
@@ -8435,13 +8438,13 @@ class _PaywallDialogState extends State<_PaywallDialog> with SingleTickerProvide
                         color: Colors.white.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.link, color: Colors.white70, size: 13),
-                        const SizedBox(width: 5),
-                        const Text('pay.djamo.com/qxmvj',
+                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.link, color: Colors.white70, size: 13),
+                        SizedBox(width: 5),
+                        Text('pay.djamo.com/qxmvj',
                           style: TextStyle(color: Colors.white70, fontSize: 11, decoration: TextDecoration.underline, decorationColor: Colors.white54)),
-                        const SizedBox(width: 5),
-                        const Icon(Icons.copy, color: Colors.white54, size: 11),
+                        SizedBox(width: 5),
+                        Icon(Icons.copy, color: Colors.white54, size: 11),
                       ]),
                     ),
                   ),
