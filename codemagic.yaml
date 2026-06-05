@@ -9,10 +9,10 @@ workflows:
     max_build_duration: 120
 
     environment:
-      flutter: stable
+      flutter: 3.32.3
       java: 17
       groups:
-        - firebase_deploy   # contient FIREBASE_TOKEN (optionnel)
+        - firebase_deploy
 
     scripts:
       - name: Set up local.properties
@@ -21,9 +21,15 @@ workflows:
           echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
           flutter --version
 
+      - name: Clean Gradle cache
+        script: |
+          rm -rf ~/.gradle/caches/ || true
+          rm -rf ~/.gradle/wrapper/dists/ || true
+          cd android && ./gradlew clean --no-daemon || true
+          echo "✅ Gradle cache nettoyé"
+
       - name: Get Flutter packages
         script: flutter pub get
-
 
       - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
         script: |
@@ -43,19 +49,15 @@ workflows:
 
       - name: Build APK and AAB
         script: |
+          set -e
           mkdir -p build/outputs
 
-          # flutter build apk exits with code 1 when it can't LOCATE the APK,
-          # even though Gradle produced it successfully. We ignore Flutter's exit
-          # code and find the file ourselves — Gradle always writes to a known path.
-
           # ── APK ──────────────────────────────────────────────────────────────
-          flutter build apk --release || true
+          flutter build apk --release --no-tree-shake-icons
 
-          # Gradle output paths (in priority order)
-          APK=$(find build/app/outputs/flutter-apk     -name "app-release.apk" 2>/dev/null | head -1)
+          APK=$(find build/app/outputs/flutter-apk -name "app-release.apk" 2>/dev/null | head -1)
           [ -z "$APK" ] && APK=$(find build/app/outputs/apk -name "app-release.apk" 2>/dev/null | head -1)
-          [ -z "$APK" ] && APK=$(find .                -name "app-release.apk" ! -path "*/.pub-cache/*" ! -path "*/debug/*" 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(find . -name "app-release.apk" ! -path "*/.pub-cache/*" ! -path "*/debug/*" 2>/dev/null | head -1)
 
           if [ -z "$APK" ]; then
             echo "❌ APK not found — listing build/app/outputs/:"
@@ -63,13 +65,13 @@ workflows:
             exit 1
           fi
           cp "$APK" build/outputs/crux-release.apk
-          echo "✅ APK: $(du -sh build/outputs/crux-release.apk | cut -f1) — source: $APK"
+          echo "✅ APK: $(du -sh build/outputs/crux-release.apk | cut -f1)"
 
           # ── AAB ──────────────────────────────────────────────────────────────
-          flutter build appbundle --release || true
+          flutter build appbundle --release --no-tree-shake-icons
 
-          AAB=$(find build/app/outputs/bundle          -name "app-release.aab" 2>/dev/null | head -1)
-          [ -z "$AAB" ] && AAB=$(find .                -name "app-release.aab" ! -path "*/.pub-cache/*" 2>/dev/null | head -1)
+          AAB=$(find build/app/outputs/bundle -name "app-release.aab" 2>/dev/null | head -1)
+          [ -z "$AAB" ] && AAB=$(find . -name "app-release.aab" ! -path "*/.pub-cache/*" 2>/dev/null | head -1)
 
           if [ -z "$AAB" ]; then
             echo "❌ AAB not found — listing build/app/outputs/:"
@@ -77,7 +79,7 @@ workflows:
             exit 1
           fi
           cp "$AAB" build/outputs/crux-release.aab
-          echo "✅ AAB: $(du -sh build/outputs/crux-release.aab | cut -f1) — source: $AAB"
+          echo "✅ AAB: $(du -sh build/outputs/crux-release.aab | cut -f1)"
 
     artifacts:
       - build/outputs/crux-release.apk
@@ -103,7 +105,7 @@ workflows:
       app_store_connect: codemagic_api_key
 
     environment:
-      flutter: stable
+      flutter: 3.32.3
       xcode: latest
       cocoapods: default
       ios_signing:
@@ -123,12 +125,11 @@ workflows:
           else
             echo "✅ iOS folder already exists"
           fi
-          # Ensure bundle ID is correct in project.pbxproj
           PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
           if [ -f "$PBXPROJ" ]; then
             sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.example.crux/g' "$PBXPROJ" || \
             sed -i 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.example.crux/g' "$PBXPROJ"
-            echo "✅ Bundle ID patché dans project.pbxproj"
+            echo "✅ Bundle ID patché"
           fi
 
       - name: Inject GoogleService-Info.plist
