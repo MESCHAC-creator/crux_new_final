@@ -9,7 +9,7 @@ workflows:
     max_build_duration: 120
 
     environment:
-      flutter: 3.29.2
+      flutter: stable
       java: 17
       groups:
         - firebase_deploy   # contient FIREBASE_TOKEN (optionnel)
@@ -103,7 +103,7 @@ workflows:
       app_store_connect: codemagic_api_key
 
     environment:
-      flutter: 3.29.2
+      flutter: stable
       xcode: latest
       cocoapods: default
       ios_signing:
