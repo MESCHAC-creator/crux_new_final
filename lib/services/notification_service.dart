@@ -101,7 +101,7 @@ class NotificationService {
   static const List<Map<String, String>> _reminderMessages = [
     {'title': '👥 Votre équipe vous attend', 'body': 'Lancez une réunion CRUX et restez connecté avec vos collaborateurs.'},
     {'title': '🎯 Productivité au rendez-vous ?', 'body': 'Planifiez votre prochaine réunion CRUX pour rester efficace.'},
-    {'title': '✨ CRUX Pro disponible', 'body': 'Réunions illimitées pour 25 000 FCFA/mois. Passez à Pro dès maintenant !'},
+    {'title': '✨ CRUX Pro disponible', 'body': 'Réunions illimitées pour 100 000 FCFA/mois. Passez à Pro dès maintenant !'},
     {'title': '📞 Quelqu\'un veut vous joindre ?', 'body': 'Ouvrez CRUX pour voir vos réunions planifiées.'},
     {'title': '🚀 Nouveau dans CRUX', 'body': 'Tableau collaboratif, sous-titres et filtres caméra disponibles dans votre réunion.'},
     {'title': '🔒 Appels sécurisés E2E', 'body': 'Toutes vos communications sont chiffrées de bout en bout avec CRUX.'},
@@ -306,7 +306,7 @@ class NotificationService {
   }) async {
     await showImmediate(
       title: '⏱️ $minutesRemaining min restantes',
-      body: 'Passez à CRUX Pro pour des réunions illimitées — 25 000 FCFA/mois',
+      body: 'Passez à CRUX Pro pour des réunions illimitées — 100 000 FCFA/mois',
       id: 51,
     );
   }

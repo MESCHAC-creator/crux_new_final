@@ -556,7 +556,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                 style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
                               ),
                               Text(
-                                _loadingPro ? '' : (_isPro ? _proExpiryText() : '25 000 FCFA/mois — Réunions illimitées'),
+                                _loadingPro ? '' : (_isPro ? _proExpiryText() : '100 000 FCFA/mois — Réunions illimitées'),
                                 style: GoogleFonts.poppins(color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
                               ),
                             ])),

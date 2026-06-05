@@ -120,6 +120,13 @@ class MyApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             supportedLocales: const [
               Locale('fr'), Locale('en'), Locale('es'), Locale('de'),
+              Locale('ru'), Locale('pt'), Locale('it'), Locale('ar'),
+              Locale('zh'), Locale('hi'), Locale('ja'), Locale('ko'),
+              Locale('tr'), Locale('vi'), Locale('id'), Locale('nl'),
+              Locale('pl'), Locale('uk'), Locale('sv'), Locale('ha'),
+              Locale('yo'), Locale('sw'), Locale('am'), Locale('fa'),
+              Locale('ro'), Locale('el'), Locale('cs'), Locale('hu'),
+              Locale('bn'), Locale('th'), Locale('mg'), Locale('wo'),
             ],
             locale: localeProvider.locale,
             localizationsDelegates: const [

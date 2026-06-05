@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show ImageFilter;
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
@@ -169,15 +170,22 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   final Map<String, bool> _participantCamOn = {};  // remote cam state
   final Map<String, StreamSubscription<Map<String, dynamic>?>> _profileSubs = {};
 
-  // ── Live transcription (UI stub — populated via speech_to_text in future) ─
+  // ── Live transcription ───────────────────────
   bool _showTranscript = false;
-  final List<Map<String, String>> _transcriptLines = []; // {speaker, text}
+  final List<Map<String, String>> _transcriptLines = [];
+  bool _sttListening = false;
+  final stt.SpeechToText _sttService = stt.SpeechToText();
+  bool _sttAvailable = false;
 
-  // ── Collaborative whiteboard ─────────────────
+  // ── Drawing whiteboard ────────────────────────
   bool _showWhiteboard = false;
-  final List<Map<String, dynamic>> _whiteboardStrokes = [];
+  final List<_WbStroke> _wbStrokes = [];           // synced from Firestore
+  final List<Offset?> _wbCurrentPoints = [];        // stroke in progress
+  Color _wbColor = Colors.black;
+  double _wbWidth = 4.0;
+  bool _wbErasing = false;
+  bool _wbSyncEnabled = false;
   StreamSubscription? _whiteboardSub;
-  final _whiteboardInputController = TextEditingController();
 
   // ── Church mode ──────────────────────────────
   bool _isChurchMode = false;
@@ -306,7 +314,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _chatController.dispose();
     _chatScrollController.dispose();
     _notesController.dispose();
-    _whiteboardInputController.dispose();
+    // whiteboard controller removed — drawing canvas has no text input
     _screenStream?.dispose();
     _localStream?.dispose();
     _pc?.close();
@@ -784,8 +792,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           if (level != null && audioLevel == 0) audioLevel = (level as num).toDouble();
         }
       }
-      // Threshold: 0.02 avoids mic noise false-positives
-      final isSpeaking = audioLevel > 0.02;
+      // Threshold: 0.005 for better Android sensitivity
+      final isSpeaking = audioLevel > 0.005 || (_micOn && audioLevel > 0);
       if (isSpeaking != _localWasSpeaking) {
         _localWasSpeaking = isSpeaking;
         _db.collection('meetings').doc(widget.meetingId)
@@ -835,6 +843,49 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       _waveController.stop();
       _waveController.reset();
     }
+  }
+
+  // ── SPEECH-TO-TEXT (live transcription) ──────
+  Future<void> _initStt() async {
+    _sttAvailable = await _sttService.initialize(
+      onError: (_) {},
+      onStatus: (status) {
+        if (status == 'done' || status == 'notListening') {
+          if (mounted && _sttListening) _restartSttListening();
+        }
+      },
+    );
+  }
+
+  Future<void> _startTranscription() async {
+    if (!_sttAvailable) await _initStt();
+    if (!_sttAvailable) return;
+    setState(() => _sttListening = true);
+    _restartSttListening();
+  }
+
+  void _restartSttListening() {
+    if (!mounted || !_sttListening || !_sttAvailable) return;
+    _sttService.listen(
+      localeId: 'fr_FR',
+      listenFor: const Duration(seconds: 30),
+      pauseFor: const Duration(seconds: 3),
+      partialResults: false,
+      onResult: (result) {
+        if (!mounted) return;
+        if (result.finalResult && result.recognizedWords.isNotEmpty) {
+          setState(() => _transcriptLines.add({
+            'speaker': widget.userName,
+            'text': result.recognizedWords,
+          }));
+        }
+      },
+    );
+  }
+
+  Future<void> _stopTranscription() async {
+    setState(() => _sttListening = false);
+    await _sttService.stop();
   }
 
   // ── AUTO-RECONNECT ───────────────────────────
@@ -1135,17 +1186,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     } else {
       // ── Start sharing ──
       try {
-        // Check platform support
-        if (!kIsWeb && !Platform.isLinux) {
-          _log.w('Screen share: Not supported on ${Platform.operatingSystem}');
+        // iOS does not support screen capture via WebRTC
+        if (!kIsWeb && Platform.isIOS) {
+          _log.w('Screen share: Not supported on iOS');
           if (mounted) {
-            String osName = Platform.isAndroid ? 'Android' : Platform.isIOS ? 'iOS' : 'this platform';
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Partage d\'écran non supporté sur $osName.', style: GoogleFonts.poppins()),
-              backgroundColor: Colors.red.shade700,
+              content: Text('Partage d\'écran non disponible sur iOS.', style: GoogleFonts.poppins()),
+              backgroundColor: Colors.orange.shade700,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              duration: const Duration(seconds: 4),
+              duration: const Duration(seconds: 3),
             ));
           }
           return;
@@ -3628,18 +3678,33 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               child: Text('Sous-titres en direct',
                   style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
+            // Start/stop transcription button
+            GestureDetector(
+              onTap: () => _sttListening ? _stopTranscription() : _startTranscription(),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _sttListening ? Colors.red.withValues(alpha: 0.2) : Colors.green.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: _sttListening ? Colors.red.withValues(alpha: 0.6) : Colors.green.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(_sttListening ? Icons.stop : Icons.mic,
+                    color: _sttListening ? Colors.red : Colors.green, size: 11),
+                  const SizedBox(width: 4),
+                  Text(_sttListening ? 'STOP' : 'DÉMARRER',
+                    style: GoogleFonts.poppins(
+                      color: _sttListening ? Colors.red : Colors.green,
+                      fontSize: 9, fontWeight: FontWeight.w700)),
+                ]),
               ),
-              child: Text('BÊTA', style: GoogleFonts.poppins(color: Colors.green, fontSize: 9, fontWeight: FontWeight.w700)),
             ),
             const SizedBox(width: 8),
             IconButton(
-              onPressed: () => setState(() => _showTranscript = false),
+              onPressed: () { _stopTranscription(); setState(() => _showTranscript = false); },
               icon: const Icon(Icons.close, color: Colors.white54, size: 18),
               padding: EdgeInsets.zero, constraints: const BoxConstraints(),
             ),
@@ -3651,9 +3716,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           child: _transcriptLines.isEmpty
               ? Center(
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Icon(Icons.mic_none, color: Colors.white24, size: 36),
+                    Icon(_sttListening ? Icons.mic : Icons.mic_none,
+                      color: _sttListening ? Colors.green.withValues(alpha: 0.7) : Colors.white24, size: 36),
                     const SizedBox(height: 8),
-                    Text('En attente de parole...', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
+                    Text(_sttListening ? 'Écoute en cours...' : 'Appuyez sur DÉMARRER',
+                      style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
                     const SizedBox(height: 4),
                     Text('La transcription s\'affichera ici', style: GoogleFonts.poppins(color: Colors.white24, fontSize: 11)),
                   ]),
@@ -3713,91 +3780,69 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     );
   }
 
-  // ── COLLABORATIVE WHITEBOARD ─────────────────
+  // ── DRAWING WHITEBOARD ────────────────────────
   void _listenWhiteboard() {
+    if (_wbSyncEnabled) return;
+    _wbSyncEnabled = true;
     _whiteboardSub?.cancel();
     _whiteboardSub = _db
         .collection('meetings')
         .doc(widget.meetingId)
         .collection('whiteboard')
-        // No orderBy — avoids requiring a composite Firestore index.
-        // Docs arrive in insertion order from cache; good enough for notes.
         .snapshots()
         .listen((snap) {
       if (!mounted) return;
       final docs = snap.docs.map((d) => d.data()).toList()
-        ..sort((a, b) {
-          // Sort by client-side 'clientTs' millis fallback
-          final ta = a['clientTs'] as int? ?? 0;
-          final tb = b['clientTs'] as int? ?? 0;
-          return ta.compareTo(tb);
-        });
+        ..sort((a, b) => ((a['clientTs'] as int? ?? 0).compareTo(b['clientTs'] as int? ?? 0)));
       setState(() {
-        _whiteboardStrokes
-          ..clear()
-          ..addAll(docs);
+        _wbStrokes.clear();
+        for (final d in docs) {
+          try {
+            final rawPts = d['points'] as List<dynamic>? ?? [];
+            final points = rawPts.map((p) => Offset(
+              (p['x'] as num).toDouble(),
+              (p['y'] as num).toDouble(),
+            )).toList();
+            _wbStrokes.add(_WbStroke(
+              points: points,
+              color: Color(d['color'] as int? ?? Colors.black.value),
+              width: (d['width'] as num? ?? 4).toDouble(),
+              isErase: d['isErase'] as bool? ?? false,
+            ));
+          } catch (_) {}
+        }
       });
-    }, onError: (e) {
-      if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-          content: Text('Tableau: $e', style: GoogleFonts.poppins(fontSize: 12)),
-          backgroundColor: Colors.red.shade700,
-          duration: const Duration(seconds: 4),
-          behavior: SnackBarBehavior.floating,
-        ));
-      }
     });
   }
 
   Future<void> _clearWhiteboard() async {
-    // Cancel listener before deleting so it doesn't re-populate during the batch
     _whiteboardSub?.cancel();
     _whiteboardSub = null;
-    setState(() => _whiteboardStrokes.clear());
+    _wbSyncEnabled = false;
+    setState(() { _wbStrokes.clear(); _wbCurrentPoints.clear(); });
     try {
-      final snap = await _db
-          .collection('meetings')
-          .doc(widget.meetingId)
-          .collection('whiteboard')
-          .get();
+      final snap = await _db.collection('meetings').doc(widget.meetingId).collection('whiteboard').get();
       final batch = _db.batch();
       for (final doc in snap.docs) { batch.delete(doc.reference); }
       await batch.commit();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-          content: Text('Erreur effacement: $e', style: GoogleFonts.poppins(fontSize: 12)),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-        ));
-      }
-    } finally {
-      // Re-attach listener after delete completes
+    } catch (_) {} finally {
       _listenWhiteboard();
     }
   }
 
-  void _submitWhiteboardNote(String text) {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) return;
-    _whiteboardInputController.clear();
-    _db.collection('meetings').doc(widget.meetingId)
-        .collection('whiteboard').add({
-      'text': trimmed,
-      'author': widget.userName,
-      'ts': FieldValue.serverTimestamp(),
-      'clientTs': DateTime.now().millisecondsSinceEpoch,
-    }).then((_) {
-      // success — no-op, listener will update the list
-    }, onError: (e) {
-      if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-          content: Text('Erreur envoi note: $e', style: GoogleFonts.poppins(fontSize: 12)),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-        ));
-      }
-    });
+  Future<void> _saveDrawingStroke(_WbStroke stroke) async {
+    if (stroke.points.isEmpty) return;
+    try {
+      await _db.collection('meetings').doc(widget.meetingId).collection('whiteboard').add({
+        'points': stroke.points.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
+        'color': stroke.color.value,
+        'width': stroke.width,
+        'isErase': stroke.isErase,
+        'author': widget.userName,
+        'clientTs': DateTime.now().millisecondsSinceEpoch,
+        'ts': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
   }
 
   Widget _buildWhiteboardPanel() {
@@ -3821,82 +3866,111 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
             ),
             if (widget.isHost || _isCoHost)
-              TextButton.icon(
-                onPressed: _clearWhiteboard,
-                icon: const Icon(Icons.delete_outline, size: 14, color: Colors.redAccent),
-                label: Text('Effacer', style: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 11)),
-                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+              GestureDetector(
+                onTap: _clearWhiteboard,
+                child: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
               ),
+            const SizedBox(width: 8),
             IconButton(
-              onPressed: () => setState(() => _showWhiteboard = false),
+              onPressed: () => setState(() { _showWhiteboard = false; }),
               icon: const Icon(Icons.close, color: Colors.white54, size: 18),
               padding: EdgeInsets.zero, constraints: const BoxConstraints(),
             ),
           ]),
         ),
-        const Divider(color: Colors.white10, height: 1),
-        // Whiteboard area
-        Expanded(
-          child: _whiteboardStrokes.isEmpty
-              ? Center(
-                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Icon(Icons.gesture, color: Colors.white24, size: 40),
-                    const SizedBox(height: 8),
-                    Text('Tableau vide', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
-                    const SizedBox(height: 4),
-                    Text('Écrivez une note ci-dessous — visible\npar tous les participants en temps réel',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.poppins(color: Colors.white24, fontSize: 11, height: 1.5)),
-                  ]),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _whiteboardStrokes.length,
-                  itemBuilder: (_, i) {
-                    final s = _whiteboardStrokes[i];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(s['author'] ?? '', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 2),
-                          Text(s['text'] ?? '', style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13)),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-        ),
-        // Quick note input for whiteboard
+        // ── TOOLBAR (colors + tools) ──────────────────────────────────
         Container(
-          padding: const EdgeInsets.all(12),
+          color: Colors.black26,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Row(children: [
-            Expanded(
-              child: TextField(
-                controller: _whiteboardInputController,
-                style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: 'Ajouter une note au tableau...',
-                  hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 12),
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.08),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.send, color: Colors.white54, size: 18),
-                    onPressed: () => _submitWhiteboardNote(_whiteboardInputController.text),
+            // Color chips
+            for (final c in [Colors.black, Colors.white, Colors.red, Colors.blue, Colors.green, Colors.yellow, Colors.orange])
+              GestureDetector(
+                onTap: () => setState(() { _wbColor = c; _wbErasing = false; }),
+                child: Container(
+                  width: 24, height: 24,
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(
+                    color: c,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: (_wbColor == c && !_wbErasing) ? Colors.white : Colors.white24,
+                      width: (_wbColor == c && !_wbErasing) ? 2.5 : 1,
+                    ),
                   ),
                 ),
-                onSubmitted: _submitWhiteboardNote,
+              ),
+            const Spacer(),
+            // Stroke width
+            GestureDetector(
+              onTap: () => setState(() => _wbWidth = _wbWidth < 8 ? _wbWidth + 2 : 2),
+              child: Container(
+                width: 28, height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Center(
+                  child: Container(
+                    width: _wbWidth.clamp(2, 10), height: _wbWidth.clamp(2, 10),
+                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Eraser
+            GestureDetector(
+              onTap: () => setState(() => _wbErasing = !_wbErasing),
+              child: Container(
+                width: 28, height: 28,
+                decoration: BoxDecoration(
+                  color: _wbErasing ? Colors.white : Colors.white12,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _wbErasing ? Colors.white : Colors.white24),
+                ),
+                child: Icon(Icons.auto_fix_high, size: 14, color: _wbErasing ? Colors.black : Colors.white54),
               ),
             ),
           ]),
+        ),
+        const Divider(color: Colors.white10, height: 1),
+        // ── DRAWING CANVAS ────────────────────────────────────────────
+        Expanded(
+          child: ClipRect(
+            child: GestureDetector(
+              onPanStart: (d) => setState(() => _wbCurrentPoints.add(d.localPosition)),
+              onPanUpdate: (d) => setState(() => _wbCurrentPoints.add(d.localPosition)),
+              onPanEnd: (_) {
+                if (_wbCurrentPoints.isNotEmpty) {
+                  final pts = _wbCurrentPoints.whereType<Offset>().toList();
+                  if (pts.isNotEmpty) {
+                    final stroke = _WbStroke(
+                      points: pts,
+                      color: _wbErasing ? Colors.white : _wbColor,
+                      width: _wbErasing ? 24.0 : _wbWidth,
+                      isErase: _wbErasing,
+                    );
+                    setState(() {
+                      _wbStrokes.add(stroke);
+                      _wbCurrentPoints.clear();
+                    });
+                    _saveDrawingStroke(stroke);
+                  }
+                }
+              },
+              child: CustomPaint(
+                painter: _WhiteboardPainter(
+                  strokes: _wbStrokes,
+                  currentPoints: _wbCurrentPoints,
+                  currentColor: _wbErasing ? Colors.white : _wbColor,
+                  currentWidth: _wbErasing ? 24.0 : _wbWidth,
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
         ),
       ]),
         ),
@@ -5385,7 +5459,7 @@ class _PaywallDialogState extends State<_PaywallDialog> with SingleTickerProvide
                 padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
                 decoration: BoxDecoration(gradient: grad, borderRadius: BorderRadius.circular(16)),
                 child: Column(children: [
-                  const Text('25 000 FCFA / mois',
+                  const Text('100 000 FCFA / mois',
                     style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 3),
                   const Text('Accès illimité — Sans publicité',
@@ -5481,7 +5555,7 @@ class _PaywallDialogState extends State<_PaywallDialog> with SingleTickerProvide
                         : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                             const Icon(Icons.payment, color: Colors.white, size: 18),
                             const SizedBox(width: 8),
-                            Text(_paymentOpened ? 'Ouvrir le paiement Djamo' : 'Passer à CRUX PRO — 25 000 FCFA',
+                            Text(_paymentOpened ? 'Ouvrir le paiement Djamo' : 'Passer à CRUX PRO — 100 000 FCFA',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
                           ]),
                   ),
@@ -5711,4 +5785,73 @@ class _InfoRow extends StatelessWidget {
       ]),
     );
   }
+}
+
+// ─────────────────────────────────────────────
+//  WHITEBOARD DRAWING MODELS
+// ─────────────────────────────────────────────
+class _WbStroke {
+  final List<Offset> points;
+  final Color color;
+  final double width;
+  final bool isErase;
+  const _WbStroke({required this.points, required this.color, required this.width, this.isErase = false});
+}
+
+class _WhiteboardPainter extends CustomPainter {
+  final List<_WbStroke> strokes;
+  final List<Offset?> currentPoints;
+  final Color currentColor;
+  final double currentWidth;
+
+  const _WhiteboardPainter({
+    required this.strokes,
+    required this.currentPoints,
+    required this.currentColor,
+    required this.currentWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // White background
+    canvas.drawRect(Offset.zero & size, Paint()..color = Colors.white);
+    // Draw synced strokes
+    for (final s in strokes) {
+      _drawPoints(canvas, s.points, s.isErase ? Colors.white : s.color, s.isErase ? s.width : s.width, s.isErase);
+    }
+    // Draw current in-progress stroke
+    final pts = currentPoints.whereType<Offset>().toList();
+    if (pts.isNotEmpty) {
+      _drawPoints(canvas, pts, currentColor, currentWidth, currentColor == Colors.white);
+    }
+  }
+
+  void _drawPoints(Canvas canvas, List<Offset> pts, Color color, double width, bool isErase) {
+    if (pts.isEmpty) return;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = width
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..blendMode = isErase ? BlendMode.clear : BlendMode.srcOver
+      ..style = PaintingStyle.stroke;
+    if (pts.length == 1) {
+      canvas.drawCircle(pts.first, width / 2, paint..style = PaintingStyle.fill);
+      return;
+    }
+    final path = Path()..moveTo(pts.first.dx, pts.first.dy);
+    for (int i = 1; i < pts.length; i++) {
+      // Smooth curve via quadratic bezier
+      if (i < pts.length - 1) {
+        final mid = Offset((pts[i].dx + pts[i + 1].dx) / 2, (pts[i].dy + pts[i + 1].dy) / 2);
+        path.quadraticBezierTo(pts[i].dx, pts[i].dy, mid.dx, mid.dy);
+      } else {
+        path.lineTo(pts[i].dx, pts[i].dy);
+      }
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_WhiteboardPainter old) => true;
 }
