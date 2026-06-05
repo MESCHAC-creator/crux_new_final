@@ -17,6 +17,8 @@
     <!-- Screen sharing (MediaProjection) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
 
     <!-- Storage Permission -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
@@ -38,6 +40,7 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/LaunchTheme"
+            android:supportsPictureInPicture="true"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
@@ -56,6 +59,12 @@
         <service
             android:name="com.cloudwebrtc.webrtc.ScreenCaptureService"
             android:foregroundServiceType="mediaProjection"
+            android:exported="false" />
+
+        <!-- CRUX call foreground service — keeps call alive in background -->
+        <service
+            android:name=".CallForegroundService"
+            android:foregroundServiceType="microphone|camera"
             android:exported="false" />
     </application>
 

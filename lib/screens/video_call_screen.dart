@@ -70,7 +70,7 @@ class VideoCallScreen extends StatefulWidget {
 }
 
 class _VideoCallScreenState extends State<VideoCallScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   // ── WebRTC ──────────────────────────────────
   final _localRenderer = RTCVideoRenderer();
   final _remoteRenderer = RTCVideoRenderer();
@@ -233,6 +233,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   String? _liveBackgroundImagePath;
   final _picker = ImagePicker();
 
+  // ── Picture-in-Picture (TikTok-style) ────────
+  static const _pipChannel = MethodChannel('com.example.crux/pip');
+  bool _isInPipMode = false;
+  bool _pipSupported = false;
+
   // ── Security & Rate Limiting ─────────────────
   Timer? _inactivityTimer;
   static const Duration _inactivityTimeout = Duration(minutes: 15);
@@ -381,6 +386,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       );
     });
     _init();
+    _initPip();
     _detectLiveMode();
     _listenReactions();
     _listenPolls();
@@ -396,6 +402,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pipChannel.invokeMethod('setInCall', {'inCall': false}).catchError((_) {});
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     _callSub?.cancel();
     _candidateSub?.cancel();
@@ -438,6 +446,41 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     super.dispose();
+  }
+
+  // ── PICTURE-IN-PICTURE ────────────────────────
+
+  Future<void> _initPip() async {
+    WidgetsBinding.instance.addObserver(this);
+    try {
+      final supported = await _pipChannel.invokeMethod<bool>('isSupported') ?? false;
+      if (mounted) setState(() => _pipSupported = supported);
+
+      // Listen for PiP mode changes from native
+      _pipChannel.setMethodCallHandler((call) async {
+        if (call.method == 'pipModeChanged' && mounted) {
+          final isInPip = call.arguments['isInPip'] as bool? ?? false;
+          setState(() => _isInPipMode = isInPip);
+        }
+      });
+
+      // Tell native we're in a call
+      await _pipChannel.invokeMethod('setInCall', {'inCall': true});
+    } catch (_) {}
+  }
+
+  Future<void> _enterPip() async {
+    try {
+      await _pipChannel.invokeMethod('enterPip');
+    } catch (_) {}
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Auto-enter PiP when app goes to background during a call
+    if (state == AppLifecycleState.inactive && !_isInPipMode && _pipSupported) {
+      _enterPip();
+    }
   }
 
   // ── INITIALISATION ───────────────────────────
@@ -2289,6 +2332,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── BUILD ────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    // PiP mode: show minimal video-only view without any controls or panels
+    if (_isInPipMode) return _buildPipView();
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -2300,6 +2346,44 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                     ? _buildLiveCall()
                     : _buildCall(),
       ),
+    );
+  }
+
+  /// Minimal view shown inside the PiP window — just video, no controls
+  Widget _buildPipView() {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(fit: StackFit.expand, children: [
+        // Remote video fullscreen
+        if (_remoteRenderer.renderVideo)
+          RTCVideoView(
+            _remoteRenderer,
+            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+          )
+        else
+          _buildLocalVideoView(),
+
+        // Meeting ID label at top
+        Positioned(
+          top: 4, left: 6,
+          child: Text(
+            widget.meetingId.substring(0, math.min(8, widget.meetingId.length)),
+            style: GoogleFonts.poppins(
+              color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+
+        // Mic status indicator
+        Positioned(
+          bottom: 4, right: 6,
+          child: Icon(
+            _micOn ? Icons.mic : Icons.mic_off,
+            color: _micOn ? Colors.white70 : Colors.redAccent,
+            size: 14,
+          ),
+        ),
+      ]),
     );
   }
 
@@ -7018,6 +7102,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 onTap: _showHostControlsSheet,
               ),
             ],
+            const SizedBox(width: 8),
+            if (_pipSupported)
+              _Btn(
+                icon: Icons.picture_in_picture_alt_rounded,
+                label: 'Mini',
+                active: true,
+                onTap: _enterPip,
+              ),
             const SizedBox(width: 8),
             Semantics(
               label: 'Quitter la réunion',
