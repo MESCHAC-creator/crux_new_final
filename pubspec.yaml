@@ -54,7 +54,7 @@ dependencies:
   # Monetization
   http: ^1.2.0
   url_launcher: ^6.3.0
-  speech_to_text: ^6.6.0
+  speech_to_text: ^7.0.0
 
   # Google Sign-In
   google_sign_in: ^6.2.1
