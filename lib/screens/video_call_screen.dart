@@ -208,6 +208,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   Timer? _recordingBlinkTimer;
   bool _recordingBlink = false;
   bool _noiseCancellation = true;
+  MediaRecorder? _mediaRecorder;
+  String? _recordingPath;
 
   // ── Spotlight & Summary ──────────────────────
   String? _spotlightUserId;
@@ -421,6 +423,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _whiteboardSub?.cancel();
     _wbLaserTimer?.cancel();
     _recordingBlinkTimer?.cancel();
+    if (_isRecordingLocally) { _mediaRecorder?.stop().catchError((_) {}); }
     _kickSub?.cancel();
     _muteSub?.cancel();
     _waitingSub?.cancel();
@@ -1975,15 +1978,19 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         return;
       }
 
-      // In a real app, you would send the WebRTC stream to YouTube via RTMP
-      // This requires a backend service (Mux, Livepeer, or self-hosted FFmpeg)
-      // For now, we simulate the streaming and just update the UI
-
+      // YouTube RTMP streaming requires an RTMP relay server on the backend.
+      // The app opens YouTube Studio so the streamer can start the live,
+      // while Firestore flags notify viewers. This is the standard mobile approach.
       if (mounted) {
+        // Open YouTube Studio / Live Dashboard so host can go live manually
+        final ytUrl = Uri.parse('https://studio.youtube.com');
+        try { await launchUrl(ytUrl, mode: LaunchMode.externalApplication); } catch (_) {}
+
         setState(() => _youtubeStreamingActive = true);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('✅ Retransmission YouTube démarrée', style: GoogleFonts.poppins()),
-          backgroundColor: Colors.green.shade700,
+          content: Text('🔴 Live activé — ouverture YouTube Studio', style: GoogleFonts.poppins()),
+          backgroundColor: Colors.red.shade700,
+          duration: const Duration(seconds: 4),
         ));
 
         // Log the event to Firestore
@@ -5250,25 +5257,82 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── RECORDING & NOISE ─────────────────────────
 
-  void _toggleLocalRecording() {
-    setState(() {
-      _isRecordingLocally = !_isRecordingLocally;
-      if (_isRecordingLocally) {
+  Future<void> _toggleLocalRecording() async {
+    if (_isRecordingLocally) {
+      // ── Stop recording ──────────────────────────
+      try {
+        await _mediaRecorder?.stop();
+      } catch (_) {}
+      _mediaRecorder = null;
+      _recordingBlinkTimer?.cancel();
+      setState(() {
+        _isRecordingLocally = false;
+        _recordingBlink = false;
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          _recordingPath != null
+              ? '🎬 Enregistrement sauvegardé : ${_recordingPath!.split('/').last}'
+              : '⏹ Enregistrement arrêté',
+          style: GoogleFonts.poppins(),
+        ),
+        backgroundColor: Colors.grey.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 4),
+      ));
+      // Update Firestore recording flag
+      _db.collection('meetings').doc(widget.meetingId)
+          .update({'isRecording': false}).catchError((_) {});
+    } else {
+      // ── Start recording ─────────────────────────
+      try {
+        final audioTrack = _localStream?.getAudioTracks().firstOrNull;
+        if (audioTrack == null) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('❌ Aucune piste audio disponible', style: GoogleFonts.poppins()),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ));
+          return;
+        }
+        final dir = await getApplicationDocumentsDirectory();
+        final ts = DateTime.now().millisecondsSinceEpoch;
+        _recordingPath = '${dir.path}/crux_rec_${widget.meetingId}_$ts.mp4';
+        _mediaRecorder = MediaRecorder();
+        await _mediaRecorder!.start(
+          _recordingPath!,
+          audioChannel: RecorderAudioChannel.INPUT,
+          videoTrack: _localStream?.getVideoTracks().firstOrNull,
+        );
+        setState(() => _isRecordingLocally = true);
         _recordingBlinkTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
           if (mounted) setState(() => _recordingBlink = !_recordingBlink);
         });
-      } else {
-        _recordingBlinkTimer?.cancel();
-        _recordingBlink = false;
+        // Update Firestore recording flag
+        _db.collection('meetings').doc(widget.meetingId)
+            .update({'isRecording': true}).catchError((_) {});
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('🔴 Enregistrement démarré', style: GoogleFonts.poppins()),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
+        ));
+      } catch (e) {
+        setState(() => _isRecordingLocally = false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('❌ Erreur enregistrement: $e', style: GoogleFonts.poppins()),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
       }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(_isRecordingLocally ? 'Enregistrement démarré' : 'Enregistrement arrêté', style: GoogleFonts.poppins()),
-      backgroundColor: _isRecordingLocally ? Colors.redAccent : Colors.grey,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      duration: const Duration(seconds: 2),
-    ));
+    }
   }
 
   Future<void> _toggleNoiseCancellation() async {
@@ -5649,31 +5713,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     } catch (_) {}
   }
 
-  // ── FEATURE 14: Toggle recording + Firestore update ──
-  void _toggleLocalRecordingWithSync() {
-    setState(() {
-      _isRecordingLocally = !_isRecordingLocally;
-      if (_isRecordingLocally) {
-        _recordingBlinkTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
-          if (mounted) setState(() => _recordingBlink = !_recordingBlink);
-        });
-      } else {
-        _recordingBlinkTimer?.cancel();
-        _recordingBlink = false;
-      }
-    });
-    // Sync to Firestore so all participants see REC badge
-    _db.collection('meetings').doc(widget.meetingId)
-        .update({'isRecording': _isRecordingLocally}).catchError((_) {});
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(_isRecordingLocally ? 'Enregistrement démarré' : 'Enregistrement arrêté',
-          style: GoogleFonts.poppins()),
-      backgroundColor: _isRecordingLocally ? Colors.redAccent : Colors.grey,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      duration: const Duration(seconds: 2),
-    ));
-  }
+  // Delegates to the real MediaRecorder implementation
+  void _toggleLocalRecordingWithSync() => _toggleLocalRecording();
 
   // ── FEATURE 11+12: Send message with recipient + DM selector ──
   void _sendMessageWithRecipient() {
@@ -5948,29 +5989,92 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   void _generateMeetingSummary() {
     if (_transcriptLines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Aucune transcription disponible', style: GoogleFonts.poppins()),
+        content: Text('Aucune transcription disponible — activez les sous-titres d\'abord', style: GoogleFonts.poppins()),
         backgroundColor: Colors.orange,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ));
       return;
     }
-    final summary = StringBuffer('Résumé IA de la réunion\n\n');
-    summary.writeln('Durée: ${_callSeconds ~/ 60} min');
-    summary.writeln('Participants: ${_participantNames.length + 1}');
-    summary.writeln('');
-    summary.writeln('Points clés abordés:');
+
+    final durationMin = _callSeconds ~/ 60;
+    final durationSec = _callSeconds % 60;
+    final allText = _transcriptLines.map((l) => '${l['text'] ?? ''}').join(' ');
+
+    // Word frequency analysis (stop-words excluded)
+    final stopWords = {'le','la','les','de','du','un','une','des','et','en','est','à','que','qui','je','tu','il','elle','nous','vous','ils','elles','pas','plus','par','sur','avec','pour','dans','se','ce','ne','on','au','aux','son','sa','ses','leur','mais','ou','donc','or','ni','si','très','bien','comme','tout','tous','toutes','être','avoir','faire','dit','dire','aussi','même','encore','quand','puis','après','avant','sous','entre','sans','lors','dont','quoi','quel','quelle','était','été','peut','cette','cela','lui','ceci'};
     final words = <String, int>{};
-    for (final line in _transcriptLines) {
-      for (final w in (line['text'] ?? '').split(' ')) {
-        final wl = w.toLowerCase().replaceAll(RegExp(r'[^\w]'), '');
-        if (wl.length > 4) words[wl] = (words[wl] ?? 0) + 1;
+    for (final w in allText.toLowerCase().split(RegExp(r'\s+'))) {
+      final clean = w.replaceAll(RegExp(r'[^\wÀ-ÿ]'), '');
+      if (clean.length > 3 && !stopWords.contains(clean)) {
+        words[clean] = (words[clean] ?? 0) + 1;
       }
     }
-    final topWords = words.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    final keywords = topWords.take(5).map((e) => e.key).join(', ');
-    summary.writeln('• Sujets principaux: $keywords');
-    summary.writeln('• ${_transcriptLines.length} interventions enregistrées');
+    final topWords = (words.entries.toList()..sort((a, b) => b.value.compareTo(a.value)))
+        .take(8).map((e) => e.key).toList();
+
+    // Detect questions (lines ending with ?)
+    final questions = _transcriptLines
+        .where((l) => (l['text'] ?? '').toString().trim().endsWith('?'))
+        .map((l) => '• ${l['speaker'] ?? 'Participant'}: ${l['text']}')
+        .take(5)
+        .toList();
+
+    // Detect action items (lines containing action keywords)
+    final actionKeywords = RegExp(r'\b(faut|devons|devez|doit|doivent|prévu|prévoir|prévoyons|action|objectif|tâche|mission|deadline|livraison|rapport|envoyer|appeler|contacter|vérifier|terminer|préparer|organiser|planifier)\b', caseSensitive: false);
+    final actions = _transcriptLines
+        .where((l) => actionKeywords.hasMatch((l['text'] ?? '').toString()))
+        .map((l) => '• ${l['text']}')
+        .take(5)
+        .toList();
+
+    // Per-speaker word count
+    final speakerCounts = <String, int>{};
+    for (final l in _transcriptLines) {
+      final spk = '${l['speaker'] ?? 'Inconnu'}';
+      speakerCounts[spk] = (speakerCounts[spk] ?? 0) + 1;
+    }
+    final sortedSpeakers = speakerCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final summary = StringBuffer();
+    summary.writeln('📋 RÉSUMÉ DE RÉUNION');
+    summary.writeln('─' * 30);
+    summary.writeln('⏱ Durée : $durationMin min $durationSec s');
+    summary.writeln('👥 Participants : ${_participantNames.length + 1}');
+    summary.writeln('🗣 Interventions : ${_transcriptLines.length}');
+    summary.writeln('');
+
+    summary.writeln('🔑 Sujets principaux :');
+    summary.writeln('  ${topWords.join(' • ')}');
+    summary.writeln('');
+
+    if (sortedSpeakers.isNotEmpty) {
+      summary.writeln('🎙 Prise de parole :');
+      for (final e in sortedSpeakers.take(5)) {
+        final pct = (_transcriptLines.isNotEmpty
+            ? (e.value / _transcriptLines.length * 100).round()
+            : 0);
+        summary.writeln('  ${e.key}: ${e.value} interventions ($pct%)');
+      }
+      summary.writeln('');
+    }
+
+    if (questions.isNotEmpty) {
+      summary.writeln('❓ Questions posées :');
+      for (final q in questions) { summary.writeln(q); }
+      summary.writeln('');
+    }
+
+    if (actions.isNotEmpty) {
+      summary.writeln('✅ Points d\'action détectés :');
+      for (final a in actions) { summary.writeln(a); }
+      summary.writeln('');
+    }
+
+    summary.writeln('─' * 30);
+    summary.writeln('Généré par CRUX • ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}');
+
     setState(() => _meetingSummary = summary.toString());
     _showSummaryDialog();
   }
