@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:provider/provider.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
 import '../models/meeting_model.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/app_translations.dart';
 import 'video_call_screen.dart';
 
 class MeetingScreen extends StatefulWidget {
@@ -48,10 +51,11 @@ class _MeetingScreenState extends State<MeetingScreen> {
   }
 
   void _copyId() {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     Clipboard.setData(ClipboardData(text: widget.meetingId));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('ID copié !', style: GoogleFonts.poppins()),
+        content: Text(AppTranslations.t('id_copied', lang), style: GoogleFonts.poppins()),
         backgroundColor: AppColors.success,
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
@@ -94,6 +98,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -131,7 +136,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                           border: Border.all(color: AppColors.primary, width: 1),
                         ),
                         child: Text(
-                          'HÔTE',
+                          AppTranslations.t('host', lang),
                           style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w700),
                         ),
                       ),
@@ -139,7 +144,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                     IconButton(
                       onPressed: _shareMeeting,
                       icon: const Icon(Icons.share_rounded, color: Colors.white70, size: 22),
-                      tooltip: 'Partager',
+                      tooltip: AppTranslations.t('share', lang),
                     ),
                   ],
                 ),
@@ -170,7 +175,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        'Réunion prête',
+                        AppTranslations.t('meeting_ready', lang),
                         style: GoogleFonts.poppins(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 8),
@@ -225,7 +230,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                     onPressed: _joinCall,
                     icon: const Icon(Icons.videocam, size: 22),
                     label: Text(
-                      'Rejoindre la réunion',
+                      AppTranslations.t('join_btn', lang),
                       style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -241,7 +246,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                 TextButton.icon(
                   onPressed: _endMeeting,
                   icon: const Icon(Icons.exit_to_app, color: Colors.white38, size: 18),
-                  label: Text('Quitter sans rejoindre', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
+                  label: Text(AppTranslations.t('leave', lang), style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
                 ),
                 const SizedBox(height: 8),
               ],

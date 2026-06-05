@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/error_handler_service.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/app_translations.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -403,6 +406,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
       body: Stack(
         children: [
@@ -486,7 +490,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             ),
                           ),
                           Text(
-                            'Connexion à votre compte',
+                            AppTranslations.t('connecting', lang),
                             style: GoogleFonts.poppins(
                               fontSize: 15,
                               color: Colors.white70,
@@ -516,7 +520,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             opacity: _emailFade,
                             child: _GlassTextField(
                               controller: _emailController,
-                              hint: 'Email',
+                              hint: AppTranslations.t('email', lang),
                               icon: Icons.email_outlined,
                               keyboardType: TextInputType.emailAddress,
                               errorText: _emailError,
@@ -533,7 +537,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             opacity: _passwordFade,
                             child: _GlassTextField(
                               controller: _passwordController,
-                              hint: 'Mot de passe',
+                              hint: AppTranslations.t('password', lang),
                               icon: Icons.lock_outlined,
                               obscure: !_showPassword,
                               errorText: _passwordError,
@@ -582,7 +586,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               onPressed: _showForgotPasswordDialog,
                               style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
                               child: Text(
-                                'Mot de passe oublié ?',
+                                AppTranslations.t('forgot_password', lang),
                                 style: GoogleFonts.poppins(
                                   fontSize: 12,
                                   color: Colors.white,
