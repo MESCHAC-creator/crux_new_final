@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
@@ -239,6 +240,36 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   final Map<String, DateTime> _lastCallTime = {};
   static const Duration _minCallInterval = Duration(milliseconds: 200);
 
+  // ── Feature 1: Kick participant ──────────────
+  StreamSubscription? _kickSub;
+
+  // ── Feature 2: Mute individual ───────────────
+  StreamSubscription? _muteSub;
+
+  // ── Feature 5: Waiting room ──────────────────
+  bool _waitingRoomEnabled = false;
+  List<Map<String, dynamic>> _waitingList = [];
+  StreamSubscription? _waitingSub;
+
+  // ── Feature 6: Meeting passcode ──────────────
+  String? _meetingPasscode;
+
+  // ── Feature 7: Mirror video ───────────────────
+  bool _mirrorVideo = true;
+
+  // ── Feature 8: Hide self view ─────────────────
+  bool _hideSelfView = false;
+
+  // ── Feature 9: HD video ───────────────────────
+  bool _hdEnabled = false;
+
+  // ── Feature 11: Private chat ──────────────────
+  String? _chatRecipient;   // display name, null = everyone
+  String? _chatRecipientId; // userId, null = everyone
+
+  // ── Feature 14: Remote recording badge ───────
+  bool _remoteRecording = false;
+
   // ── Firestore streams ────────────────────────
   StreamSubscription? _callSub;
   StreamSubscription? _candidateSub;
@@ -332,6 +363,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _whiteboardSub?.cancel();
     _wbLaserTimer?.cancel();
     _recordingBlinkTimer?.cancel();
+    _kickSub?.cancel();
+    _muteSub?.cancel();
+    _waitingSub?.cancel();
     for (final sub in _profileSubs.values) { sub.cancel(); }
     _profileSubs.clear();
     _bannerHideTimer?.cancel();
@@ -484,9 +518,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
       if (widget.isHost) {
         await _hostCall();
+        _listenWaitingRoom();
       } else {
         await _joinCall();
       }
+      _listenKickSignal();
+      _listenMuteSignal();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -1025,9 +1062,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       }
       // isLocked check
       final locked = data['isLocked'] ?? false;
+      // Feature 14: remote recording badge
+      final isRecording = data['isRecording'] as bool? ?? false;
+      // Feature 5: waiting room enabled
+      final waitingRoomEnabled = data['waitingRoomEnabled'] as bool? ?? false;
+      // Feature 6: passcode
+      final passcode = data['passcode'] as String?;
       if (mounted) setState(() {
         _isCoHost = nowCoHost;
         _isLocked = locked as bool;
+        _remoteRecording = isRecording;
+        _waitingRoomEnabled = waitingRoomEnabled;
+        _meetingPasscode = passcode;
       });
     });
   }
@@ -1472,6 +1518,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           _isLiveMode = title.contains('[Live]') || title.contains('[LIVE]');
           _isChurchMode = title.contains('[Église]') || title.contains('[Eglise]') || title.contains('[EGLISE]');
           _offeringLink = snap.data()?['offeringLink'] as String?;
+          _meetingPasscode = snap.data()?['passcode'] as String?;
+          _waitingRoomEnabled = snap.data()?['waitingRoomEnabled'] as bool? ?? false;
         });
         if (_isLiveMode) {
           _listenLiveComments();
@@ -1947,6 +1995,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _meetingDocSub?.cancel();
     _presenceSub?.cancel();
     _proSub?.cancel();
+    _kickSub?.cancel();
+    _muteSub?.cancel();
+    _waitingSub?.cancel();
     _liveCommentSub?.cancel();
     for (final sub in _profileSubs.values) { sub.cancel(); }
     _profileSubs.clear();
@@ -2148,20 +2199,27 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     // ── Which video goes fullscreen ──────────────────────────────────────
     // Default: when remote connected → remote video fullscreen, local = PiP
     // swappedView = true → local fullscreen, remote = PiP
-    final showLocalBig = !hasRemote || _swappedView;
+    // Spotlight overrides: spotlighted user goes fullscreen
+    final spotlightLocal = _spotlightUserId == widget.userId;
+    final spotlightRemote = _spotlightUserId != null && _spotlightUserId != widget.userId;
+    final showLocalBig = !hasRemote || _swappedView || spotlightLocal;
 
     return Stack(children: [
       // ── MAIN VIDEO (full screen) ──────────────────────────────────────
       Positioned.fill(
-        child: showLocalBig
-            ? (_camOn
-                ? _buildLocalVideoView()
-                : _buildVideoOff(widget.userName, _ownPhotoBytes))
-            : (_waitingForHost
-                ? _buildWaitingForHost()
-                : hasRemote
-                    ? _buildRemoteVideo()
-                    : _buildWaiting()),
+        child: spotlightRemote
+            ? (_buildRemoteVideo())
+            : spotlightLocal
+                ? (_camOn ? _buildLocalVideoView() : _buildVideoOff(widget.userName, _ownPhotoBytes))
+                : showLocalBig
+                    ? (_camOn
+                        ? _buildLocalVideoView()
+                        : _buildVideoOff(widget.userName, _ownPhotoBytes))
+                    : (_waitingForHost
+                        ? _buildWaitingForHost()
+                        : hasRemote
+                            ? _buildRemoteVideo()
+                            : _buildWaiting()),
       ),
       // ── SPEAKING RING on fullscreen remote ────────────────────────────
       if (!showLocalBig && hasRemote)
@@ -2215,10 +2273,24 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   child: showLocalBig
                       // Local big → show remote in PiP
                       ? _buildRemoteVideo(pip: true)
-                      // Remote big → show local in PiP
-                      : (_camOn
-                          ? _buildLocalVideoView()
-                          : _buildVideoOff(widget.userName, _ownPhotoBytes, size: 115)),
+                      // Remote big → show local in PiP (hide self view check)
+                      : _hideSelfView
+                          ? Container(
+                              color: const Color(0xFF1A1529),
+                              child: Center(
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _hideSelfView = false),
+                                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                    const Icon(Icons.visibility_off, color: Colors.white38, size: 20),
+                                    const SizedBox(height: 4),
+                                    Text('Afficher', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 9)),
+                                  ]),
+                                ),
+                              ),
+                            )
+                          : (_camOn
+                              ? _buildLocalVideoView()
+                              : _buildVideoOff(widget.userName, _ownPhotoBytes, size: 115)),
                 ),
               ),
               // Name label
@@ -3083,6 +3155,28 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           const SizedBox(width: 8),
           const Icon(Icons.lock, color: Colors.amber, size: 14),
         ],
+        if (_meetingPasscode != null && _meetingPasscode!.isNotEmpty) ...[
+          const SizedBox(width: 6),
+          Tooltip(
+            message: 'Réunion protégée par un code',
+            child: const Icon(Icons.lock_outline, color: Colors.lightBlue, size: 14),
+          ),
+        ],
+        if (_remoteRecording || _isRecordingLocally) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.fiber_manual_record, color: Colors.white, size: 8),
+              const SizedBox(width: 3),
+              Text('REC', style: GoogleFonts.poppins(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+            ]),
+          ),
+        ],
         if (_isCoHost) ...[
           const SizedBox(width: 8),
           Container(
@@ -3303,10 +3397,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── EMOJI BAR ────────────────────────────────
   Widget _buildEmojiBar() {
-    const emojis = ['👍', '❤️', '😂', '🎉', '🙏', '👏', '🔥', '😮'];
+    const emojis = ['👍', '❤️', '😂', '🎉', '😮', '👏', '🙏', '🔥', '😢', '💯', '🎊', '✨'];
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(30),
@@ -3317,18 +3411,33 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: emojis
-            .map((e) => GestureDetector(
-                  onTap: () {
-                    _sendReaction(e);
-                    setState(() => _showEmojiBar = false);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(e, style: const TextStyle(fontSize: 26)),
-                  ),
-                ))
-            .toList(),
+        children: [
+          ...emojis
+              .map((e) => GestureDetector(
+                    onTap: () {
+                      _sendReaction(e);
+                      setState(() => _showEmojiBar = false);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Text(e, style: const TextStyle(fontSize: 22)),
+                    ),
+                  )),
+          GestureDetector(
+            onTap: () {
+              setState(() => _showEmojiBar = false);
+              _showFullEmojiPicker();
+            },
+            child: Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.add, color: Colors.white70, size: 18),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3407,6 +3516,56 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ]),
         ),
         const Divider(color: Colors.white12, height: 1),
+        // Waiting room section (host only)
+        if (isPrivileged && _waitingList.isNotEmpty)
+          Container(
+            color: Colors.orange.withValues(alpha: 0.08),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                child: Text('Salle d\'attente (${_waitingList.length})',
+                    style: GoogleFonts.poppins(color: Colors.orange, fontSize: 13, fontWeight: FontWeight.w700)),
+              ),
+              ..._waitingList.map((w) {
+                final wId = w['id'] as String? ?? '';
+                final wName = w['name'] as String? ?? 'Inconnu';
+                return ListTile(
+                  dense: true,
+                  leading: Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.2), shape: BoxShape.circle),
+                    child: Center(child: Text(wName.isNotEmpty ? wName[0].toUpperCase() : '?',
+                        style: GoogleFonts.poppins(color: Colors.orange, fontWeight: FontWeight.w700))),
+                  ),
+                  title: Text(wName, style: GoogleFonts.poppins(color: Colors.white, fontSize: 12)),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    GestureDetector(
+                      onTap: () => _admitParticipant(wId),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green.withValues(alpha: 0.6))),
+                        child: Text('Admettre', style: GoogleFonts.poppins(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () => _denyParticipant(wId),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red.withValues(alpha: 0.5))),
+                        child: Text('Refuser', style: GoogleFonts.poppins(color: Colors.red, fontSize: 11, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ]),
+                );
+              }),
+              const Divider(color: Colors.white12, height: 1),
+            ]),
+          ),
         Expanded(
           child: _presenceList.isEmpty
               ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -3461,6 +3620,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                                   ));
                                 } else if (action == 'remove_cohost') {
                                   await _meetingService.removeCoHost(widget.meetingId, pId);
+                                } else if (action == 'kick') {
+                                  await _kickParticipant(pId, pName);
+                                } else if (action == 'mute') {
+                                  await _muteParticipant(pId);
+                                } else if (action == 'rename') {
+                                  await _renameParticipant(pId, pName);
+                                } else if (action == 'transfer_host') {
+                                  await _transferHost(pId, pName);
+                                } else if (action == 'spotlight') {
+                                  _toggleSpotlight(pId);
                                 }
                               },
                               itemBuilder: (_) => [
@@ -3475,6 +3644,37 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                                       const Icon(Icons.star_border, color: Colors.white54, size: 16),
                                       const SizedBox(width: 8),
                                       Text('Retirer co-hôte', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13)),
+                                    ])),
+                                PopupMenuItem(value: 'mute',
+                                    child: Row(children: [
+                                      const Icon(Icons.mic_off, color: Colors.orange, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text('Couper le micro', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                                    ])),
+                                PopupMenuItem(value: 'rename',
+                                    child: Row(children: [
+                                      const Icon(Icons.drive_file_rename_outline, color: Colors.lightBlue, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text('Renommer', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                                    ])),
+                                PopupMenuItem(value: 'spotlight',
+                                    child: Row(children: [
+                                      Icon(_spotlightUserId == pId ? Icons.star : Icons.star_outline, color: Colors.purple, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text(_spotlightUserId == pId ? 'Retirer spotlight' : 'Mettre en avant',
+                                          style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                                    ])),
+                                if (widget.isHost) PopupMenuItem(value: 'transfer_host',
+                                    child: Row(children: [
+                                      const Icon(Icons.swap_horiz, color: Colors.amber, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text('Transférer le rôle hôte', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                                    ])),
+                                PopupMenuItem(value: 'kick',
+                                    child: Row(children: [
+                                      const Icon(Icons.person_remove, color: Colors.red, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text('Retirer de la réunion', style: GoogleFonts.poppins(color: Colors.red, fontSize: 13)),
                                     ])),
                               ],
                             )
@@ -3567,7 +3767,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             }
           });
         }
-        if (docs.isEmpty) {
+        // Filter: show public messages and DMs involving this user
+        final visibleDocs = docs.where((doc) {
+          final data = doc.data()! as Map<String, dynamic>;
+          final recipientId = data['recipientId'] as String?;
+          final senderId = data['senderId'] as String? ?? '';
+          if (recipientId == null) return true; // public
+          return recipientId == widget.userId || senderId == widget.userId;
+        }).toList();
+
+        if (visibleDocs.isEmpty) {
           return Center(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               const Icon(Icons.chat_bubble_outline,
@@ -3583,9 +3792,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           reverse: true,
           controller: _chatScrollController,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          itemCount: docs.length,
+          itemCount: visibleDocs.length,
           itemBuilder: (ctx, i) {
-            final d = docs[i].data()! as Map<String, dynamic>;
+            final doc = visibleDocs[i];
+            final d = doc.data()! as Map<String, dynamic>;
             final isMine = d['sender'] == widget.userName;
             final senderId = d['senderId'] as String? ?? '';
             final senderPhoto = isMine
@@ -3593,6 +3803,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 : (senderId.isNotEmpty ? _participantPhotos[senderId] : null);
             final senderName = d['sender'] as String? ?? '';
             final senderInitial = senderName.isNotEmpty ? senderName[0].toUpperCase() : '?';
+            final recipientId = d['recipientId'] as String?;
+            final recipientName = d['recipientName'] as String?;
+            final imageBase64 = d['imageBase64'] as String?;
+            final reactions = d['reactions'] as Map<String, dynamic>? ?? {};
 
             Widget avatarWidget = Container(
               width: 28, height: 28,
@@ -3607,47 +3821,106 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisAlignment:
-                    isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (!isMine) ...[avatarWidget, const SizedBox(width: 6)],
-                  Flexible(
-                    child: Container(
-                      constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(ctx).size.width * 0.65),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isMine
-                            ? AppColors.primary
-                            : Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
+              child: GestureDetector(
+                onLongPress: () => _showMessageReactionPicker(doc.id),
+                child: Column(
+                  crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    // DM label
+                    if (recipientId != null)
+                      Padding(
+                        padding: EdgeInsets.only(
+                            left: isMine ? 0 : 40, right: isMine ? 40 : 0, bottom: 2),
+                        child: Text(
+                          isMine
+                              ? 'Message privé à ${recipientName ?? 'quelqu\'un'}'
+                              : 'Message privé',
+                          style: GoogleFonts.poppins(color: Colors.lightBlue, fontSize: 10, fontStyle: FontStyle.italic),
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (!isMine)
-                            Text(
-                              senderName,
-                              style: GoogleFonts.poppins(
-                                  color: Colors.white54,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600),
+                    Row(
+                      mainAxisAlignment:
+                          isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (!isMine) ...[avatarWidget, const SizedBox(width: 6)],
+                        Flexible(
+                          child: Container(
+                            constraints: BoxConstraints(
+                                maxWidth: MediaQuery.of(ctx).size.width * 0.65),
+                            padding: imageBase64 != null
+                                ? const EdgeInsets.all(4)
+                                : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: recipientId != null
+                                  ? (isMine ? Colors.blue.shade800 : Colors.blue.withValues(alpha: 0.15))
+                                  : (isMine ? AppColors.primary : Colors.white.withValues(alpha: 0.1)),
+                              borderRadius: BorderRadius.circular(12),
+                              border: recipientId != null
+                                  ? Border.all(color: Colors.lightBlue.withValues(alpha: 0.4)) : null,
                             ),
-                          Text(
-                            d['message'] ?? '',
-                            style: GoogleFonts.poppins(
-                                color: Colors.white, fontSize: 13),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (!isMine)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 2),
+                                    child: Text(senderName,
+                                        style: GoogleFonts.poppins(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.w600)),
+                                  ),
+                                if (imageBase64 != null)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.memory(
+                                      base64Decode(imageBase64),
+                                      width: 200,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                else
+                                  Text(d['message'] ?? '',
+                                      style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                              ],
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                        if (isMine) ...[const SizedBox(width: 6), avatarWidget],
+                      ],
                     ),
-                  ),
-                  if (isMine) ...[const SizedBox(width: 6), avatarWidget],
-                ],
+                    // Reaction counts
+                    if (reactions.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.only(
+                            top: 4, left: isMine ? 0 : 40, right: isMine ? 40 : 0),
+                        child: Wrap(
+                          spacing: 4,
+                          children: reactions.entries.map((e) {
+                            final users = (e.value as List<dynamic>);
+                            final iMine = users.contains(widget.userId);
+                            return GestureDetector(
+                              onTap: () => _toggleMessageReaction(doc.id, e.key),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: iMine
+                                      ? AppColors.primary.withValues(alpha: 0.3)
+                                      : Colors.white.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: iMine ? AppColors.primary : Colors.white24,
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: Text('${e.key} ${users.length}',
+                                    style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             );
           },
@@ -3657,41 +3930,90 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   Widget _buildChatInput() {
+    final isDM = _chatRecipientId != null;
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-      child: Row(children: [
-        Expanded(
-          child: TextField(
-            controller: _chatController,
-            style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
-            textInputAction: TextInputAction.send,
-            onSubmitted: (_) => _sendMessage(),
-            decoration: InputDecoration(
-              hintText: 'Message...',
-              hintStyle:
-                  GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.08),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide.none,
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        // DM indicator
+        if (isDM)
+          GestureDetector(
+            onTap: _showRecipientSelector,
+            child: Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.lightBlue.withValues(alpha: 0.4)),
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(children: [
+                const Icon(Icons.lock, color: Colors.lightBlue, size: 12),
+                const SizedBox(width: 6),
+                Expanded(child: Text('À: $_chatRecipient',
+                    style: GoogleFonts.poppins(color: Colors.lightBlue, fontSize: 11))),
+                const Icon(Icons.close, color: Colors.lightBlue, size: 14),
+              ]),
+            ),
+          )
+        else
+          GestureDetector(
+            onTap: _showRecipientSelector,
+            child: Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Row(children: [
+                const Icon(Icons.people_outline, color: Colors.white38, size: 12),
+                const SizedBox(width: 6),
+                Text('À: Tout le monde', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                const SizedBox(width: 4),
+                const Icon(Icons.arrow_drop_down, color: Colors.white38, size: 14),
+              ]),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        GestureDetector(
-          onTap: _sendMessage,
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration:
-                BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-            child: const Icon(Icons.send, color: Colors.white, size: 18),
+        Row(children: [
+          // Image picker
+          GestureDetector(
+            onTap: _sendImageMessage,
+            child: Container(
+              width: 38, height: 38,
+              decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08), shape: BoxShape.circle),
+              child: const Icon(Icons.image_outlined, color: Colors.white54, size: 18),
+            ),
           ),
-        ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _chatController,
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _sendMessageWithRecipient(),
+              decoration: InputDecoration(
+                hintText: isDM ? 'Message privé...' : 'Message...',
+                hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.08),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _sendMessageWithRecipient,
+            child: Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                  color: isDM ? Colors.blue.shade700 : AppColors.primary, shape: BoxShape.circle),
+              child: const Icon(Icons.send, color: Colors.white, size: 18),
+            ),
+          ),
+        ]),
       ]),
     );
   }
@@ -4512,6 +4834,550 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     setState(() => _spotlightUserId = _spotlightUserId == userId ? null : userId);
   }
 
+  // ── FEATURE 1: Kick listener ──────────────────
+  void _listenKickSignal() {
+    _kickSub?.cancel();
+    _kickSub = _db
+        .collection('meetings')
+        .doc(widget.meetingId)
+        .collection('kickSignals')
+        .doc(widget.userId)
+        .snapshots()
+        .listen((snap) {
+      if (!snap.exists || !mounted) return;
+      final kicked = snap.data()?['kicked'] as bool? ?? false;
+      if (kicked) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Vous avez été retiré de la réunion',
+              style: GoogleFonts.poppins(color: Colors.white)),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 4),
+        ));
+        _leave();
+      }
+    });
+  }
+
+  Future<void> _kickParticipant(String pId, String pName) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Retirer $pName ?',
+            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+        content: Text('Ce participant sera retiré de la réunion.',
+            style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white38))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Retirer', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await _db.collection('meetings').doc(widget.meetingId)
+          .collection('kickSignals').doc(pId).set({'kicked': true});
+    } catch (_) {}
+  }
+
+  // ── FEATURE 2: Mute individual ────────────────
+  void _listenMuteSignal() {
+    _muteSub?.cancel();
+    _muteSub = _db
+        .collection('meetings')
+        .doc(widget.meetingId)
+        .collection('muteSignals')
+        .doc(widget.userId)
+        .snapshots()
+        .listen((snap) {
+      if (!snap.exists || !mounted) return;
+      final muteSignal = snap.data()?['muteSignal'] as bool? ?? false;
+      if (muteSignal) {
+        for (final t in _localStream?.getAudioTracks() ?? []) {
+          t.enabled = false;
+        }
+        if (mounted) {
+          setState(() => _micOn = false);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Votre micro a été coupé par l\'hôte',
+                style: GoogleFonts.poppins(color: Colors.white)),
+            backgroundColor: Colors.orange.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+          ));
+        }
+        // Clear the signal
+        _db.collection('meetings').doc(widget.meetingId)
+            .collection('muteSignals').doc(widget.userId)
+            .set({'muteSignal': false}).catchError((_) {});
+      }
+    });
+  }
+
+  Future<void> _muteParticipant(String pId) async {
+    try {
+      await _db.collection('meetings').doc(widget.meetingId)
+          .collection('muteSignals').doc(pId)
+          .set({'muteSignal': true, 'timestamp': FieldValue.serverTimestamp()});
+    } catch (_) {}
+  }
+
+  // ── FEATURE 3: Rename participant ─────────────
+  Future<void> _renameParticipant(String pId, String currentName) async {
+    final ctrl = TextEditingController(text: currentName);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Renommer le participant',
+            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: ctrl,
+          style: GoogleFonts.poppins(color: Colors.white),
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: 'Nouveau nom',
+            hintStyle: GoogleFonts.poppins(color: Colors.white38),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.08),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx),
+              child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white38))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: Text('Renommer', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (newName == null || newName.isEmpty) return;
+    try {
+      await _db.collection('meetings').doc(widget.meetingId)
+          .collection('presence').doc(pId).update({'name': newName});
+      if (mounted) setState(() => _participantNames[pId] = newName);
+    } catch (_) {}
+  }
+
+  // ── FEATURE 4: Transfer host ──────────────────
+  Future<void> _transferHost(String pId, String pName) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Transférer le rôle hôte ?',
+            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+        content: Text('Transférer le rôle hôte à $pName ?',
+            style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white38))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.amber,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Transférer', style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await _db.collection('meetings').doc(widget.meetingId)
+          .update({'hostId': pId});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Rôle hôte transféré à $pName',
+            style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: Colors.amber.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 3),
+      ));
+    } catch (_) {}
+  }
+
+  // ── FEATURE 5: Waiting room ───────────────────
+  void _listenWaitingRoom() {
+    _waitingSub?.cancel();
+    _waitingSub = _db
+        .collection('meetings')
+        .doc(widget.meetingId)
+        .collection('waitingRoom')
+        .where('status', isEqualTo: 'waiting')
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      setState(() {
+        _waitingList = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      });
+    });
+  }
+
+  Future<void> _admitParticipant(String uid) async {
+    try {
+      await _db.collection('meetings').doc(widget.meetingId)
+          .collection('waitingRoom').doc(uid).update({'status': 'admitted'});
+    } catch (_) {}
+  }
+
+  Future<void> _denyParticipant(String uid) async {
+    try {
+      await _db.collection('meetings').doc(widget.meetingId)
+          .collection('waitingRoom').doc(uid).update({'status': 'denied'});
+    } catch (_) {}
+  }
+
+  Future<void> _toggleWaitingRoom() async {
+    final next = !_waitingRoomEnabled;
+    try {
+      await _db.collection('meetings').doc(widget.meetingId)
+          .update({'waitingRoomEnabled': next});
+      if (mounted) {
+        setState(() => _waitingRoomEnabled = next);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(next ? 'Salle d\'attente activée' : 'Salle d\'attente désactivée',
+              style: GoogleFonts.poppins(color: Colors.white)),
+          backgroundColor: next ? Colors.green.shade700 : Colors.orange.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
+        ));
+      }
+    } catch (_) {}
+  }
+
+  // ── FEATURE 6: Passcode ───────────────────────
+  Future<void> _showSetPasscodeDialog() async {
+    final ctrl = TextEditingController(text: _meetingPasscode ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Code d\'accès',
+            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: ctrl,
+          style: GoogleFonts.poppins(color: Colors.white),
+          keyboardType: TextInputType.number,
+          maxLength: 8,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: '4-8 chiffres',
+            hintStyle: GoogleFonts.poppins(color: Colors.white38),
+            prefixIcon: const Icon(Icons.lock, color: Colors.amber),
+            counterStyle: GoogleFonts.poppins(color: Colors.white38),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.08),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx),
+              child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white38))),
+          if (_meetingPasscode != null)
+            TextButton(onPressed: () => Navigator.pop(ctx, ''),
+                child: Text('Supprimer', style: GoogleFonts.poppins(color: Colors.red))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.amber,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: Text('Définir', style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (result == null) return;
+    try {
+      await _db.collection('meetings').doc(widget.meetingId)
+          .update({'passcode': result.isEmpty ? FieldValue.delete() : result});
+      if (mounted) setState(() => _meetingPasscode = result.isEmpty ? null : result);
+    } catch (_) {}
+  }
+
+  // ── FEATURE 9: HD Toggle ──────────────────────
+  Future<void> _toggleHD() async {
+    final next = !_hdEnabled;
+    setState(() => _hdEnabled = next);
+    if (next) {
+      await _applyVideoQuality(_VideoQuality.hd);
+    } else {
+      await _applyVideoQuality(_VideoQuality.medium);
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(next ? 'Vidéo HD activée (1080p)' : 'Vidéo HD désactivée',
+          style: GoogleFonts.poppins(color: Colors.white)),
+      backgroundColor: next ? Colors.blue.shade700 : Colors.grey,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      duration: const Duration(seconds: 2),
+    ));
+  }
+
+  // ── FEATURE 10: Speaker toggle ────────────────
+  void _toggleSpeaker() {
+    HapticFeedback.selectionClick();
+    final next = !_speakerOn;
+    setState(() => _speakerOn = next);
+    try {
+      Helper.setSpeakerphoneOn(next);
+    } catch (_) {}
+  }
+
+  // ── FEATURE 12: Image in chat ─────────────────
+  Future<void> _sendImageMessage() async {
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery, imageQuality: 60, maxWidth: 800);
+      if (picked == null) return;
+      final bytes = await File(picked.path).readAsBytes();
+      final base64Str = base64Encode(bytes);
+      await _db.collection('meetings').doc(widget.meetingId)
+          .collection('chat').add({
+        'sender': widget.userName,
+        'senderId': widget.userId,
+        'imageBase64': base64Str,
+        'timestamp': FieldValue.serverTimestamp(),
+        if (_chatRecipientId != null) 'recipientId': _chatRecipientId,
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Erreur envoi image', style: GoogleFonts.poppins()),
+        backgroundColor: Colors.red,
+      ));
+    }
+  }
+
+  // ── FEATURE 13: Message reactions ────────────
+  Future<void> _toggleMessageReaction(String docId, String emoji) async {
+    try {
+      final ref = _db.collection('meetings').doc(widget.meetingId)
+          .collection('chat').doc(docId);
+      final snap = await ref.get();
+      if (!snap.exists) return;
+      final reactions = Map<String, dynamic>.from(snap.data()?['reactions'] ?? {});
+      final users = List<String>.from(reactions[emoji] ?? []);
+      if (users.contains(widget.userId)) {
+        users.remove(widget.userId);
+      } else {
+        users.add(widget.userId);
+      }
+      reactions[emoji] = users;
+      await ref.update({'reactions': reactions});
+    } catch (_) {}
+  }
+
+  // ── FEATURE 14: Toggle recording + Firestore update ──
+  void _toggleLocalRecordingWithSync() {
+    setState(() {
+      _isRecordingLocally = !_isRecordingLocally;
+      if (_isRecordingLocally) {
+        _recordingBlinkTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
+          if (mounted) setState(() => _recordingBlink = !_recordingBlink);
+        });
+      } else {
+        _recordingBlinkTimer?.cancel();
+        _recordingBlink = false;
+      }
+    });
+    // Sync to Firestore so all participants see REC badge
+    _db.collection('meetings').doc(widget.meetingId)
+        .update({'isRecording': _isRecordingLocally}).catchError((_) {});
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(_isRecordingLocally ? 'Enregistrement démarré' : 'Enregistrement arrêté',
+          style: GoogleFonts.poppins()),
+      backgroundColor: _isRecordingLocally ? Colors.redAccent : Colors.grey,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      duration: const Duration(seconds: 2),
+    ));
+  }
+
+  // ── FEATURE 11+12: Send message with recipient + DM selector ──
+  void _sendMessageWithRecipient() {
+    final text = _chatController.text.trim();
+    if (text.isEmpty || text.length > _maxMessageLength) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Message: 1-$_maxMessageLength caractères', style: GoogleFonts.poppins()),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+    if (!_checkRateLimit('sendMessage')) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Trop de requêtes. Attendez un moment.', style: GoogleFonts.poppins()),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+    HapticFeedback.selectionClick();
+    _resetInactivityTimer();
+    _chatController.clear();
+    _db.collection('meetings').doc(widget.meetingId)
+        .collection('chat').add({
+      'sender': widget.userName,
+      'senderId': widget.userId,
+      'message': text,
+      'timestamp': FieldValue.serverTimestamp(),
+      if (_chatRecipientId != null) 'recipientId': _chatRecipientId,
+      if (_chatRecipient != null) 'recipientName': _chatRecipient,
+    });
+  }
+
+  void _showRecipientSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 12),
+          Text('Envoyer à...', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          ListTile(
+            leading: const Icon(Icons.people, color: Colors.white70),
+            title: Text('Tout le monde', style: GoogleFonts.poppins(color: Colors.white)),
+            trailing: _chatRecipientId == null
+                ? Icon(Icons.check_circle, color: AppColors.primary) : null,
+            onTap: () {
+              setState(() { _chatRecipient = null; _chatRecipientId = null; });
+              Navigator.pop(context);
+            },
+          ),
+          ..._presenceList.where((p) => p['userId'] != widget.userId).map((p) {
+            final pId = p['userId'] as String? ?? '';
+            final pName = _participantNames[pId] ?? (p['name'] as String? ?? 'Participant');
+            return ListTile(
+              leading: Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
+                child: Center(child: Text(pName[0].toUpperCase(),
+                    style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700))),
+              ),
+              title: Text(pName, style: GoogleFonts.poppins(color: Colors.white)),
+              trailing: _chatRecipientId == pId
+                  ? Icon(Icons.check_circle, color: AppColors.primary) : null,
+              onTap: () {
+                setState(() { _chatRecipient = pName; _chatRecipientId = pId; });
+                Navigator.pop(context);
+              },
+            );
+          }),
+        ]),
+      ),
+    );
+  }
+
+  // ── FEATURE 13: Message reaction picker ──────
+  void _showMessageReactionPicker(String docId) {
+    const quickEmojis = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: quickEmojis.map((e) => GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+                _toggleMessageReaction(docId, e);
+              },
+              child: Text(e, style: const TextStyle(fontSize: 32)),
+            )).toList(),
+          ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+  }
+
+  // ── FEATURE 16: Full emoji picker ─────────────
+  void _showFullEmojiPicker() {
+    const allEmojis = [
+      '👍','❤️','😂','🎉','😮','👏','🙏','🔥','😢','💯','🎊','✨',
+      '😍','🤩','😆','🤣','😭','😡','🥳','🫶','🫡','💪','🤝','✌️',
+      '🌟','⚡','💥','🌈','🍀','🎯','🏆','👑','💎','🎵','🎶','🎸',
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        height: 320,
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(children: [
+          Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 12),
+          Text('Réactions', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          Expanded(
+            child: GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 8, mainAxisSpacing: 8, crossAxisSpacing: 8,
+              ),
+              itemCount: allEmojis.length,
+              itemBuilder: (_, i) => GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  _sendReaction(allEmojis[i]);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(child: Text(allEmojis[i], style: const TextStyle(fontSize: 22))),
+                ),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
   // ── AI SUMMARY ────────────────────────────────
 
   void _generateMeetingSummary() {
@@ -4614,12 +5480,23 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   Widget _buildLocalVideoView({RTCVideoViewObjectFit objectFit = RTCVideoViewObjectFit.RTCVideoViewObjectFitCover}) {
-    final view = RTCVideoView(_localRenderer, mirror: true, objectFit: objectFit);
-    if (_cameraFilter == _CameraFilter.natural) return view;
-    return ColorFiltered(
-      colorFilter: ColorFilter.matrix(_filterMatrix(_cameraFilter)),
-      child: view,
-    );
+    final view = RTCVideoView(_localRenderer, mirror: _mirrorVideo, objectFit: objectFit);
+    Widget filtered = _cameraFilter == _CameraFilter.natural
+        ? view
+        : ColorFiltered(colorFilter: ColorFilter.matrix(_filterMatrix(_cameraFilter)), child: view);
+    if (!_hdEnabled) return filtered;
+    // HD badge overlay
+    return Stack(children: [
+      filtered,
+      Positioned(
+        bottom: 8, left: 8,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+          decoration: BoxDecoration(color: Colors.blue.shade700, borderRadius: BorderRadius.circular(4)),
+          child: Text('HD', style: GoogleFonts.poppins(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+        ),
+      ),
+    ]);
   }
 
   void _showFiltersPanel() {
@@ -4772,19 +5649,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             ),
             const SizedBox(width: 8),
             _Btn(
-              icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
-              label: _speakerOn ? 'HP' : 'Muet HP',
-              active: _speakerOn,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                setState(() => _speakerOn = !_speakerOn);
-                try {
-                  Helper.setSpeakerphoneOn(_speakerOn ? false : true);
-                } catch (_) {}
-              },
-            ),
-            const SizedBox(width: 8),
-            _Btn(
               icon: _sharingScreen
                   ? Icons.stop_screen_share
                   : Icons.screen_share,
@@ -4827,15 +5691,30 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               ],
             ),
             const SizedBox(width: 8),
-            _Btn(
-              icon: Icons.people_outline,
-              label: 'Participants',
-              active: !_showParticipants,
-              isHighlight: _showParticipants,
-              onTap: () => setState(() {
-                _showParticipants = !_showParticipants;
-                if (_showParticipants) { _showChat = false; _showEmojiBar = false; }
-              }),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _Btn(
+                  icon: Icons.people_outline,
+                  label: 'Participants',
+                  active: !_showParticipants,
+                  isHighlight: _showParticipants,
+                  onTap: () => setState(() {
+                    _showParticipants = !_showParticipants;
+                    if (_showParticipants) { _showChat = false; _showEmojiBar = false; }
+                  }),
+                ),
+                if (_waitingList.isNotEmpty)
+                  Positioned(
+                    top: -4, right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle),
+                      child: Text('${_waitingList.length}',
+                          style: GoogleFonts.poppins(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 8),
             _Btn(
@@ -4862,6 +5741,20 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               label: 'Info',
               active: true,
               onTap: _showMeetingInfoPanel,
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
+              label: _speakerOn ? 'HP' : 'Écouteur',
+              active: _speakerOn,
+              onTap: _toggleSpeaker,
+            ),
+            const SizedBox(width: 8),
+            _Btn(
+              icon: Icons.tune,
+              label: 'Options',
+              active: true,
+              onTap: _showMoreOptionsSheet,
             ),
             if (isPrivileged) ...[
               const SizedBox(width: 8),
@@ -4968,7 +5861,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               label: _isRecordingLocally ? 'Stop REC' : 'Enreg.',
               active: !_isRecordingLocally,
               isHighlight: _isRecordingLocally,
-              onTap: _toggleLocalRecording,
+              onTap: _toggleLocalRecordingWithSync,
             ),
             const SizedBox(width: 8),
             _Btn(
@@ -5000,6 +5893,108 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── MORE OPTIONS SHEET ───────────────────────
+  void _showMoreOptionsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final isPrivileged = widget.isHost || _isCoHost;
+          return Container(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            decoration: const BoxDecoration(
+              color: Color(0xFF181828),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 40, height: 4,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 12),
+              Text('Options', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+
+              // Mirror video
+              SwitchListTile(
+                title: Text('Miroir vidéo', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                subtitle: Text('Inverser l\'image de votre caméra', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                value: _mirrorVideo,
+                activeColor: AppColors.primary,
+                onChanged: (v) {
+                  setState(() => _mirrorVideo = v);
+                  setLocal(() {});
+                },
+              ),
+
+              // Hide self view
+              SwitchListTile(
+                title: Text('Masquer ma vue', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                subtitle: Text('Cacher votre propre vidéo dans l\'interface', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                value: _hideSelfView,
+                activeColor: AppColors.primary,
+                onChanged: (v) {
+                  setState(() => _hideSelfView = v);
+                  setLocal(() {});
+                },
+              ),
+
+              // HD video
+              SwitchListTile(
+                title: Row(children: [
+                  Text('Vidéo HD', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                  const SizedBox(width: 8),
+                  if (_hdEnabled) Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(color: Colors.blue.shade700, borderRadius: BorderRadius.circular(4)),
+                    child: Text('HD', style: GoogleFonts.poppins(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                  ),
+                ]),
+                subtitle: Text('1080p Full HD', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                value: _hdEnabled,
+                activeColor: Colors.blue,
+                onChanged: (v) async {
+                  setLocal(() {});
+                  await _toggleHD();
+                  setLocal(() {});
+                },
+              ),
+
+              // Waiting room (host only)
+              if (isPrivileged) SwitchListTile(
+                title: Text('Salle d\'attente', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                subtitle: Text('Admettre manuellement les participants', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                value: _waitingRoomEnabled,
+                activeColor: Colors.orange,
+                onChanged: (v) async {
+                  setLocal(() {});
+                  await _toggleWaitingRoom();
+                  setLocal(() {});
+                },
+              ),
+
+              // Passcode (host only)
+              if (widget.isHost) ListTile(
+                leading: const Icon(Icons.lock_outline, color: Colors.amber),
+                title: Text(
+                  _meetingPasscode != null && _meetingPasscode!.isNotEmpty
+                      ? 'Code: $_meetingPasscode'
+                      : 'Ajouter un code d\'accès',
+                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+                ),
+                trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showSetPasscodeDialog();
+                },
+              ),
+            ]),
+          );
+        },
       ),
     );
   }
@@ -5341,6 +6336,21 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                             ),
                             child: Text('Moi', style: GoogleFonts.poppins(
                                 color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+
+                      // ── SPOTLIGHT BADGE ───────────────────────────
+                      if (_spotlightUserId == uid)
+                        Positioned(
+                          top: 7, left: handRaised ? 44 : 7,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.withValues(alpha: 0.85),
+                              shape: BoxShape.circle,
+                              boxShadow: [BoxShadow(color: Colors.purple.withValues(alpha: 0.5), blurRadius: 6)],
+                            ),
+                            child: const Icon(Icons.star, color: Colors.white, size: 10),
                           ),
                         ),
                     ]),

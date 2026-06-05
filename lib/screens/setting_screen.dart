@@ -622,7 +622,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       _GlassCard(
                         isDark: isDark,
                         child: Column(children: [
-                          _GlassTile(icon: Icons.info_outline, iconColor: Colors.grey, title: AppTranslations.t('version', localeProvider.locale.languageCode), subtitle: '2.35.0', isDark: isDark, trailing: const SizedBox()),
+                          _GlassTile(icon: Icons.info_outline, iconColor: Colors.grey, title: AppTranslations.t('version', localeProvider.locale.languageCode), subtitle: '2.36.0', isDark: isDark, trailing: const SizedBox()),
                           _GlassDivider(isDark: isDark),
                           _GlassTile(icon: Icons.code, iconColor: colorProvider.primary, title: AppTranslations.t('built_by', localeProvider.locale.languageCode), subtitle: 'MESCHAC_</>', isDark: isDark, trailing: const SizedBox()),
                         ]),
