@@ -22,9 +22,9 @@ class DeviceVerificationService {
           return (false, '🔒 Android 8.0+ requis. Veuillez mettre à jour votre système.');
         }
 
-        // 2. Check for rooting/custom ROMs (basic check)
+        // 2. Check for rooting/custom ROMs (warn only — don't block)
         if (await _isRooted()) {
-          return (false, '⚠️ Appareils rootés non supportés pour des raisons de sécurité.');
+          _log.w('⚠️ Root detected — proceeding anyway (warn-only mode)');
         }
       } else if (Platform.isIOS) {
         final iosInfo = await DeviceInfoPlugin().iosInfo;
@@ -33,9 +33,9 @@ class DeviceVerificationService {
           return (false, '🔒 iOS 14.0+ requis. Veuillez mettre à jour votre système.');
         }
 
-        // Check jailbreak
+        // Check jailbreak (warn only — don't block)
         if (await _isJailbroken()) {
-          return (false, '⚠️ Appareils jailbreakés non supportés pour des raisons de sécurité.');
+          _log.w('⚠️ Jailbreak detected — proceeding anyway (warn-only mode)');
         }
       }
 

@@ -180,11 +180,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF0A0A0F) : AppColors.whiteBg;
+
     // While SharedPreferences hasn't loaded yet, show spinner
     if (_termsAccepted == null) {
-      return const Scaffold(
-        backgroundColor: AppColors.whiteBg,
-        body: Center(
+      return Scaffold(
+        backgroundColor: bg,
+        body: const Center(
           child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
         ),
       );
@@ -194,9 +197,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
       stream: _authStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            backgroundColor: AppColors.whiteBg,
-            body: Center(
+          return Scaffold(
+            backgroundColor: bg,
+            body: const Center(
               child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
             ),
           );
