@@ -9,6 +9,7 @@ apply(plugin = "com.google.gms.google-services")
 android {
     namespace = "com.example.crux"
     compileSdk = 36
+    ndkVersion = "26.3.11579264"
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true

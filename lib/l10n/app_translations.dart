@@ -29,6 +29,7 @@ class AppTranslations {
       'invite': 'Inviter', 'meeting_info': 'Les réunions s\'ouvrent directement dans l\'application — gratuit et sécurisé.',
       'logout': 'Déconnexion', 'logout_confirm': 'Voulez-vous vraiment vous déconnecter ?',
       'disconnect': 'Déconnecter', 'copied': '📋 Lien copié ! Colle-le où tu veux.',
+      'download_apk': 'Télécharger l\'APK', 'copy_link': 'Copier le lien',
       // Meeting
       'meeting_id': 'ID de réunion', 'host': 'HÔTE', 'meeting_ready': 'Réunion prête',
       'meeting_desc': 'La visioconférence se lancera directement dans l\'application.',
@@ -104,6 +105,7 @@ class AppTranslations {
       'invite': 'Invite', 'meeting_info': 'Meetings open directly in the app — free and secure.',
       'logout': 'Log out', 'logout_confirm': 'Do you really want to log out?',
       'disconnect': 'Log out', 'copied': '📋 Link copied! Paste it anywhere.',
+      'download_apk': 'Download APK', 'copy_link': 'Copy link',
       'meeting_id': 'Meeting ID', 'host': 'HOST', 'meeting_ready': 'Meeting ready',
       'meeting_desc': 'The video conference will launch directly in the app.',
       'leave': 'Leave without joining', 'id_copied': 'ID copied!',

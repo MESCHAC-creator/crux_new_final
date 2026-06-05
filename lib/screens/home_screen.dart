@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
@@ -677,11 +678,60 @@ class _HomeScreenState extends State<HomeScreen> {
                       subtitle: AppTranslations.t('invite', lang),
                       gradientColors: const [Color(0xFF27AE60), Color(0xFF1E8449)],
                       onTap: () async {
-                        const msg = '🎥 Rejoins-moi sur CRUX !\n\nhttps://github.com/MESCHAC-creator/crux_new_final/releases\n\n📲 Gratuit · Disponible sur Android';
-                        await Clipboard.setData(const ClipboardData(text: msg));
-                        if (context.mounted) {
-                          _errorHandler.showInfoSnackBar(context, AppTranslations.t('copied', lang));
-                        }
+                        const apkUrl = 'https://github.com/MESCHAC-creator/crux_new_final/releases/latest/download/crux-release.apk';
+                        const shareMsg = '🎥 Rejoins-moi sur CRUX !\n\n📲 Télécharge l\'app : $apkUrl\n\nGratuit · Disponible sur Android';
+                        if (!context.mounted) return;
+                        await showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            backgroundColor: const Color(0xFF1A1A2E),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            title: Text(AppTranslations.t('share', lang), style: const TextStyle(color: Colors.white)),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white10,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(apkUrl, style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                ),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF27AE60)),
+                                    icon: const Icon(Icons.download, color: Colors.white),
+                                    label: Text(AppTranslations.t('download_apk', lang), style: const TextStyle(color: Colors.white)),
+                                    onPressed: () async {
+                                      final uri = Uri.parse(apkUrl);
+                                      try { await launchUrl(uri, mode: LaunchMode.externalApplication); } catch (_) {}
+                                      if (ctx.mounted) Navigator.pop(ctx);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white30)),
+                                    icon: const Icon(Icons.copy, color: Colors.white70, size: 16),
+                                    label: Text(AppTranslations.t('copy_link', lang), style: const TextStyle(color: Colors.white70)),
+                                    onPressed: () async {
+                                      await Clipboard.setData(const ClipboardData(text: shareMsg));
+                                      if (ctx.mounted) {
+                                        Navigator.pop(ctx);
+                                        _errorHandler.showInfoSnackBar(context, AppTranslations.t('copied', lang));
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
                       },
                     )),
                   ]),
