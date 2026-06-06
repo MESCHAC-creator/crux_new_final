@@ -2597,21 +2597,24 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   ),
                 ),
               ),
-              // Mic status icon at top-right
+              // Mic status icon at top-right (animated when speaking)
               Positioned(
                 top: 6, right: 6,
-                child: Container(
-                  width: 20, height: 20,
-                  decoration: BoxDecoration(
-                    color: (showLocalBig ? false : !_micOn) ? Colors.red.shade700 : Colors.black54,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    (showLocalBig ? true : _micOn) ? Icons.mic : Icons.mic_off,
-                    color: Colors.white, size: 11,
-                  ),
+                child: _SpeakingMicIcon(
+                  isMuted: showLocalBig ? false : !_micOn,
+                  isSpeaking: showLocalBig
+                      ? false
+                      : (_participantSpeaking[
+                              _presenceList.where((p) => p['userId'] != widget.userId).firstOrNull?['userId'] as String? ?? ''] == true),
+                  size: 20,
                 ),
               ),
+              // Poor connection indicator (WhatsApp-style)
+              if (_netQuality == _NetQuality.poor)
+                const Positioned(
+                  bottom: 30, right: 6,
+                  child: _PoorConnectionBadge(),
+                ),
             ]),
           ),
         ),
@@ -3466,20 +3469,21 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── TOP BAR ──────────────────────────────────
   Widget _buildTopBar() {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     Color netColor;
     String netLabel;
     switch (_netQuality) {
       case _NetQuality.good:
         netColor = Colors.green;
-        netLabel = 'Excellent';
+        netLabel = AppTranslations.t('net_excellent', lang);
         break;
       case _NetQuality.fair:
         netColor = Colors.orange;
-        netLabel = 'Moyen';
+        netLabel = AppTranslations.t('net_fair', lang);
         break;
       case _NetQuality.poor:
         netColor = Colors.red;
-        netLabel = 'Faible';
+        netLabel = AppTranslations.t('net_poor', lang);
         break;
       case _NetQuality.unknown:
         netColor = Colors.grey;
@@ -3727,9 +3731,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── ACTIVE SPEAKER BANNER ────────────────────
   Widget _buildSpeakerBanner() {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     final name = _activeSpeakerName ?? '';
     final isMe = _activeSpeakerId == widget.userId;
-    final displayName = isMe ? 'Vous parlez' : '$name parle';
+    final displayName = isMe
+        ? AppTranslations.t('you_are_speaking', lang)
+        : '$name ${AppTranslations.t("is_speaking", lang)}';
     return AnimatedOpacity(
       opacity: _bannerVisible ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 250),
@@ -7730,7 +7737,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── GALLERY VIEW (CRUX: Meet + Zoom blend) ────
   Widget _buildGalleryView() {
-    const tileBg = Color(0xFF1A1529);  // CRUX dark purple tint
+    const tileBg = Color(0xFF1A1529);
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
 
     return Container(
       color: const Color(0xFF0F0C1A),
@@ -7862,24 +7870,15 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
                           child: Row(children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: 22, height: 22,
-                              decoration: BoxDecoration(
-                                color: micMuted
-                                    ? const Color(0xFFEA4335)
-                                    : Colors.black.withValues(alpha: 0.5),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                micMuted ? Icons.mic_off : Icons.mic,
-                                color: Colors.white, size: 13,
-                              ),
+                            _SpeakingMicIcon(
+                              isMuted: micMuted,
+                              isSpeaking: isSpeaking && !micMuted,
+                              size: 22,
                             ),
                             const SizedBox(width: 5),
                             Expanded(
                               child: Text(
-                                isMe ? 'Vous' : firstName,
+                                isMe ? AppTranslations.t('you', lang) : firstName,
                                 style: GoogleFonts.poppins(
                                     color: Colors.white, fontSize: 11,
                                     fontWeight: FontWeight.w600,
@@ -7927,7 +7926,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                             child: Row(mainAxisSize: MainAxisSize.min, children: [
                               const Icon(Icons.screen_share, color: Colors.white, size: 10),
                               const SizedBox(width: 3),
-                              Text('Écran', style: GoogleFonts.poppins(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+                              Text(AppTranslations.t('screen_label', lang), style: GoogleFonts.poppins(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
                             ]),
                           ),
                         ),
@@ -7943,7 +7942,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(color: Colors.white24, width: 0.5),
                             ),
-                            child: Text('Moi', style: GoogleFonts.poppins(
+                            child: Text(AppTranslations.t('me_label', lang), style: GoogleFonts.poppins(
                                 color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w600)),
                           ),
                         ),
@@ -7961,6 +7960,13 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                             ),
                             child: const Icon(Icons.star, color: Colors.white, size: 10),
                           ),
+                        ),
+
+                      // ── POOR CONNECTION (WhatsApp-style) ──────────
+                      if (_netQuality == _NetQuality.poor)
+                        const Positioned(
+                          bottom: 32, right: 7,
+                          child: _PoorConnectionBadge(),
                         ),
                     ]),
                   ),
@@ -9000,6 +9006,143 @@ class _LiveBadgeState extends State<_LiveBadge> with SingleTickerProviderStateMi
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────
+//  SPEAKING MIC (Google Meet animated mic icon)
+// ─────────────────────────────────────────────
+class _SpeakingMicIcon extends StatefulWidget {
+  final bool isMuted;
+  final bool isSpeaking;
+  final double size;
+  const _SpeakingMicIcon({required this.isMuted, required this.isSpeaking, this.size = 22});
+
+  @override
+  State<_SpeakingMicIcon> createState() => _SpeakingMicIconState();
+}
+
+class _SpeakingMicIconState extends State<_SpeakingMicIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _ring;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))
+      ..repeat(reverse: true);
+    _ring = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ring,
+      builder: (_, __) {
+        final speaking = widget.isSpeaking && !widget.isMuted;
+        final ringOpacity = speaking ? (_ring.value * 0.8) : 0.0;
+        final ringSize = widget.size + (speaking ? _ring.value * 6 : 0);
+        return SizedBox(
+          width: ringSize,
+          height: ringSize,
+          child: Stack(alignment: Alignment.center, children: [
+            // Green pulsing ring (Google Meet style)
+            if (speaking)
+              Container(
+                width: ringSize,
+                height: ringSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF34A853).withValues(alpha: ringOpacity * 0.5),
+                  border: Border.all(
+                    color: const Color(0xFF34A853).withValues(alpha: ringOpacity),
+                    width: 2,
+                  ),
+                ),
+              ),
+            // Mic circle
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: widget.size,
+              height: widget.size,
+              decoration: BoxDecoration(
+                color: widget.isMuted
+                    ? const Color(0xFFEA4335)
+                    : speaking
+                        ? const Color(0xFF34A853)
+                        : Colors.black.withValues(alpha: 0.55),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                widget.isMuted ? Icons.mic_off : Icons.mic,
+                color: Colors.white,
+                size: widget.size * 0.58,
+              ),
+            ),
+          ]),
+        );
+      },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  POOR CONNECTION BADGE (WhatsApp-style)
+// ─────────────────────────────────────────────
+class _PoorConnectionBadge extends StatefulWidget {
+  const _PoorConnectionBadge();
+
+  @override
+  State<_PoorConnectionBadge> createState() => _PoorConnectionBadgeState();
+}
+
+class _PoorConnectionBadgeState extends State<_PoorConnectionBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))
+      ..repeat(reverse: true);
+    _fade = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: _fade,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.75),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.orange.shade700, width: 1),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.signal_wifi_statusbar_connected_no_internet_4,
+                color: Colors.orange.shade400, size: 12),
+            const SizedBox(width: 3),
+            Text('⚠', style: TextStyle(color: Colors.orange.shade400, fontSize: 10)),
+          ]),
+        ),
+      );
 }
 
 // ─────────────────────────────────────────────
