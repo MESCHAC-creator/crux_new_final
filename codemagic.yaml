@@ -46,6 +46,43 @@ workflows:
             echo "⏭️  FIREBASE_TOKEN absent — build OK"
           fi
 
+      - name: Patch flutter_webrtc (remove V1 embedding)
+        script: |
+          python3 - <<'PYEOF'
+          import re, glob, os
+
+          pattern = os.path.expanduser(
+              '~/.pub-cache/hosted/pub.dev/flutter_webrtc*/android/src/main/java/com/cloudwebrtc/webrtc/FlutterWebRTCPlugin.java'
+          )
+          files = glob.glob(pattern)
+          if not files:
+              print('flutter_webrtc plugin not found, skipping patch')
+              exit(0)
+
+          for path in files:
+              with open(path, 'r') as f:
+                  content = f.read()
+              original = content
+              # Remove V1 Registrar import line
+              content = re.sub(
+                  r'import io\.flutter\.plugin\.common\.PluginRegistry\.Registrar;\n',
+                  '',
+                  content
+              )
+              # Remove V1 registerWith method (short body, no nested braces)
+              content = re.sub(
+                  r'\n[ \t]+public static void registerWith\(Registrar[^)]*\) \{[^}]*\}',
+                  '',
+                  content
+              )
+              if content != original:
+                  with open(path, 'w') as f:
+                      f.write(content)
+                  print(f'Patched: {path}')
+              else:
+                  print(f'No changes needed: {path}')
+          PYEOF
+
       - name: Generate app icons
         script: dart run flutter_launcher_icons -f flutter_launcher_icons_android.yaml
 
