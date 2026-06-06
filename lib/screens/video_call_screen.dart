@@ -6524,6 +6524,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               title: Text('Autoriser le chat', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
               subtitle: Text('Les participants peuvent envoyer des messages', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
               value: _allowParticipantChat,
+              // ignore: deprecated_member_use
               activeColor: AppColors.primary,
               onChanged: (v) async {
                 setState(() => _allowParticipantChat = v);
@@ -6535,6 +6536,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               title: Text('Autoriser les réactions', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
               subtitle: Text('Les participants peuvent envoyer des emojis', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
               value: _allowParticipantReactions,
+              // ignore: deprecated_member_use
               activeColor: AppColors.primary,
               onChanged: (v) async {
                 setState(() => _allowParticipantReactions = v);
@@ -6546,6 +6548,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               title: Text('Autoriser le partage d\'écran', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
               subtitle: Text('Les participants peuvent partager leur écran', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
               value: _allowParticipantScreenShare,
+              // ignore: deprecated_member_use
               activeColor: AppColors.primary,
               onChanged: (v) async {
                 setState(() => _allowParticipantScreenShare = v);
@@ -6557,6 +6560,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               title: Text('Couper micro à l\'entrée', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
               subtitle: Text('Les nouveaux participants arrivent muets', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
               value: _muteOnEntry,
+              // ignore: deprecated_member_use
               activeColor: Colors.orange,
               onChanged: (v) async {
                 setState(() => _muteOnEntry = v);
@@ -7201,6 +7205,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 title: Text('Miroir vidéo', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
                 subtitle: Text('Inverser l\'image de votre caméra', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _mirrorVideo,
+                // ignore: deprecated_member_use
                 activeColor: AppColors.primary,
                 onChanged: (v) {
                   setState(() => _mirrorVideo = v);
@@ -7213,6 +7218,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 title: Text('Masquer ma vue', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
                 subtitle: Text('Cacher votre propre vidéo dans l\'interface', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _hideSelfView,
+                // ignore: deprecated_member_use
                 activeColor: AppColors.primary,
                 onChanged: (v) {
                   setState(() => _hideSelfView = v);
@@ -7233,6 +7239,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 ]),
                 subtitle: Text('1080p Full HD', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _hdEnabled,
+                // ignore: deprecated_member_use
                 activeColor: Colors.blue,
                 onChanged: (v) async {
                   setLocal(() {});
@@ -7246,6 +7253,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 title: Text('Salle d\'attente', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
                 subtitle: Text('Admettre manuellement les participants', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _waitingRoomEnabled,
+                // ignore: deprecated_member_use
                 activeColor: Colors.orange,
                 onChanged: (v) async {
                   setLocal(() {});
@@ -7275,6 +7283,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 title: Text('Mode faible luminosité', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
                 subtitle: Text('Améliore la visibilité dans l\'obscurité', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _lowLightMode,
+                // ignore: deprecated_member_use
                 activeColor: Colors.amber,
                 secondary: const Icon(Icons.brightness_6, color: Colors.amber),
                 onChanged: (v) {
@@ -7288,6 +7297,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 title: Text('Mode côte à côte', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
                 subtitle: Text('Partage + caméra côte à côte', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _sideBySide,
+                // ignore: deprecated_member_use
                 activeColor: Colors.blue,
                 secondary: const Icon(Icons.view_column_outlined, color: Colors.blue),
                 onChanged: (v) {
@@ -7301,6 +7311,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 title: Text('Sons d\'entrée/sortie', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
                 subtitle: Text('Sons quand quelqu\'un rejoint ou quitte', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
                 value: _joinLeaveSounds,
+                // ignore: deprecated_member_use
                 activeColor: AppColors.primary,
                 secondary: const Icon(Icons.notifications_outlined, color: Colors.white54),
                 onChanged: (v) {
