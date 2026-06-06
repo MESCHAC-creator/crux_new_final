@@ -25,6 +25,68 @@ import 'theme/theme.dart';
 
 final logger = Logger();
 
+// ---------------------------------------------------------------------------
+// Locales that flutter_localizations does NOT support natively.
+// Any locale outside this set falls back to French for Material/Cupertino
+// internals (button labels, date pickers, etc.) while our AppTranslations
+// handles all visible app text in the correct language.
+// ---------------------------------------------------------------------------
+const _flutterUnsupportedLocales = {'ha', 'yo', 'mg', 'wo'};
+
+/// Returns the locale to use for Material/Cupertino widgets.
+/// For locales unsupported by flutter_localizations, falls back to French
+/// so widgets never throw a "no localizations found" error.
+Locale _materialFallback(Locale locale) =>
+    _flutterUnsupportedLocales.contains(locale.languageCode)
+        ? const Locale('fr')
+        : locale;
+
+// ---------------------------------------------------------------------------
+// Fallback delegates — accept every locale, load French for unsupported ones.
+// Applied globally in MaterialApp AND in _DeviceBlockedApp so the grey-screen
+// can NEVER appear regardless of which screen is shown.
+// ---------------------------------------------------------------------------
+class _FallbackMaterialLocalizationsDelegate
+    extends LocalizationsDelegate<MaterialLocalizations> {
+  const _FallbackMaterialLocalizationsDelegate();
+  static const instance = _FallbackMaterialLocalizationsDelegate();
+
+  @override
+  bool isSupported(Locale locale) => true;
+
+  @override
+  Future<MaterialLocalizations> load(Locale locale) =>
+      GlobalMaterialLocalizations.delegate.load(_materialFallback(locale));
+
+  @override
+  bool shouldReload(_FallbackMaterialLocalizationsDelegate old) => false;
+}
+
+class _FallbackCupertinoLocalizationsDelegate
+    extends LocalizationsDelegate<CupertinoLocalizations> {
+  const _FallbackCupertinoLocalizationsDelegate();
+  static const instance = _FallbackCupertinoLocalizationsDelegate();
+
+  @override
+  bool isSupported(Locale locale) => true;
+
+  @override
+  Future<CupertinoLocalizations> load(Locale locale) =>
+      GlobalCupertinoLocalizations.delegate.load(_materialFallback(locale));
+
+  @override
+  bool shouldReload(_FallbackCupertinoLocalizationsDelegate old) => false;
+}
+
+// The shared delegate list used in EVERY MaterialApp in this app.
+const _localizationsDelegates = [
+  _FallbackMaterialLocalizationsDelegate.instance,
+  _FallbackCupertinoLocalizationsDelegate.instance,
+  GlobalWidgetsLocalizations.delegate,
+];
+
+// ---------------------------------------------------------------------------
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -60,6 +122,7 @@ void main() async {
 }
 
 /// Shown when the device fails security checks.
+/// Uses the same fallback delegates so it never grey-screens on any locale.
 class _DeviceBlockedApp extends StatelessWidget {
   final String reason;
   const _DeviceBlockedApp({required this.reason});
@@ -68,6 +131,8 @@ class _DeviceBlockedApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: _localizationsDelegates,
+      supportedLocales: LocaleProvider.languages.values.toList(),
       home: Scaffold(
         backgroundColor: const Color(0xFF0F0C1A),
         body: Center(
@@ -101,48 +166,6 @@ class _DeviceBlockedApp extends StatelessWidget {
   }
 }
 
-// Delegates that accept all locales but fall back to French for unsupported ones.
-// This prevents grey-screen crashes on locales like Wolof (wo), Malagasy (mg), etc.
-// that are not in flutter_localizations but ARE in our custom AppTranslations.
-class _FallbackMaterialLocalizationsDelegate
-    extends LocalizationsDelegate<MaterialLocalizations> {
-  const _FallbackMaterialLocalizationsDelegate();
-  static const instance = _FallbackMaterialLocalizationsDelegate();
-
-  @override
-  bool isSupported(Locale locale) => true;
-
-  @override
-  Future<MaterialLocalizations> load(Locale locale) {
-    final supported = GlobalMaterialLocalizations.delegate.isSupported(locale);
-    return GlobalMaterialLocalizations.delegate
-        .load(supported ? locale : const Locale('fr'));
-  }
-
-  @override
-  bool shouldReload(_FallbackMaterialLocalizationsDelegate old) => false;
-}
-
-class _FallbackCupertinoLocalizationsDelegate
-    extends LocalizationsDelegate<CupertinoLocalizations> {
-  const _FallbackCupertinoLocalizationsDelegate();
-  static const instance = _FallbackCupertinoLocalizationsDelegate();
-
-  @override
-  bool isSupported(Locale locale) => true;
-
-  @override
-  Future<CupertinoLocalizations> load(Locale locale) {
-    final supported =
-        GlobalCupertinoLocalizations.delegate.isSupported(locale);
-    return GlobalCupertinoLocalizations.delegate
-        .load(supported ? locale : const Locale('fr'));
-  }
-
-  @override
-  bool shouldReload(_FallbackCupertinoLocalizationsDelegate old) => false;
-}
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -165,22 +188,23 @@ class MyApp extends StatelessWidget {
             navigatorKey: MyApp._navigatorKey,
             title: 'CRUX - Premium Video Conference',
             debugShowCheckedModeBanner: false,
-            supportedLocales: const [
-              Locale('fr'), Locale('en'), Locale('es'), Locale('de'),
-              Locale('ru'), Locale('pt'), Locale('it'), Locale('ar'),
-              Locale('zh'), Locale('hi'), Locale('ja'), Locale('ko'),
-              Locale('tr'), Locale('vi'), Locale('id'), Locale('nl'),
-              Locale('pl'), Locale('uk'), Locale('sv'), Locale('ha'),
-              Locale('yo'), Locale('sw'), Locale('am'), Locale('fa'),
-              Locale('ro'), Locale('el'), Locale('cs'), Locale('hu'),
-              Locale('bn'), Locale('th'), Locale('mg'), Locale('wo'),
-            ],
+            // Every locale the app supports — drives the language picker.
+            supportedLocales: LocaleProvider.languages.values.toList(),
+            // Force the user-chosen locale; Flutter won't override it.
             locale: localeProvider.locale,
-            localizationsDelegates: [
-              _FallbackMaterialLocalizationsDelegate.instance,
-              GlobalWidgetsLocalizations.delegate,
-              _FallbackCupertinoLocalizationsDelegate.instance,
-            ],
+            // Shared delegates: accept all locales, fall back to French for
+            // the 4 locales (ha, yo, mg, wo) not in flutter_localizations.
+            localizationsDelegates: _localizationsDelegates,
+            // Safety net: if somehow locale ends up outside supportedLocales
+            // (e.g. system locale on first launch), default to French.
+            localeResolutionCallback: (locale, supported) {
+              if (locale == null) return const Locale('fr');
+              // Exact match first
+              for (final s in supported) {
+                if (s.languageCode == locale.languageCode) return s;
+              }
+              return const Locale('fr');
+            },
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
