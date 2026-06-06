@@ -466,8 +466,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         }
       });
 
-      // Tell native we're in a call
-      await _pipChannel.invokeMethod('setInCall', {'inCall': true});
+      // setInCall(true) is deferred to _init() after permissions are confirmed
     } catch (_) {}
   }
 
@@ -512,6 +511,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         }
         return;
       }
+
+      // Permissions confirmed — now safe to start foreground service
+      _pipChannel.invokeMethod('setInCall', {'inCall': true}).catchError((_) {});
 
       if (mounted) setState(() => _loadingStep = 'Démarrage caméra...');
 
