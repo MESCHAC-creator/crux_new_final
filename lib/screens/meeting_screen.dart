@@ -182,7 +182,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'La visioconférence se lancera directement dans l\'application. Caméra et micro natifs — aucun navigateur requis.',
+                        AppTranslations.t('meeting_desc', lang),
                         textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13, height: 1.5),
                       ),

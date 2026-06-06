@@ -1574,13 +1574,39 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           return;
         }
 
-        // Allow screen share even without a peer connection yet — stream will be
-        // added to peer connection when/if one is established later.
         _log.i('Starting screen share - requesting display media');
-        _screenStream = await navigator.mediaDevices.getDisplayMedia({
-          'video': true,
-          'audio': false,
-        });
+        // On Android, getDisplayMedia triggers a system consent dialog via
+        // MediaProjectionManager. Use a broad try/catch including PlatformException
+        // to prevent the app from crashing if the user denies or the service fails.
+        MediaStream? stream;
+        try {
+          stream = await navigator.mediaDevices.getDisplayMedia({
+            'video': true,
+            'audio': false,
+          });
+        } on Exception catch (e) {
+          _log.w('Screen share: getDisplayMedia exception: $e');
+          // User denied or cancelled — show message, do not crash
+          if (mounted) {
+            final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+            final isCancelled = e.toString().toLowerCase().contains('cancel')
+                || e.toString().toLowerCase().contains('denied')
+                || e.toString().toLowerCase().contains('permission');
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                isCancelled
+                    ? AppTranslations.t('screen_share_cancelled', lang)
+                    : AppTranslations.t('screen_share_unavailable', lang),
+                style: GoogleFonts.poppins(),
+              ),
+              backgroundColor: Colors.orange.shade700,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ));
+          }
+          return;
+        }
+        _screenStream = stream;
 
         if (_screenStream == null) {
           _log.w('Screen share: getDisplayMedia returned null');
