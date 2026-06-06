@@ -17,26 +17,9 @@ workflows:
     scripts:
       - name: Set up local.properties
         script: |
-          # Resolve Flutter SDK root robustly from the flutter binary in PATH
-          FLUTTER_BIN=$(command -v flutter)
-          FLUTTER_SDK=$(dirname "$(dirname "$FLUTTER_BIN")")
+          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
           echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
-          # Also expose Android SDK path so Gradle can find it
-          if [ -n "$ANDROID_SDK_ROOT" ]; then
-            echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
-          elif [ -n "$ANDROID_HOME" ]; then
-            echo "sdk.dir=$ANDROID_HOME" >> android/local.properties
-          fi
-          echo "✅ local.properties:"
-          cat android/local.properties
           flutter --version
-
-      - name: Clean Gradle cache
-        script: |
-          rm -rf ~/.gradle/caches/ || true
-          rm -rf ~/.gradle/wrapper/dists/ || true
-          cd android && ./gradlew clean --no-daemon || true
-          echo "✅ Gradle cache nettoyé"
 
       - name: Get Flutter packages
         script: |
@@ -60,7 +43,6 @@ workflows:
         script: |
           python3 - <<'PYEOF'
           import re, glob, os
-
           pattern = os.path.expanduser(
               '~/.pub-cache/hosted/pub.dev/flutter_webrtc*/android/src/main/java/com/cloudwebrtc/webrtc/FlutterWebRTCPlugin.java'
           )
@@ -68,23 +50,16 @@ workflows:
           if not files:
               print('flutter_webrtc plugin not found, skipping patch')
               exit(0)
-
           for path in files:
               with open(path, 'r') as f:
                   content = f.read()
               original = content
-              # Remove V1 Registrar import line
               content = re.sub(
                   r'import io\.flutter\.plugin\.common\.PluginRegistry\.Registrar;\n',
-                  '',
-                  content
-              )
-              # Remove V1 registerWith method (short body, no nested braces)
+                  '', content)
               content = re.sub(
                   r'\n[ \t]+public static void registerWith\(Registrar[^)]*\) \{[^}]*\}',
-                  '',
-                  content
-              )
+                  '', content)
               if content != original:
                   with open(path, 'w') as f:
                       f.write(content)
@@ -98,69 +73,36 @@ workflows:
 
       - name: Build APK and AAB
         script: |
-          set -e
           mkdir -p build/outputs
 
-          # Helper: find an APK/AAB anywhere in the build tree after Gradle runs
-          find_apk() {
-            find build/app/outputs/flutter-apk -name "app-release.apk" 2>/dev/null | head -1
-            find build/app/outputs/apk         -name "app-release.apk" 2>/dev/null | head -1
-            find build/app/outputs             -name "*.apk" ! -path "*/debug/*" 2>/dev/null | head -1
-          }
-          find_aab() {
-            find build/app/outputs/bundle -name "app-release.aab" 2>/dev/null | head -1
-            find build/app/outputs        -name "*.aab"            2>/dev/null | head -1
-          }
-
           # ── APK ──────────────────────────────────────────────────────────────
-          set +e
-          flutter build apk --release --no-tree-shake-icons
-          APK_EXIT=$?
-          set -e
+          flutter build apk --release || true
 
-          APK=$(find_apk | head -1)
-
-          if [ -z "$APK" ]; then
-            echo "⚠️  flutter build apk (exit $APK_EXIT) did not place APK in expected dirs."
-            echo "    Listing build/app/outputs:"
-            find build/app/outputs 2>/dev/null || echo "    (empty)"
-            echo "    Retrying via Gradle directly..."
-            cd android
-            ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tail -40
-            cd ..
-            APK=$(find build/app/outputs -name "*.apk" ! -path "*/debug/*" 2>/dev/null | head -1)
-          fi
+          APK=$(find build/app/outputs/flutter-apk -name "app-release.apk" 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(find build/app/outputs/apk -name "app-release.apk" 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(find . -name "app-release.apk" ! -path "*/.pub-cache/*" ! -path "*/debug/*" 2>/dev/null | head -1)
 
           if [ -z "$APK" ]; then
-            echo "❌ APK not found after Gradle retry."
+            echo "❌ APK not found — listing build/app/outputs/:"
+            find build/app/outputs 2>/dev/null || echo "(empty)"
             exit 1
           fi
           cp "$APK" build/outputs/crux-release.apk
-          echo "✅ APK: $(du -sh build/outputs/crux-release.apk | cut -f1) — from $APK"
+          echo "✅ APK: $(du -sh build/outputs/crux-release.apk | cut -f1) — source: $APK"
 
           # ── AAB ──────────────────────────────────────────────────────────────
-          set +e
-          flutter build appbundle --release --no-tree-shake-icons
-          AAB_EXIT=$?
-          set -e
+          flutter build appbundle --release || true
 
-          AAB=$(find_aab | head -1)
+          AAB=$(find build/app/outputs/bundle -name "app-release.aab" 2>/dev/null | head -1)
+          [ -z "$AAB" ] && AAB=$(find . -name "app-release.aab" ! -path "*/.pub-cache/*" 2>/dev/null | head -1)
 
           if [ -z "$AAB" ]; then
-            echo "⚠️  flutter build appbundle (exit $AAB_EXIT) did not place AAB in expected dirs."
-            echo "    Retrying via Gradle directly..."
-            cd android
-            ./gradlew bundleRelease --no-daemon 2>&1 | tail -20
-            cd ..
-            AAB=$(find build/app/outputs -name "*.aab" 2>/dev/null | head -1)
-          fi
-
-          if [ -z "$AAB" ]; then
-            echo "❌ AAB not found after Gradle retry."
+            echo "❌ AAB not found — listing build/app/outputs/:"
+            find build/app/outputs 2>/dev/null || echo "(empty)"
             exit 1
           fi
           cp "$AAB" build/outputs/crux-release.aab
-          echo "✅ AAB: $(du -sh build/outputs/crux-release.aab | cut -f1) — from $AAB"
+          echo "✅ AAB: $(du -sh build/outputs/crux-release.aab | cut -f1) — source: $AAB"
 
     artifacts:
       - build/outputs/crux-release.apk
