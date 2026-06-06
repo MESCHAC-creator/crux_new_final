@@ -9,7 +9,7 @@ workflows:
     max_build_duration: 120
 
     environment:
-      flutter: 3.32.3
+      flutter: 3.29.2
       java: 17
       groups:
         - firebase_deploy
@@ -29,7 +29,9 @@ workflows:
           echo "✅ Gradle cache nettoyé"
 
       - name: Get Flutter packages
-        script: flutter pub get
+        script: |
+          rm -f pubspec.lock
+          flutter pub get
 
       - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
         script: |
@@ -105,7 +107,7 @@ workflows:
       app_store_connect: codemagic_api_key
 
     environment:
-      flutter: 3.32.3
+      flutter: 3.29.2
       xcode: latest
       cocoapods: default
       ios_signing:
