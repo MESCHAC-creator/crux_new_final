@@ -79,7 +79,7 @@ class _FallbackCupertinoLocalizationsDelegate
 }
 
 // The shared delegate list used in EVERY MaterialApp in this app.
-const _localizationsDelegates = [
+const List<LocalizationsDelegate<dynamic>> _localizationsDelegates = [
   _FallbackMaterialLocalizationsDelegate.instance,
   _FallbackCupertinoLocalizationsDelegate.instance,
   GlobalWidgetsLocalizations.delegate,
