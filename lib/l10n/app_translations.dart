@@ -296,6 +296,9 @@ class AppTranslations {
       'agenda_label': 'Agenda',
       'live_label': 'En live',
       'stream_label': 'Diffuser',
+      'screen_share_active_title': 'Vous partagez votre écran',
+      'screen_share_active_sub': 'Tout votre écran est visible par les participants',
+      'stop_share': 'Arrêter',
     },
     'en': {
       'app_title': 'CRUX', 'hello': 'Hello', 'cancel': 'Cancel', 'ok': 'OK',
@@ -583,6 +586,9 @@ class AppTranslations {
       'agenda_label': 'Agenda',
       'live_label': 'Live',
       'stream_label': 'Stream',
+      'screen_share_active_title': 'You are sharing your screen',
+      'screen_share_active_sub': 'Your entire screen is visible to participants',
+      'stop_share': 'Stop',
     },
     'es': {
       'app_title': 'CRUX', 'hello': 'Hola', 'cancel': 'Cancelar', 'ok': 'OK',

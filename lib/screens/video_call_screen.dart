@@ -243,6 +243,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   bool _isInPipMode = false;
   bool _pipSupported = false;
 
+  // ── Screen share service signals ─────────────
+  static const _screenChannel = MethodChannel('com.example.crux/screen_share');
+
   // ── Security & Rate Limiting ─────────────────
   Timer? _inactivityTimer;
   static const Duration _inactivityTimeout = Duration(minutes: 15);
@@ -466,6 +469,13 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         if (call.method == 'pipModeChanged' && mounted) {
           final isInPip = call.arguments['isInPip'] as bool? ?? false;
           setState(() => _isInPipMode = isInPip);
+        }
+      });
+
+      // Listen for "stop screen share" from the Android notification button
+      _screenChannel.setMethodCallHandler((call) async {
+        if (call.method == 'stopScreenShareFromNotification' && mounted && _sharingScreen) {
+          _toggleScreenShare();
         }
       });
 
@@ -1506,6 +1516,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             _localRenderer.srcObject = _localStream;
           });
         }
+        // Signal Android service to dismiss screen share notification
+        if (!kIsWeb && Platform.isAndroid) {
+          try {
+            await _screenChannel.invokeMethod('screenShareStopped');
+          } catch (_) {}
+        }
       } catch (e, st) {
         _log.e('Error stopping screen share: $e', stackTrace: st);
         _screenStream?.getTracks().forEach((t) => t.stop());
@@ -1540,7 +1556,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         MediaStream? stream;
         try {
           stream = await navigator.mediaDevices.getDisplayMedia({
-            'video': true,
+            'video': {
+              'width': {'ideal': 1280, 'max': 1920},
+              'height': {'ideal': 720, 'max': 1080},
+              'frameRate': {'ideal': 15, 'max': 30},
+            },
             'audio': false,
           });
         } catch (e) {
@@ -1637,6 +1657,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             _localRenderer.srcObject = _screenStream;
           });
           _log.i('Screen share: State updated, sharing active');
+          // Signal Android service to show screen share notification
+          if (!kIsWeb && Platform.isAndroid) {
+            try {
+              await _screenChannel.invokeMethod('screenShareStarted');
+            } catch (_) {}
+          }
         }
       } catch (e, st) {
         _log.e('Screen share error: $e\nStackTrace: $st', stackTrace: st);
@@ -2755,6 +2781,17 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ),
         ),
 
+      // ── SCREEN SHARE BANNER (WhatsApp-style) ─────────────────────────
+      if (_sharingScreen)
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOut,
+          bottom: (_showChat || _showParticipants || _showTranscript || _showWhiteboard || _showPolls || _showQA || _showAgendaPanel || _showActivities) ? 470 : 70,
+          left: 12,
+          right: 12,
+          child: _buildScreenShareBanner(),
+        ),
+
       // ── CONTROLS ─────────────────────────────────────────────────────
       AnimatedPositioned(
         duration: const Duration(milliseconds: 280),
@@ -2766,6 +2803,60 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       ),
 
     ]);
+  }
+
+  // ── SCREEN SHARE BANNER ──────────────────────
+  Widget _buildScreenShareBanner() {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFCC0000).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(children: [
+        // Pulsing red dot
+        _PulsingDot(),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text(
+              AppTranslations.t('screen_share_active_title', lang),
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+            Text(
+              AppTranslations.t('screen_share_active_sub', lang),
+              style: GoogleFonts.poppins(color: Colors.white70, fontSize: 10),
+            ),
+          ]),
+        ),
+        const SizedBox(width: 10),
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            _toggleScreenShare();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              AppTranslations.t('stop_share', lang),
+              style: GoogleFonts.poppins(color: const Color(0xFFCC0000), fontSize: 12, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+      ]),
+    );
   }
 
   // ── LIVE CALL (TikTok Live style) ────────────
@@ -8909,6 +9000,45 @@ class _LiveBadgeState extends State<_LiveBadge> with SingleTickerProviderStateMi
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────
+//  PULSING DOT (screen share banner indicator)
+// ─────────────────────────────────────────────
+class _PulsingDot extends StatefulWidget {
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
+      ..repeat(reverse: true);
+    _scale = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ScaleTransition(
+        scale: _scale,
+        child: Container(
+          width: 12,
+          height: 12,
+          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+        ),
+      );
 }
 
 // ─────────────────────────────────────────────
