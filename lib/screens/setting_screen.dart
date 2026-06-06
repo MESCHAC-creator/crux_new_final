@@ -552,11 +552,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                             const SizedBox(width: 14),
                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Text(
-                                _loadingPro ? 'Chargement...' : (_isPro ? '✓ CRUX PRO Actif' : 'Passer à CRUX PRO'),
+                                _loadingPro ? AppTranslations.t('loading', localeProvider.locale.languageCode) : (_isPro ? AppTranslations.t('pro_active', localeProvider.locale.languageCode) : AppTranslations.t('pro_inactive', localeProvider.locale.languageCode)),
                                 style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
                               ),
                               Text(
-                                _loadingPro ? '' : (_isPro ? _proExpiryText() : '100 000 FCFA/mois — Réunions illimitées'),
+                                _loadingPro ? '' : (_isPro ? _proExpiryText() : AppTranslations.t('pro_inactive_sub', localeProvider.locale.languageCode)),
                                 style: GoogleFonts.poppins(color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
                               ),
                             ])),

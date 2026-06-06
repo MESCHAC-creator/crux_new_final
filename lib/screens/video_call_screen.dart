@@ -876,54 +876,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  Widget _buildFreeTimePill() {
-    final totalFree = _freeMinutes * 60;
-    final remaining = (totalFree - _callSeconds).clamp(0, totalFree);
-    final rm = remaining ~/ 60;
-    final rs = remaining % 60;
-    final label = '$rm:${rs.toString().padLeft(2, '0')}';
-    final isUrgent = remaining <= 60;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: isUrgent ? Colors.red.withValues(alpha: 0.85) : Colors.orange.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isUrgent ? Colors.red : Colors.orange,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.timer_outlined, color: Colors.white, size: 11),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              fontFeatures: [const FontFeature.tabularFigures()],
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            'FREE',
-            style: GoogleFonts.poppins(
-              color: Colors.white70,
-              fontSize: 8,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ── STATS MONITOR ────────────────────────────
   void _startStatsMonitor() {
     _statsTimer?.cancel();
@@ -1234,13 +1186,16 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       // Host ended meeting for everyone
       final status = data['status'] as String? ?? '';
       if (status == 'ended' && !widget.isHost) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text("L'hôte a terminé la réunion", style: GoogleFonts.poppins()),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          duration: const Duration(seconds: 3),
-        ));
+        if (mounted) {
+          final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(AppTranslations.t('meeting_ended', lang), style: GoogleFonts.poppins()),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+          ));
+        }
         _leave();
         return;
       }
@@ -1258,8 +1213,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         }
         if (mounted) {
           setState(() => _micOn = false);
+          final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text("L'hôte a coupé tous les micros",
+            content: Text(AppTranslations.t('muted_by_host', lang),
                 style: GoogleFonts.poppins()),
             backgroundColor: Colors.orange.shade700,
             behavior: SnackBarBehavior.floating,
@@ -1541,6 +1497,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             }
           }
         }
+        _screenStream?.getTracks().forEach((t) => t.stop());
         await _screenStream?.dispose();
         _screenStream = null;
         if (mounted) {
@@ -1551,6 +1508,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         }
       } catch (e, st) {
         _log.e('Error stopping screen share: $e', stackTrace: st);
+        _screenStream?.getTracks().forEach((t) => t.stop());
         await _screenStream?.dispose();
         _screenStream = null;
         if (mounted) setState(() => _sharingScreen = false);
@@ -1582,7 +1540,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         MediaStream? stream;
         try {
           stream = await navigator.mediaDevices.getDisplayMedia({
-            'video': {'mandatory': {}, 'optional': []},
+            'video': true,
             'audio': false,
           });
         } catch (e) {
@@ -1946,10 +1904,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               style: GoogleFonts.poppins(color: Colors.white),
               obscureText: true,
               decoration: InputDecoration(
-                labelText: 'Clé RTMP YouTube',
+                labelText: AppTranslations.t('rtmp_how_to', lang),
                 labelStyle: GoogleFonts.poppins(color: Colors.white54),
                 prefixIcon: const Icon(Icons.key, color: Color(0xFFB71C1C)),
-                hintText: 'Collez votre clé RTMP ici',
+                hintText: AppTranslations.t('rtmp_hint', lang),
                 hintStyle: GoogleFonts.poppins(color: Colors.white30),
                 filled: true,
                 fillColor: Colors.white.withValues(alpha: 0.08),
@@ -3165,7 +3123,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 gradient: const LinearGradient(colors: [Color(0xFFB71C1C), Color(0xFF6A1B9A)]),
                 borderRadius: BorderRadius.circular(25),
               ),
-              child: Text('Terminer', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+              child: Builder(builder: (ctx2) { final l = Provider.of<LocaleProvider>(ctx2, listen: false).locale.languageCode; return Text(AppTranslations.t('leave', l), style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)); }),
             ),
           ),
         ]),
@@ -3239,7 +3197,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          _youtubeStreamingActive ? 'En live' : 'Diffuser',
+                          _youtubeStreamingActive ? AppTranslations.t('live_label', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode) : AppTranslations.t('stream_label', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
                           style: GoogleFonts.poppins(
                             color: _youtubeStreamingActive ? Colors.white : Colors.white70,
                             fontSize: 12,
@@ -3273,7 +3231,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
                         const Icon(Icons.share, color: Colors.blue, size: 16),
                         const SizedBox(width: 6),
-                        Text('Partager', style: GoogleFonts.poppins(color: Colors.blue.shade300, fontSize: 12, fontWeight: FontWeight.w600)),
+                        Text(AppTranslations.t('share', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode), style: GoogleFonts.poppins(color: Colors.blue.shade300, fontSize: 12, fontWeight: FontWeight.w600)),
                       ]),
                     ),
                   ),
@@ -3290,7 +3248,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 autofocus: true,
                 style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
                 decoration: InputDecoration(
-                  hintText: 'Écrire un commentaire...',
+                  hintText: AppTranslations.t('comment_hint', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
                   hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
                   filled: true,
                   fillColor: Colors.white.withValues(alpha: 0.12),
@@ -3457,13 +3415,13 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               showDialog(context: context, builder: (ctx) => AlertDialog(
                 backgroundColor: const Color(0xFF1A1A2E),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                title: Text('Statistiques', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
-                content: Column(mainAxisSize: MainAxisSize.min, children: [
-                  _InfoRow(icon: Icons.timer, label: 'Durée', value: _formattedDuration),
-                  _InfoRow(icon: Icons.people, label: 'Participants', value: '${_presenceList.length}'),
-                  _InfoRow(icon: Icons.fiber_manual_record, label: AppTranslations.t('recording', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode), value: _isRecordingLocally ? AppTranslations.t('active', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode) : AppTranslations.t('inactive', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode)),
-                ]),
-                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Fermer', style: GoogleFonts.poppins(color: Colors.white60)))],
+                title: Builder(builder: (ctx2) { final l = Provider.of<LocaleProvider>(ctx2, listen: false).locale.languageCode; return Text(AppTranslations.t('meeting_info_title', l), style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)); }),
+                content: Builder(builder: (ctx2) { final l = Provider.of<LocaleProvider>(ctx2, listen: false).locale.languageCode; return Column(mainAxisSize: MainAxisSize.min, children: [
+                  _InfoRow(icon: Icons.timer, label: AppTranslations.t('duration_label', l), value: _formattedDuration),
+                  _InfoRow(icon: Icons.people, label: AppTranslations.t('participants_label', l), value: '${_presenceList.length}'),
+                  _InfoRow(icon: Icons.fiber_manual_record, label: AppTranslations.t('recording', l), value: _isRecordingLocally ? AppTranslations.t('active', l) : AppTranslations.t('inactive', l)),
+                ]); }),
+                actions: [Builder(builder: (ctx2) { final l2 = Provider.of<LocaleProvider>(ctx2, listen: false).locale.languageCode; return TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppTranslations.t('cancel', l2), style: GoogleFonts.poppins(color: Colors.white60))); })],
               ));
             },
             child: Container(
@@ -3579,7 +3537,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               const Icon(Icons.share, color: Colors.white, size: 14),
               const SizedBox(width: 4),
-              Text('Partager', style: GoogleFonts.poppins(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+              Text(AppTranslations.t('share', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode), style: GoogleFonts.poppins(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
             ]),
           ),
         ),
@@ -3814,6 +3772,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   Widget _buildParticipantsPanelContent(bool isPrivileged) {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xCC181828),
@@ -3834,7 +3793,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           child: Row(children: [
             const Icon(Icons.people, color: Colors.white70, size: 18),
             const SizedBox(width: 8),
-            Text('${AppTranslations.t('tb_participants', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode)} (${_presenceList.length})',
+            Text('${AppTranslations.t('tb_participants', lang)} (${_presenceList.length})',
                 style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
             const Spacer(),
             // Feature N11: hand raise queue count badge
@@ -3858,7 +3817,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   _meetingService.triggerMuteAll(widget.meetingId).catchError((_) {});
                   ScaffoldMessenger.of(context).hideCurrentSnackBar();
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('🔇 Tous les micros ont été coupés', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                    content: Text('🔇 ${AppTranslations.t('tb_all_muted', lang)}', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                     backgroundColor: Colors.orange.shade800,
                     duration: const Duration(seconds: 2),
                     behavior: SnackBarBehavior.floating,
@@ -3875,7 +3834,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     const Icon(Icons.mic_off, color: Colors.orange, size: 14),
                     const SizedBox(width: 5),
-                    Text('Couper tous', style: GoogleFonts.poppins(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.w700)),
+                    Text(AppTranslations.t('mute_all', lang), style: GoogleFonts.poppins(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.w700)),
                   ]),
                 ),
               ),
@@ -4037,7 +3996,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                                   await _sendCamOffSignal(pId);
                                   if (!mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                    content: Text('Caméra désactivée pour $pName', style: GoogleFonts.poppins()),
+                                    content: Text('${AppTranslations.t("tb_cam_off", lang)} — $pName', style: GoogleFonts.poppins()),
                                     backgroundColor: Colors.orange.shade700,
                                     behavior: SnackBarBehavior.floating,
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -4050,50 +4009,50 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                                     child: Row(children: [
                                       const Icon(Icons.star, color: Colors.amber, size: 16),
                                       const SizedBox(width: 8),
-                                      Text('Nommer co-hôte', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                                      Text(AppTranslations.t('make_cohost', lang), style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
                                     ])),
                                 PopupMenuItem(value: 'remove_cohost',
                                     child: Row(children: [
                                       const Icon(Icons.star_border, color: Colors.white54, size: 16),
                                       const SizedBox(width: 8),
-                                      Text('Retirer co-hôte', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13)),
+                                      Text(AppTranslations.t('remove_cohost', lang), style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13)),
                                     ])),
                                 PopupMenuItem(value: 'mute',
                                     child: Row(children: [
                                       const Icon(Icons.mic_off, color: Colors.orange, size: 16),
                                       const SizedBox(width: 8),
-                                      Text('Couper le micro', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                                      Text(AppTranslations.t('mute_mic', lang), style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
                                     ])),
                                 PopupMenuItem(value: 'rename',
                                     child: Row(children: [
                                       const Icon(Icons.drive_file_rename_outline, color: Colors.lightBlue, size: 16),
                                       const SizedBox(width: 8),
-                                      Text('Renommer', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                                      Text(AppTranslations.t('rename_btn', lang), style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
                                     ])),
                                 PopupMenuItem(value: 'spotlight',
                                     child: Row(children: [
                                       Icon(_spotlightUserId == pId ? Icons.star : Icons.star_outline, color: Colors.purple, size: 16),
                                       const SizedBox(width: 8),
-                                      Text(_spotlightUserId == pId ? 'Retirer spotlight' : 'Mettre en avant',
+                                      Text(_spotlightUserId == pId ? AppTranslations.t('spotlight_remove', lang) : AppTranslations.t('spotlight_add', lang),
                                           style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
                                     ])),
                                 if (widget.isHost) PopupMenuItem(value: 'transfer_host',
                                     child: Row(children: [
                                       const Icon(Icons.swap_horiz, color: Colors.amber, size: 16),
                                       const SizedBox(width: 8),
-                                      Text('Transférer le rôle hôte', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                                      Text(AppTranslations.t('transfer_host', lang).replaceAll(' ?', ''), style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
                                     ])),
                                 PopupMenuItem(value: 'turn_off_cam',
                                     child: Row(children: [
                                       const Icon(Icons.videocam_off, color: Colors.orange, size: 16),
                                       const SizedBox(width: 8),
-                                      Text('Éteindre la caméra', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                                      Text(AppTranslations.t('tb_cam_off', lang), style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
                                     ])),
                                 PopupMenuItem(value: 'kick',
                                     child: Row(children: [
                                       const Icon(Icons.person_remove, color: Colors.red, size: 16),
                                       const SizedBox(width: 8),
-                                      Text('Retirer de la réunion', style: GoogleFonts.poppins(color: Colors.red, fontSize: 13)),
+                                      Text(AppTranslations.t('remove_from_meeting', lang), style: GoogleFonts.poppins(color: Colors.red, fontSize: 13)),
                                     ])),
                               ],
                             )
@@ -4142,7 +4101,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
                   onChanged: (v) => setState(() => _chatSearchQuery = v),
                   decoration: InputDecoration(
-                    hintText: 'Rechercher dans le chat...',
+                    hintText: AppTranslations.t('search_chat', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
                     hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 12),
                     prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 18),
                     filled: true,
@@ -4533,7 +4492,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             expands: true,
             textAlignVertical: TextAlignVertical.top,
             decoration: InputDecoration(
-              hintText: 'Prenez vos notes ici...',
+              hintText: AppTranslations.t('notes_hint', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
               hintStyle:
                   GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
               filled: true,
@@ -4669,7 +4628,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                     onPressed: () => setState(() { _transcriptLines.clear(); _sttPartialText = null; }),
                     icon: const Icon(Icons.delete_outline, color: Colors.white38, size: 16),
                     padding: EdgeInsets.zero, constraints: const BoxConstraints(),
-                    tooltip: 'Effacer',
+                    tooltip: AppTranslations.t('clear', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
                   ),
                 const SizedBox(width: 4),
                 IconButton(
@@ -5167,7 +5126,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           autofocus: true,
           style: GoogleFonts.poppins(color: Colors.white),
           decoration: InputDecoration(
-            hintText: 'Entrez votre texte...',
+            hintText: AppTranslations.t('enter_text_hint', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
             hintStyle: GoogleFonts.poppins(color: Colors.white38),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white24)),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white24)),
@@ -5341,7 +5300,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Row(children: [
                             Expanded(child: Text(poll['question'] as String, style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600))),
-                            if (widget.isHost) IconButton(icon: const Icon(Icons.stop_circle_outlined, color: Colors.redAccent, size: 18), onPressed: () => _endPoll(pollId), tooltip: 'Terminer'),
+                            if (widget.isHost) IconButton(icon: const Icon(Icons.stop_circle_outlined, color: Colors.redAccent, size: 18), onPressed: () => _endPoll(pollId), tooltip: AppTranslations.t('leave', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode)),
                           ]),
                           const SizedBox(height: 8),
                           ...opts.asMap().entries.map((e) {
@@ -5926,6 +5885,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   void _showMessageActionSheet(String docId) {
     const quickEmojis = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
     final isStarred = _starredMessageIds.contains(docId);
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -5952,7 +5912,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           const SizedBox(height: 12),
           ListTile(
             leading: Icon(isStarred ? Icons.star : Icons.star_outline, color: Colors.amber),
-            title: Text(isStarred ? 'Retirer des sauvegardés' : 'Sauvegarder le message',
+            title: Text(isStarred ? AppTranslations.t('unsave_message', lang) : AppTranslations.t('save_message', lang),
                 style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
             onTap: () {
               Navigator.pop(context);
@@ -6446,7 +6406,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                     controller: qCtrl,
                     style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
                     decoration: InputDecoration(
-                      hintText: 'Posez votre question...',
+                      hintText: AppTranslations.t('ask_question', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
                       hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 12),
                       filled: true,
                       fillColor: Colors.white.withValues(alpha: 0.08),
@@ -6767,7 +6727,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                           expands: true,
                           textAlignVertical: TextAlignVertical.top,
                           decoration: InputDecoration(
-                            hintText: 'Entrez l\'ordre du jour de la réunion...',
+                            hintText: AppTranslations.t('enter_agenda', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
                             hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
                             filled: true,
                             fillColor: Colors.white.withValues(alpha: 0.05),
@@ -6807,7 +6767,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                     ])
                   : SingleChildScrollView(
                       child: Text(
-                        _meetingAgenda.isEmpty ? 'Aucun ordre du jour défini.' : _meetingAgenda,
+                        _meetingAgenda.isEmpty ? AppTranslations.t('no_agenda', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode) : _meetingAgenda,
                         style: GoogleFonts.poppins(color: _meetingAgenda.isEmpty ? Colors.white38 : Colors.white70, fontSize: 13, height: 1.6),
                       ),
                     ),
@@ -7612,6 +7572,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── PARTICIPANT MANAGE SHEET (host/co-host tap on gallery tile) ────
   void _showParticipantManageSheet(String pId, String pName, bool handRaised) {
     if (!widget.isHost && !_isCoHost) return;
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -7629,7 +7590,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           const SizedBox(height: 8),
           ListTile(
             leading: const Icon(Icons.mic_off, color: Colors.orange),
-            title: Text('🔇 Couper le micro', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+            title: Text('🔇 ${AppTranslations.t("mute_mic", lang)}', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
             onTap: () async {
               Navigator.pop(context);
               await _muteParticipant(pId);
@@ -7637,22 +7598,25 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ),
           ListTile(
             leading: const Icon(Icons.star, color: Colors.amber),
-            title: Text('👑 Nommer co-hôte', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+            title: Text('👑 ${AppTranslations.t("make_cohost", lang)}', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
             onTap: () async {
               Navigator.pop(context);
               await _meetingService.addCoHost(widget.meetingId, pId);
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('$pName est maintenant co-hôte', style: GoogleFonts.poppins()),
-                backgroundColor: AppColors.success,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ));
+              if (mounted) {
+                final l2 = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('$pName — ${AppTranslations.t("co_host_label", l2)}', style: GoogleFonts.poppins()),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ));
+              }
             },
           ),
           if (handRaised)
             ListTile(
               leading: const Icon(Icons.front_hand, color: Colors.orangeAccent),
-              title: Text('✋ Baisser la main', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+              title: Text('✋ ${AppTranslations.t("lower_hand", lang)}', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
               onTap: () async {
                 Navigator.pop(context);
                 await _db.collection('meetings').doc(widget.meetingId)
@@ -7662,7 +7626,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             ),
           ListTile(
             leading: const Icon(Icons.door_back_door_outlined, color: Colors.redAccent),
-            title: Text('🚪 Retirer de la réunion', style: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 14)),
+            title: Text('🚪 ${AppTranslations.t("remove_from_meeting", lang)}', style: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 14)),
             onTap: () async {
               Navigator.pop(context);
               await _kickParticipant(pId, pName);
@@ -8056,23 +8020,28 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
           ]),
           const SizedBox(height: 20),
-          _InfoRow(icon: Icons.title, label: 'Titre', value: _meetingTitle),
-          _InfoRow(icon: Icons.tag, label: 'ID', value: widget.meetingId),
-          _InfoRow(
-            icon: Icons.person,
-            label: 'Hôte',
-            value: widget.isHost ? '${widget.userName} (vous)' : widget.userName,
-          ),
-          _InfoRow(
-            icon: Icons.timer,
-            label: 'Durée',
-            value: _callSeconds > 0 ? _formattedDuration : 'En attente',
-          ),
-          _InfoRow(
-            icon: Icons.people,
-            label: 'Participants',
-            value: '${_presenceList.length}',
-          ),
+          Builder(builder: (ctx2) {
+            final lang = Provider.of<LocaleProvider>(ctx2, listen: false).locale.languageCode;
+            return Column(mainAxisSize: MainAxisSize.min, children: [
+              _InfoRow(icon: Icons.title, label: AppTranslations.t('title_label', lang), value: _meetingTitle),
+              _InfoRow(icon: Icons.tag, label: 'ID', value: widget.meetingId),
+              _InfoRow(
+                icon: Icons.person,
+                label: AppTranslations.t('host_label', lang),
+                value: widget.isHost ? '${widget.userName} (${AppTranslations.t("you", lang)})' : widget.userName,
+              ),
+              _InfoRow(
+                icon: Icons.timer,
+                label: AppTranslations.t('duration_label', lang),
+                value: _callSeconds > 0 ? _formattedDuration : AppTranslations.t('waiting_dots', lang),
+              ),
+              _InfoRow(
+                icon: Icons.people,
+                label: AppTranslations.t('participants_label', lang),
+                value: '${_presenceList.length}',
+              ),
+            ]);
+          }),
           if (_meetingDescription.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
@@ -8084,7 +8053,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 border: Border.all(color: Colors.white12),
               ),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Agenda', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
+                Text(AppTranslations.t('agenda_label', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode), style: GoogleFonts.poppins(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text(_meetingDescription,
                     style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13, height: 1.5)),

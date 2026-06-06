@@ -104,7 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           _localPhotoPath = dest;
           _isUpdatingPhoto = false;
         });
-        _snack('✅ Photo mise à jour !');
+        _snack(AppTranslations.t('photo_updated_ok', context.read<LocaleProvider>().locale.languageCode));
       }
     } catch (e) {
       if (mounted) {
@@ -133,7 +133,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     }
     if (mounted) {
       setState(() => _localPhotoPath = null);
-      _snack('✅ Photo supprimée');
+      _snack(AppTranslations.t('photo_removed_ok', context.read<LocaleProvider>().locale.languageCode));
     }
   }
 
@@ -345,11 +345,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   Future<void> _changePassword(String current, String newPass, String lang) async {
     if (current.isEmpty || newPass.isEmpty) {
-      _snack('⚠️ Remplissez les deux champs');
+      _snack('⚠️ ${AppTranslations.t('val_pwd_required', lang)}');
       return;
     }
     if (newPass.length < 6) {
-      _snack('⚠️ Le nouveau mot de passe doit faire au moins 6 caractères');
+      _snack('⚠️ ${AppTranslations.t('val_min_6', lang)}');
       return;
     }
     try {
