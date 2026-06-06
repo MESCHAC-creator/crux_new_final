@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import '../models/user_model.dart';
@@ -11,20 +12,15 @@ class CruxAuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   bool _isLoggedIn = false;
+  StreamSubscription? _authSub;
 
-  // Getters
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isLoggedIn => _isLoggedIn;
 
-  // Constructeur
   CruxAuthProvider() {
-    _checkAuthState();
-  }
-
-  void _checkAuthState() {
-    _authService.authStateChanges.listen((user) {
+    _authSub = _authService.authStateChanges.listen((user) {
       if (user != null) {
         _currentUser = UserModel(
           uid: user.uid,
@@ -40,7 +36,12 @@ class CruxAuthProvider extends ChangeNotifier {
     });
   }
 
-  // Inscription
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
   Future<bool> signUp({
     required String email,
     required String password,
@@ -49,13 +50,7 @@ class CruxAuthProvider extends ChangeNotifier {
     try {
       _setLoading(true);
       _clearError();
-
-      final user = await _authService.signUp(
-        email: email,
-        password: password,
-        name: name,
-      );
-
+      final user = await _authService.signUp(email: email, password: password, name: name);
       if (user != null) {
         _currentUser = user;
         _isLoggedIn = true;
@@ -66,27 +61,17 @@ class CruxAuthProvider extends ChangeNotifier {
       return false;
     } catch (e) {
       _setError('Erreur inscription: $e');
-      _logger.e('❌ Erreur: $e');
       return false;
     } finally {
       _setLoading(false);
     }
   }
 
-  // Connexion
-  Future<bool> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<bool> signIn({required String email, required String password}) async {
     try {
       _setLoading(true);
       _clearError();
-
-      final user = await _authService.signIn(
-        email: email,
-        password: password,
-      );
-
+      final user = await _authService.signIn(email: email, password: password);
       if (user != null) {
         _currentUser = user;
         _isLoggedIn = true;
@@ -97,19 +82,16 @@ class CruxAuthProvider extends ChangeNotifier {
       return false;
     } catch (e) {
       _setError('Erreur connexion: $e');
-      _logger.e('❌ Erreur: $e');
       return false;
     } finally {
       _setLoading(false);
     }
   }
 
-  // Déconnexion
   Future<void> signOut() async {
     try {
       _setLoading(true);
       _clearError();
-
       await _authService.signOut();
       _currentUser = null;
       _isLoggedIn = false;
@@ -117,32 +99,26 @@ class CruxAuthProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _setError('Erreur déconnexion: $e');
-      _logger.e('❌ Erreur: $e');
     } finally {
       _setLoading(false);
     }
   }
 
-  // Réinitialiser mot de passe
   Future<bool> resetPassword(String email) async {
     try {
       _setLoading(true);
       _clearError();
-
       await _authService.resetPassword(email);
-      _logger.i('✅ Email de réinitialisation envoyé');
       notifyListeners();
       return true;
     } catch (e) {
       _setError('Erreur réinitialisation: $e');
-      _logger.e('❌ Erreur: $e');
       return false;
     } finally {
       _setLoading(false);
     }
   }
 
-  // Helpers privés
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
@@ -153,7 +129,5 @@ class CruxAuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _clearError() {
-    _error = null;
-  }
+  void _clearError() => _error = null;
 }

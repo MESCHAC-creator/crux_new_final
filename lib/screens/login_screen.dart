@@ -575,7 +575,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'Se souvenir de moi',
+                                    AppTranslations.t('remember_me', lang),
                                     style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12),
                                   ),
                                 ],

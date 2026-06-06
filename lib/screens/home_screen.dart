@@ -591,7 +591,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Text('4 à 6 chiffres',
+                          Text(AppTranslations.t('passcode_digits', lang),
                               style: GoogleFonts.poppins(fontSize: 10, color: Colors.white38)),
                         ],
 
@@ -678,10 +678,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       subtitle: AppTranslations.t('invite', lang),
                       gradientColors: const [Color(0xFF27AE60), Color(0xFF1E8449)],
                       onTap: () {
-                        const apkUrl = 'https://github.com/MESCHAC-creator/crux_new_final/releases/latest/download/crux-release.apk';
-                        Share.share(
-                          '🎥 Rejoins-moi sur CRUX — visioconférence premium !\n\n📲 Télécharge l\'app directement ici :\n$apkUrl\n\nGratuit · Android',
-                        );
+                        Share.share(AppTranslations.t('share_app_msg', lang));
                       },
                     )),
                   ]),

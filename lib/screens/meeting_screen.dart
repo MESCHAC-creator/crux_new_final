@@ -65,11 +65,13 @@ class _MeetingScreenState extends State<MeetingScreen> {
   }
 
   void _shareMeeting() {
-    final text = 'Rejoignez ma réunion CRUX !\n'
-        'Réunion : ${widget.meetingName}\n'
-        'Code : ${widget.meetingId}\n\n'
-        'Téléchargez CRUX et rejoignez avec ce code.';
-    Share.share(text, subject: 'Invitation CRUX - ${widget.meetingName}');
+    final lang = context.read<LocaleProvider>().locale.languageCode;
+    final text = AppTranslations.t('share_meeting_msg', lang)
+        .replaceAll('{name}', widget.meetingName)
+        .replaceAll('{code}', widget.meetingId);
+    final subject = AppTranslations.t('share_meeting_subject', lang)
+        .replaceAll('{name}', widget.meetingName);
+    Share.share(text, subject: subject);
   }
 
   void _endMeeting() {
