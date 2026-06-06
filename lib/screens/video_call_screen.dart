@@ -179,8 +179,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   bool _showTranscript = false;
   final List<Map<String, String>> _transcriptLines = [];
   bool _sttListening = false;
+  String? _sttPartialText; // live partial result shown in real-time
   final stt.SpeechToText _sttService = stt.SpeechToText();
   bool _sttAvailable = false;
+  bool _sttInitializing = false;
 
   // ── Drawing whiteboard ────────────────────────
   bool _showWhiteboard = false;
@@ -1116,48 +1118,89 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   Future<void> _initStt() async {
-    _sttAvailable = await _sttService.initialize(
-      onError: (_) {},
-      onStatus: (status) {
-        if (status == 'done' || status == 'notListening') {
-          if (mounted && _sttListening) _restartSttListening();
-        }
-      },
-    );
+    if (_sttInitializing) return;
+    _sttInitializing = true;
+    try {
+      _sttAvailable = await _sttService.initialize(
+        onError: (error) {
+          _log.w('STT error: ${error.errorMsg}');
+          if (mounted) setState(() { _sttListening = false; _sttPartialText = null; });
+          // Auto-restart on transient errors
+          if (mounted && _sttListening) {
+            Future.delayed(const Duration(seconds: 1), _restartSttListening);
+          }
+        },
+        onStatus: (status) {
+          _log.i('STT status: $status');
+          if ((status == 'done' || status == 'notListening') && mounted && _sttListening) {
+            Future.delayed(const Duration(milliseconds: 300), _restartSttListening);
+          }
+        },
+      );
+    } finally {
+      _sttInitializing = false;
+    }
   }
 
   Future<void> _startTranscription() async {
-    if (!_sttAvailable) await _initStt();
-    if (!_sttAvailable) return;
-    setState(() => _sttListening = true);
+    if (_sttListening) return;
+    if (!_sttAvailable) {
+      if (mounted) setState(() => _sttInitializing = true);
+      await _initStt();
+      if (mounted) setState(() => _sttInitializing = false);
+    }
+    if (!_sttAvailable) {
+      if (mounted) {
+        final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppTranslations.t('stt_unavailable', lang), style: GoogleFonts.poppins()),
+          backgroundColor: Colors.orange.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 4),
+        ));
+      }
+      return;
+    }
+    if (mounted) setState(() { _sttListening = true; _sttPartialText = null; });
     _restartSttListening();
   }
 
   void _restartSttListening() {
     if (!mounted || !_sttListening || !_sttAvailable) return;
+    if (_sttService.isListening) return; // already listening — don't double-start
     final langCode = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     final localeId = _sttLocaleFor(langCode);
     _sttService.listen(
       listenOptions: stt.SpeechListenOptions(
         localeId: localeId,
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 3),
-        partialResults: false,
+        listenFor: const Duration(seconds: 60),
+        pauseFor: const Duration(seconds: 2),
+        partialResults: true, // show words as they are spoken
+        cancelOnError: false,
       ),
       onResult: (result) {
         if (!mounted) return;
-        if (result.finalResult && result.recognizedWords.isNotEmpty) {
-          setState(() => _transcriptLines.add({
-            'speaker': widget.userName,
-            'text': result.recognizedWords,
-          }));
+        if (result.finalResult) {
+          if (result.recognizedWords.isNotEmpty) {
+            setState(() {
+              _transcriptLines.add({
+                'speaker': widget.userName,
+                'text': result.recognizedWords,
+              });
+              _sttPartialText = null;
+            });
+          }
+        } else {
+          // Show partial result in real-time
+          if (mounted) setState(() => _sttPartialText = result.recognizedWords.isNotEmpty ? result.recognizedWords : null);
         }
       },
     );
   }
 
   Future<void> _stopTranscription() async {
-    setState(() => _sttListening = false);
+    if (mounted) setState(() { _sttListening = false; _sttPartialText = null; });
     await _sttService.stop();
   }
 
@@ -4535,6 +4578,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── TRANSCRIPT PANEL ─────────────────────────
   Widget _buildTranscriptPanel() {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+    final scrollCtrl = ScrollController();
+
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -4543,114 +4589,200 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             color: const Color(0xCC141420),
             border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.12))),
           ),
-      child: Column(children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Row(children: [
-            const Icon(Icons.subtitles, color: Colors.white70, size: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text('Sous-titres en direct',
-                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-            ),
-            // Start/stop transcription button
-            GestureDetector(
-              onTap: () => _sttListening ? _stopTranscription() : _startTranscription(),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _sttListening ? Colors.red.withValues(alpha: 0.2) : Colors.green.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: _sttListening ? Colors.red.withValues(alpha: 0.6) : Colors.green.withValues(alpha: 0.5),
-                  ),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(_sttListening ? Icons.stop : Icons.mic,
-                    color: _sttListening ? Colors.red : Colors.green, size: 11),
-                  const SizedBox(width: 4),
-                  Text(_sttListening ? 'STOP' : 'DÉMARRER',
-                    style: GoogleFonts.poppins(
-                      color: _sttListening ? Colors.red : Colors.green,
-                      fontSize: 9, fontWeight: FontWeight.w700)),
-                ]),
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: () { _stopTranscription(); setState(() => _showTranscript = false); },
-              icon: const Icon(Icons.close, color: Colors.white54, size: 18),
-              padding: EdgeInsets.zero, constraints: const BoxConstraints(),
-            ),
-          ]),
-        ),
-        const Divider(color: Colors.white10, height: 1),
-        // Transcript lines
-        Expanded(
-          child: _transcriptLines.isEmpty
-              ? Center(
-                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(_sttListening ? Icons.mic : Icons.mic_none,
-                      color: _sttListening ? Colors.green.withValues(alpha: 0.7) : Colors.white24, size: 36),
-                    const SizedBox(height: 8),
-                    Text(_sttListening ? 'Écoute en cours...' : 'Appuyez sur DÉMARRER',
-                      style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
-                    const SizedBox(height: 4),
-                    Text('La transcription s\'affichera ici', style: GoogleFonts.poppins(color: Colors.white24, fontSize: 11)),
-                  ]),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _transcriptLines.length,
-                  itemBuilder: (_, i) {
-                    final line = _transcriptLines[i];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: RichText(
-                        text: TextSpan(children: [
-                          TextSpan(
-                            text: '${line['speaker'] ?? ''}: ',
-                            style: GoogleFonts.poppins(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
-                          ),
-                          TextSpan(
-                            text: line['text'] ?? '',
-                            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13, height: 1.5),
-                          ),
-                        ]),
-                      ),
-                    );
-                  },
-                ),
-        ),
-        // Info footer
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(children: [
-            const Icon(Icons.info_outline, color: Colors.white24, size: 14),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                'Transcription IA disponible dans CRUX Pro',
-                style: GoogleFonts.poppins(color: Colors.white38, fontSize: 10),
-              ),
-            ),
-            if (!_isPro)
-              GestureDetector(
-                onTap: _showPaywall,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: Column(children: [
+            // ── Header ──────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(children: [
+                // Animated mic indicator
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 400),
+                  width: 8, height: 8,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)]),
-                    borderRadius: BorderRadius.circular(12),
+                    shape: BoxShape.circle,
+                    color: _sttListening ? Colors.red : Colors.white24,
+                    boxShadow: _sttListening
+                        ? [BoxShadow(color: Colors.red.withValues(alpha: 0.5), blurRadius: 6)]
+                        : [],
                   ),
-                  child: Text('ACTIVER PRO', style: GoogleFonts.poppins(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    AppTranslations.t('subtitles_live', lang),
+                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                // Start/stop button
+                if (_sttInitializing)
+                  const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+                  )
+                else
+                  GestureDetector(
+                    onTap: () => _sttListening ? _stopTranscription() : _startTranscription(),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _sttListening
+                            ? Colors.red.withValues(alpha: 0.2)
+                            : Colors.green.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _sttListening
+                              ? Colors.red.withValues(alpha: 0.6)
+                              : Colors.green.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(
+                          _sttListening ? Icons.stop : Icons.mic,
+                          color: _sttListening ? Colors.red : Colors.green,
+                          size: 11,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _sttListening
+                              ? AppTranslations.t('stt_stop', lang)
+                              : AppTranslations.t('stt_start', lang),
+                          style: GoogleFonts.poppins(
+                            color: _sttListening ? Colors.red : Colors.green,
+                            fontSize: 9, fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ),
+                const SizedBox(width: 8),
+                // Clear button
+                if (_transcriptLines.isNotEmpty)
+                  IconButton(
+                    onPressed: () => setState(() { _transcriptLines.clear(); _sttPartialText = null; }),
+                    icon: const Icon(Icons.delete_outline, color: Colors.white38, size: 16),
+                    padding: EdgeInsets.zero, constraints: const BoxConstraints(),
+                    tooltip: 'Effacer',
+                  ),
+                const SizedBox(width: 4),
+                IconButton(
+                  onPressed: () { _stopTranscription(); setState(() => _showTranscript = false); },
+                  icon: const Icon(Icons.close, color: Colors.white54, size: 18),
+                  padding: EdgeInsets.zero, constraints: const BoxConstraints(),
+                ),
+              ]),
+            ),
+            const Divider(color: Colors.white10, height: 1),
+
+            // ── Transcript content ───────────────────
+            Expanded(
+              child: _transcriptLines.isEmpty && _sttPartialText == null
+                  ? Center(
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(
+                          _sttListening ? Icons.mic : Icons.mic_none,
+                          color: _sttListening
+                              ? Colors.green.withValues(alpha: 0.7)
+                              : Colors.white24,
+                          size: 36,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _sttInitializing
+                              ? AppTranslations.t('stt_initializing', lang)
+                              : _sttListening
+                                  ? AppTranslations.t('stt_listening', lang)
+                                  : AppTranslations.t('stt_tap_start', lang),
+                          style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          AppTranslations.t('stt_will_appear', lang),
+                          style: GoogleFonts.poppins(color: Colors.white24, fontSize: 11),
+                        ),
+                      ]),
+                    )
+                  : ListView.builder(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                      // +1 for partial result row
+                      itemCount: _transcriptLines.length + (_sttPartialText != null ? 1 : 0),
+                      itemBuilder: (_, i) {
+                        // Last item = partial (live) result
+                        if (i == _transcriptLines.length && _sttPartialText != null) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: RichText(
+                              text: TextSpan(children: [
+                                TextSpan(
+                                  text: '${widget.userName}: ',
+                                  style: GoogleFonts.poppins(
+                                      color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w600),
+                                ),
+                                TextSpan(
+                                  text: _sttPartialText!,
+                                  style: GoogleFonts.poppins(
+                                      color: Colors.white38, fontSize: 13,
+                                      height: 1.5, fontStyle: FontStyle.italic),
+                                ),
+                              ]),
+                            ),
+                          );
+                        }
+                        final line = _transcriptLines[i];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: RichText(
+                            text: TextSpan(children: [
+                              TextSpan(
+                                text: '${line['speaker'] ?? ''}: ',
+                                style: GoogleFonts.poppins(
+                                    color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                              TextSpan(
+                                text: line['text'] ?? '',
+                                style: GoogleFonts.poppins(
+                                    color: Colors.white70, fontSize: 13, height: 1.5),
+                              ),
+                            ]),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+
+            // ── Footer ──────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(children: [
+                const Icon(Icons.info_outline, color: Colors.white24, size: 14),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    AppTranslations.t('stt_device_only', lang),
+                    style: GoogleFonts.poppins(color: Colors.white38, fontSize: 10),
+                  ),
+                ),
+                if (!_isPro)
+                  GestureDetector(
+                    onTap: _showPaywall,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                            colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)]),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        AppTranslations.t('activate_pro', lang),
+                        style: GoogleFonts.poppins(
+                            color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+              ]),
+            ),
           ]),
-        ),
-      ]),
         ),
       ),
     );
@@ -7042,14 +7174,24 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               label: 'Sous-titres',
               active: !_showTranscript,
               isHighlight: _showTranscript,
-              onTap: () => setState(() {
-                _showTranscript = !_showTranscript;
-                if (_showTranscript) {
-                  _showChat = false;
-                  _showParticipants = false;
-                  _showWhiteboard = false;
+              onTap: () {
+                setState(() {
+                  _showTranscript = !_showTranscript;
+                  if (_showTranscript) {
+                    _showChat = false;
+                    _showParticipants = false;
+                    _showWhiteboard = false;
+                  }
+                });
+                // Auto-start transcription when panel opens
+                if (_showTranscript && !_sttListening) {
+                  _startTranscription();
                 }
-              }),
+                // Auto-stop when panel closes
+                if (!_showTranscript && _sttListening) {
+                  _stopTranscription();
+                }
+              },
             ),
             const SizedBox(width: 8),
             _Btn(
