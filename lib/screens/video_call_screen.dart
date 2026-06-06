@@ -1309,23 +1309,22 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         .streamPresence(widget.meetingId)
         .listen((list) {
       if (!mounted) return;
-      if (widget.isHost) {
-        for (final p in list) {
-          final uid = p['userId'] as String? ?? '';
-          final raised = p['handRaised'] == true;
-          if (raised && uid != widget.userId && !_raisedHands.contains(uid)) {
-            _raisedHands.add(uid);
-            final name = p['userName'] ?? 'Participant';
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('🖐 $name a levé la main', style: GoogleFonts.poppins(color: Colors.white)),
-              backgroundColor: Colors.orange.shade800,
-              duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ));
-          } else if (!raised) {
-            _raisedHands.remove(uid);
-          }
+      // Notify ALL participants (not just host) when someone raises their hand
+      for (final p in list) {
+        final uid = p['userId'] as String? ?? '';
+        final raised = p['handRaised'] == true;
+        if (raised && uid != widget.userId && !_raisedHands.contains(uid)) {
+          _raisedHands.add(uid);
+          final name = p['userName'] ?? (p['name'] as String? ?? 'Participant');
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('✋ $name a levé la main', style: GoogleFonts.poppins(color: Colors.white)),
+            backgroundColor: Colors.orange.shade800,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ));
+        } else if (!raised) {
+          _raisedHands.remove(uid);
         }
       }
       // Feature N10: join/leave sounds
@@ -6917,8 +6916,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   Widget _buildControls() {
     final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     final isPrivileged = widget.isHost || _isCoHost;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(4, 10, 4, 16),
+    return SafeArea(
+      top: false,
+      child: Container(
+      padding: const EdgeInsets.fromLTRB(4, 10, 4, 12),
       decoration: BoxDecoration(
         color: const Color(0xF0141420),
         border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.07), width: 0.5)),
@@ -7129,11 +7130,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 active: true,
                 onTap: () {
                   HapticFeedback.mediumImpact();
-                  // Mute host's own mic immediately
-                  for (final t in _localStream?.getAudioTracks() ?? []) {
-                    t.enabled = false;
-                  }
-                  if (mounted) setState(() => _micOn = false);
+                  // Keep host's own mic enabled — only signal OTHER participants to mute
+                  // Do NOT mute the host's local audio track or set _micOn = false
                   // Signal all participants via Firestore (fire-and-forget)
                   _meetingService.triggerMuteAll(widget.meetingId).catchError((_) {});
                   if (mounted) {
@@ -7325,7 +7323,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           ],
         ),
       ),
-    );
+    ), // Container
+    ); // SafeArea
   }
 
   // ── MORE OPTIONS SHEET ───────────────────────
@@ -7601,6 +7600,70 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     ]);
   }
 
+  // ── PARTICIPANT MANAGE SHEET (host/co-host tap on gallery tile) ────
+  void _showParticipantManageSheet(String pId, String pName, bool handRaised) {
+    if (!widget.isHost && !_isCoHost) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        decoration: const BoxDecoration(
+          color: Color(0xFF181828),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 12),
+          Text(pName, style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          ListTile(
+            leading: const Icon(Icons.mic_off, color: Colors.orange),
+            title: Text('🔇 Couper le micro', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+            onTap: () async {
+              Navigator.pop(context);
+              await _muteParticipant(pId);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.star, color: Colors.amber),
+            title: Text('👑 Nommer co-hôte', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+            onTap: () async {
+              Navigator.pop(context);
+              await _meetingService.addCoHost(widget.meetingId, pId);
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('$pName est maintenant co-hôte', style: GoogleFonts.poppins()),
+                backgroundColor: AppColors.success,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ));
+            },
+          ),
+          if (handRaised)
+            ListTile(
+              leading: const Icon(Icons.front_hand, color: Colors.orangeAccent),
+              title: Text('✋ Baisser la main', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+              onTap: () async {
+                Navigator.pop(context);
+                await _db.collection('meetings').doc(widget.meetingId)
+                    .collection('presence').doc(pId)
+                    .update({'handRaised': false}).catchError((_) {});
+              },
+            ),
+          ListTile(
+            leading: const Icon(Icons.door_back_door_outlined, color: Colors.redAccent),
+            title: Text('🚪 Retirer de la réunion', style: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 14)),
+            onTap: () async {
+              Navigator.pop(context);
+              await _kickParticipant(pId, pName);
+            },
+          ),
+        ]),
+      ),
+    );
+  }
+
   // ── GALLERY VIEW (CRUX: Meet + Zoom blend) ────
   Widget _buildGalleryView() {
     const tileBg = Color(0xFF1A1529);  // CRUX dark purple tint
@@ -7634,8 +7697,13 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 final isSpeaking = _participantSpeaking[uid] == true;
                 final micMuted = isMe ? !_micOn : false;
                 final handRaised = p['handRaised'] == true;
+                final isPrivilegedUser = widget.isHost || _isCoHost;
 
-                return AnimatedContainer(
+                return GestureDetector(
+                  onLongPress: (!isMe && isPrivilegedUser)
+                      ? () => _showParticipantManageSheet(uid, name, handRaised)
+                      : null,
+                  child: AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
                   curve: Curves.easeOutCubic,
                   decoration: BoxDecoration(
@@ -7832,7 +7900,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                         ),
                     ]),
                   ),
-                );
+                ), // AnimatedContainer
+                ); // GestureDetector
               },
             ),
           ),
