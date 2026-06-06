@@ -162,6 +162,7 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
   }
 
   Future<void> _signUp() async {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     // Clear previous errors
     setState(() {
       _nameError = null;
@@ -178,34 +179,34 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
     bool hasError = false;
 
     if (name.isEmpty) {
-      setState(() => _nameError = 'Entrez votre nom complet');
+      setState(() => _nameError = AppTranslations.t('val_name_required', lang));
       hasError = true;
     } else if (name.length < 2) {
-      setState(() => _nameError = 'Le nom doit faire au moins 2 caractères');
+      setState(() => _nameError = AppTranslations.t('val_min_2', lang));
       hasError = true;
     }
 
     if (email.isEmpty) {
-      setState(() => _emailError = 'Entrez votre adresse email');
+      setState(() => _emailError = AppTranslations.t('val_email_required', lang));
       hasError = true;
     } else if (!email.contains('@') || !email.contains('.')) {
-      setState(() => _emailError = 'Format invalide (ex: nom@domaine.com)');
+      setState(() => _emailError = AppTranslations.t('val_email_invalid', lang));
       hasError = true;
     }
 
     if (pass.isEmpty) {
-      setState(() => _passwordError = 'Entrez un mot de passe');
+      setState(() => _passwordError = AppTranslations.t('val_pwd_required', lang));
       hasError = true;
     } else if (pass.length < 6) {
-      setState(() => _passwordError = 'Minimum 6 caractères requis');
+      setState(() => _passwordError = AppTranslations.t('val_min_6', lang));
       hasError = true;
     }
 
     if (confirm.isEmpty) {
-      setState(() => _confirmError = 'Confirmez votre mot de passe');
+      setState(() => _confirmError = AppTranslations.t('val_confirm_pwd', lang));
       hasError = true;
     } else if (pass != confirm) {
-      setState(() => _confirmError = 'Les mots de passe ne correspondent pas');
+      setState(() => _confirmError = AppTranslations.t('val_pwd_mismatch', lang));
       hasError = true;
     }
 
@@ -228,13 +229,13 @@ class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMix
       if (!mounted) return;
       final msg = e.toString().replaceFirst('Exception: ', '');
       if (msg.contains('email-already-in-use') || msg.contains('déjà utilisé')) {
-        setState(() => _emailError = 'Cet email est déjà utilisé');
+        setState(() => _emailError = AppTranslations.t('auth_email_used', lang));
       } else if (msg.contains('invalid-email') || msg.contains('invalide')) {
-        setState(() => _emailError = 'Format d\'email invalide');
+        setState(() => _emailError = AppTranslations.t('auth_invalid_email_fmt', lang));
       } else if (msg.contains('weak-password') || msg.contains('trop faible')) {
-        setState(() => _passwordError = 'Mot de passe trop faible');
+        setState(() => _passwordError = AppTranslations.t('auth_weak_pwd', lang));
       } else if (msg.contains('network') || msg.contains('réseau')) {
-        _errorHandler.showWarningSnackBar(context, 'Pas de connexion Internet');
+        _errorHandler.showWarningSnackBar(context, AppTranslations.t('auth_no_network', lang));
       } else {
         _errorHandler.showError(context, msg);
       }

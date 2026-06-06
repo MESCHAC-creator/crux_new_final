@@ -200,6 +200,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   /// Validate fields locally and set inline errors. Returns true if valid.
   bool _validateFields() {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     String? emailErr;
     String? passErr;
 
@@ -207,13 +208,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     final password = _passwordController.text;
 
     if (email.isEmpty) {
-      emailErr = 'Entrez votre adresse email';
+      emailErr = AppTranslations.t('val_email_required', lang);
     } else if (!email.contains('@')) {
-      emailErr = 'Format invalide (ex: nom@domaine.com)';
+      emailErr = AppTranslations.t('val_email_invalid', lang);
     }
 
     if (password.isEmpty) {
-      passErr = 'Entrez votre mot de passe';
+      passErr = AppTranslations.t('val_pwd_required', lang);
     }
 
     setState(() {
@@ -233,7 +234,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       }
     } catch (e) {
       if (mounted) {
-        _errorHandler.showErrorDialog(context, '❌ Connexion Google échouée',
+        final lang = context.read<LocaleProvider>().locale.languageCode;
+        _errorHandler.showErrorDialog(context, '❌ ${AppTranslations.t('google_failed', lang)}',
             e.toString().replaceFirst('Exception: ', ''));
       }
     } finally {
@@ -258,28 +260,26 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       if (mounted) _goHome();
     } catch (e) {
       if (!mounted) return;
+      final lang = context.read<LocaleProvider>().locale.languageCode;
       final msg = e.toString().replaceFirst('Exception: ', '');
 
       if (msg.contains('wrong-password') ||
           msg.contains('invalid-credential') ||
           msg.contains('INVALID_LOGIN_CREDENTIALS') ||
           msg.contains('incorrect')) {
-        setState(() => _passwordError = 'Mot de passe incorrect');
+        setState(() => _passwordError = AppTranslations.t('auth_wrong_pwd', lang));
       } else if (msg.contains('user-not-found') || msg.contains('no user') || msg.contains('non trouvé')) {
-        setState(() => _emailError = 'Aucun compte trouvé avec cet email');
+        setState(() => _emailError = AppTranslations.t('auth_no_account', lang));
       } else if (msg.contains('invalid-email') || msg.contains('invalide')) {
-        setState(() => _emailError = 'Format d\'email invalide (ex: nom@domaine.com)');
+        setState(() => _emailError = AppTranslations.t('auth_invalid_email_fmt', lang));
       } else if (msg.contains('too-many-requests') || msg.contains('Trop de tentatives')) {
-        _errorHandler.showWarningSnackBar(
-            context, 'Trop de tentatives. Réessayez dans quelques minutes.');
+        _errorHandler.showWarningSnackBar(context, AppTranslations.t('auth_too_many', lang));
       } else if (msg.contains('network') || msg.contains('réseau')) {
-        _errorHandler.showWarningSnackBar(
-            context, 'Pas de connexion Internet. Vérifiez votre réseau.');
+        _errorHandler.showWarningSnackBar(context, AppTranslations.t('auth_no_network', lang));
       } else if (msg.contains('disabled') || msg.contains('désactivé')) {
-        _errorHandler.showErrorDialog(
-            context, 'Compte désactivé', 'Compte désactivé. Contactez le support.');
+        _errorHandler.showErrorDialog(context, AppTranslations.t('attention', lang), AppTranslations.t('auth_disabled', lang));
       } else {
-        _errorHandler.showErrorDialog(context, '❌ Connexion échouée', msg);
+        _errorHandler.showErrorDialog(context, '❌ ${AppTranslations.t('error', lang)}', _errorHandler.cleanErrorMessageL(msg, lang));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -312,7 +312,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Entrez votre adresse email pour recevoir un lien de réinitialisation.',
+                    AppTranslations.t('reset_prompt', lang),
                     style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
                   ),
                   const SizedBox(height: 16),
@@ -321,7 +321,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                     keyboardType: TextInputType.emailAddress,
                     style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
                     decoration: InputDecoration(
-                      hintText: 'email@exemple.com',
+                      hintText: AppTranslations.t('reset_email_hint', lang),
                       hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
                       prefixIcon: const Icon(Icons.email_outlined, color: Colors.white60, size: 20),
                       filled: true,
@@ -366,7 +366,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                       : () async {
                           final email = emailController.text.trim();
                           if (email.isEmpty || !email.contains('@')) {
-                            setDialogState(() => dialogError = 'Entrez un email valide');
+                            setDialogState(() => dialogError = AppTranslations.t('reset_valid_email', lang));
                             return;
                           }
                           setDialogState(() => sending = true);
@@ -377,7 +377,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               if (mounted) {
                                 _errorHandler.showSuccessSnackBar(
                                   context,
-                                  'Email de réinitialisation envoyé ! Vérifiez votre boîte mail.',
+                                  AppTranslations.t('reset_sent', lang),
                                 );
                               }
                             }
@@ -385,9 +385,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             final msg = e.toString().replaceFirst('Exception: ', '');
                             String errorMsg;
                             if (msg.contains('user-not-found') || msg.contains('non trouvé')) {
-                              errorMsg = 'Aucun compte avec cet email';
+                              errorMsg = AppTranslations.t('reset_no_account', lang);
                             } else if (msg.contains('network') || msg.contains('réseau')) {
-                              errorMsg = 'Problème réseau';
+                              errorMsg = AppTranslations.t('reset_network', lang);
                             } else {
                               errorMsg = msg;
                             }
@@ -402,7 +402,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                           width: 18, height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
                         )
-                      : Text('Envoyer',
+                      : Text(AppTranslations.t('reset_send', lang),
                           style: GoogleFonts.poppins(
                             color: const Color(0xFFB71C1C),
                             fontWeight: FontWeight.w700,

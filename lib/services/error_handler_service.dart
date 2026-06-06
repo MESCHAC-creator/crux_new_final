@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:logger/logger.dart';
 import '../theme/colors.dart';
+import '../l10n/app_translations.dart';
 
 class ErrorHandlerService {
   static final ErrorHandlerService _instance = ErrorHandlerService._internal();
@@ -297,6 +298,88 @@ class ErrorHandlerService {
       return '📡 Pas de connexion Internet.';
     }
     return cleanErrorMessage(raw);
+  }
+
+  /// Returns a user-friendly translated message for any Firebase Auth error code.
+  String getFirebaseErrorMessageL(String code, String lang) {
+    switch (code) {
+      case 'wrong-password':
+      case 'invalid-credential':
+      case 'INVALID_LOGIN_CREDENTIALS':
+        return AppTranslations.t('auth_wrong_pwd', lang);
+      case 'user-not-found':
+        return AppTranslations.t('auth_no_account', lang);
+      case 'invalid-email':
+        return AppTranslations.t('auth_invalid_email_fmt', lang);
+      case 'email-already-in-use':
+        return AppTranslations.t('auth_email_used', lang);
+      case 'weak-password':
+        return AppTranslations.t('auth_weak_pwd', lang);
+      case 'user-disabled':
+        return AppTranslations.t('auth_disabled', lang);
+      case 'too-many-requests':
+        return AppTranslations.t('auth_too_many', lang);
+      case 'operation-not-allowed':
+        return AppTranslations.t('auth_not_allowed', lang);
+      case 'network-request-failed':
+        return AppTranslations.t('auth_no_network', lang);
+      case 'account-exists-with-different-credential':
+        return AppTranslations.t('auth_other_method', lang);
+      case 'requires-recent-login':
+      case 'user-token-expired':
+        return AppTranslations.t('auth_session_expired', lang);
+      case 'expired-action-code':
+        return AppTranslations.t('auth_link_expired', lang);
+      case 'invalid-action-code':
+        return AppTranslations.t('auth_link_invalid', lang);
+      case 'popup-closed-by-user':
+      case 'cancelled-popup-request':
+        return AppTranslations.t('auth_cancelled', lang);
+      case 'quota-exceeded':
+        return AppTranslations.t('auth_limit', lang);
+      default:
+        if (code.contains('network')) return AppTranslations.t('auth_network_issue', lang);
+        return AppTranslations.t('auth_unknown', lang);
+    }
+  }
+
+  /// Converts any exception/error string into a clean translated user-friendly message.
+  String cleanErrorMessageL(String raw, String lang) {
+    final msg = raw.replaceAll('Exception: ', '').trim();
+    if (msg.contains('wrong-password') || msg.contains('invalid-credential') ||
+        msg.contains('INVALID_LOGIN_CREDENTIALS') || msg.contains('incorrect')) {
+      return AppTranslations.t('auth_wrong_pwd', lang);
+    }
+    if (msg.contains('user-not-found')) return AppTranslations.t('auth_no_account', lang);
+    if (msg.contains('email-already-in-use')) return AppTranslations.t('auth_email_used', lang);
+    if (msg.contains('weak-password')) return AppTranslations.t('auth_weak_pwd', lang);
+    if (msg.contains('invalid-email')) return AppTranslations.t('auth_invalid_email_fmt', lang);
+    if (msg.contains('too-many-requests')) return AppTranslations.t('auth_too_many', lang);
+    if (msg.contains('network') || msg.contains('Network')) return AppTranslations.t('auth_no_network', lang);
+    if (msg.contains('user-disabled')) return AppTranslations.t('auth_disabled', lang);
+    if (msg.contains('requires-recent-login')) return AppTranslations.t('auth_session_expired', lang);
+    if (msg.contains('account-exists-with-different-credential')) return AppTranslations.t('auth_other_method', lang);
+    if (msg.contains('permission-denied')) return AppTranslations.t('auth_unknown', lang);
+    if (msg.contains('cancelled') || msg.contains('canceled')) return AppTranslations.t('auth_cancelled', lang);
+    if (msg.length < 120 && !msg.contains('[') && !msg.contains('{')) return msg;
+    return AppTranslations.t('auth_unknown', lang);
+  }
+
+  /// Translated meeting error message.
+  String getMeetingErrorMessageL(String raw, String lang) {
+    if (raw.contains('verrouillée') || raw.contains('locked')) {
+      return AppTranslations.t('meet_locked', lang);
+    }
+    if (raw.contains('mot de passe') || raw.contains('password') || raw.contains('incorrect')) {
+      return AppTranslations.t('meet_wrong_code', lang);
+    }
+    if (raw.contains('introuvable') || raw.contains('not-found') || raw.contains('n\'existe pas')) {
+      return AppTranslations.t('meet_not_found', lang);
+    }
+    if (raw.contains('network') || raw.contains('réseau')) {
+      return AppTranslations.t('meet_no_network', lang);
+    }
+    return cleanErrorMessageL(raw, lang);
   }
 
   void logError(String source, String error) {

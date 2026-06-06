@@ -86,20 +86,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _createMeeting() async {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     final name = _meetingNameController.text.trim();
     if (name.isEmpty) {
-      _errorHandler.showErrorDialog(context, '⚠️ Attention', 'Entrez le nom de la réunion');
+      _errorHandler.showErrorDialog(context, '⚠️ ${AppTranslations.t('attention', lang)}', AppTranslations.t('meet_enter_name', lang));
       return;
     }
 
     final rawPasscode = _showPasscode ? _passcodeController.text.trim() : null;
     if (rawPasscode != null && rawPasscode.isNotEmpty) {
       if (rawPasscode.length < 4 || rawPasscode.length > 6) {
-        _errorHandler.showErrorDialog(context, '⚠️ Code invalide', 'Le code d\'accès doit contenir entre 4 et 6 chiffres.');
+        _errorHandler.showErrorDialog(context, '⚠️ ${AppTranslations.t('attention', lang)}', AppTranslations.t('meet_code_range', lang));
         return;
       }
       if (!RegExp(r'^\d+$').hasMatch(rawPasscode)) {
-        _errorHandler.showErrorDialog(context, '⚠️ Code invalide', 'Le code d\'accès doit contenir uniquement des chiffres.');
+        _errorHandler.showErrorDialog(context, '⚠️ ${AppTranslations.t('attention', lang)}', AppTranslations.t('meet_code_digits', lang));
         return;
       }
     }
@@ -128,7 +129,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ));
     } catch (e) {
-      if (mounted) _errorHandler.showErrorDialog(context, '❌ Erreur', e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        final lang = context.read<LocaleProvider>().locale.languageCode;
+        _errorHandler.showErrorDialog(context, '❌ ${AppTranslations.t('error', lang)}', _errorHandler.getMeetingErrorMessageL(e.toString().replaceFirst('Exception: ', ''), lang));
+      }
     } finally {
       if (mounted) setState(() => _isCreating = false);
     }
@@ -137,12 +141,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _joinById(String id) async {
     if (id.isEmpty) return;
     final cleanId = id.trim().toUpperCase();
+    final lang = context.read<LocaleProvider>().locale.languageCode;
 
     final meeting = await _meetingService.getMeetingOnce(cleanId);
     if (!mounted) return;
 
     if (meeting == null) {
-      _errorHandler.showErrorDialog(context, '🔍 Introuvable', 'Réunion introuvable. Vérifiez l\'ID.');
+      _errorHandler.showErrorDialog(context, '🔍 ${AppTranslations.t('error', lang)}', AppTranslations.t('meet_not_found', lang));
       return;
     }
 
@@ -151,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       if (entered == null) return;
       if (entered != meeting.passcode) {
-        if (mounted) _errorHandler.showErrorDialog(context, '🔒 Code incorrect', 'Code incorrect. Vérifiez et réessayez.');
+        if (mounted) _errorHandler.showErrorDialog(context, '🔒 ${AppTranslations.t('error', lang)}', AppTranslations.t('meet_wrong_code', lang));
         return;
       }
     }
