@@ -18,6 +18,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import '../providers/locale_provider.dart';
+import '../l10n/app_translations.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
 import '../services/pro_service.dart';
@@ -1517,8 +1518,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         if (!kIsWeb && Platform.isIOS) {
           _log.w('Screen share: Not supported on iOS');
           if (mounted) {
+            final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Partage d\'écran non disponible sur iOS.', style: GoogleFonts.poppins()),
+              content: Text(AppTranslations.t('screen_share_ios', lang), style: GoogleFonts.poppins()),
               backgroundColor: Colors.orange.shade700,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1528,15 +1530,21 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           return;
         }
 
-        // Verify peer connection exists
+        // If peer connection not yet established, show a helpful message
+        // (happens when participant count is still 0 / signaling not complete)
         if (_pc == null) {
-          _log.w('Screen share: Peer connection not initialized');
+          _log.w('Screen share: Peer connection not initialized yet');
           if (mounted) {
+            final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Connexion non établie. Veuillez réessayer.', style: GoogleFonts.poppins()),
+              content: Text(
+                AppTranslations.t('screen_share_wait', lang),
+                style: GoogleFonts.poppins(),
+              ),
               backgroundColor: Colors.orange.shade700,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              duration: const Duration(seconds: 4),
             ));
           }
           return;
@@ -1551,8 +1559,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         if (_screenStream == null) {
           _log.w('Screen share: getDisplayMedia returned null');
           if (mounted) {
+            final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Partage d\'écran non disponible.', style: GoogleFonts.poppins()),
+              content: Text(AppTranslations.t('screen_share_unavailable', lang), style: GoogleFonts.poppins()),
               backgroundColor: Colors.orange.shade700,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1568,8 +1577,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           await _screenStream?.dispose();
           _screenStream = null;
           if (mounted) {
+            final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Aucune piste vidéo trouvée.', style: GoogleFonts.poppins()),
+              content: Text(AppTranslations.t('screen_share_no_track', lang), style: GoogleFonts.poppins()),
               backgroundColor: Colors.orange.shade700,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
