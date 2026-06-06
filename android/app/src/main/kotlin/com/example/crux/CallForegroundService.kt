@@ -19,13 +19,10 @@ class CallForegroundService : Service() {
         const val NOTIFICATION_ID = 1001
         const val NOTIFICATION_SCREEN_ID = 1002
 
-        // Intent actions
         const val ACTION_SCREEN_SHARE_START = "com.example.crux.SCREEN_SHARE_START"
         const val ACTION_SCREEN_SHARE_STOP  = "com.example.crux.SCREEN_SHARE_STOP"
         const val ACTION_STOP_SCREEN_SHARE  = "com.example.crux.ACTION_STOP_SCREEN_SHARE"
     }
-
-    private var isScreenSharing = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -37,25 +34,23 @@ class CallForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_SCREEN_SHARE_START -> {
-                isScreenSharing = true
-                showScreenShareNotification()
+                // Ensure service is foreground first, then post screen share notification
+                ensureForeground()
+                postScreenShareNotification()
             }
             ACTION_SCREEN_SHARE_STOP -> {
-                isScreenSharing = false
                 getSystemService(NotificationManager::class.java)
                     ?.cancel(NOTIFICATION_SCREEN_ID)
                 showCallNotification()
             }
             ACTION_STOP_SCREEN_SHARE -> {
                 // User tapped "Stop sharing" in the notification — broadcast back to Flutter
-                isScreenSharing = false
                 getSystemService(NotificationManager::class.java)
                     ?.cancel(NOTIFICATION_SCREEN_ID)
                 showCallNotification()
                 sendBroadcast(Intent("com.example.crux.STOP_SCREEN_SHARE_FROM_NOTIFICATION"))
             }
             else -> {
-                // Default: start the call foreground service
                 startCallForeground()
             }
         }
@@ -80,12 +75,20 @@ class CallForegroundService : Service() {
         }
     }
 
+    // Ensure we are already a foreground service before posting additional notifications.
+    // Called before postScreenShareNotification() so Android 12+ doesn't kill the process.
+    private fun ensureForeground() {
+        try {
+            startForeground(NOTIFICATION_ID, buildCallNotification())
+        } catch (_: Exception) {}
+    }
+
     private fun showCallNotification() {
         getSystemService(NotificationManager::class.java)
             ?.notify(NOTIFICATION_ID, buildCallNotification())
     }
 
-    private fun showScreenShareNotification() {
+    private fun postScreenShareNotification() {
         val stopIntent = PendingIntent.getService(
             this,
             1,
@@ -133,25 +136,6 @@ class CallForegroundService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Réunion CRUX en cours")
             .setContentText("Appuyez pour revenir à la réunion")
-            .setSmallIcon(android.R.drawable.ic_menu_call)
-            .setContentIntent(openIntent)
-            .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setCategory(NotificationCompat.CATEGORY_CALL)
-            .build()
-    }
-
-    private fun buildCallNotification(title: String, text: String): Notification {
-        val openIntent = PendingIntent.getActivity(
-            this,
-            0,
-            packageManager.getLaunchIntentForPackage(packageName),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_call)
             .setContentIntent(openIntent)
             .setOngoing(true)

@@ -2604,8 +2604,13 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   isMuted: showLocalBig ? false : !_micOn,
                   isSpeaking: showLocalBig
                       ? false
-                      : (_participantSpeaking[
-                              _presenceList.where((p) => p['userId'] != widget.userId).firstOrNull?['userId'] as String? ?? ''] == true),
+                      : () {
+                          final remoteUid = _presenceList
+                              .where((p) => p['userId'] != widget.userId)
+                              .firstOrNull?['userId'] as String?;
+                          return remoteUid != null &&
+                              _participantSpeaking[remoteUid] == true;
+                        }(),
                   size: 20,
                 ),
               ),
