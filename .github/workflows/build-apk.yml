@@ -28,7 +28,42 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: flutter pub get
+        run: |
+          rm -f pubspec.lock
+          flutter pub get
+
+      - name: Patch flutter_webrtc (remove V1 embedding)
+        run: |
+          python3 - <<'PYEOF'
+          import re, glob, os
+          pattern = os.path.expanduser(
+              '~/.pub-cache/hosted/pub.dev/flutter_webrtc*/android/src/main/java/com/cloudwebrtc/webrtc/FlutterWebRTCPlugin.java'
+          )
+          files = glob.glob(pattern)
+          if not files:
+              print('flutter_webrtc plugin not found, skipping patch')
+              exit(0)
+          for path in files:
+              with open(path, 'r') as f:
+                  content = f.read()
+              original = content
+              content = re.sub(
+                  r'import io\.flutter\.plugin\.common\.PluginRegistry\.Registrar;\n',
+                  '',
+                  content
+              )
+              content = re.sub(
+                  r'\n[ \t]+public static void registerWith\(Registrar[^)]*\) \{[^}]*\}',
+                  '',
+                  content
+              )
+              if content != original:
+                  with open(path, 'w') as f:
+                      f.write(content)
+                  print(f'Patched: {path}')
+              else:
+                  print(f'No changes needed: {path}')
+          PYEOF
 
       - name: Build release APK
         run: flutter build apk --release --no-tree-shake-icons
