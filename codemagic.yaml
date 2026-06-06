@@ -17,8 +17,18 @@ workflows:
     scripts:
       - name: Set up local.properties
         script: |
-          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
+          # Resolve Flutter SDK root robustly from the flutter binary in PATH
+          FLUTTER_BIN=$(command -v flutter)
+          FLUTTER_SDK=$(dirname "$(dirname "$FLUTTER_BIN")")
           echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
+          # Also expose Android SDK path so Gradle can find it
+          if [ -n "$ANDROID_SDK_ROOT" ]; then
+            echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
+          elif [ -n "$ANDROID_HOME" ]; then
+            echo "sdk.dir=$ANDROID_HOME" >> android/local.properties
+          fi
+          echo "✅ local.properties:"
+          cat android/local.properties
           flutter --version
 
       - name: Clean Gradle cache
@@ -91,34 +101,66 @@ workflows:
           set -e
           mkdir -p build/outputs
 
-          # ── APK ──────────────────────────────────────────────────────────────
-          flutter build apk --release --no-tree-shake-icons
+          # Helper: find an APK/AAB anywhere in the build tree after Gradle runs
+          find_apk() {
+            find build/app/outputs/flutter-apk -name "app-release.apk" 2>/dev/null | head -1
+            find build/app/outputs/apk         -name "app-release.apk" 2>/dev/null | head -1
+            find build/app/outputs             -name "*.apk" ! -path "*/debug/*" 2>/dev/null | head -1
+          }
+          find_aab() {
+            find build/app/outputs/bundle -name "app-release.aab" 2>/dev/null | head -1
+            find build/app/outputs        -name "*.aab"            2>/dev/null | head -1
+          }
 
-          APK=$(find build/app/outputs/flutter-apk -name "app-release.apk" 2>/dev/null | head -1)
-          [ -z "$APK" ] && APK=$(find build/app/outputs/apk -name "app-release.apk" 2>/dev/null | head -1)
-          [ -z "$APK" ] && APK=$(find . -name "app-release.apk" ! -path "*/.pub-cache/*" ! -path "*/debug/*" 2>/dev/null | head -1)
+          # ── APK ──────────────────────────────────────────────────────────────
+          set +e
+          flutter build apk --release --no-tree-shake-icons
+          APK_EXIT=$?
+          set -e
+
+          APK=$(find_apk | head -1)
 
           if [ -z "$APK" ]; then
-            echo "❌ APK not found — listing build/app/outputs/:"
-            find build/app/outputs 2>/dev/null || echo "(empty)"
+            echo "⚠️  flutter build apk (exit $APK_EXIT) did not place APK in expected dirs."
+            echo "    Listing build/app/outputs:"
+            find build/app/outputs 2>/dev/null || echo "    (empty)"
+            echo "    Retrying via Gradle directly..."
+            cd android
+            ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tail -40
+            cd ..
+            APK=$(find build/app/outputs -name "*.apk" ! -path "*/debug/*" 2>/dev/null | head -1)
+          fi
+
+          if [ -z "$APK" ]; then
+            echo "❌ APK not found after Gradle retry."
             exit 1
           fi
           cp "$APK" build/outputs/crux-release.apk
-          echo "✅ APK: $(du -sh build/outputs/crux-release.apk | cut -f1)"
+          echo "✅ APK: $(du -sh build/outputs/crux-release.apk | cut -f1) — from $APK"
 
           # ── AAB ──────────────────────────────────────────────────────────────
+          set +e
           flutter build appbundle --release --no-tree-shake-icons
+          AAB_EXIT=$?
+          set -e
 
-          AAB=$(find build/app/outputs/bundle -name "app-release.aab" 2>/dev/null | head -1)
-          [ -z "$AAB" ] && AAB=$(find . -name "app-release.aab" ! -path "*/.pub-cache/*" 2>/dev/null | head -1)
+          AAB=$(find_aab | head -1)
 
           if [ -z "$AAB" ]; then
-            echo "❌ AAB not found — listing build/app/outputs/:"
-            find build/app/outputs 2>/dev/null || echo "(empty)"
+            echo "⚠️  flutter build appbundle (exit $AAB_EXIT) did not place AAB in expected dirs."
+            echo "    Retrying via Gradle directly..."
+            cd android
+            ./gradlew bundleRelease --no-daemon 2>&1 | tail -20
+            cd ..
+            AAB=$(find build/app/outputs -name "*.aab" 2>/dev/null | head -1)
+          fi
+
+          if [ -z "$AAB" ]; then
+            echo "❌ AAB not found after Gradle retry."
             exit 1
           fi
           cp "$AAB" build/outputs/crux-release.aab
-          echo "✅ AAB: $(du -sh build/outputs/crux-release.aab | cut -f1)"
+          echo "✅ AAB: $(du -sh build/outputs/crux-release.aab | cut -f1) — from $AAB"
 
     artifacts:
       - build/outputs/crux-release.apk
