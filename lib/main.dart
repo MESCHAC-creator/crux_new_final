@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -100,6 +101,48 @@ class _DeviceBlockedApp extends StatelessWidget {
   }
 }
 
+// Delegates that accept all locales but fall back to French for unsupported ones.
+// This prevents grey-screen crashes on locales like Wolof (wo), Malagasy (mg), etc.
+// that are not in flutter_localizations but ARE in our custom AppTranslations.
+class _FallbackMaterialLocalizationsDelegate
+    extends LocalizationsDelegate<MaterialLocalizations> {
+  const _FallbackMaterialLocalizationsDelegate();
+  static const instance = _FallbackMaterialLocalizationsDelegate();
+
+  @override
+  bool isSupported(Locale locale) => true;
+
+  @override
+  Future<MaterialLocalizations> load(Locale locale) {
+    final supported = GlobalMaterialLocalizations.delegate.isSupported(locale);
+    return GlobalMaterialLocalizations.delegate
+        .load(supported ? locale : const Locale('fr'));
+  }
+
+  @override
+  bool shouldReload(_FallbackMaterialLocalizationsDelegate old) => false;
+}
+
+class _FallbackCupertinoLocalizationsDelegate
+    extends LocalizationsDelegate<CupertinoLocalizations> {
+  const _FallbackCupertinoLocalizationsDelegate();
+  static const instance = _FallbackCupertinoLocalizationsDelegate();
+
+  @override
+  bool isSupported(Locale locale) => true;
+
+  @override
+  Future<CupertinoLocalizations> load(Locale locale) {
+    final supported =
+        GlobalCupertinoLocalizations.delegate.isSupported(locale);
+    return GlobalCupertinoLocalizations.delegate
+        .load(supported ? locale : const Locale('fr'));
+  }
+
+  @override
+  bool shouldReload(_FallbackCupertinoLocalizationsDelegate old) => false;
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -133,10 +176,10 @@ class MyApp extends StatelessWidget {
               Locale('bn'), Locale('th'), Locale('mg'), Locale('wo'),
             ],
             locale: localeProvider.locale,
-            localizationsDelegates: const [
-              GlobalMaterialLocalizations.delegate,
+            localizationsDelegates: [
+              _FallbackMaterialLocalizationsDelegate.instance,
               GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
+              _FallbackCupertinoLocalizationsDelegate.instance,
             ],
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
