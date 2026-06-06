@@ -573,8 +573,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             if (autoMute && mounted) {
               _localStream?.getAudioTracks().forEach((t) => t.enabled = false);
               setState(() => _micOn = false);
+              final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Votre micro a été désactivé automatiquement à l\'entrée',
+                content: Text(AppTranslations.t('vc_muted_auto', lang),
                     style: GoogleFonts.poppins(color: Colors.white)),
                 backgroundColor: Colors.orange.shade700,
                 behavior: SnackBarBehavior.floating,
@@ -596,8 +597,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           _localStream?.getVideoTracks().forEach((t) => t.enabled = false);
           if (mounted) {
             setState(() => _camOn = false);
+            final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Votre caméra a été désactivée par l\'hôte',
+              content: Text(AppTranslations.t('vc_cam_disabled', lang),
                   style: GoogleFonts.poppins(color: Colors.white)),
               backgroundColor: Colors.orange.shade700,
               behavior: SnackBarBehavior.floating,
@@ -854,7 +856,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       content: Row(children: [
         const Icon(Icons.workspace_premium, color: Colors.white, size: 20),
         const SizedBox(width: 10),
-        Expanded(child: Text('🎉 Bienvenue dans CRUX PRO ! Réunions illimitées.',
+        Expanded(child: Text('🎉 ${AppTranslations.t('pro_welcome', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode)}',
             style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600))),
       ]),
       backgroundColor: const Color(0xFF6A1B9A),
@@ -1572,29 +1574,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           return;
         }
 
-        // If peer connection not yet established, show a helpful message
-        // (happens when participant count is still 0 / signaling not complete)
-        if (_pc == null) {
-          _log.w('Screen share: Peer connection not initialized yet');
-          if (mounted) {
-            final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(
-                AppTranslations.t('screen_share_wait', lang),
-                style: GoogleFonts.poppins(),
-              ),
-              backgroundColor: Colors.orange.shade700,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              duration: const Duration(seconds: 4),
-            ));
-          }
-          return;
-        }
-
+        // Allow screen share even without a peer connection yet — stream will be
+        // added to peer connection when/if one is established later.
         _log.i('Starting screen share - requesting display media');
         _screenStream = await navigator.mediaDevices.getDisplayMedia({
-          'video': {'mandatory': {}, 'optional': []},
+          'video': true,
           'audio': false,
         });
 
@@ -1631,28 +1615,31 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         }
 
         final screenTrack = tracks.first;
-        _log.i('Screen share: Replacing video track with screen track');
+        _log.i('Screen share: Got screen track, checking peer connection');
 
-        // Replace video track in all senders
-        final senders = await _pc!.getSenders();
-        _log.i('Screen share: Found ${senders.length} senders');
+        // If peer connection exists, replace the video track in senders
+        if (_pc != null) {
+          final senders = await _pc!.getSenders();
+          _log.i('Screen share: Found ${senders.length} senders');
 
-        bool trackReplaced = false;
-        for (final sender in senders) {
-          _log.i('Screen share: Sender track kind: ${sender.track?.kind}');
-          if (sender.track?.kind == 'video') {
-            try {
-              await sender.replaceTrack(screenTrack);
-              _log.i('Screen share: Track replaced successfully');
-              trackReplaced = true;
-            } catch (e, st) {
-              _log.e('Screen share: Error replacing track: $e', stackTrace: st);
+          bool trackReplaced = false;
+          for (final sender in senders) {
+            _log.i('Screen share: Sender track kind: ${sender.track?.kind}');
+            if (sender.track?.kind == 'video') {
+              try {
+                await sender.replaceTrack(screenTrack);
+                _log.i('Screen share: Track replaced successfully');
+                trackReplaced = true;
+              } catch (e, st) {
+                _log.e('Screen share: Error replacing track: $e', stackTrace: st);
+              }
             }
           }
-        }
-
-        if (!trackReplaced) {
-          _log.w('Screen share: No video track was replaced');
+          if (!trackReplaced) {
+            _log.w('Screen share: No video track was replaced (will add on peer connect)');
+          }
+        } else {
+          _log.i('Screen share: No peer connection yet — stream ready, will use on connection');
         }
 
         screenTrack.onEnded = () {
@@ -1672,15 +1659,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         await _screenStream?.dispose();
         _screenStream = null;
         if (mounted) {
-          final msg = e.toString().contains('Permission')
-              ? 'Permission refusée pour le partage d\'écran.'
+          final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+          final msg = e.toString().contains('Permission') || e.toString().contains('NotAllowedError')
+              ? AppTranslations.t('screen_share_permission_denied', lang)
               : e.toString().contains('cancel') || e.toString().contains('Cancel')
-                  ? 'Partage d\'écran annulé.'
-                  : e.toString().contains('NotAllowedError')
-                      ? 'Partage d\'écran non autorisé.'
-                      : e.toString().contains('NotSupportedError')
-                          ? 'Partage d\'écran non supporté sur cet appareil.'
-                          : 'Erreur: ${e.toString().substring(0, 100)}';
+                  ? AppTranslations.t('screen_share_cancelled', lang)
+                  : e.toString().contains('NotSupportedError')
+                      ? AppTranslations.t('screen_share_not_supported', lang)
+                      : '${AppTranslations.t('error', lang)}: ${e.toString().length > 80 ? e.toString().substring(0, 80) : e.toString()}';
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(msg, style: GoogleFonts.poppins()),
             backgroundColor: Colors.red.shade700,
@@ -2138,6 +2124,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   Future<void> _confirmLeave() async {
     if (_leaving) return;
     HapticFeedback.mediumImpact();
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     if (widget.isHost) {
       // Host gets two options: leave only, or end for everyone
       await showDialog(
@@ -2145,21 +2132,21 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         builder: (_) => AlertDialog(
           backgroundColor: const Color(0xFF1A1A2E),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Terminer la réunion ?',
+          title: Text(AppTranslations.t('end_meeting_q', lang),
               style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
-          content: Text('Voulez-vous quitter uniquement ou terminer la réunion pour tous les participants ?',
+          content: Text(AppTranslations.t('end_meeting_prompt', lang),
               style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13, height: 1.5)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white38)),
+              child: Text(AppTranslations.t('cancel', lang), style: GoogleFonts.poppins(color: Colors.white38)),
             ),
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
                 _leave();
               },
-              child: Text('Quitter seulement', style: GoogleFonts.poppins(color: Colors.white70)),
+              child: Text(AppTranslations.t('leave_only', lang), style: GoogleFonts.poppins(color: Colors.white70)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -2173,7 +2160,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                     widget.meetingId, MeetingStatus.ended).catchError((_) {});
                 _leave();
               },
-              child: Text('Terminer pour tous', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+              child: Text(AppTranslations.t('end_for_all', lang), style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
             ),
           ],
         ),
@@ -2185,14 +2172,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         builder: (ctx) => AlertDialog(
           backgroundColor: const Color(0xFF1A1A2E),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Quitter la réunion ?',
+          title: Text(AppTranslations.t('leave_meeting_q', lang),
               style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
-          content: Text('Êtes-vous sûr de vouloir quitter cette réunion ?',
+          content: Text(AppTranslations.t('leave_confirm', lang),
               style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white38)),
+              child: Text(AppTranslations.t('cancel', lang), style: GoogleFonts.poppins(color: Colors.white38)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -2200,7 +2187,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Quitter', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+              child: Text(AppTranslations.t('leave', lang), style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
             ),
           ],
         ),
@@ -3503,9 +3490,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         ],
         if (_meetingPasscode != null && _meetingPasscode!.isNotEmpty) ...[
           const SizedBox(width: 6),
-          const Tooltip(
-            message: 'Réunion protégée par un code',
-            child: Icon(Icons.lock_outline, color: Colors.lightBlue, size: 14),
+          Tooltip(
+            message: AppTranslations.t('passcode_protected', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
+            child: const Icon(Icons.lock_outline, color: Colors.lightBlue, size: 14),
           ),
         ],
         if (_remoteRecording || _isRecordingLocally) ...[
@@ -3821,7 +3808,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           child: Row(children: [
             const Icon(Icons.people, color: Colors.white70, size: 18),
             const SizedBox(width: 8),
-            Text('Participants (${_presenceList.length})',
+            Text('${AppTranslations.t('tb_participants', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode)} (${_presenceList.length})',
                 style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
             const Spacer(),
             // Feature N11: hand raise queue count badge
@@ -3881,7 +3868,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                child: Text('Salle d\'attente (${_waitingList.length})',
+                child: Text('${AppTranslations.t('waiting_room', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode)} (${_waitingList.length})',
                     style: GoogleFonts.poppins(color: Colors.orange, fontSize: 13, fontWeight: FontWeight.w700)),
               ),
               ..._waitingList.map((w) {
@@ -3931,7 +3918,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                child: Text('✋ File d\'attente (${_handRaiseOrder.length})',
+                child: Text('✋ ${AppTranslations.t('hand_queue', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode)} (${_handRaiseOrder.length})',
                     style: GoogleFonts.poppins(color: Colors.orange, fontSize: 13, fontWeight: FontWeight.w700)),
               ),
               ..._handRaiseOrder.asMap().entries.map((entry) {
@@ -5496,23 +5483,24 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   Future<void> _kickParticipant(String pId, String pName) async {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A2E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Retirer $pName ?',
+        title: Text('${AppTranslations.t('remove_participant', lang)} $pName ?',
             style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
-        content: Text('Ce participant sera retiré de la réunion.',
+        content: Text(AppTranslations.t('remove_participant_confirm', lang),
             style: GoogleFonts.poppins(color: Colors.white60, fontSize: 13)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Annuler', style: GoogleFonts.poppins(color: Colors.white38))),
+              child: Text(AppTranslations.t('cancel', lang), style: GoogleFonts.poppins(color: Colors.white38))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Retirer', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+            child: Text(AppTranslations.t('remove_participant', lang), style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -5542,8 +5530,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         }
         if (mounted) {
           setState(() => _micOn = false);
+          final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Votre micro a été coupé par l\'hôte',
+            content: Text(AppTranslations.t('vc_mic_cut', lang),
                 style: GoogleFonts.poppins(color: Colors.white)),
             backgroundColor: Colors.orange.shade700,
             behavior: SnackBarBehavior.floating,
@@ -7591,7 +7580,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             ),
             onPressed: _leave,
             icon: const Icon(Icons.call_end, color: Colors.white),
-            label: Text('Quitter',
+            label: Text(AppTranslations.t('leave', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
                 style: GoogleFonts.poppins(
                     color: Colors.white, fontWeight: FontWeight.w600)),
           ),
@@ -7950,7 +7939,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               child: const Icon(Icons.share, color: Colors.white, size: 20),
             ),
             const SizedBox(width: 12),
-            Text('Inviter des participants',
+            Text(AppTranslations.t('invite', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
                 style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
           ]),
           const SizedBox(height: 24),
@@ -7964,7 +7953,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
             ),
             child: Column(children: [
-              Text('ID de la réunion',
+              Text(AppTranslations.t('meeting_id', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
                   style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12)),
               const SizedBox(height: 8),
               Text(
@@ -8043,7 +8032,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               child: const Icon(Icons.info_outline, color: Colors.white, size: 20),
             ),
             const SizedBox(width: 12),
-            Text('Informations',
+            Text(AppTranslations.t('meeting_info_title', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
                 style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
           ]),
           const SizedBox(height: 20),
@@ -8094,7 +8083,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               child: Row(children: [
                 const Icon(Icons.lock, color: Colors.amber, size: 16),
                 const SizedBox(width: 8),
-                Text('Réunion protégée par un code',
+                Text(AppTranslations.t('passcode_protected', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
                     style: GoogleFonts.poppins(color: Colors.amber, fontSize: 12)),
               ]),
             ),
