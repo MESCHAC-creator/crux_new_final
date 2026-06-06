@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../theme/colors.dart';
 import '../models/user_model.dart';
-import 'home_screen.dart';
 
 class ConsentScreen extends StatefulWidget {
   final UserModel user;
@@ -26,10 +25,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('crux_terms_accepted', true);
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => HomeScreen(user: widget.user)),
-    );
+    Navigator.pushReplacementNamed(context, '/home', arguments: widget.user);
   }
 
   @override

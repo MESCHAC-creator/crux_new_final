@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/error_handler_service.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_translations.dart';
+import '../models/user_model.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -175,6 +177,16 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     );
   }
 
+  void _goHome() {
+    final fb = FirebaseAuth.instance.currentUser;
+    final user = fb == null ? null : UserModel(
+      uid: fb.uid,
+      email: fb.email ?? '',
+      name: fb.displayName ?? fb.email?.split('@')[0] ?? 'Utilisateur',
+    );
+    Navigator.of(context).pushReplacementNamed('/home', arguments: user);
+  }
+
   @override
   void dispose() {
     _bgController.dispose();
@@ -217,7 +229,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     try {
       final user = await _authService.signInWithGoogle();
       if (user != null && mounted) {
-        Navigator.of(context).pushReplacementNamed('/home');
+        _goHome();
       }
     } catch (e) {
       if (mounted) {
@@ -243,7 +255,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         password: _passwordController.text,
       );
       await _saveRememberedEmail(email);
-      if (mounted) Navigator.of(context).pushReplacementNamed('/home');
+      if (mounted) _goHome();
     } catch (e) {
       if (!mounted) return;
       final msg = e.toString().replaceFirst('Exception: ', '');
