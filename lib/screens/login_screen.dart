@@ -657,7 +657,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                           const Expanded(child: Divider(color: Colors.white24, thickness: 1)),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text('ou', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
+                            child: Text(AppTranslations.t('or_divider', lang), style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
                           ),
                           const Expanded(child: Divider(color: Colors.white24, thickness: 1)),
                         ]),

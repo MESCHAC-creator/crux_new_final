@@ -381,11 +381,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         builder: (ctx) => AlertDialog(
           backgroundColor: isDark ? const Color(0xFF1A1A2E) : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Confirmer votre identité',
+          title: Text(AppTranslations.t('confirm_identity', lang),
               style: GoogleFonts.poppins(fontWeight: FontWeight.w700,
                   color: isDark ? Colors.white : Colors.black87)),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('Entrez votre mot de passe pour confirmer la suppression',
+            Text(AppTranslations.t('confirm_delete_msg', lang),
                 style: GoogleFonts.poppins(fontSize: 13, color: isDark ? Colors.white60 : Colors.black54)),
             const SizedBox(height: 12),
             TextField(
@@ -412,7 +412,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               onPressed: () => Navigator.pop(ctx, ctrl.text),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-              child: Text('Confirmer', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+              child: Text(AppTranslations.t('confirm_btn', lang), style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
             ),
           ],
         ),

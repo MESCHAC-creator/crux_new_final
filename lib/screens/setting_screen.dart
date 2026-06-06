@@ -478,7 +478,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Column(children: [
-                                        Text('Début', style: GoogleFonts.poppins(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38)),
+                                        Text(AppTranslations.t('start_label', localeProvider.locale.languageCode), style: GoogleFonts.poppins(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38)),
                                         const SizedBox(height: 2),
                                         Text(_formatTime(_dndStart), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: const Color(0xFF8B5CF6))),
                                       ]),
@@ -499,7 +499,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Column(children: [
-                                        Text('Fin', style: GoogleFonts.poppins(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38)),
+                                        Text(AppTranslations.t('end_label', localeProvider.locale.languageCode), style: GoogleFonts.poppins(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38)),
                                         const SizedBox(height: 2),
                                         Text(_formatTime(_dndEnd), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: const Color(0xFF8B5CF6))),
                                       ]),
@@ -566,7 +566,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                                child: Text('Activer', style: GoogleFonts.poppins(color: const Color(0xFFFFA500), fontWeight: FontWeight.w800, fontSize: 13)),
+                                child: Text(AppTranslations.t('activate', localeProvider.locale.languageCode), style: GoogleFonts.poppins(color: const Color(0xFFFFA500), fontWeight: FontWeight.w800, fontSize: 13)),
                               )
                             else
                               const Icon(Icons.check_circle, color: Colors.white, size: 24),
@@ -645,8 +645,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) {
+      builder: (ctx2) {
         final isDark = context.read<ThemeProvider>().isDark;
+        final lang2 = context.read<LocaleProvider>().locale.languageCode;
         return ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           child: BackdropFilter(
@@ -660,7 +661,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 children: [
                   Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2)))),
                   const SizedBox(height: 20),
-                  Text('Qualité vidéo', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                  Text(AppTranslations.t('video_quality', lang2), style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
                   const SizedBox(height: 16),
                   ...qualities.map((q) => GestureDetector(
                     onTap: () async {

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../services/device_verification_service.dart';
 import '../theme/colors.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/app_translations.dart';
 
 class DeviceVerificationScreen extends StatefulWidget {
   final VoidCallback onVerified;
@@ -98,7 +101,7 @@ class _DeviceVerificationScreenState extends State<DeviceVerificationScreen> {
               _verificationFuture = DeviceVerificationService.instance.verifyDeviceSecurity();
             }),
             icon: const Icon(Icons.refresh),
-            label: Text('Réessayer', style: GoogleFonts.poppins()),
+            label: Builder(builder: (ctx2) { final l = Provider.of<LocaleProvider>(ctx2, listen: false).locale.languageCode; return Text(AppTranslations.t('retry', l), style: GoogleFonts.poppins()); }),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
           ),
         ],
