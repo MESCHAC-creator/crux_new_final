@@ -3482,11 +3482,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             ),
           ),
         ],
-        // Free-time countdown pill — visible to all free users
-        if (!_isPro && _callSeconds > 0) ...[
-          const SizedBox(width: 6),
-          _buildFreeTimePill(),
-        ],
         if (_sharingScreen) ...[
           const SizedBox(width: 8),
           Container(
@@ -6920,6 +6915,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── CONTROLS BAR ─────────────────────────────
   Widget _buildControls() {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     final isPrivileged = widget.isHost || _isCoHost;
     return Container(
       padding: const EdgeInsets.fromLTRB(4, 10, 4, 16),
@@ -6934,11 +6930,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Semantics(
-              label: 'Activer/désactiver le micro',
+              label: AppTranslations.t('tb_mic_toggle', lang),
               button: true,
               child: _Btn(
                 icon: _micOn ? Icons.mic : Icons.mic_off,
-                label: _micOn ? 'Micro' : 'Muet',
+                label: _micOn ? AppTranslations.t('tb_mic', lang) : AppTranslations.t('tb_muted', lang),
                 active: _micOn,
                 onTap: () {
                   HapticFeedback.selectionClick();
@@ -6951,11 +6947,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             ),
             const SizedBox(width: 8),
             Semantics(
-              label: 'Activer/désactiver la caméra',
+              label: AppTranslations.t('tb_cam_toggle', lang),
               button: true,
               child: _Btn(
                 icon: _camOn ? Icons.videocam : Icons.videocam_off,
-                label: _camOn ? 'Caméra' : 'Arrêt',
+                label: _camOn ? AppTranslations.t('tb_cam', lang) : AppTranslations.t('tb_cam_off', lang),
                 active: _camOn,
                 onTap: () {
                   HapticFeedback.selectionClick();
@@ -6974,7 +6970,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             const SizedBox(width: 8),
             _Btn(
               icon: Icons.flip_camera_ios,
-              label: 'Flip',
+              label: AppTranslations.t('tb_flip', lang),
               active: true,
               onTap: () async {
                 HapticFeedback.selectionClick();
@@ -6986,7 +6982,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             const SizedBox(width: 8),
             _Btn(
               icon: Icons.auto_fix_high,
-              label: 'Filtres',
+              label: AppTranslations.t('tb_filters', lang),
               active: _cameraFilter == _CameraFilter.natural,
               isHighlight: _cameraFilter != _CameraFilter.natural,
               onTap: _showFiltersPanel,
@@ -6996,11 +6992,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             if (!_allowParticipantScreenShare && !isPrivileged)
               _Btn(
                 icon: Icons.screen_share,
-                label: 'Écran',
+                label: AppTranslations.t('tb_screen', lang),
                 active: false,
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('L\'hôte a désactivé le partage d\'écran', style: GoogleFonts.poppins()),
+                    content: Text(AppTranslations.t('screen_share_disabled', lang), style: GoogleFonts.poppins()),
                     backgroundColor: Colors.orange.shade700,
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -7013,7 +7009,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 icon: _sharingScreen
                     ? Icons.stop_screen_share
                     : Icons.screen_share,
-                label: _sharingScreen ? 'Stopper' : 'Écran',
+                label: _sharingScreen ? AppTranslations.t('tb_stop', lang) : AppTranslations.t('tb_screen', lang),
                 active: !_sharingScreen,
                 isHighlight: _sharingScreen,
                 onTap: _toggleScreenShare,
@@ -7024,7 +7020,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               children: [
                 _Btn(
                   icon: Icons.chat_bubble_outline,
-                  label: 'Chat',
+                  label: AppTranslations.t('tb_chat', lang),
                   active: !_showChat,
                   isHighlight: _showChat,
                   onTap: () => setState(() {
@@ -7057,7 +7053,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               children: [
                 _Btn(
                   icon: Icons.people_outline,
-                  label: 'Participants',
+                  label: AppTranslations.t('tb_participants', lang),
                   active: !_showParticipants,
                   isHighlight: _showParticipants,
                   onTap: () => setState(() {
@@ -7080,7 +7076,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             const SizedBox(width: 8),
             _Btn(
               icon: _handRaised ? Icons.front_hand : Icons.front_hand_outlined,
-              label: _handRaised ? 'Main levée' : 'Lever main',
+              label: _handRaised ? AppTranslations.t('tb_hand_lower', lang) : AppTranslations.t('tb_hand_raise', lang),
               active: !_handRaised,
               isHighlight: _handRaised,
               onTap: _toggleRaiseHand,
@@ -7088,7 +7084,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             const SizedBox(width: 8),
             _Btn(
               icon: Icons.emoji_emotions_outlined,
-              label: 'Emoji',
+              label: AppTranslations.t('tb_emoji', lang),
               active: !_showEmojiBar,
               isHighlight: _showEmojiBar,
               onTap: () => setState(() {
@@ -7099,21 +7095,21 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             const SizedBox(width: 8),
             _Btn(
               icon: Icons.info_outline,
-              label: 'Info',
+              label: AppTranslations.t('tb_info', lang),
               active: true,
               onTap: _showMeetingInfoPanel,
             ),
             const SizedBox(width: 8),
             _Btn(
               icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
-              label: _speakerOn ? 'HP' : 'Écouteur',
+              label: _speakerOn ? AppTranslations.t('tb_speaker', lang) : AppTranslations.t('tb_earpiece', lang),
               active: _speakerOn,
               onTap: _toggleSpeaker,
             ),
             const SizedBox(width: 8),
             _Btn(
               icon: Icons.tune,
-              label: 'Options',
+              label: AppTranslations.t('tb_options', lang),
               active: true,
               onTap: _showMoreOptionsSheet,
             ),
@@ -7121,7 +7117,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               const SizedBox(width: 8),
               _Btn(
                 icon: _isLocked ? Icons.lock : Icons.lock_open,
-                label: _isLocked ? 'Déverrouiller' : 'Verrouiller',
+                label: _isLocked ? AppTranslations.t('tb_unlock', lang) : AppTranslations.t('tb_lock', lang),
                 active: !_isLocked,
                 isHighlight: _isLocked,
                 onTap: _toggleLock,
@@ -7129,7 +7125,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               const SizedBox(width: 8),
               _Btn(
                 icon: Icons.mic_off,
-                label: 'Couper tous',
+                label: AppTranslations.t('tb_mute_all', lang),
                 active: true,
                 onTap: () {
                   HapticFeedback.mediumImpact();
@@ -7143,7 +7139,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   if (mounted) {
                     ScaffoldMessenger.of(context).hideCurrentSnackBar();
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text('🔇 Tous les micros ont été coupés',
+                      content: Text('🔇 ${AppTranslations.t('tb_all_muted', lang)}',
                           style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
                       backgroundColor: Colors.orange.shade800,
                       duration: const Duration(seconds: 2),
@@ -7159,7 +7155,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               const SizedBox(width: 8),
               _Btn(
                 icon: Icons.volunteer_activism,
-                label: 'Offrande',
+                label: AppTranslations.t('tb_offering', lang),
                 active: true,
                 isHighlight: true,
                 onTap: () {
@@ -7171,7 +7167,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             const SizedBox(width: 8),
             _Btn(
               icon: Icons.subtitles_outlined,
-              label: 'Sous-titres',
+              label: AppTranslations.t('tb_subtitles', lang),
               active: !_showTranscript,
               isHighlight: _showTranscript,
               onTap: () {
@@ -7196,7 +7192,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             const SizedBox(width: 8),
             _Btn(
               icon: Icons.draw_outlined,
-              label: 'Tableau',
+              label: AppTranslations.t('tb_whiteboard', lang),
               active: !_showWhiteboard,
               isHighlight: _showWhiteboard,
               onTap: () => setState(() {
@@ -7213,7 +7209,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             const SizedBox(width: 8),
             _Btn(
               icon: Icons.poll_outlined,
-              label: 'Sondage',
+              label: AppTranslations.t('tb_polls', lang),
               active: !_showPolls,
               isHighlight: _showPolls,
               onTap: () => setState(() {
@@ -7229,7 +7225,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             const SizedBox(width: 8),
             _Btn(
               icon: _isRecordingLocally ? Icons.stop_circle_outlined : Icons.fiber_manual_record,
-              label: _isRecordingLocally ? 'Stop REC' : 'Enreg.',
+              label: _isRecordingLocally ? AppTranslations.t('tb_rec_stop', lang) : AppTranslations.t('tb_rec', lang),
               active: !_isRecordingLocally,
               isHighlight: _isRecordingLocally,
               onTap: _toggleLocalRecordingWithSync,
@@ -7237,7 +7233,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             const SizedBox(width: 8),
             _Btn(
               icon: _noiseCancellation ? Icons.noise_aware : Icons.noise_control_off,
-              label: 'Bruit',
+              label: AppTranslations.t('tb_noise', lang),
               active: _noiseCancellation,
               isHighlight: !_noiseCancellation,
               onTap: _toggleNoiseCancellation,
@@ -7246,7 +7242,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             if (_transcriptLines.isNotEmpty)
               _Btn(
                 icon: Icons.auto_awesome,
-                label: 'Résumé',
+                label: AppTranslations.t('tb_summary', lang),
                 active: true,
                 onTap: _generateMeetingSummary,
               ),
@@ -7254,7 +7250,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             // Feature N1: Q&A button
             _Btn(
               icon: Icons.quiz_outlined,
-              label: 'Q&R',
+              label: AppTranslations.t('tb_qa', lang),
               active: !_showQA,
               isHighlight: _showQA,
               onTap: () => setState(() {
@@ -7266,7 +7262,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             // Feature N6: Agenda button
             _Btn(
               icon: Icons.notes,
-              label: 'Agenda',
+              label: AppTranslations.t('tb_agenda', lang),
               active: !_showAgendaPanel,
               isHighlight: _showAgendaPanel,
               onTap: () => setState(() {
@@ -7278,7 +7274,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             // Feature N15: Activities panel
             _Btn(
               icon: Icons.grid_view,
-              label: 'Activités',
+              label: AppTranslations.t('tb_activities', lang),
               active: !_showActivities,
               isHighlight: _showActivities,
               onTap: () => setState(() {
@@ -7291,7 +7287,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               const SizedBox(width: 8),
               _Btn(
                 icon: Icons.checklist,
-                label: 'Présences',
+                label: AppTranslations.t('tb_attendance', lang),
                 active: true,
                 onTap: _listenAttendance,
               ),
@@ -7301,7 +7297,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               const SizedBox(width: 8),
               _Btn(
                 icon: Icons.shield_outlined,
-                label: 'Contrôles',
+                label: AppTranslations.t('tb_controls', lang),
                 active: true,
                 onTap: _showHostControlsSheet,
               ),
