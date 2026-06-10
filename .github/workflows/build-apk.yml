@@ -2,7 +2,9 @@ name: Build APK
 
 on:
   push:
-    branches: [ main, claude/kind-babbage-vqDxq ]
+    branches: [ main, schac-claude, claude/kind-babbage-vqDxq ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -28,9 +30,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: |
-          rm -f pubspec.lock
-          flutter pub get
+        run: flutter pub get
 
       - name: Patch flutter_webrtc (remove V1 embedding)
         run: |
@@ -66,17 +66,18 @@ jobs:
           PYEOF
 
       - name: Build release APK
-        run: flutter build apk --release --no-tree-shake-icons
+        run: flutter build apk --release --no-tree-shake-icons --verbose
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: crux-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
 
       - name: Create GitHub Release (on push to main)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && success()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
