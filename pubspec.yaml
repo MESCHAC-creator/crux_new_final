@@ -23,6 +23,9 @@ dependencies:
   # Network & Connectivity
   connectivity_plus: ^6.0.3
 
+  # Deep links (join meeting by link without account)
+  app_links: ^6.3.3
+
   # Permissions & Localization
   permission_handler: ^11.3.0
   intl: any

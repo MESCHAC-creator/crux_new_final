@@ -532,6 +532,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 isHost: d['organizerId'] == uid,
                               )));
                 },
+                onShare: () {
+                  final id = d['id'] as String? ?? doc.id;
+                  _shareMeetingLink(id, d['title'] as String? ?? 'Réunion');
+                },
               );
             }).toList(),
           );
@@ -670,6 +674,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               userEmail: widget.user.email,
                               isHost: d['organizerId'] == uid,
                             )));
+              },
+              onShare: () {
+                final id = d['id'] as String? ?? docs[i].id;
+                _shareMeetingLink(id, d['title'] as String? ?? 'Réunion');
               },
             );
           },
@@ -952,6 +960,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final lang = context.read<LocaleProvider>().locale.languageCode;
     Share.share(AppTranslations.t('share_app_msg', lang));
   }
+
+  void _shareMeetingLink(String meetingId, String title) {
+    final link = 'crux://join/$meetingId';
+    Share.share(
+      'Rejoins ma réunion "$title" sur CRUX !\n\nCode: $meetingId\nLien direct: $link\n\n(Aucun compte requis)',
+      subject: 'Invitation à rejoindre "$title"',
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -959,8 +975,9 @@ class _HomeScreenState extends State<HomeScreen> {
 class _MeetingCard extends StatelessWidget {
   final Map<String, dynamic> data;
   final VoidCallback onJoin;
+  final VoidCallback? onShare;
 
-  const _MeetingCard({required this.data, required this.onJoin});
+  const _MeetingCard({required this.data, required this.onJoin, this.onShare});
 
   @override
   Widget build(BuildContext context) {
@@ -1041,6 +1058,16 @@ class _MeetingCard extends StatelessWidget {
                     letterSpacing: 1)),
         ])),
         const SizedBox(width: 8),
+        // Share button
+        if (onShare != null)
+          IconButton(
+            onPressed: onShare,
+            icon: const Icon(Icons.share, color: Colors.white38, size: 18),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            tooltip: 'Partager le lien',
+          ),
+        const SizedBox(width: 4),
         GestureDetector(
           onTap: onJoin,
           child: Container(

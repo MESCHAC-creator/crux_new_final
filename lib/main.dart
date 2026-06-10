@@ -7,12 +7,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:app_links/app_links.dart';
 import 'services/notification_service.dart';
 import 'services/device_verification_service.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/consent_screen.dart';
+import 'screens/guest_join_screen.dart';
 import 'models/user_model.dart';
 import 'providers/auth_provider.dart' show CruxAuthProvider;
 import 'providers/meeting_provider.dart';
@@ -227,15 +229,49 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   bool? _termsAccepted;
-  // Cache the stream to prevent StreamBuilder from re-subscribing on every
-  // rebuild (locale/theme change) which would flash the loading screen.
   late final Stream<User?> _authStream;
+  String? _pendingMeetingId; // set when app is opened via a deep link
 
   @override
   void initState() {
     super.initState();
     _authStream = FirebaseAuth.instance.authStateChanges();
     _loadTerms();
+    _initDeepLinks();
+  }
+
+  Future<void> _initDeepLinks() async {
+    final appLinks = AppLinks();
+
+    // App already open — stream of incoming links
+    appLinks.uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    });
+
+    // App started cold via a link
+    final initialUri = await appLinks.getInitialLink();
+    if (initialUri != null) {
+      _handleDeepLink(initialUri);
+    }
+  }
+
+  void _handleDeepLink(Uri uri) {
+    // crux://join/MEETING_ID
+    if (uri.scheme == 'crux' && uri.host == 'join') {
+      final meetingId = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+      if (meetingId != null && meetingId.isNotEmpty) {
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => GuestJoinScreen(meetingId: meetingId),
+            ),
+          );
+        } else {
+          setState(() => _pendingMeetingId = meetingId);
+        }
+      }
+    }
   }
 
   Future<void> _loadTerms() async {
@@ -270,6 +306,22 @@ class _AuthWrapperState extends State<AuthWrapper> {
               child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
             ),
           );
+        }
+
+        // Deep link pending — open guest join immediately regardless of auth state
+        if (_pendingMeetingId != null) {
+          final mid = _pendingMeetingId!;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() => _pendingMeetingId = null);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => GuestJoinScreen(meetingId: mid),
+                ),
+              );
+            }
+          });
         }
 
         final user = snapshot.data;
