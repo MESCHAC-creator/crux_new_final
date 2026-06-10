@@ -1,7 +1,7 @@
 {
   "android/app/build.gradle.kts": {
-    "mtime": 1780758403.8423052,
-    "ast_hash": "1fb2683a692d041ccc90cd4701e18a2e",
+    "mtime": 1781133329.4704723,
+    "ast_hash": "3ebf8ef9fb70e85cc8d1a28c6ee318cd",
     "semantic_hash": ""
   },
   "android/app/google-services.json": {
@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   "android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java": {
-    "mtime": 1780702340.198239,
-    "ast_hash": "8d69b63d63fc3070e808c9eaad02a1d3",
+    "mtime": 1781131248.367239,
+    "ast_hash": "c62e1eb88fe9c3df28d37c63805e9dd8",
     "semantic_hash": ""
   },
   "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt": {
@@ -90,8 +90,8 @@
     "semantic_hash": ""
   },
   "lib/main.dart": {
-    "mtime": 1780768337.879411,
-    "ast_hash": "ce38fa99525078647ad6b0c1c006c15d",
+    "mtime": 1781131321.4712372,
+    "ast_hash": "dcc32e7f96c467fcb5e10a68768c5a9c",
     "semantic_hash": ""
   },
   "lib/models/meeting_model.dart": {
@@ -150,8 +150,8 @@
     "semantic_hash": ""
   },
   "lib/screens/home_screen.dart": {
-    "mtime": 1781127572.5874624,
-    "ast_hash": "87fb4fddd1a3236a7d8de1e8ef5f4f8f",
+    "mtime": 1781131375.4072359,
+    "ast_hash": "1caf93fa214068ff057dbc1131915c47",
     "semantic_hash": ""
   },
   "lib/screens/login_screen.dart": {
@@ -200,8 +200,8 @@
     "semantic_hash": ""
   },
   "lib/screens/video_call_screen.dart": {
-    "mtime": 1781127818.7314568,
-    "ast_hash": "e0b9f84fb4f1ef561ff74fd29c84bb00",
+    "mtime": 1781131578.6712313,
+    "ast_hash": "049b70e669998ca775aa946ba7f4c496",
     "semantic_hash": ""
   },
   "lib/services/auth_service.dart": {
@@ -340,8 +340,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/build-apk.yml": {
-    "mtime": 1780758412.6623049,
-    "ast_hash": "55a5af1be62b7314db8ac468fc9b33fa",
+    "mtime": 1781133346.102472,
+    "ast_hash": "63141e3e61b453d34fea8428bcb8559e",
     "semantic_hash": ""
   },
   "README.md": {
@@ -370,8 +370,8 @@
     "semantic_hash": ""
   },
   "pubspec.yaml": {
-    "mtime": 1780752318.8648744,
-    "ast_hash": "93ff095164e66020d2a8a61597fa02b1",
+    "mtime": 1781131217.0832396,
+    "ast_hash": "422c413d18ea0d9b3b04766665333544",
     "semantic_hash": ""
   },
   "android/app/src/main/res/mipmap-hdpi/ic_launcher.png": {
@@ -442,6 +442,11 @@
   "assets/images/placeholder.png": {
     "mtime": 1780310295.8414502,
     "ast_hash": "80eb697c85eff1201fcaebef63e6a9a9",
+    "semantic_hash": ""
+  },
+  "lib/screens/guest_join_screen.dart": {
+    "mtime": 1781131435.5472345,
+    "ast_hash": "6e3e5f5b4908278ed79e3b79d9037044",
     "semantic_hash": ""
   }
 }
