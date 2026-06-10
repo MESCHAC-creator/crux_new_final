@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showPasscode = false;
   bool _obscurePasscode = true;
   String? _localPhotoPath;
+  int _currentTab = 0;
 
   @override
   void initState() {
@@ -299,7 +300,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Zoom-style build ──────────────────────────────────────────────────────
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Bonjour';
+    if (h < 18) return 'Bon après-midi';
+    return 'Bonsoir';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -307,16 +315,28 @@ class _HomeScreenState extends State<HomeScreen> {
     final displayName = _displayName();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F1A),
+      backgroundColor: const Color(0xFF0A0A14),
       appBar: _buildTopBar(displayName, lang),
-      body: _buildBody(lang),
+      body: IndexedStack(
+        index: _currentTab,
+        children: [
+          _buildHomeTab(lang),
+          _buildChatTab(),
+          _buildMeetingsTab(lang),
+          const SizedBox.shrink(), // Profil → push
+          const SizedBox.shrink(), // Plus → sheet
+        ],
+      ),
       bottomNavigationBar: _buildBottomNav(lang),
     );
   }
 
+  // ── Top bar ────────────────────────────────────────────────────────────────
+
   AppBar _buildTopBar(String displayName, String lang) {
+    final titles = ['CRUX', 'Chat', 'Réunions', 'CRUX', 'CRUX'];
     return AppBar(
-      backgroundColor: const Color(0xFF0F0F1A),
+      backgroundColor: const Color(0xFF0A0A14),
       elevation: 0,
       titleSpacing: 0,
       leading: GestureDetector(
@@ -333,134 +353,48 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? Text(
                     displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14))
+                        color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))
                 : null,
           ),
         ),
       ),
-      title: Text('CRUX',
+      title: Text(titles[_currentTab],
           style: GoogleFonts.poppins(
               color: Colors.white,
               fontWeight: FontWeight.w900,
-              fontSize: 24,
-              letterSpacing: 2)),
+              fontSize: 22,
+              letterSpacing: _currentTab == 0 ? 2 : 0)),
       actions: [
         IconButton(
-            icon: const Icon(Icons.search, color: Colors.white70, size: 22),
+            icon: const Icon(Icons.search, color: Colors.white54, size: 22),
             onPressed: () => _showJoinDialog(lang)),
         IconButton(
-            icon: const Icon(Icons.more_horiz, color: Colors.white70, size: 22),
+            icon: const Icon(Icons.more_horiz, color: Colors.white54, size: 22),
             onPressed: () => _showMainMenu(lang)),
-        IconButton(
-            icon: const Icon(Icons.auto_awesome, color: Colors.white70, size: 22),
-            onPressed: () {}),
       ],
     );
   }
 
-  Widget _buildBody(String lang) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _buildQuickActions(lang),
-        const SizedBox(height: 28),
-        _buildTodaySection(lang),
-      ]),
-    );
-  }
-
-  Widget _buildQuickActions(String lang) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _QuickAction(
-          icon: Icons.video_call,
-          label: 'Nouvelle\nréunion',
-          color: const Color(0xFFE53935),
-          onTap: () => _showNewMeetingSheet(lang),
-        ),
-        _QuickAction(
-          icon: Icons.add,
-          label: 'Rejoindre',
-          color: const Color(0xFF1976D2),
-          onTap: () => _showJoinDialog(lang),
-        ),
-        _QuickAction(
-          icon: Icons.calendar_today,
-          label: 'Programmer',
-          color: const Color(0xFF1976D2),
-          onTap: () => _showScheduleDialog(lang),
-        ),
-        _QuickAction(
-          icon: Icons.share,
-          label: 'Partager',
-          color: const Color(0xFF1976D2),
-          onTap: _shareApp,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTodaySection(String lang) {
-    final now = DateTime.now();
-    final weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-    final months = [
-      'jan', 'fév', 'mar', 'avr', 'mai', 'juin',
-      'juil', 'août', 'sep', 'oct', 'nov', 'déc'
-    ];
-    final dayName = weekdays[now.weekday - 1];
-    final monthName = months[now.month - 1];
-
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Text(
-          "Aujourd'hui • $dayName. ${now.day} $monthName",
-          style: GoogleFonts.poppins(
-              color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
-        ),
-        const Spacer(),
-        IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white54, size: 18),
-            onPressed: () => setState(() {})),
-        IconButton(
-            icon: const Icon(Icons.calendar_month_outlined, color: Colors.white54, size: 18),
-            onPressed: () {}),
-      ]),
-      const SizedBox(height: 12),
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(children: [
-          const Icon(Icons.calendar_today_outlined, color: Colors.white24, size: 40),
-          const SizedBox(height: 12),
-          Text("Aucune réunion aujourd'hui",
-              style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
-          const SizedBox(height: 4),
-          Text("Créez ou rejoignez une réunion",
-              style: GoogleFonts.poppins(color: Colors.white24, fontSize: 11)),
-        ]),
-      ),
-    ]);
-  }
+  // ── Bottom nav ─────────────────────────────────────────────────────────────
 
   Widget _buildBottomNav(String lang) {
     return BottomNavigationBar(
-      backgroundColor: const Color(0xFF161622),
-      selectedItemColor: AppColors.primary,
-      unselectedItemColor: Colors.white38,
-      selectedLabelStyle: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600),
+      backgroundColor: const Color(0xFF12121E),
+      selectedItemColor: const Color(0xFFE53935),
+      unselectedItemColor: Colors.white30,
+      selectedLabelStyle:
+          GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600),
       unselectedLabelStyle: GoogleFonts.poppins(fontSize: 10),
       type: BottomNavigationBarType.fixed,
-      currentIndex: 0,
+      currentIndex: _currentTab.clamp(0, 2), // max 3 real tabs
       onTap: (i) {
-        if (i == 3) Navigator.pushNamed(context, '/profile').then((_) => _loadLocalPhoto());
-        if (i == 4) _showMainMenu(lang);
+        if (i == 3) {
+          Navigator.pushNamed(context, '/profile').then((_) => _loadLocalPhoto());
+        } else if (i == 4) {
+          _showMainMenu(lang);
+        } else {
+          setState(() => _currentTab = i);
+        }
       },
       items: const [
         BottomNavigationBarItem(
@@ -479,8 +413,267 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.person_outline),
             activeIcon: Icon(Icons.person),
             label: 'Profil'),
-        BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'Plus'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.more_horiz), label: 'Plus'),
       ],
+    );
+  }
+
+  // ── Onglet 0 : Accueil ─────────────────────────────────────────────────────
+
+  Widget _buildHomeTab(String lang) {
+    final displayName = _displayName();
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Salutation ──
+        _buildGreetingHeader(displayName),
+        const SizedBox(height: 24),
+        // ── Actions rapides ──
+        _buildQuickActions(lang),
+        const SizedBox(height: 28),
+        // ── Réunions récentes ──
+        _buildRecentMeetings(lang),
+      ]),
+    );
+  }
+
+  Widget _buildGreetingHeader(String displayName) {
+    final firstName = displayName.split(' ').first;
+    return Row(children: [
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${_greeting()}, $firstName 👋',
+              style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 2),
+          Text('Prêt pour votre prochaine réunion ?',
+              style: GoogleFonts.poppins(color: Colors.white38, fontSize: 12)),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _buildQuickActions(String lang) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _QuickAction(
+          icon: Icons.video_call,
+          label: 'Nouvelle\nréunion',
+          color: const Color(0xFFC62828),
+          onTap: () => _showNewMeetingSheet(lang),
+        ),
+        _QuickAction(
+          icon: Icons.add_circle_outline,
+          label: 'Rejoindre',
+          color: const Color(0xFF1565C0),
+          onTap: () => _showJoinDialog(lang),
+        ),
+        _QuickAction(
+          icon: Icons.calendar_today_outlined,
+          label: 'Programmer',
+          color: const Color(0xFF4527A0),
+          onTap: () => _showScheduleDialog(lang),
+        ),
+        _QuickAction(
+          icon: Icons.ios_share_outlined,
+          label: 'Partager',
+          color: const Color(0xFF00695C),
+          onTap: _shareApp,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentMeetings(String lang) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _buildSectionHeader(lang),
+      const SizedBox(height: 12),
+      StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('meetings')
+            .where('organizerId', isEqualTo: uid)
+            .orderBy('createdAt', descending: true)
+            .limit(5)
+            .snapshots(),
+        builder: (ctx, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(
+                child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Color(0xFFE53935))));
+          }
+          final docs = snap.data?.docs ?? [];
+          if (docs.isEmpty) return _buildEmptyState();
+          return Column(
+            children: docs.map((doc) {
+              final d = doc.data() as Map<String, dynamic>;
+              return _MeetingCard(
+                data: d,
+                onJoin: () {
+                  final id = d['id'] as String? ?? doc.id;
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => MeetingScreen(
+                                meetingId: id,
+                                meetingName: d['title'] as String? ?? 'Réunion',
+                                userId: uid,
+                                userName: _displayName(),
+                                userEmail: widget.user.email,
+                                isHost: d['organizerId'] == uid,
+                              )));
+                },
+              );
+            }).toList(),
+          );
+        },
+      ),
+    ]);
+  }
+
+  Widget _buildSectionHeader(String lang) {
+    final now = DateTime.now();
+    final weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+    final months = [
+      'jan', 'fév', 'mar', 'avr', 'mai', 'juin',
+      'juil', 'août', 'sep', 'oct', 'nov', 'déc'
+    ];
+    return Row(children: [
+      Text(
+        "Aujourd'hui • ${weekdays[now.weekday - 1]}. ${now.day} ${months[now.month - 1]}",
+        style: GoogleFonts.poppins(
+            color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+      ),
+      const Spacer(),
+      GestureDetector(
+        onTap: () => setState(() {}),
+        child: const Icon(Icons.refresh, color: Colors.white30, size: 18),
+      ),
+    ]);
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      decoration: BoxDecoration(
+        color: const Color(0xFF12121E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Column(children: [
+        const Icon(Icons.calendar_today_outlined, color: Colors.white12, size: 40),
+        const SizedBox(height: 12),
+        Text("Aucune réunion récente",
+            style: GoogleFonts.poppins(color: Colors.white30, fontSize: 13)),
+        const SizedBox(height: 4),
+        Text("Créez ou rejoignez une réunion",
+            style: GoogleFonts.poppins(color: Colors.white12, fontSize: 11)),
+        const SizedBox(height: 16),
+        GestureDetector(
+          onTap: () {
+            final lang = context.read<LocaleProvider>().locale.languageCode;
+            _showNewMeetingSheet(lang);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFC62828),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text('Nouvelle réunion',
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  // ── Onglet 1 : Chat (placeholder) ─────────────────────────────────────────
+
+  Widget _buildChatTab() {
+    return Center(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.chat_bubble_outline, color: Colors.white12, size: 60),
+        const SizedBox(height: 16),
+        Text('Chat bientôt disponible',
+            style: GoogleFonts.poppins(color: Colors.white30, fontSize: 15)),
+        const SizedBox(height: 4),
+        Text('Échangez avec vos participants\ndans les réunions',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(color: Colors.white12, fontSize: 12)),
+      ]),
+    );
+  }
+
+  // ── Onglet 2 : Réunions (StreamBuilder complet) ────────────────────────────
+
+  Widget _buildMeetingsTab(String lang) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('meetings')
+          .where('organizerId', isEqualTo: uid)
+          .orderBy('createdAt', descending: true)
+          .limit(20)
+          .snapshots(),
+      builder: (ctx, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Color(0xFFE53935)));
+        }
+        final docs = snap.data?.docs ?? [];
+        if (docs.isEmpty) {
+          return Center(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.video_camera_front_outlined,
+                  color: Colors.white12, size: 60),
+              const SizedBox(height: 16),
+              Text('Aucune réunion',
+                  style: GoogleFonts.poppins(color: Colors.white30, fontSize: 15)),
+              const SizedBox(height: 4),
+              Text('Vos réunions créées apparaîtront ici',
+                  style: GoogleFonts.poppins(color: Colors.white12, fontSize: 12)),
+            ]),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          itemCount: docs.length,
+          itemBuilder: (_, i) {
+            final d = docs[i].data() as Map<String, dynamic>;
+            return _MeetingCard(
+              data: d,
+              onJoin: () {
+                final id = d['id'] as String? ?? docs[i].id;
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => MeetingScreen(
+                              meetingId: id,
+                              meetingName: d['title'] as String? ?? 'Réunion',
+                              userId: uid,
+                              userName: _displayName(),
+                              userEmail: widget.user.email,
+                              isHost: d['organizerId'] == uid,
+                            )));
+              },
+            );
+          },
+        );
+      },
     );
   }
 
@@ -757,6 +950,113 @@ class _HomeScreenState extends State<HomeScreen> {
   void _shareApp() {
     final lang = context.read<LocaleProvider>().locale.languageCode;
     Share.share(AppTranslations.t('share_app_msg', lang));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _MeetingCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final VoidCallback onJoin;
+
+  const _MeetingCard({required this.data, required this.onJoin});
+
+  @override
+  Widget build(BuildContext context) {
+    final title = data['title'] as String? ?? 'Réunion';
+    final status = data['status'] as String? ?? 'scheduled';
+    final id = data['id'] as String? ?? '';
+    final ts = data['createdAt'];
+    final createdAt = ts is Timestamp ? ts.toDate() : null;
+
+    final isOngoing = status == 'ongoing';
+    final statusColor = isOngoing ? const Color(0xFF2E7D32) : Colors.white24;
+    final statusLabel = isOngoing ? 'En cours' : (status == 'ended' ? 'Terminée' : 'Programmée');
+
+    String dateStr = '';
+    if (createdAt != null) {
+      final months = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin',
+          'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
+      dateStr =
+          '${createdAt.day} ${months[createdAt.month - 1]} · ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF12121E),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isOngoing
+              ? const Color(0xFF2E7D32).withValues(alpha: 0.4)
+              : Colors.white.withValues(alpha: 0.05),
+        ),
+      ),
+      child: Row(children: [
+        Container(
+          width: 44, height: 44,
+          decoration: BoxDecoration(
+            color: isOngoing
+                ? const Color(0xFF2E7D32).withValues(alpha: 0.15)
+                : Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            isOngoing ? Icons.videocam : Icons.videocam_off_outlined,
+            color: isOngoing ? const Color(0xFF4CAF50) : Colors.white24,
+            size: 22,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                  color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+          const SizedBox(height: 2),
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(statusLabel,
+                  style: GoogleFonts.poppins(color: statusColor, fontSize: 9,
+                      fontWeight: FontWeight.w600)),
+            ),
+            if (dateStr.isNotEmpty) ...[
+              const SizedBox(width: 6),
+              Text(dateStr,
+                  style: GoogleFonts.poppins(color: Colors.white24, fontSize: 10)),
+            ],
+          ]),
+          if (id.isNotEmpty)
+            Text(id,
+                style: GoogleFonts.poppins(
+                    color: Colors.white12, fontSize: 9,
+                    fontFamily: 'monospace')),
+        ])),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: onJoin,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isOngoing
+                  ? const Color(0xFF2E7D32)
+                  : const Color(0xFF1565C0),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(isOngoing ? 'Rejoindre' : 'Ouvrir',
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+          ),
+        ),
+      ]),
+    );
   }
 }
 
