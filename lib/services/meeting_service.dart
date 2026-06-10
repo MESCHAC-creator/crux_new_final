@@ -39,13 +39,14 @@ class MeetingService {
       passcode: passcode?.isNotEmpty == true ? passcode : null,
     );
 
-    // Try to persist to Firestore — non-blocking, never throws
-    _firestore
-        .collection('meetings')
-        .doc(meetingId)
-        .set(meeting.toJson())
-        .then((_) => _log.i('✅ Réunion persistée dans Firestore: $meetingId'))
-        .catchError((e) => _log.w('⚠️ Firestore indisponible, réunion locale uniquement: $e'));
+    // Await the Firestore write so guests can join immediately after the host shares the code.
+    try {
+      await _firestore.collection('meetings').doc(meetingId).set(meeting.toJson());
+      _log.i('✅ Réunion persistée dans Firestore: $meetingId');
+    } catch (e) {
+      _log.w('⚠️ Firestore write failed: $e');
+      rethrow; // propagate so the UI can show an error instead of a phantom meeting ID
+    }
 
     return meetingId;
   }
