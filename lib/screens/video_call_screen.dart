@@ -7213,18 +7213,46 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       builder: (_) => StatefulBuilder(
         builder: (ctx, setLocal) {
           final isPrivileged = widget.isHost || _isCoHost;
-          return Container(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          return DraggableScrollableSheet(
+            initialChildSize: 0.6,
+            minChildSize: 0.4,
+            maxChildSize: 0.92,
+            expand: false,
+            builder: (_, scrollCtrl) => Container(
             decoration: const BoxDecoration(
               color: Color(0xFF181828),
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
+            child: Column(children: [
+              const SizedBox(height: 8),
               Container(width: 40, height: 4,
                   decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 12),
               Text('Options', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
+              Expanded(child: ListView(controller: scrollCtrl, children: [
+
+              // ── Screen share ──
+              ListTile(
+                leading: Icon(
+                  _sharingScreen ? Icons.stop_screen_share : Icons.screen_share,
+                  color: _sharingScreen ? Colors.red : Colors.white54,
+                ),
+                title: Text(
+                  _sharingScreen ? 'Arrêter le partage' : 'Partager l\'écran',
+                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+                ),
+                subtitle: Text(
+                  _sharingScreen ? 'Partage en cours' : 'Partager votre écran avec les participants',
+                  style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _toggleScreenShare();
+                },
+              ),
+
+              const Divider(color: Colors.white12, height: 1),
 
               // Mirror video
               SwitchListTile(
@@ -7491,8 +7519,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   _showOfferingPanel();
                 },
               ),
-            ]),
-          );
+              const SizedBox(height: 16),
+            ])),
+          ]),
+          ),
+        );
         },
       ),
     );
