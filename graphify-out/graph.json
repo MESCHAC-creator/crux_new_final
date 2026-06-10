@@ -1410,7 +1410,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "providers_theme_provider_dart",
-      "community": 44,
+      "community": 47,
       "norm_label": "../providers/theme_provider.dart"
     },
     {
@@ -2750,7 +2750,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "providers_theme_provider_themeprovider",
-      "community": 52,
+      "community": 44,
       "norm_label": "themeprovider"
     },
     {
@@ -3200,7 +3200,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "screens_consent_screen_build",
-      "community": 52,
+      "community": 44,
       "norm_label": "build"
     },
     {
@@ -3260,7 +3260,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "voidcallback",
-      "community": 42,
+      "community": 33,
       "norm_label": "voidcallback"
     },
     {
@@ -4940,7 +4940,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "screens_privacy_policy_screen_privacypolicyscreen",
-      "community": 52,
+      "community": 44,
       "norm_label": "privacypolicyscreen"
     },
     {
@@ -5030,7 +5030,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "screens_privacy_policy_screen_build",
-      "community": 52,
+      "community": 44,
       "norm_label": "build"
     },
     {
@@ -6030,7 +6030,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "screens_setting_screen_showqualitydialog",
-      "community": 52,
+      "community": 44,
       "norm_label": "_showqualitydialog"
     },
     {
@@ -6040,7 +6040,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "screens_setting_screen_showlanguagedialog",
-      "community": 52,
+      "community": 44,
       "norm_label": "_showlanguagedialog"
     },
     {
@@ -6970,7 +6970,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "screens_terms_screen_termsscreen",
-      "community": 52,
+      "community": 44,
       "norm_label": "termsscreen"
     },
     {
@@ -7070,7 +7070,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "screens_terms_screen_build",
-      "community": 52,
+      "community": 44,
       "norm_label": "build"
     },
     {
@@ -7212,16 +7212,6 @@
       "id": "screens_video_call_screen_paywalldialogstate",
       "community": 12,
       "norm_label": "_paywalldialogstate"
-    },
-    {
-      "label": "_Btn",
-      "file_type": "code",
-      "source_file": "lib/screens/video_call_screen.dart",
-      "source_location": null,
-      "_origin": "ast",
-      "id": "screens_video_call_screen_btn",
-      "community": 17,
-      "norm_label": "_btn"
     },
     {
       "label": "_QualityItem",
@@ -9504,36 +9494,6 @@
       "norm_label": "_statusmessage"
     },
     {
-      "label": "active",
-      "file_type": "code",
-      "source_file": "lib/screens/video_call_screen.dart",
-      "source_location": null,
-      "_origin": "ast",
-      "id": "screens_video_call_screen_active",
-      "community": 0,
-      "norm_label": "active"
-    },
-    {
-      "label": "isEnd",
-      "file_type": "code",
-      "source_file": "lib/screens/video_call_screen.dart",
-      "source_location": null,
-      "_origin": "ast",
-      "id": "screens_video_call_screen_isend",
-      "community": 0,
-      "norm_label": "isend"
-    },
-    {
-      "label": "isHighlight",
-      "file_type": "code",
-      "source_file": "lib/screens/video_call_screen.dart",
-      "source_location": null,
-      "_origin": "ast",
-      "id": "screens_video_call_screen_ishighlight",
-      "community": 0,
-      "norm_label": "ishighlight"
-    },
-    {
       "label": "badge",
       "file_type": "code",
       "source_file": "lib/screens/video_call_screen.dart",
@@ -9632,6 +9592,16 @@
       "id": "screens_video_call_screen_current",
       "community": 0,
       "norm_label": "current"
+    },
+    {
+      "label": "active",
+      "file_type": "code",
+      "source_file": "lib/screens/video_call_screen.dart",
+      "source_location": null,
+      "_origin": "ast",
+      "id": "screens_video_call_screen_active",
+      "community": 0,
+      "norm_label": "active"
     },
     {
       "label": "color",
@@ -9812,6 +9782,16 @@
       "id": "screens_video_call_screen_laserpos",
       "community": 0,
       "norm_label": "laserpos"
+    },
+    {
+      "label": "isEnd",
+      "file_type": "code",
+      "source_file": "lib/screens/video_call_screen.dart",
+      "source_location": null,
+      "_origin": "ast",
+      "id": "screens_video_call_screen_isend",
+      "community": 0,
+      "norm_label": "isend"
     },
     {
       "label": "createState",
@@ -15340,7 +15320,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "widgets_custom_button_custombutton",
-      "community": 12,
+      "community": 32,
       "norm_label": "custombutton"
     },
     {
@@ -15350,7 +15330,7 @@
       "source_location": null,
       "_origin": "ast",
       "id": "widgets_custom_button_custombuttonstate",
-      "community": 12,
+      "community": 32,
       "norm_label": "_custombuttonstate"
     },
     {
@@ -16422,9 +16402,9 @@
       "source_file": "android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
       "source_location": "L7",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "plugins_generatedpluginregistrant",
-      "target": "android_app_src_main_java_io_flutter_plugins_generatedpluginregistrant_java_flutterengine",
-      "confidence_score": 1.0
+      "target": "android_app_src_main_java_io_flutter_plugins_generatedpluginregistrant_java_flutterengine"
     },
     {
       "relation": "contains",
@@ -16432,9 +16412,9 @@
       "source_file": "android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
       "source_location": "L14",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "plugins_generatedpluginregistrant",
-      "target": "plugins_generatedpluginregistrant_generatedpluginregistrant",
-      "confidence_score": 1.0
+      "target": "plugins_generatedpluginregistrant_generatedpluginregistrant"
     },
     {
       "relation": "method",
@@ -16442,9 +16422,9 @@
       "source_file": "android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
       "source_location": "L17",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "plugins_generatedpluginregistrant_generatedpluginregistrant",
-      "target": "plugins_generatedpluginregistrant_generatedpluginregistrant_registerwith",
-      "confidence_score": 1.0
+      "target": "plugins_generatedpluginregistrant_generatedpluginregistrant_registerwith"
     },
     {
       "relation": "references",
@@ -16453,9 +16433,9 @@
       "source_location": "L17",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "plugins_generatedpluginregistrant_generatedpluginregistrant_registerwith",
-      "target": "android_app_src_main_java_io_flutter_plugins_generatedpluginregistrant_java_flutterengine",
-      "confidence_score": 1.0
+      "target": "android_app_src_main_java_io_flutter_plugins_generatedpluginregistrant_java_flutterengine"
     },
     {
       "relation": "contains",
@@ -16463,9 +16443,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L14",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice",
-      "target": "crux_callforegroundservice_callforegroundservice",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice"
     },
     {
       "relation": "method",
@@ -16473,9 +16453,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L128",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice",
-      "target": "crux_callforegroundservice_callforegroundservice_buildcallnotification",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_buildcallnotification"
     },
     {
       "relation": "method",
@@ -16483,9 +16463,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L147",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice",
-      "target": "crux_callforegroundservice_callforegroundservice_createnotificationchannels",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_createnotificationchannels"
     },
     {
       "relation": "method",
@@ -16493,9 +16473,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L80",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice",
-      "target": "crux_callforegroundservice_callforegroundservice_ensureforeground",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_ensureforeground"
     },
     {
       "relation": "method",
@@ -16503,9 +16483,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L27",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice",
-      "target": "crux_callforegroundservice_callforegroundservice_onbind",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_onbind"
     },
     {
       "relation": "method",
@@ -16513,9 +16493,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L29",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice",
-      "target": "crux_callforegroundservice_callforegroundservice_oncreate",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_oncreate"
     },
     {
       "relation": "method",
@@ -16523,9 +16503,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L174",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice",
-      "target": "crux_callforegroundservice_callforegroundservice_ondestroy",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_ondestroy"
     },
     {
       "relation": "method",
@@ -16533,9 +16513,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L34",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice",
-      "target": "crux_callforegroundservice_callforegroundservice_onstartcommand",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_onstartcommand"
     },
     {
       "relation": "method",
@@ -16543,9 +16523,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L91",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice",
-      "target": "crux_callforegroundservice_callforegroundservice_postscreensharenotification",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_postscreensharenotification"
     },
     {
       "relation": "method",
@@ -16553,9 +16533,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L86",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice",
-      "target": "crux_callforegroundservice_callforegroundservice_showcallnotification",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_showcallnotification"
     },
     {
       "relation": "method",
@@ -16563,9 +16543,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L60",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice",
-      "target": "crux_callforegroundservice_callforegroundservice_startcallforeground",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_startcallforeground"
     },
     {
       "relation": "inherits",
@@ -16573,9 +16553,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L14",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice",
-      "target": "service",
-      "confidence_score": 1.0
+      "target": "service"
     },
     {
       "relation": "references",
@@ -16584,9 +16564,9 @@
       "source_location": "L27",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_onbind",
-      "target": "ibinder",
-      "confidence_score": 1.0
+      "target": "ibinder"
     },
     {
       "relation": "references",
@@ -16595,9 +16575,9 @@
       "source_location": "L27",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_onbind",
-      "target": "intent",
-      "confidence_score": 1.0
+      "target": "intent"
     },
     {
       "relation": "references",
@@ -16606,9 +16586,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L34",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_onstartcommand",
-      "target": "intent",
-      "confidence_score": 1.0
+      "target": "intent"
     },
     {
       "relation": "calls",
@@ -16617,9 +16597,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L95",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_postscreensharenotification",
-      "target": "intent",
-      "confidence_score": 1.0
+      "target": "intent"
     },
     {
       "relation": "calls",
@@ -16672,9 +16652,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L31",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_oncreate",
-      "target": "crux_callforegroundservice_callforegroundservice_createnotificationchannels",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_createnotificationchannels"
     },
     {
       "relation": "references",
@@ -16683,9 +16663,9 @@
       "source_location": "L34",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_onstartcommand",
-      "target": "android_app_src_main_kotlin_com_example_crux_callforegroundservice_kt_int",
-      "confidence_score": 1.0
+      "target": "android_app_src_main_kotlin_com_example_crux_callforegroundservice_kt_int"
     },
     {
       "relation": "calls",
@@ -16694,9 +16674,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L38",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_onstartcommand",
-      "target": "crux_callforegroundservice_callforegroundservice_ensureforeground",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_ensureforeground"
     },
     {
       "relation": "calls",
@@ -16705,9 +16685,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L39",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_onstartcommand",
-      "target": "crux_callforegroundservice_callforegroundservice_postscreensharenotification",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_postscreensharenotification"
     },
     {
       "relation": "calls",
@@ -16716,9 +16696,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L44",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_onstartcommand",
-      "target": "crux_callforegroundservice_callforegroundservice_showcallnotification",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_showcallnotification"
     },
     {
       "relation": "calls",
@@ -16727,9 +16707,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L54",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_onstartcommand",
-      "target": "crux_callforegroundservice_callforegroundservice_startcallforeground",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_startcallforeground"
     },
     {
       "relation": "calls",
@@ -16738,9 +16718,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L65",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_startcallforeground",
-      "target": "crux_callforegroundservice_callforegroundservice_buildcallnotification",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_buildcallnotification"
     },
     {
       "relation": "calls",
@@ -16749,9 +16729,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L82",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_ensureforeground",
-      "target": "crux_callforegroundservice_callforegroundservice_buildcallnotification",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_buildcallnotification"
     },
     {
       "relation": "calls",
@@ -16760,9 +16740,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/CallForegroundService.kt",
       "source_location": "L88",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_showcallnotification",
-      "target": "crux_callforegroundservice_callforegroundservice_buildcallnotification",
-      "confidence_score": 1.0
+      "target": "crux_callforegroundservice_callforegroundservice_buildcallnotification"
     },
     {
       "relation": "references",
@@ -16771,9 +16751,9 @@
       "source_location": "L128",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "crux_callforegroundservice_callforegroundservice_buildcallnotification",
-      "target": "notification",
-      "confidence_score": 1.0
+      "target": "notification"
     },
     {
       "relation": "contains",
@@ -16781,9 +16761,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L15",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity",
-      "target": "crux_mainactivity_mainactivity",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity"
     },
     {
       "relation": "method",
@@ -16791,9 +16771,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L31",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity",
-      "target": "crux_mainactivity_mainactivity_configureflutterengine",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_configureflutterengine"
     },
     {
       "relation": "method",
@@ -16801,9 +16781,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L103",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity",
-      "target": "crux_mainactivity_mainactivity_enterpipmode",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_enterpipmode"
     },
     {
       "relation": "method",
@@ -16811,9 +16791,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L81",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity",
-      "target": "crux_mainactivity_mainactivity_notifyscreensharestarted",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_notifyscreensharestarted"
     },
     {
       "relation": "method",
@@ -16821,9 +16801,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L94",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity",
-      "target": "crux_mainactivity_mainactivity_notifyscreensharestopped",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_notifyscreensharestopped"
     },
     {
       "relation": "method",
@@ -16831,9 +16811,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L137",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity",
-      "target": "crux_mainactivity_mainactivity_onpictureinpicturemodechanged",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_onpictureinpicturemodechanged"
     },
     {
       "relation": "method",
@@ -16841,9 +16821,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L66",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity",
-      "target": "crux_mainactivity_mainactivity_onstart",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_onstart"
     },
     {
       "relation": "method",
@@ -16851,9 +16831,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L76",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity",
-      "target": "crux_mainactivity_mainactivity_onstop",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_onstop"
     },
     {
       "relation": "method",
@@ -16861,9 +16841,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L133",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity",
-      "target": "crux_mainactivity_mainactivity_onuserleavehint",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_onuserleavehint"
     },
     {
       "relation": "method",
@@ -16871,9 +16851,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L116",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity",
-      "target": "crux_mainactivity_mainactivity_startcallservice",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_startcallservice"
     },
     {
       "relation": "method",
@@ -16881,9 +16861,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L127",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity",
-      "target": "crux_mainactivity_mainactivity_stopcallservice",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_stopcallservice"
     },
     {
       "relation": "inherits",
@@ -16891,9 +16871,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L15",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity",
-      "target": "flutteractivity",
-      "confidence_score": 1.0
+      "target": "flutteractivity"
     },
     {
       "relation": "references",
@@ -16902,9 +16882,9 @@
       "source_location": "L22",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity",
-      "target": "methodchannel",
-      "confidence_score": 1.0
+      "target": "methodchannel"
     },
     {
       "relation": "calls",
@@ -16913,9 +16893,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L35",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity_configureflutterengine",
-      "target": "methodchannel",
-      "confidence_score": 1.0
+      "target": "methodchannel"
     },
     {
       "relation": "references",
@@ -16924,9 +16904,9 @@
       "source_location": "L31",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity_configureflutterengine",
-      "target": "android_app_src_main_kotlin_com_example_crux_mainactivity_kt_flutterengine",
-      "confidence_score": 1.0
+      "target": "android_app_src_main_kotlin_com_example_crux_mainactivity_kt_flutterengine"
     },
     {
       "relation": "calls",
@@ -16935,9 +16915,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L38",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity_configureflutterengine",
-      "target": "crux_mainactivity_mainactivity_enterpipmode",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_enterpipmode"
     },
     {
       "relation": "calls",
@@ -16946,9 +16926,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L54",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity_configureflutterengine",
-      "target": "crux_mainactivity_mainactivity_notifyscreensharestarted",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_notifyscreensharestarted"
     },
     {
       "relation": "calls",
@@ -16957,9 +16937,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L58",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity_configureflutterengine",
-      "target": "crux_mainactivity_mainactivity_notifyscreensharestopped",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_notifyscreensharestopped"
     },
     {
       "relation": "calls",
@@ -16968,9 +16948,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L41",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity_configureflutterengine",
-      "target": "crux_mainactivity_mainactivity_startcallservice",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_startcallservice"
     },
     {
       "relation": "calls",
@@ -16979,9 +16959,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L41",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity_configureflutterengine",
-      "target": "crux_mainactivity_mainactivity_stopcallservice",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_stopcallservice"
     },
     {
       "relation": "references",
@@ -16990,9 +16970,9 @@
       "source_location": "L103",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity_enterpipmode",
-      "target": "boolean",
-      "confidence_score": 1.0
+      "target": "boolean"
     },
     {
       "relation": "calls",
@@ -17001,9 +16981,9 @@
       "source_file": "android/app/src/main/kotlin/com/example/crux/MainActivity.kt",
       "source_location": "L134",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity_onuserleavehint",
-      "target": "crux_mainactivity_mainactivity_enterpipmode",
-      "confidence_score": 1.0
+      "target": "crux_mainactivity_mainactivity_enterpipmode"
     },
     {
       "relation": "references",
@@ -17012,9 +16992,9 @@
       "source_location": "L137",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity_onpictureinpicturemodechanged",
-      "target": "boolean",
-      "confidence_score": 1.0
+      "target": "boolean"
     },
     {
       "relation": "references",
@@ -17023,9 +17003,9 @@
       "source_location": "L137",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "crux_mainactivity_mainactivity_onpictureinpicturemodechanged",
-      "target": "configuration",
-      "confidence_score": 1.0
+      "target": "configuration"
     },
     {
       "relation": "contains",
@@ -17033,9 +17013,9 @@
       "source_file": "functions/index.js",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_index",
-      "target": "functions_index_admin",
-      "confidence_score": 1.0
+      "target": "functions_index_admin"
     },
     {
       "relation": "contains",
@@ -17043,9 +17023,9 @@
       "source_file": "functions/index.js",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_index",
-      "target": "functions_index_axios",
-      "confidence_score": 1.0
+      "target": "functions_index_axios"
     },
     {
       "relation": "contains",
@@ -17053,9 +17033,9 @@
       "source_file": "functions/index.js",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_index",
-      "target": "functions_index_db",
-      "confidence_score": 1.0
+      "target": "functions_index_db"
     },
     {
       "relation": "contains",
@@ -17063,9 +17043,9 @@
       "source_file": "functions/index.js",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_index",
-      "target": "functions_index_functions",
-      "confidence_score": 1.0
+      "target": "functions_index_functions"
     },
     {
       "relation": "contains",
@@ -17073,9 +17053,9 @@
       "source_file": "functions/package.json",
       "source_location": "L10",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package",
-      "target": "functions_package_author",
-      "confidence_score": 1.0
+      "target": "functions_package_author"
     },
     {
       "relation": "contains",
@@ -17083,9 +17063,9 @@
       "source_file": "functions/package.json",
       "source_location": "L12",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package",
-      "target": "functions_package_dependencies",
-      "confidence_score": 1.0
+      "target": "functions_package_dependencies"
     },
     {
       "relation": "contains",
@@ -17093,9 +17073,9 @@
       "source_file": "functions/package.json",
       "source_location": "L4",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package",
-      "target": "functions_package_description",
-      "confidence_score": 1.0
+      "target": "functions_package_description"
     },
     {
       "relation": "contains",
@@ -17103,9 +17083,9 @@
       "source_file": "functions/package.json",
       "source_location": "L9",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package",
-      "target": "functions_package_keywords",
-      "confidence_score": 1.0
+      "target": "functions_package_keywords"
     },
     {
       "relation": "contains",
@@ -17113,9 +17093,9 @@
       "source_file": "functions/package.json",
       "source_location": "L11",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package",
-      "target": "functions_package_license",
-      "confidence_score": 1.0
+      "target": "functions_package_license"
     },
     {
       "relation": "contains",
@@ -17123,9 +17103,9 @@
       "source_file": "functions/package.json",
       "source_location": "L5",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package",
-      "target": "functions_package_main",
-      "confidence_score": 1.0
+      "target": "functions_package_main"
     },
     {
       "relation": "contains",
@@ -17133,9 +17113,9 @@
       "source_file": "functions/package.json",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package",
-      "target": "functions_package_name",
-      "confidence_score": 1.0
+      "target": "functions_package_name"
     },
     {
       "relation": "contains",
@@ -17143,9 +17123,9 @@
       "source_file": "functions/package.json",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package",
-      "target": "functions_package_scripts",
-      "confidence_score": 1.0
+      "target": "functions_package_scripts"
     },
     {
       "relation": "contains",
@@ -17153,9 +17133,9 @@
       "source_file": "functions/package.json",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package",
-      "target": "functions_package_version",
-      "confidence_score": 1.0
+      "target": "functions_package_version"
     },
     {
       "relation": "contains",
@@ -17163,9 +17143,9 @@
       "source_file": "functions/package.json",
       "source_location": "L7",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package_scripts",
-      "target": "functions_package_scripts_test",
-      "confidence_score": 1.0
+      "target": "functions_package_scripts_test"
     },
     {
       "relation": "contains",
@@ -17173,9 +17153,9 @@
       "source_file": "functions/package.json",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package_dependencies",
-      "target": "functions_package_dependencies_axios",
-      "confidence_score": 1.0
+      "target": "functions_package_dependencies_axios"
     },
     {
       "relation": "contains",
@@ -17183,9 +17163,9 @@
       "source_file": "functions/package.json",
       "source_location": "L14",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package_dependencies",
-      "target": "functions_package_dependencies_firebase_admin",
-      "confidence_score": 1.0
+      "target": "functions_package_dependencies_firebase_admin"
     },
     {
       "relation": "contains",
@@ -17193,9 +17173,9 @@
       "source_file": "functions/package.json",
       "source_location": "L15",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "functions_package_dependencies",
-      "target": "functions_package_dependencies_firebase_functions",
-      "confidence_score": 1.0
+      "target": "functions_package_dependencies_firebase_functions"
     },
     {
       "relation": "defines",
@@ -18452,16 +18432,6 @@
       "source_location": null,
       "weight": 1.0,
       "source": "screens_terms_screen_termsscreen",
-      "target": "statelesswidget"
-    },
-    {
-      "relation": "inherits",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "lib/screens/video_call_screen.dart",
-      "source_location": null,
-      "weight": 1.0,
-      "source": "screens_video_call_screen_btn",
       "target": "statelesswidget"
     },
     {
@@ -29567,16 +29537,6 @@
       "source_location": null,
       "weight": 1.0,
       "source": "screens_video_call_screen",
-      "target": "screens_video_call_screen_btn"
-    },
-    {
-      "relation": "defines",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "lib/screens/video_call_screen.dart",
-      "source_location": null,
-      "weight": 1.0,
-      "source": "screens_video_call_screen",
       "target": "screens_video_call_screen_build"
     },
     {
@@ -30739,16 +30699,6 @@
       "weight": 1.0,
       "source": "screens_video_call_screen",
       "target": "screens_video_call_screen_iserase"
-    },
-    {
-      "relation": "defines",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "lib/screens/video_call_screen.dart",
-      "source_location": null,
-      "weight": 1.0,
-      "source": "screens_video_call_screen",
-      "target": "screens_video_call_screen_ishighlight"
     },
     {
       "relation": "defines",
@@ -38612,9 +38562,9 @@
       "source_file": "README.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme",
-      "target": "readme_crux_new_final",
-      "confidence_score": 1.0
+      "target": "readme_crux_new_final"
     },
     {
       "relation": "contains",
@@ -38622,11 +38572,11 @@
       "source_file": "README.md",
       "source_location": "L5",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_crux_new_final",
-      "target": "readme_getting_started",
-      "confidence_score": 1.0
+      "target": "readme_getting_started"
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "9d0f412ddf5234e8ded80733b300f7f3db9cbbf3"
+  "built_at_commit": "4e4d224e7dcf84517efaf47ad601b09f6189ae2d"
 }

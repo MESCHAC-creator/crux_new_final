@@ -1,16 +1,16 @@
 # Graph Report - crux_new_final  (2026-06-10)
 
 ## Corpus Check
-- 69 files · ~82,793 words
+- 69 files · ~83,005 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1641 nodes · 2183 edges · 77 communities (66 shown, 11 thin omitted)
+- 1639 nodes · 2180 edges · 76 communities (65 shown, 11 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 4 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `9d0f412d`
+- Built from commit: `4e4d224e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -67,7 +67,6 @@
 - [[_COMMUNITY_Community 49|Community 49]]
 - [[_COMMUNITY_Community 50|Community 50]]
 - [[_COMMUNITY_Community 51|Community 51]]
-- [[_COMMUNITY_Community 52|Community 52]]
 - [[_COMMUNITY_Community 53|Community 53]]
 - [[_COMMUNITY_Community 54|Community 54]]
 - [[_COMMUNITY_Community 55|Community 55]]
@@ -117,11 +116,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (77 total, 11 thin omitted)
+## Communities (76 total, 11 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.01
-Nodes (360): ../constants/app_constants.dart, MediaStream?, meeting_report_screen.dart, package:flutter_webrtc/flutter_webrtc.dart, package:permission_handler/permission_handler.dart, package:speech_to_text/speech_to_text.dart, ProService, RTCPeerConnection? (+352 more)
+Nodes (359): ../constants/app_constants.dart, MediaStream?, meeting_report_screen.dart, package:flutter_webrtc/flutter_webrtc.dart, package:permission_handler/permission_handler.dart, package:speech_to_text/speech_to_text.dart, ProService, RTCPeerConnection? (+351 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.04
@@ -168,8 +167,8 @@ Cohesion: 0.06
 Nodes (35): Color?, Color get, int get, LinearGradient get, package:flutter_secure_storage/flutter_secure_storage.dart, package:url_launcher/url_launcher.dart, ColorOption, end (+27 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.09
-Nodes (37): AuthWrapper, _AuthWrapperState, DeviceVerificationScreen, _DeviceVerificationScreenState, LoginScreen, _LoginScreenState, ProfileScreen, _ProfileScreenState (+29 more)
+Cohesion: 0.10
+Nodes (35): AuthWrapper, _AuthWrapperState, DeviceVerificationScreen, _DeviceVerificationScreenState, LoginScreen, _LoginScreenState, ProfileScreen, _ProfileScreenState (+27 more)
 
 ### Community 13 - "Community 13"
 Cohesion: 0.06
@@ -188,8 +187,8 @@ Cohesion: 0.06
 Nodes (32): package:firebase_messaging/firebase_messaging.dart, package:flutter_local_notifications/flutter_local_notifications.dart, package:timezone/data/latest_all.dart, package:timezone/timezone.dart, _createChannels, getToken, _handleBackgroundMessage, _handleForegroundMessage (+24 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.07
-Nodes (27): _MeetingCard, _QuickAction, _FloatingCircle, _GlassTextField, _Badge, _BottomSheetTile, _GlassCard, _ProfileDivider (+19 more)
+Cohesion: 0.08
+Nodes (26): _MeetingCard, _QuickAction, _FloatingCircle, _GlassTextField, _Badge, _BottomSheetTile, _GlassCard, _ProfileDivider (+18 more)
 
 ### Community 18 - "Community 18"
 Cohesion: 0.08
@@ -248,12 +247,12 @@ Cohesion: 0.12
 Nodes (15): TextEditingController, TextInputType, build, controller, createState, hint, initState, inputType (+7 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.13
-Nodes (14): double?, EdgeInsets?, backgroundColor, borderRadius, build, createState, icon, isFullWidth (+6 more)
+Cohesion: 0.12
+Nodes (16): double?, EdgeInsets?, backgroundColor, borderRadius, build, createState, CustomButton, _CustomButtonState (+8 more)
 
 ### Community 33 - "Community 33"
-Cohesion: 0.13
-Nodes (14): IconData?, build, color, _HostControlButton, HostControlsPanel, icon, isRecording, label (+6 more)
+Cohesion: 0.12
+Nodes (15): IconData?, VoidCallback, build, color, _HostControlButton, HostControlsPanel, icon, isRecording (+7 more)
 
 ### Community 34 - "Community 34"
 Cohesion: 0.14
@@ -288,16 +287,16 @@ Cohesion: 0.15
 Nodes (12): dart:io, package:device_info_plus/device_info_plus.dart, package:package_info_plus/package_info_plus.dart, DeviceVerificationService, _getAvailableStorageSpace, _instance, _isIOSVersionValid, _isJailbroken (+4 more)
 
 ### Community 42 - "Community 42"
-Cohesion: 0.15
-Nodes (12): ../models/meeting_model.dart, MeetingModel, ../theme/colors.dart, VoidCallback, build, _formatTime, _getStatusColor, _getStatusText (+4 more)
+Cohesion: 0.17
+Nodes (11): ../models/meeting_model.dart, MeetingModel, ../theme/colors.dart, build, _formatTime, _getStatusColor, _getStatusText, meeting (+3 more)
 
 ### Community 43 - "Community 43"
 Cohesion: 0.18
 Nodes (10): dart:convert, dart:typed_data, package:cloud_firestore/cloud_firestore.dart, _db, decodePhoto, getProfile, instance, saveProfile (+2 more)
 
 ### Community 44 - "Community 44"
-Cohesion: 0.18
-Nodes (10): ../providers/theme_provider.dart, body, cardColor, _Header, icon, isDark, _Section, _t (+2 more)
+Cohesion: 0.12
+Nodes (17): ThemeProvider, build, body, build, cardColor, _Header, icon, isDark (+9 more)
 
 ### Community 45 - "Community 45"
 Cohesion: 0.20
@@ -308,8 +307,8 @@ Cohesion: 0.20
 Nodes (9): package:logger/logger.dart, ErrorLogger, _instance, logError, logFailedOperation, logFirestoreError, _logger, static final ErrorLogger (+1 more)
 
 ### Community 47 - "Community 47"
-Cohesion: 0.20
-Nodes (9): body, cardColor, _Header, icon, isDark, _Section, _t, textColor (+1 more)
+Cohesion: 0.18
+Nodes (10): ../providers/theme_provider.dart, body, cardColor, _Header, icon, isDark, _Section, _t (+2 more)
 
 ### Community 48 - "Community 48"
 Cohesion: 0.22
@@ -326,10 +325,6 @@ Nodes (8): package:provider/provider.dart, ../providers/locale_provider.dart, bu
 ### Community 51 - "Community 51"
 Cohesion: 0.25
 Nodes (7): Config, environment, firebaseProjectId, isDevelopment, isProduction, static bool get, static const String
-
-### Community 52 - "Community 52"
-Cohesion: 0.25
-Nodes (8): ThemeProvider, build, build, PrivacyPolicyScreen, _showLanguageDialog, _showQualityDialog, build, TermsScreen
 
 ### Community 53 - "Community 53"
 Cohesion: 0.29
@@ -372,23 +367,23 @@ Cohesion: 0.67
 Nodes (3): Route /profile, _buildBottomNav, _buildTopBar
 
 ## Knowledge Gaps
-- **1181 isolated node(s):** `IBinder`, `Int`, `Notification`, `FlutterEngine`, `Configuration` (+1176 more)
+- **1180 isolated node(s):** `IBinder`, `Int`, `Notification`, `FlutterEngine`, `Configuration` (+1175 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `LocaleProvider` connect `Community 3` to `Community 0`, `Community 1`, `Community 2`, `Community 71`, `Community 8`, `Community 9`, `Community 7`, `Community 12`, `Community 44`, `Community 47`, `Community 49`, `Community 50`, `Community 52`, `Community 56`, `Community 25`, `Community 62`, `Community 57`?**
-  _High betweenness centrality (0.066) - this node is a cross-community bridge._
-- **Why does `build` connect `Community 57` to `Community 65`, `Community 3`, `Community 52`, `Community 7`?**
+- **Why does `LocaleProvider` connect `Community 3` to `Community 0`, `Community 1`, `Community 2`, `Community 71`, `Community 8`, `Community 9`, `Community 7`, `Community 12`, `Community 44`, `Community 47`, `Community 49`, `Community 50`, `Community 56`, `Community 25`, `Community 62`, `Community 57`?**
+  _High betweenness centrality (0.064) - this node is a cross-community bridge._
+- **Why does `build` connect `Community 57` to `Community 65`, `Community 3`, `Community 44`, `Community 7`?**
   _High betweenness centrality (0.011) - this node is a cross-community bridge._
 - **Why does `_FallbackMaterialLocalizationsDelegate` connect `Community 58` to `Community 13`?**
   _High betweenness centrality (0.010) - this node is a cross-community bridge._
 - **What connects `IBinder`, `Int`, `Notification` to the rest of the system?**
-  _1181 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1180 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.00554016620498615 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.005555555555555556 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.03773584905660377 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
