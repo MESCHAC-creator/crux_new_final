@@ -77,3 +77,20 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("androidx.multidex:multidex:2.0.1")
 }
+
+// Ensure the APK lands where flutter_tools/gradle.dart expects it.
+// The Flutter Gradle plugin attaches a doLast to packageRelease but the copy
+// may silently fail with certain AGP/Gradle combinations; this guarantees it.
+afterEvaluate {
+    tasks.matching { it.name == "packageRelease" }.configureEach {
+        doLast {
+            val apkSrc = layout.buildDirectory.file("outputs/apk/release/app-release.apk").get().asFile
+            val flutterApkDir = File(rootProject.projectDir, "../build/app/outputs/flutter-apk")
+            if (apkSrc.exists()) {
+                flutterApkDir.mkdirs()
+                apkSrc.copyTo(File(flutterApkDir, "app-release.apk"), overwrite = true)
+                println("flutter-apk: copied ${apkSrc.absolutePath}")
+            }
+        }
+    }
+}
