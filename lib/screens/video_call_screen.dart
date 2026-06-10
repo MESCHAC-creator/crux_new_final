@@ -333,6 +333,15 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   String _chatSearchQuery = '';
   final _chatSearchController = TextEditingController();
 
+  // ── Feature N16: Message replies ─────────────
+  String? _replyToId;
+  String? _replyToSender;
+  String? _replyToText;
+  DateTime? _joinedAt; // for pre-meeting message detection
+
+  // ── Feature N17: Audio output ─────────────
+  String _audioOutput = 'speaker'; // 'speaker', 'earpiece', 'bluetooth'
+
   // ── Feature N10: Join/leave sounds ───────────
   bool _joinLeaveSounds = true;
   int _prevPresenceCount = 0;
@@ -392,6 +401,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         ),
       );
     });
+    _joinedAt = DateTime.now();
     _init();
     _initPip();
     _detectLiveMode();
@@ -4369,10 +4379,12 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             );
 
             final isStarred = _starredMessageIds.contains(doc.id);
+            final msgTs = (d['timestamp'] as Timestamp?)?.toDate();
+            final isPreMeeting = msgTs != null && _joinedAt != null && msgTs.isBefore(_joinedAt!.subtract(const Duration(seconds: 5)));
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: GestureDetector(
-                onLongPress: () => _showMessageActionSheet(doc.id),
+                onLongPress: () => _showMessageActionSheet(doc.id, senderName, d['message'] as String? ?? ''),
                 child: Column(
                   crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                   children: [
@@ -4387,6 +4399,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                               : 'Message privé',
                           style: GoogleFonts.poppins(color: Colors.lightBlue, fontSize: 10, fontStyle: FontStyle.italic),
                         ),
+                      ),
+                    if (isPreMeeting)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 2, left: isMine ? 0 : 40, right: isMine ? 40 : 0),
+                        child: Text('Envoyé avant votre arrivée', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 9, fontStyle: FontStyle.italic)),
                       ),
                     Row(
                       mainAxisAlignment:
@@ -4419,6 +4436,27 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                                     child: Text(senderName,
                                         style: GoogleFonts.poppins(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.w600)),
                                   ),
+                                // Reply quote
+                                Builder(builder: (_) {
+                                  final replyToSender = d['replyToSender'] as String?;
+                                  final replyToText = d['replyToText'] as String?;
+                                  if (replyToSender != null && replyToText != null) {
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 4),
+                                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: const Border(left: BorderSide(color: AppColors.primary, width: 2)),
+                                      ),
+                                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                                        Text(replyToSender, style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 9, fontWeight: FontWeight.w600)),
+                                        Text(replyToText, style: GoogleFonts.poppins(color: Colors.white54, fontSize: 10), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                      ]),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                }),
                                 if (imageBase64 != null)
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
@@ -4498,6 +4536,28 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
+        // Reply preview banner
+        if (_replyToId != null)
+          GestureDetector(
+            onTap: () => setState(() { _replyToId = null; _replyToSender = null; _replyToText = null; }),
+            child: Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: const Border(left: BorderSide(color: AppColors.primary, width: 3)),
+              ),
+              child: Row(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                  Text(_replyToSender ?? '', style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.w600)),
+                  Text(_replyToText ?? '', style: GoogleFonts.poppins(color: Colors.white54, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ])),
+                const Icon(Icons.close, color: Colors.white38, size: 16),
+              ]),
+            ),
+          ),
         // DM indicator
         if (isDM)
           GestureDetector(
@@ -5850,10 +5910,60 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   void _toggleSpeaker() {
     HapticFeedback.selectionClick();
     final next = !_speakerOn;
-    setState(() => _speakerOn = next);
+    setState(() {
+      _speakerOn = next;
+      _audioOutput = next ? 'speaker' : 'earpiece';
+    });
     try {
       Helper.setSpeakerphoneOn(next);
     } catch (_) {}
+  }
+
+  // ── Feature N17: Audio output selector ────────
+  void _showAudioOutputSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 12),
+          Text('Sortie audio', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          _audioOutputTile('speaker', Icons.volume_up, 'Haut-parleur'),
+          _audioOutputTile('earpiece', Icons.phone_in_talk, 'Écouteur'),
+          _audioOutputTile('bluetooth', Icons.bluetooth_audio, 'Bluetooth'),
+        ]),
+      ),
+    );
+  }
+
+  Widget _audioOutputTile(String key, IconData icon, String label) {
+    final selected = _audioOutput == key;
+    return ListTile(
+      leading: Icon(icon, color: selected ? AppColors.primary : Colors.white70),
+      title: Text(label, style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+      trailing: selected ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
+      onTap: () {
+        Navigator.pop(context);
+        setState(() => _audioOutput = key);
+        try {
+          if (key == 'speaker') {
+            Helper.setSpeakerphoneOn(true);
+          } else if (key == 'earpiece') {
+            Helper.setSpeakerphoneOn(false);
+          } else if (key == 'bluetooth') {
+            Helper.setSpeakerphoneOn(false);
+          }
+        } catch (_) {}
+      },
+    );
   }
 
   // ── FEATURE 12: Image in chat ─────────────────
@@ -5931,7 +6041,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       'timestamp': FieldValue.serverTimestamp(),
       if (_chatRecipientId != null) 'recipientId': _chatRecipientId,
       if (_chatRecipient != null) 'recipientName': _chatRecipient,
+      if (_replyToId != null) 'replyToId': _replyToId,
+      if (_replyToSender != null) 'replyToSender': _replyToSender,
+      if (_replyToText != null) 'replyToText': _replyToText,
     });
+    setState(() { _replyToId = null; _replyToSender = null; _replyToText = null; });
   }
 
   void _showRecipientSelector() {
@@ -5985,7 +6099,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   // ── Feature N8+N13: Message action sheet ─────
-  void _showMessageActionSheet(String docId) {
+  void _showMessageActionSheet(String docId, String senderName, String messageText) {
     const quickEmojis = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
     final isStarred = _starredMessageIds.contains(docId);
     final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
@@ -6013,6 +6127,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             )).toList(),
           ),
           const SizedBox(height: 12),
+          ListTile(
+            leading: const Icon(Icons.reply, color: Colors.white70),
+            title: Text('Répondre', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+            onTap: () {
+              Navigator.pop(context);
+              setState(() {
+                _replyToId = docId;
+                _replyToSender = senderName;
+                _replyToText = messageText.length > 80 ? '${messageText.substring(0, 80)}…' : messageText;
+              });
+            },
+          ),
           ListTile(
             leading: Icon(isStarred ? Icons.star : Icons.star_outline, color: Colors.amber),
             title: Text(isStarred ? AppTranslations.t('unsave_message', lang) : AppTranslations.t('save_message', lang),
