@@ -342,6 +342,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── Feature N17: Audio output ─────────────
   String _audioOutput = 'speaker'; // 'speaker', 'earpiece', 'bluetooth'
 
+  // ── Feature N18: Gallery pagination ──────────
+  int _galleryPage = 0;
+
   // ── Feature N10: Join/leave sounds ───────────
   bool _joinLeaveSounds = true;
   int _prevPresenceCount = 0;
@@ -7299,11 +7302,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               onTap: _showMeetingInfoPanel,
             ),
             const SizedBox(width: 8),
-            _Btn(
-              icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
-              label: _speakerOn ? AppTranslations.t('tb_speaker', lang) : AppTranslations.t('tb_earpiece', lang),
-              active: _speakerOn,
-              onTap: _toggleSpeaker,
+            GestureDetector(
+              onLongPress: _showAudioOutputSelector,
+              child: _Btn(
+                icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
+                label: _speakerOn ? AppTranslations.t('tb_speaker', lang) : AppTranslations.t('tb_earpiece', lang),
+                active: _speakerOn,
+                onTap: _toggleSpeaker,
+              ),
             ),
             const SizedBox(width: 8),
             _Btn(
@@ -7868,17 +7874,59 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   // ── GALLERY VIEW (CRUX: Meet + Zoom blend) ────
   Widget _buildGalleryView() {
-    const tileBg = Color(0xFF1A1529);
-    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
-
     return Container(
       color: const Color(0xFF0F0C1A),
       child: SafeArea(
         bottom: false,
         child: Column(children: [
           const SizedBox(height: 60),
-          Expanded(
-            child: GridView.builder(
+          Expanded(child: _buildPaginatedGallery()),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildPaginatedGallery() {
+    const perPage = 6;
+    final totalPages = (_presenceList.length / perPage).ceil().clamp(1, 999);
+    if (totalPages == 1) {
+      return _buildGalleryGrid(_presenceList);
+    }
+    return Column(children: [
+      Expanded(
+        child: PageView.builder(
+          onPageChanged: (p) => setState(() => _galleryPage = p.clamp(0, totalPages - 1)),
+          itemCount: totalPages,
+          itemBuilder: (_, page) {
+            final start = page * perPage;
+            final end = (start + perPage).clamp(0, _presenceList.length);
+            return _buildGalleryGrid(_presenceList.sublist(start, end));
+          },
+        ),
+      ),
+      if (totalPages > 1)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(totalPages, (i) => Container(
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: _galleryPage == i ? 18 : 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: _galleryPage == i ? AppColors.primary : Colors.white24,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            )),
+          ),
+        ),
+    ]);
+  }
+
+  Widget _buildGalleryGrid(List<Map<String, dynamic>> items) {
+    const tileBg = Color(0xFF1A1529);
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+    return GridView.builder(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 90),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
@@ -7886,9 +7934,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 mainAxisSpacing: 8,
                 childAspectRatio: 4 / 3,
               ),
-              itemCount: _presenceList.length,
+              itemCount: items.length,
               itemBuilder: (ctx, i) {
-                final p = _presenceList[i];
+                final p = items[i];
                 final uid = p['userId'] as String? ?? '';
                 final isMe = uid == widget.userId;
                 final name = isMe
@@ -8104,11 +8152,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 ), // AnimatedContainer
                 ); // GestureDetector
               },
-            ),
-          ),
-        ]),
-      ),
-    );
+            );
   }
 
   // CRUX gradient pairs per uid
