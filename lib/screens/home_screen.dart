@@ -89,18 +89,21 @@ class _HomeScreenState extends State<HomeScreen> {
     final lang = context.read<LocaleProvider>().locale.languageCode;
     final name = _meetingNameController.text.trim();
     if (name.isEmpty) {
-      _errorHandler.showErrorDialog(context, '⚠️ ${AppTranslations.t('attention', lang)}', AppTranslations.t('meet_enter_name', lang));
+      _errorHandler.showErrorDialog(context, '⚠️ ${AppTranslations.t('attention', lang)}',
+          AppTranslations.t('meet_enter_name', lang));
       return;
     }
 
     final rawPasscode = _showPasscode ? _passcodeController.text.trim() : null;
     if (rawPasscode != null && rawPasscode.isNotEmpty) {
       if (rawPasscode.length < 4 || rawPasscode.length > 6) {
-        _errorHandler.showErrorDialog(context, '⚠️ ${AppTranslations.t('attention', lang)}', AppTranslations.t('meet_code_range', lang));
+        _errorHandler.showErrorDialog(context, '⚠️ ${AppTranslations.t('attention', lang)}',
+            AppTranslations.t('meet_code_range', lang));
         return;
       }
       if (!RegExp(r'^\d+$').hasMatch(rawPasscode)) {
-        _errorHandler.showErrorDialog(context, '⚠️ ${AppTranslations.t('attention', lang)}', AppTranslations.t('meet_code_digits', lang));
+        _errorHandler.showErrorDialog(context, '⚠️ ${AppTranslations.t('attention', lang)}',
+            AppTranslations.t('meet_code_digits', lang));
         return;
       }
     }
@@ -118,20 +121,26 @@ class _HomeScreenState extends State<HomeScreen> {
       _passcodeController.clear();
       setState(() => _showPasscode = false);
       if (!mounted) return;
-      Navigator.push(context, MaterialPageRoute(
-        builder: (_) => MeetingScreen(
-          meetingId: meetingId,
-          meetingName: name,
-          userId: widget.user.uid,
-          userName: _displayName(),
-          userEmail: widget.user.email,
-          isHost: true,
-        ),
-      ));
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MeetingScreen(
+              meetingId: meetingId,
+              meetingName: name,
+              userId: widget.user.uid,
+              userName: _displayName(),
+              userEmail: widget.user.email,
+              isHost: true,
+            ),
+          ));
     } catch (e) {
       if (mounted) {
         final lang = context.read<LocaleProvider>().locale.languageCode;
-        _errorHandler.showErrorDialog(context, '❌ ${AppTranslations.t('error', lang)}', _errorHandler.getMeetingErrorMessageL(e.toString().replaceFirst('Exception: ', ''), lang));
+        _errorHandler.showErrorDialog(
+            context,
+            '❌ ${AppTranslations.t('error', lang)}',
+            _errorHandler.getMeetingErrorMessageL(
+                e.toString().replaceFirst('Exception: ', ''), lang));
       }
     } finally {
       if (mounted) setState(() => _isCreating = false);
@@ -147,7 +156,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     if (meeting == null) {
-      _errorHandler.showErrorDialog(context, '🔍 ${AppTranslations.t('error', lang)}', AppTranslations.t('meet_not_found', lang));
+      _errorHandler.showErrorDialog(context, '🔍 ${AppTranslations.t('error', lang)}',
+          AppTranslations.t('meet_not_found', lang));
       return;
     }
 
@@ -156,22 +166,26 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       if (entered == null) return;
       if (entered != meeting.passcode) {
-        if (mounted) _errorHandler.showErrorDialog(context, '🔒 ${AppTranslations.t('error', lang)}', AppTranslations.t('meet_wrong_code', lang));
+        if (mounted)
+          _errorHandler.showErrorDialog(context, '🔒 ${AppTranslations.t('error', lang)}',
+              AppTranslations.t('meet_wrong_code', lang));
         return;
       }
     }
 
     if (!mounted) return;
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => MeetingScreen(
-        meetingId: cleanId,
-        meetingName: meeting.title,
-        userId: widget.user.uid,
-        userName: _displayName(),
-        userEmail: widget.user.email,
-        isHost: false,
-      ),
-    ));
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MeetingScreen(
+            meetingId: cleanId,
+            meetingName: meeting.title,
+            userId: widget.user.uid,
+            userName: _displayName(),
+            userEmail: widget.user.email,
+            isHost: false,
+          ),
+        ));
   }
 
   Future<String?> _showPasscodePrompt() async {
@@ -193,7 +207,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(width: 12),
           Text(AppTranslations.t('passcode_title', lang),
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 17, color: Colors.white)),
+              style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700, fontSize: 17, color: Colors.white)),
         ]),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(AppTranslations.t('passcode_protected', lang),
@@ -208,7 +223,8 @@ class _HomeScreenState extends State<HomeScreen> {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(6),
             ],
-            style: GoogleFonts.poppins(color: Colors.white, letterSpacing: 4, fontWeight: FontWeight.w700),
+            style: GoogleFonts.poppins(
+                color: Colors.white, letterSpacing: 4, fontWeight: FontWeight.w700),
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white.withValues(alpha: 0.08),
@@ -246,71 +262,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showJoinDialog() {
-    _joinIdController.clear();
-    final lang = context.read<LocaleProvider>().locale.languageCode;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.link, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Text(AppTranslations.t('join', lang),
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 18)),
-        ]),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(AppTranslations.t('join_hint', lang),
-              style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _joinIdController,
-            autofocus: true,
-            textCapitalization: TextCapitalization.characters,
-            decoration: InputDecoration(
-              hintText: AppTranslations.t('meeting_id', lang),
-              hintStyle: GoogleFonts.poppins(color: AppColors.textTertiary),
-              prefixIcon: const Icon(Icons.tag, color: AppColors.secondary),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.secondary, width: 2),
-              ),
-            ),
-          ),
-        ]),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(AppTranslations.t('cancel', lang),
-                style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final id = _joinIdController.text.trim().toUpperCase();
-              if (id.isEmpty) return;
-              Navigator.pop(ctx);
-              await _joinById(id);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.secondary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: Text(AppTranslations.t('join', lang),
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _logout() {
     final lang = context.read<LocaleProvider>().locale.languageCode;
     showDialog(
@@ -329,7 +280,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              // Mark offline before signing out
               final uid = FirebaseAuth.instance.currentUser?.uid;
               if (uid != null) {
                 FirebaseFirestore.instance.collection('users').doc(uid).set(
@@ -349,465 +299,511 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ── Zoom-style build ──────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final lang = context.watch<LocaleProvider>().locale.languageCode;
-    final bgColor = isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF5F3FF);
-    final fieldFill = isDark
-        ? Colors.white.withValues(alpha: 0.07)
-        : Colors.white.withValues(alpha: 0.15);
     final displayName = _displayName();
 
     return Scaffold(
-      backgroundColor: bgColor,
-      body: CustomScrollView(
-        slivers: [
-          // ── App bar with gradient + profile photo ──────────────
-          SliverAppBar(
-            expandedHeight: 160,
-            floating: false,
-            pinned: true,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFE74C3C), Color(0xFF8E44AD)],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            // Profile photo + name
-                            Row(children: [
-                              GestureDetector(
-                                onTap: () => Navigator.pushNamed(context, '/profile')
-                                    .then((_) => _loadLocalPhoto()),
-                                child: Container(
-                                  width: 46, height: 46,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
-                                    color: Colors.white24,
-                                  ),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: _localPhotoPath != null
-                                      ? Image.file(File(_localPhotoPath!), fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => _avatarLetter(displayName))
-                                      : _avatarLetter(displayName),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                'CRUX',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  letterSpacing: 2,
-                                ),
-                              ),
-                            ]),
-                            // Actions
-                            Row(children: [
-                              IconButton(
-                                icon: const Icon(Icons.settings_outlined, color: Colors.white70),
-                                onPressed: () => Navigator.pushNamed(context, '/settings'),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.logout, color: Colors.white70),
-                                onPressed: _logout,
-                              ),
-                            ]),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '${AppTranslations.t('hello', lang)}, ${displayName.split(' ').first} 👋',
-                          style: GoogleFonts.poppins(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          AppTranslations.t('ready_meeting', lang),
-                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ),
+      backgroundColor: const Color(0xFF0F0F1A),
+      appBar: _buildTopBar(displayName, lang),
+      body: _buildBody(lang),
+      bottomNavigationBar: _buildBottomNav(lang),
+    );
+  }
+
+  AppBar _buildTopBar(String displayName, String lang) {
+    return AppBar(
+      backgroundColor: const Color(0xFF0F0F1A),
+      elevation: 0,
+      titleSpacing: 0,
+      leading: GestureDetector(
+        onTap: () =>
+            Navigator.pushNamed(context, '/profile').then((_) => _loadLocalPhoto()),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.primary,
+            backgroundImage:
+                _localPhotoPath != null ? FileImage(File(_localPhotoPath!)) : null,
+            child: _localPhotoPath == null
+                ? Text(
+                    displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14))
+                : null,
+          ),
+        ),
+      ),
+      title: Text('CRUX',
+          style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 24,
+              letterSpacing: 2)),
+      actions: [
+        IconButton(
+            icon: const Icon(Icons.search, color: Colors.white70, size: 22),
+            onPressed: () => _showJoinDialog(lang)),
+        IconButton(
+            icon: const Icon(Icons.more_horiz, color: Colors.white70, size: 22),
+            onPressed: () => _showMainMenu(lang)),
+        IconButton(
+            icon: const Icon(Icons.auto_awesome, color: Colors.white70, size: 22),
+            onPressed: () {}),
+      ],
+    );
+  }
+
+  Widget _buildBody(String lang) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _buildQuickActions(lang),
+        const SizedBox(height: 28),
+        _buildTodaySection(lang),
+      ]),
+    );
+  }
+
+  Widget _buildQuickActions(String lang) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _QuickAction(
+          icon: Icons.video_call,
+          label: 'Nouvelle\nréunion',
+          color: const Color(0xFFE53935),
+          onTap: () => _showNewMeetingSheet(lang),
+        ),
+        _QuickAction(
+          icon: Icons.add,
+          label: 'Rejoindre',
+          color: const Color(0xFF1976D2),
+          onTap: () => _showJoinDialog(lang),
+        ),
+        _QuickAction(
+          icon: Icons.calendar_today,
+          label: 'Programmer',
+          color: const Color(0xFF1976D2),
+          onTap: () => _showScheduleDialog(lang),
+        ),
+        _QuickAction(
+          icon: Icons.share,
+          label: 'Partager',
+          color: const Color(0xFF1976D2),
+          onTap: _shareApp,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTodaySection(String lang) {
+    final now = DateTime.now();
+    final weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+    final months = [
+      'jan', 'fév', 'mar', 'avr', 'mai', 'juin',
+      'juil', 'août', 'sep', 'oct', 'nov', 'déc'
+    ];
+    final dayName = weekdays[now.weekday - 1];
+    final monthName = months[now.month - 1];
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text(
+          "Aujourd'hui • $dayName. ${now.day} $monthName",
+          style: GoogleFonts.poppins(
+              color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
+        ),
+        const Spacer(),
+        IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white54, size: 18),
+            onPressed: () => setState(() {})),
+        IconButton(
+            icon: const Icon(Icons.calendar_month_outlined, color: Colors.white54, size: 18),
+            onPressed: () {}),
+      ]),
+      const SizedBox(height: 12),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(children: [
+          const Icon(Icons.calendar_today_outlined, color: Colors.white24, size: 40),
+          const SizedBox(height: 12),
+          Text("Aucune réunion aujourd'hui",
+              style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13)),
+          const SizedBox(height: 4),
+          Text("Créez ou rejoignez une réunion",
+              style: GoogleFonts.poppins(color: Colors.white24, fontSize: 11)),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _buildBottomNav(String lang) {
+    return BottomNavigationBar(
+      backgroundColor: const Color(0xFF161622),
+      selectedItemColor: AppColors.primary,
+      unselectedItemColor: Colors.white38,
+      selectedLabelStyle: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: GoogleFonts.poppins(fontSize: 10),
+      type: BottomNavigationBarType.fixed,
+      currentIndex: 0,
+      onTap: (i) {
+        if (i == 3) Navigator.pushNamed(context, '/profile').then((_) => _loadLocalPhoto());
+        if (i == 4) _showMainMenu(lang);
+      },
+      items: const [
+        BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Accueil'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_outline),
+            activeIcon: Icon(Icons.chat_bubble),
+            label: 'Chat'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.video_camera_front_outlined),
+            activeIcon: Icon(Icons.video_camera_front),
+            label: 'Réunions'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profil'),
+        BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'Plus'),
+      ],
+    );
+  }
+
+  // ── Action sheet helpers ──────────────────────────────────────────────────
+
+  void _showNewMeetingSheet(String lang) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A2E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: StatefulBuilder(
+            builder: (ctx2, setSheet) => Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 16),
+              Text(AppTranslations.t('new_meeting', lang),
+                  style: GoogleFonts.poppins(
+                      color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _meetingNameController,
+                style: GoogleFonts.poppins(color: Colors.white),
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: AppTranslations.t('meeting_name_hint', lang),
+                  hintStyle: GoogleFonts.poppins(color: Colors.white38),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.08),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 ),
               ),
-            ),
-          ),
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-
-                  // ── Create meeting card ─────────────────────────
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFFE74C3C), Color(0xFF9B59B6), Color(0xFF8E44AD)],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFE74C3C).withValues(alpha: 0.35),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(22),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.video_call, color: Colors.white, size: 22),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            AppTranslations.t('new_meeting', lang),
-                            style: GoogleFonts.poppins(
-                              fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white,
-                            ),
-                          ),
-                        ]),
-                        const SizedBox(height: 16),
-
-                        // Meeting name field
-                        TextField(
-                          controller: _meetingNameController,
-                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500),
-                          decoration: InputDecoration(
-                            hintText: AppTranslations.t('meeting_name_hint', lang),
-                            hintStyle: GoogleFonts.poppins(color: Colors.white54),
-                            prefixIcon: const Icon(Icons.edit, color: Colors.white60, size: 20),
-                            filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.15),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: Colors.white, width: 2),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Toggle passcode
-                        GestureDetector(
-                          onTap: () => setState(() {
-                            _showPasscode = !_showPasscode;
-                            if (!_showPasscode) _passcodeController.clear();
-                          }),
-                          child: Row(children: [
-                            Icon(
-                              _showPasscode ? Icons.lock_outline : Icons.lock_open_outlined,
-                              size: 15, color: Colors.white70,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _showPasscode
-                                  ? AppTranslations.t('remove_passcode', lang)
-                                  : AppTranslations.t('add_passcode', lang),
-                              style: GoogleFonts.poppins(
-                                fontSize: 12, color: Colors.white70,
-                                decoration: TextDecoration.underline,
-                                decorationColor: Colors.white70,
-                              ),
-                            ),
-                          ]),
-                        ),
-
-                        // Passcode field (conditional)
-                        if (_showPasscode) ...[
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: _passcodeController,
-                            obscureText: _obscurePasscode,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(6),
-                            ],
-                            style: GoogleFonts.poppins(
-                                color: Colors.white, fontWeight: FontWeight.w600, letterSpacing: 4),
-                            decoration: InputDecoration(
-                              hintText: AppTranslations.t('passcode_hint', lang),
-                              hintStyle: GoogleFonts.poppins(color: Colors.white38, letterSpacing: 0),
-                              prefixIcon: const Icon(Icons.lock_outline, color: Colors.white60, size: 20),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePasscode
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: Colors.white54, size: 18,
-                                ),
-                                onPressed: () => setState(() => _obscurePasscode = !_obscurePasscode),
-                              ),
-                              filled: true,
-                              fillColor: fieldFill,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(color: Colors.white, width: 2),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(AppTranslations.t('passcode_digits', lang),
-                              style: GoogleFonts.poppins(fontSize: 10, color: Colors.white38)),
-                        ],
-
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: _isCreating ? null : _createMeeting,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFFE74C3C),
-                              disabledBackgroundColor: Colors.white60,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                            child: _isCreating
-                                ? const SizedBox(
-                                    width: 22, height: 22,
-                                    child: CircularProgressIndicator(
-                                        color: Color(0xFFE74C3C), strokeWidth: 2.5),
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.rocket_launch, size: 18),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        AppTranslations.t('start_meeting', lang),
-                                        style: GoogleFonts.poppins(
-                                            fontWeight: FontWeight.w700, fontSize: 15),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // ── Quick actions ───────────────────────────────
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: () {
+                  setSheet(() {
+                    _showPasscode = !_showPasscode;
+                    if (!_showPasscode) _passcodeController.clear();
+                  });
+                  setState(() {});
+                },
+                child: Row(children: [
+                  Icon(
+                      _showPasscode ? Icons.lock_outline : Icons.lock_open_outlined,
+                      size: 14,
+                      color: Colors.white54),
+                  const SizedBox(width: 6),
                   Text(
-                    AppTranslations.t('quick_actions', lang),
-                    style: GoogleFonts.poppins(
-                      fontSize: 17, fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  Row(children: [
-                    Expanded(child: _ActionCard(
-                      icon: Icons.group_add,
-                      title: AppTranslations.t('join', lang),
-                      subtitle: AppTranslations.t('via_id', lang),
-                      gradientColors: const [Color(0xFF8E44AD), Color(0xFF6C3483)],
-                      onTap: _showJoinDialog,
-                    )),
-                    const SizedBox(width: 12),
-                    Expanded(child: _ActionCard(
-                      icon: Icons.person_outline,
-                      title: AppTranslations.t('profile', lang),
-                      subtitle: AppTranslations.t('my_account', lang),
-                      gradientColors: const [Color(0xFFF39C12), Color(0xFFD68910)],
-                      onTap: () => Navigator.pushNamed(context, '/profile')
-                          .then((_) => _loadLocalPhoto()),
-                    )),
-                  ]),
-                  const SizedBox(height: 12),
-                  Row(children: [
-                    Expanded(child: _ActionCard(
-                      icon: Icons.tune,
-                      title: AppTranslations.t('settings_short', lang),
-                      subtitle: AppTranslations.t('preferences', lang),
-                      gradientColors: const [Color(0xFF3498DB), Color(0xFF2980B9)],
-                      onTap: () => Navigator.pushNamed(context, '/settings'),
-                    )),
-                    const SizedBox(width: 12),
-                    Expanded(child: _ActionCard(
-                      icon: Icons.share,
-                      title: AppTranslations.t('share', lang),
-                      subtitle: AppTranslations.t('invite', lang),
-                      gradientColors: const [Color(0xFF27AE60), Color(0xFF1E8449)],
-                      onTap: () {
-                        Share.share(AppTranslations.t('share_app_msg', lang));
-                      },
-                    )),
-                  ]),
-
-                  const SizedBox(height: 28),
-
-                  // ── Info banner ─────────────────────────────────
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.05)
-                          : const Color(0xFFEDE7F6),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.secondary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.info_outline, color: AppColors.secondary, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          AppTranslations.t('meeting_info', lang),
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: isDark ? Colors.white70 : AppColors.textSecondary,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ]),
-                  ),
-                  const SizedBox(height: 20),
-                ],
+                      _showPasscode
+                          ? AppTranslations.t('remove_passcode', lang)
+                          : AppTranslations.t('add_passcode', lang),
+                      style: GoogleFonts.poppins(
+                          color: Colors.white54,
+                          fontSize: 12,
+                          decoration: TextDecoration.underline,
+                          decorationColor: Colors.white54)),
+                ]),
               ),
-            ),
+              if (_showPasscode) ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _passcodeController,
+                  keyboardType: TextInputType.number,
+                  obscureText: _obscurePasscode,
+                  style: GoogleFonts.poppins(color: Colors.white),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                  decoration: InputDecoration(
+                    hintText: 'Code (4-6 chiffres)',
+                    hintStyle: GoogleFonts.poppins(color: Colors.white38),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.08),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    suffixIcon: IconButton(
+                        icon: Icon(
+                            _obscurePasscode
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: Colors.white54,
+                            size: 18),
+                        onPressed: () {
+                          setSheet(() => _obscurePasscode = !_obscurePasscode);
+                          setState(() {});
+                        }),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isCreating
+                      ? null
+                      : () {
+                          Navigator.pop(context);
+                          _createMeeting();
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE53935),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _isCreating
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : Text(AppTranslations.t('start_meeting', lang),
+                          style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w700, fontSize: 15)),
+                ),
+              ),
+            ]),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _avatarLetter(String name) {
-    return Center(
-      child: Text(
-        name.isNotEmpty ? name[0].toUpperCase() : 'U',
-        style: GoogleFonts.poppins(
-            color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18),
+  void _showJoinDialog(String lang) {
+    _joinIdController.clear();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A2E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            Text(AppTranslations.t('join_meeting', lang),
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _joinIdController,
+              style: GoogleFonts.poppins(color: Colors.white),
+              autofocus: true,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                hintText: AppTranslations.t('meeting_id', lang),
+                hintStyle: GoogleFonts.poppins(color: Colors.white38),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.08),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                prefixIcon: const Icon(Icons.tag, color: Colors.white38, size: 18),
+              ),
+              onSubmitted: (_) {
+                Navigator.pop(ctx);
+                _joinById(_joinIdController.text);
+                _joinIdController.clear();
+              },
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _joinById(_joinIdController.text);
+                  _joinIdController.clear();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1976D2),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(AppTranslations.t('join', lang),
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700, fontSize: 15)),
+              ),
+            ),
+          ]),
+        ),
       ),
     );
+  }
+
+  void _showScheduleDialog(String lang) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Fonctionnalité de planification bientôt disponible',
+          style: GoogleFonts.poppins()),
+      backgroundColor: AppColors.primary,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
+  }
+
+  void _showMainMenu(String lang) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 12),
+          ListTile(
+              leading: const Icon(Icons.settings_outlined, color: Colors.white70),
+              title: Text(AppTranslations.t('settings', lang),
+                  style: GoogleFonts.poppins(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/settings');
+              }),
+          ListTile(
+              leading: const Icon(Icons.logout, color: Colors.white70),
+              title: Text(AppTranslations.t('logout', lang),
+                  style: GoogleFonts.poppins(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _logout();
+              }),
+          ListTile(
+              leading: const Icon(Icons.share, color: Colors.white70),
+              title: Text(AppTranslations.t('share', lang),
+                  style: GoogleFonts.poppins(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _shareApp();
+              }),
+        ]),
+      ),
+    );
+  }
+
+  void _shareApp() {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
+    Share.share(AppTranslations.t('share_app_msg', lang));
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ActionCard extends StatelessWidget {
+class _QuickAction extends StatelessWidget {
   final IconData icon;
-  final String title;
-  final String subtitle;
-  final List<Color> gradientColors;
+  final String label;
+  final Color color;
   final VoidCallback onTap;
 
-  const _ActionCard({
+  const _QuickAction({
     required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.gradientColors,
+    required this.label,
+    required this.color,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.grey.withValues(alpha: 0.15),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(children: [
+      child: SizedBox(
+        width: 72,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
-            width: 44, height: 44,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: gradientColors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
+              color: color,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                    color: color.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4))
+              ],
             ),
-            child: Icon(icon, color: Colors.white, size: 22),
+            child: Icon(icon, color: Colors.white, size: 26),
           ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: GoogleFonts.poppins(
-                fontSize: 14, fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white : AppColors.textPrimary,
-              )),
-              Text(subtitle, style: GoogleFonts.poppins(
-                fontSize: 11, color: AppColors.textTertiary,
-              )),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+                color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+            maxLines: 2,
           ),
         ]),
       ),
