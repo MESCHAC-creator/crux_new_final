@@ -167,9 +167,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       if (entered == null) return;
       if (entered != meeting.passcode) {
-        if (mounted)
+        if (mounted) {
           _errorHandler.showErrorDialog(context, '🔒 ${AppTranslations.t('error', lang)}',
               AppTranslations.t('meet_wrong_code', lang));
+        }
         return;
       }
     }
@@ -1037,7 +1038,7 @@ class _MeetingCard extends StatelessWidget {
             Text(id,
                 style: GoogleFonts.poppins(
                     color: Colors.white12, fontSize: 9,
-                    fontFamily: 'monospace')),
+                    letterSpacing: 1)),
         ])),
         const SizedBox(width: 8),
         GestureDetector(

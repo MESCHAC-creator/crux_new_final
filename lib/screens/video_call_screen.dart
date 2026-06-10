@@ -7148,7 +7148,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
               onTap: () {
                 HapticFeedback.selectionClick();
                 final newCamOn = !_camOn;
-                for (final t in _localStream?.getVideoTracks() ?? []) t.enabled = newCamOn;
+                for (final t in _localStream?.getVideoTracks() ?? []) { t.enabled = newCamOn; }
                 setState(() => _camOn = newCamOn);
                 _db.collection('meetings').doc(widget.meetingId)
                     .collection('presence').doc(widget.userId)
@@ -7343,6 +7343,152 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 onChanged: (v) {
                   setState(() => _joinLeaveSounds = v);
                   setLocal(() {});
+                },
+              ),
+
+              // Noise cancellation
+              SwitchListTile(
+                title: Text('Réduction de bruit', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                subtitle: Text('Filtre les bruits de fond', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                value: _noiseCancellation,
+                // ignore: deprecated_member_use
+                activeColor: AppColors.primary,
+                secondary: const Icon(Icons.noise_aware, color: Colors.white54),
+                onChanged: (v) async {
+                  await _toggleNoiseCancellation();
+                  setLocal(() {});
+                },
+              ),
+
+              // Speaker toggle
+              ListTile(
+                leading: Icon(
+                  _speakerOn ? Icons.volume_up : Icons.volume_off,
+                  color: _speakerOn ? AppColors.primary : Colors.white54,
+                ),
+                title: Text('Haut-parleur', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                subtitle: Text(_speakerOn ? 'Activé' : 'Désactivé', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _toggleSpeaker();
+                  _showAudioOutputSelector();
+                },
+              ),
+
+              // Recording
+              ListTile(
+                leading: Icon(
+                  Icons.fiber_manual_record,
+                  color: _isRecordingLocally ? Colors.red : Colors.white54,
+                ),
+                title: Text(
+                  _isRecordingLocally ? 'Arrêter l\'enregistrement' : 'Enregistrer',
+                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+                ),
+                subtitle: Text('Enregistrement local', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _toggleLocalRecordingWithSync();
+                },
+              ),
+
+              // Raise hand
+              ListTile(
+                leading: Icon(
+                  Icons.back_hand_outlined,
+                  color: _handRaised ? Colors.amber : Colors.white54,
+                ),
+                title: Text(
+                  _handRaised ? 'Baisser la main' : 'Lever la main',
+                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _toggleRaiseHand();
+                },
+              ),
+
+              // Lock meeting (host only)
+              if (widget.isHost) ListTile(
+                leading: Icon(
+                  _isLocked ? Icons.lock : Icons.lock_open,
+                  color: _isLocked ? Colors.red : Colors.white54,
+                ),
+                title: Text(
+                  _isLocked ? 'Déverrouiller la réunion' : 'Verrouiller la réunion',
+                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _toggleLock();
+                },
+              ),
+
+              // Host controls (host only)
+              if (isPrivileged) ListTile(
+                leading: const Icon(Icons.admin_panel_settings_outlined, color: Colors.white54),
+                title: Text('Contrôles hôte', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showHostControlsSheet();
+                },
+              ),
+
+              // Filters
+              ListTile(
+                leading: const Icon(Icons.auto_fix_high_outlined, color: Colors.white54),
+                title: Text('Filtres vidéo', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showFiltersPanel();
+                },
+              ),
+
+              // AI Summary
+              ListTile(
+                leading: const Icon(Icons.auto_awesome, color: Colors.amber),
+                title: Text('Résumé IA', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                subtitle: Text('Générer un résumé de la réunion', style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
+                trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _generateMeetingSummary();
+                },
+              ),
+
+              // Meeting info
+              ListTile(
+                leading: const Icon(Icons.info_outline, color: Colors.white54),
+                title: Text('Infos réunion', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showMeetingInfoPanel();
+                },
+              ),
+
+              // Attendance (host/cohost only)
+              if (isPrivileged) ListTile(
+                leading: const Icon(Icons.checklist, color: Colors.white54),
+                title: Text('Présences', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _listenAttendance();
+                },
+              ),
+
+              // Offering (church mode)
+              if (_isChurchMode) ListTile(
+                leading: const Icon(Icons.volunteer_activism, color: Colors.amber),
+                title: Text('Offrandes', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showOfferingPanel();
                 },
               ),
             ]),
@@ -8701,85 +8847,6 @@ class _PaywallDialogState extends State<_PaywallDialog> with SingleTickerProvide
           ),
         ),
       ),
-    );
-  }
-}
-
-class _Btn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-  final bool isEnd;
-  final bool isHighlight;
-  final VoidCallback onTap;
-
-  const _Btn({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-    this.isEnd = false,
-    this.isHighlight = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        if (isEnd)
-          Container(
-            width: 56, height: 46,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEA4335),
-              borderRadius: BorderRadius.circular(23),
-              boxShadow: [BoxShadow(color: const Color(0xFFEA4335).withValues(alpha: 0.45), blurRadius: 14, offset: const Offset(0, 4))],
-            ),
-            child: const Icon(Icons.call_end, color: Colors.white, size: 22),
-          )
-        else if (isHighlight)
-          Container(
-            width: 52, height: 52,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFB71C1C), Color(0xFF6A1B9A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: const Color(0xFF6A1B9A).withValues(alpha: 0.45), blurRadius: 12)],
-            ),
-            child: Icon(icon, color: Colors.white, size: 22),
-          )
-        else if (active)
-          Container(
-            width: 52, height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.10), width: 1),
-            ),
-            child: Icon(icon, color: Colors.white, size: 22),
-          )
-        else
-          Container(
-            width: 52, height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.white.withValues(alpha: 0.38), size: 22),
-          ),
-        const SizedBox(height: 5),
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            color: isEnd ? Colors.white70 : (active || isHighlight ? Colors.white : Colors.white38),
-            fontSize: 9.5,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ]),
     );
   }
 }
