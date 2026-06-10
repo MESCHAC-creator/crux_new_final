@@ -7116,419 +7116,92 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   // ── CONTROLS BAR ─────────────────────────────
   Widget _buildControls() {
     final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
-    final isPrivileged = widget.isHost || _isCoHost;
     return SafeArea(
       top: false,
       child: Container(
-      padding: const EdgeInsets.fromLTRB(4, 10, 4, 12),
-      decoration: BoxDecoration(
-        color: const Color(0xF0141420),
-        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.07), width: 0.5)),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0F1A),
+          border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08), width: 0.5)),
+        ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            Semantics(
-              label: AppTranslations.t('tb_mic_toggle', lang),
-              button: true,
-              child: _Btn(
-                icon: _micOn ? Icons.mic : Icons.mic_off,
-                label: _micOn ? AppTranslations.t('tb_mic', lang) : AppTranslations.t('tb_muted', lang),
-                active: _micOn,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  for (final t in _localStream?.getAudioTracks() ?? []) {
-                    t.enabled = !_micOn;
-                  }
-                  setState(() => _micOn = !_micOn);
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            Semantics(
-              label: AppTranslations.t('tb_cam_toggle', lang),
-              button: true,
-              child: _Btn(
-                icon: _camOn ? Icons.videocam : Icons.videocam_off,
-                label: _camOn ? AppTranslations.t('tb_cam', lang) : AppTranslations.t('tb_cam_off', lang),
-                active: _camOn,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  final newCamOn = !_camOn;
-                  for (final t in _localStream?.getVideoTracks() ?? []) {
-                    t.enabled = newCamOn;
-                  }
-                  setState(() => _camOn = newCamOn);
-                  // Broadcast cam state so others know to show your photo
-                  _db.collection('meetings').doc(widget.meetingId)
-                      .collection('presence').doc(widget.userId)
-                      .update({'camOn': newCamOn}).catchError((_) {});
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            _Btn(
-              icon: Icons.flip_camera_ios,
-              label: AppTranslations.t('tb_flip', lang),
-              active: true,
-              onTap: () async {
-                HapticFeedback.selectionClick();
-                for (final t in _localStream?.getVideoTracks() ?? []) {
-                  await Helper.switchCamera(t);
-                }
-              },
-            ),
-            const SizedBox(width: 8),
-            _Btn(
-              icon: Icons.auto_fix_high,
-              label: AppTranslations.t('tb_filters', lang),
-              active: _cameraFilter == _CameraFilter.natural,
-              isHighlight: _cameraFilter != _CameraFilter.natural,
-              onTap: _showFiltersPanel,
-            ),
-            const SizedBox(width: 8),
-            // Feature N12: Screen share with permission check
-            if (!_allowParticipantScreenShare && !isPrivileged)
-              _Btn(
-                icon: Icons.screen_share,
-                label: AppTranslations.t('tb_screen', lang),
-                active: false,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(AppTranslations.t('screen_share_disabled', lang), style: GoogleFonts.poppins()),
-                    backgroundColor: Colors.orange.shade700,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    duration: const Duration(seconds: 3),
-                  ));
-                },
-              )
-            else
-              _Btn(
-                icon: _sharingScreen
-                    ? Icons.stop_screen_share
-                    : Icons.screen_share,
-                label: _sharingScreen ? AppTranslations.t('tb_stop', lang) : AppTranslations.t('tb_screen', lang),
-                active: !_sharingScreen,
-                isHighlight: _sharingScreen,
-                onTap: _toggleScreenShare,
-              ),
-            const SizedBox(width: 8),
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                _Btn(
-                  icon: Icons.chat_bubble_outline,
-                  label: AppTranslations.t('tb_chat', lang),
-                  active: !_showChat,
-                  isHighlight: _showChat,
-                  onTap: () => setState(() {
-                    _showChat = !_showChat;
-                    if (_showChat) {
-                      _showEmojiBar = false;
-                      _showParticipants = false;
-                      _unreadMessages = 0;
-                    }
-                  }),
-                ),
-                if (_unreadMessages > 0)
-                  Positioned(
-                    top: -4, right: -4,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red, shape: BoxShape.circle),
-                      child: Text('$_unreadMessages',
-                          style: GoogleFonts.poppins(
-                              color: Colors.white, fontSize: 9,
-                              fontWeight: FontWeight.w800)),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(width: 8),
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                _Btn(
-                  icon: Icons.people_outline,
-                  label: AppTranslations.t('tb_participants', lang),
-                  active: !_showParticipants,
-                  isHighlight: _showParticipants,
-                  onTap: () => setState(() {
-                    _showParticipants = !_showParticipants;
-                    if (_showParticipants) { _showChat = false; _showEmojiBar = false; }
-                  }),
-                ),
-                if (_waitingList.isNotEmpty)
-                  Positioned(
-                    top: -4, right: -4,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle),
-                      child: Text('${_waitingList.length}',
-                          style: GoogleFonts.poppins(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(width: 8),
-            _Btn(
-              icon: _handRaised ? Icons.front_hand : Icons.front_hand_outlined,
-              label: _handRaised ? AppTranslations.t('tb_hand_lower', lang) : AppTranslations.t('tb_hand_raise', lang),
-              active: !_handRaised,
-              isHighlight: _handRaised,
-              onTap: _toggleRaiseHand,
-            ),
-            const SizedBox(width: 8),
-            _Btn(
-              icon: Icons.emoji_emotions_outlined,
-              label: AppTranslations.t('tb_emoji', lang),
-              active: !_showEmojiBar,
-              isHighlight: _showEmojiBar,
-              onTap: () => setState(() {
-                _showEmojiBar = !_showEmojiBar;
-                if (_showEmojiBar) _showChat = false;
-              }),
-            ),
-            const SizedBox(width: 8),
-            _Btn(
-              icon: Icons.info_outline,
-              label: AppTranslations.t('tb_info', lang),
-              active: true,
-              onTap: _showMeetingInfoPanel,
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onLongPress: _showAudioOutputSelector,
-              child: _Btn(
-                icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
-                label: _speakerOn ? AppTranslations.t('tb_speaker', lang) : AppTranslations.t('tb_earpiece', lang),
-                active: _speakerOn,
-                onTap: _toggleSpeaker,
-              ),
-            ),
-            const SizedBox(width: 8),
-            _Btn(
-              icon: Icons.tune,
-              label: AppTranslations.t('tb_options', lang),
-              active: true,
-              onTap: _showMoreOptionsSheet,
-            ),
-            if (isPrivileged) ...[
-              const SizedBox(width: 8),
-              _Btn(
-                icon: _isLocked ? Icons.lock : Icons.lock_open,
-                label: _isLocked ? AppTranslations.t('tb_unlock', lang) : AppTranslations.t('tb_lock', lang),
-                active: !_isLocked,
-                isHighlight: _isLocked,
-                onTap: _toggleLock,
-              ),
-              const SizedBox(width: 8),
-              _Btn(
-                icon: Icons.mic_off,
-                label: AppTranslations.t('tb_mute_all', lang),
-                active: true,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  // Keep host's own mic enabled — only signal OTHER participants to mute
-                  // Do NOT mute the host's local audio track or set _micOn = false
-                  // Signal all participants via Firestore (fire-and-forget)
-                  _meetingService.triggerMuteAll(widget.meetingId).catchError((_) {});
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text('🔇 ${AppTranslations.t('tb_all_muted', lang)}',
-                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
-                      backgroundColor: Colors.orange.shade800,
-                      duration: const Duration(seconds: 2),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ));
-                  }
-                },
-              ),
-            ],
-            // ── CHURCH OFFERING BUTTON ──────────────────────
-            if (_isChurchMode) ...[
-              const SizedBox(width: 8),
-              _Btn(
-                icon: Icons.volunteer_activism,
-                label: AppTranslations.t('tb_offering', lang),
-                active: true,
-                isHighlight: true,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  _showOfferingPanel();
-                },
-              ),
-            ],
-            const SizedBox(width: 8),
-            _Btn(
-              icon: Icons.subtitles_outlined,
-              label: AppTranslations.t('tb_subtitles', lang),
-              active: !_showTranscript,
-              isHighlight: _showTranscript,
+            // 1. Microphone
+            _ZoomBtn(
+              icon: _micOn ? Icons.mic : Icons.mic_off,
+              label: _micOn ? AppTranslations.t('tb_mic', lang) : AppTranslations.t('tb_muted', lang),
+              active: _micOn,
               onTap: () {
-                setState(() {
-                  _showTranscript = !_showTranscript;
-                  if (_showTranscript) {
-                    _showChat = false;
-                    _showParticipants = false;
-                    _showWhiteboard = false;
-                  }
-                });
-                // Auto-start transcription when panel opens
-                if (_showTranscript && !_sttListening) {
-                  _startTranscription();
+                HapticFeedback.selectionClick();
+                for (final t in _localStream?.getAudioTracks() ?? []) {
+                  t.enabled = !_micOn;
                 }
-                // Auto-stop when panel closes
-                if (!_showTranscript && _sttListening) {
-                  _stopTranscription();
-                }
+                setState(() => _micOn = !_micOn);
               },
             ),
-            const SizedBox(width: 8),
-            _Btn(
-              icon: Icons.draw_outlined,
-              label: AppTranslations.t('tb_whiteboard', lang),
-              active: !_showWhiteboard,
-              isHighlight: _showWhiteboard,
-              onTap: () => setState(() {
-                _showWhiteboard = !_showWhiteboard;
-                if (_showWhiteboard) {
-                  _showChat = false;
-                  _showParticipants = false;
-                  _showTranscript = false;
-                  _showPolls = false;
-                  _listenWhiteboard();
-                }
-              }),
+            // 2. Camera
+            _ZoomBtn(
+              icon: _camOn ? Icons.videocam : Icons.videocam_off,
+              label: _camOn ? AppTranslations.t('tb_cam', lang) : AppTranslations.t('tb_cam_off', lang),
+              active: _camOn,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                final newCamOn = !_camOn;
+                for (final t in _localStream?.getVideoTracks() ?? []) t.enabled = newCamOn;
+                setState(() => _camOn = newCamOn);
+                _db.collection('meetings').doc(widget.meetingId)
+                    .collection('presence').doc(widget.userId)
+                    .update({'camOn': newCamOn}).catchError((_) {});
+              },
             ),
-            const SizedBox(width: 8),
-            _Btn(
-              icon: Icons.poll_outlined,
-              label: AppTranslations.t('tb_polls', lang),
-              active: !_showPolls,
-              isHighlight: _showPolls,
-              onTap: () => setState(() {
-                _showPolls = !_showPolls;
-                if (_showPolls) {
-                  _showChat = false;
-                  _showParticipants = false;
-                  _showTranscript = false;
-                  _showWhiteboard = false;
-                }
-              }),
+            // 3. Chat
+            _ZoomBtn(
+              icon: Icons.chat_bubble_outline,
+              label: AppTranslations.t('tb_chat', lang),
+              active: true,
+              badge: _unreadMessages > 0 ? '$_unreadMessages' : null,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() {
+                  _showChat = !_showChat;
+                  if (_showChat) _unreadMessages = 0;
+                });
+              },
             ),
-            const SizedBox(width: 8),
-            _Btn(
-              icon: _isRecordingLocally ? Icons.stop_circle_outlined : Icons.fiber_manual_record,
-              label: _isRecordingLocally ? AppTranslations.t('tb_rec_stop', lang) : AppTranslations.t('tb_rec', lang),
-              active: !_isRecordingLocally,
-              isHighlight: _isRecordingLocally,
-              onTap: _toggleLocalRecordingWithSync,
+            // 4. Participants
+            _ZoomBtn(
+              icon: Icons.people_outline,
+              label: AppTranslations.t('tb_participants', lang),
+              active: true,
+              badge: '${_presenceList.length}',
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _showParticipants = !_showParticipants);
+              },
             ),
-            const SizedBox(width: 8),
-            _Btn(
-              icon: _noiseCancellation ? Icons.noise_aware : Icons.noise_control_off,
-              label: AppTranslations.t('tb_noise', lang),
-              active: _noiseCancellation,
-              isHighlight: !_noiseCancellation,
-              onTap: _toggleNoiseCancellation,
+            // 5. More
+            _ZoomBtn(
+              icon: Icons.more_horiz,
+              label: AppTranslations.t('more', lang),
+              active: true,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                _showMoreOptionsSheet();
+              },
             ),
-            const SizedBox(width: 8),
-            if (_transcriptLines.isNotEmpty)
-              _Btn(
-                icon: Icons.auto_awesome,
-                label: AppTranslations.t('tb_summary', lang),
-                active: true,
-                onTap: _generateMeetingSummary,
-              ),
-            const SizedBox(width: 8),
-            // Feature N1: Q&A button
-            _Btn(
-              icon: Icons.quiz_outlined,
-              label: AppTranslations.t('tb_qa', lang),
-              active: !_showQA,
-              isHighlight: _showQA,
-              onTap: () => setState(() {
-                _showQA = !_showQA;
-                if (_showQA) { _showChat = false; _showParticipants = false; _showWhiteboard = false; _showPolls = false; _showActivities = false; }
-              }),
-            ),
-            const SizedBox(width: 8),
-            // Feature N6: Agenda button
-            _Btn(
-              icon: Icons.notes,
-              label: AppTranslations.t('tb_agenda', lang),
-              active: !_showAgendaPanel,
-              isHighlight: _showAgendaPanel,
-              onTap: () => setState(() {
-                _showAgendaPanel = !_showAgendaPanel;
-                if (_showAgendaPanel) { _showChat = false; _showParticipants = false; _showWhiteboard = false; _showPolls = false; _showActivities = false; }
-              }),
-            ),
-            const SizedBox(width: 8),
-            // Feature N15: Activities panel
-            _Btn(
-              icon: Icons.grid_view,
-              label: AppTranslations.t('tb_activities', lang),
-              active: !_showActivities,
-              isHighlight: _showActivities,
-              onTap: () => setState(() {
-                _showActivities = !_showActivities;
-                if (_showActivities) { _showChat = false; _showParticipants = false; _showWhiteboard = false; _showPolls = false; _showQA = false; }
-              }),
-            ),
-            // Feature N2: Attendance button (host/cohost only)
-            if (isPrivileged) ...[
-              const SizedBox(width: 8),
-              _Btn(
-                icon: Icons.checklist,
-                label: AppTranslations.t('tb_attendance', lang),
-                active: true,
-                onTap: _listenAttendance,
-              ),
-            ],
-            // Feature N4: Host controls (host/cohost only)
-            if (isPrivileged) ...[
-              const SizedBox(width: 8),
-              _Btn(
-                icon: Icons.shield_outlined,
-                label: AppTranslations.t('tb_controls', lang),
-                active: true,
-                onTap: _showHostControlsSheet,
-              ),
-            ],
-            const SizedBox(width: 8),
-            if (_pipSupported)
-              _Btn(
-                icon: Icons.picture_in_picture_alt_rounded,
-                label: 'Mini',
-                active: true,
-                onTap: _enterPip,
-              ),
-            const SizedBox(width: 8),
-            Semantics(
-              label: AppTranslations.t('leave_meeting', Provider.of<LocaleProvider>(context, listen: false).locale.languageCode),
-              button: true,
-              child: _Btn(
-                icon: Icons.call_end,
-                label: 'Fin',
-                active: false,
-                isEnd: true,
-                onTap: _confirmLeave,
-              ),
+            // 6. Leave (red)
+            _ZoomBtn(
+              icon: Icons.call_end,
+              label: AppTranslations.t('leave_meeting', lang),
+              active: false,
+              isEnd: true,
+              onTap: _confirmLeave,
             ),
           ],
         ),
       ),
-    ), // Container
-    ); // SafeArea
+    );
   }
 
   // ── MORE OPTIONS SHEET ───────────────────────
@@ -9654,4 +9327,72 @@ class _WhiteboardPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_WhiteboardPainter old) => true;
+}
+
+// ── ZOOM-STYLE BOTTOM BAR BUTTON ────────────────────────────────────────────
+class _ZoomBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final bool isEnd;
+  final String? badge;
+  final VoidCallback onTap;
+
+  const _ZoomBtn({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+    this.isEnd = false,
+    this.badge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = isEnd
+        ? Colors.white
+        : (active ? Colors.white : Colors.red.shade300);
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 52,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Stack(alignment: Alignment.topRight, clipBehavior: Clip.none, children: [
+            Container(
+              width: 44, height: 36,
+              decoration: BoxDecoration(
+                color: isEnd
+                    ? const Color(0xFFE53935)
+                    : (active ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.05)),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor, size: 22),
+            ),
+            if (badge != null)
+              Positioned(
+                top: -4,
+                right: -4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE53935),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(badge!, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                ),
+              ),
+          ]),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w500),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ]),
+      ),
+    );
+  }
 }
