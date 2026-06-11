@@ -39,14 +39,11 @@ class MeetingService {
       passcode: passcode?.isNotEmpty == true ? passcode : null,
     );
 
-    // Await the Firestore write so guests can join immediately after the host shares the code.
-    try {
-      await _firestore.collection('meetings').doc(meetingId).set(meeting.toJson());
-      _log.i('✅ Réunion persistée dans Firestore: $meetingId');
-    } catch (e) {
-      _log.w('⚠️ Firestore write failed: $e');
-      rethrow; // propagate so the UI can show an error instead of a phantom meeting ID
-    }
+    // Fire-and-forget: offline persistence caches the doc immediately so
+    // getMeetingOnce works even before server ack, and the UI never hangs.
+    _firestore.collection('meetings').doc(meetingId).set(meeting.toJson())
+        .then((_) => _log.i('✅ Réunion persistée: $meetingId'))
+        .catchError((e) => _log.w('⚠️ Firestore sync: $e'));
 
     return meetingId;
   }

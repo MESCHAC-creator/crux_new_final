@@ -91,20 +91,21 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_photoKey, dest);
 
-      // 2. Encode as base64 and publish to Firestore so others can see it
-      final uid = _auth.currentUser?.uid;
-      if (uid != null) {
-        final bytes = await file.readAsBytes();
-        final b64 = base64Encode(bytes);
-        await UserService.instance.saveProfile(uid: uid, photoBase64: b64);
-      }
-
+      // 2. Update UI immediately — local file is already saved
       if (mounted) {
         setState(() {
           _localPhotoPath = dest;
           _isUpdatingPhoto = false;
         });
         _snack(AppTranslations.t('photo_updated_ok', context.read<LocaleProvider>().locale.languageCode));
+      }
+
+      // 3. Background Firestore sync — non-blocking, never delays UI
+      final uid = _auth.currentUser?.uid;
+      if (uid != null) {
+        final bytes = await file.readAsBytes();
+        final b64 = base64Encode(bytes);
+        UserService.instance.saveProfile(uid: uid, photoBase64: b64).catchError((_) {});
       }
     } catch (e) {
       if (mounted) {
