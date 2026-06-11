@@ -358,6 +358,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   String get _docId =>
       'room_${widget.meetingId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
 
+  // ICE servers: multiple STUN (Google + Cloudflare + Mozilla) + TURN fallback.
+  // The TURN server is essential when both peers are behind strict NAT/firewalls.
+  // Replace the openrelay credentials with your own Metered.ca or Twilio TURN
+  // credentials in production — the public openrelay is rate-limited and unreliable.
   static const _iceConfig = {
     'iceServers': [
       {
@@ -365,6 +369,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           'stun:stun.l.google.com:19302',
           'stun:stun1.l.google.com:19302',
           'stun:stun2.l.google.com:19302',
+          'stun:stun.cloudflare.com:3478',    // Cloudflare STUN — very reliable
+          'stun:stun.mozilla.com:3478',       // Mozilla STUN — additional fallback
         ]
       },
       {
@@ -372,6 +378,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           'turn:openrelay.metered.ca:80',
           'turn:openrelay.metered.ca:443',
           'turn:openrelay.metered.ca:443?transport=tcp',
+          'turns:openrelay.metered.ca:443',   // TLS-encrypted TURN (firewall-friendly)
         ],
         'username': 'openrelayproject',
         'credential': 'openrelayproject',
@@ -933,15 +940,20 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         });
         // Auto-adaptive quality
         if (_autoQuality) {
-          if (_netQuality == _NetQuality.poor && _videoQuality != _VideoQuality.low) {
-            setState(() => _videoQuality = _VideoQuality.low);
-            _applyVideoQuality(_videoQuality);
-          } else if (_netQuality == _NetQuality.fair && _videoQuality == _VideoQuality.high) {
-            setState(() => _videoQuality = _VideoQuality.medium);
-            _applyVideoQuality(_videoQuality);
-          } else if (_netQuality == _NetQuality.good && _videoQuality == _VideoQuality.low) {
-            setState(() => _videoQuality = _VideoQuality.medium);
-            _applyVideoQuality(_videoQuality);
+          if (_sharingScreen) {
+            // Screen share: re-apply encoding constraints based on current network
+            _applyScreenShareEncoding();
+          } else {
+            if (_netQuality == _NetQuality.poor && _videoQuality != _VideoQuality.low) {
+              setState(() => _videoQuality = _VideoQuality.low);
+              _applyVideoQuality(_videoQuality);
+            } else if (_netQuality == _NetQuality.fair && _videoQuality == _VideoQuality.high) {
+              setState(() => _videoQuality = _VideoQuality.medium);
+              _applyVideoQuality(_videoQuality);
+            } else if (_netQuality == _NetQuality.good && _videoQuality == _VideoQuality.low) {
+              setState(() => _videoQuality = _VideoQuality.medium);
+              _applyVideoQuality(_videoQuality);
+            }
           }
         }
       } catch (_) {}
@@ -1487,6 +1499,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     setState(() => _videoQuality = q);
     final videoTrack = _localStream?.getVideoTracks().firstOrNull;
     if (videoTrack == null) return;
+
+    // 1. Adjust capture resolution/fps at the source
     switch (q) {
       case _VideoQuality.low:
         await videoTrack.applyConstraints({'width': 320, 'height': 240, 'frameRate': 15});
@@ -1501,9 +1515,77 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         await videoTrack.applyConstraints({'width': 1920, 'height': 1080, 'frameRate': 30});
         break;
     }
+
+    // 2. Also cap the RTP sender bitrate so the network load matches the quality level.
+    //    setParameters() controls what actually leaves the device, independent of capture.
+    if (_pc == null) return;
+    try {
+      final senders = await _pc!.getSenders();
+      for (final sender in senders) {
+        if (sender.track?.kind != 'video') continue;
+        final params = await sender.getParameters();
+        if (params.encodings == null || params.encodings!.isEmpty) continue;
+        final maxBps = switch (q) {
+          _VideoQuality.low    => 150000,   // 150 kbps
+          _VideoQuality.medium => 500000,   // 500 kbps
+          _VideoQuality.high   => 1500000,  // 1.5 Mbps
+          _VideoQuality.hd     => 3000000,  // 3 Mbps
+        };
+        for (final enc in params.encodings!) {
+          enc.maxBitrate = maxBps;
+        }
+        await sender.setParameters(params);
+      }
+    } catch (_) {}
   }
 
-  // ── SCREEN SHARE ────────────────────────────
+  // ── SCREEN SHARE ENCODING ────────────────────
+  // Screen content needs high resolution but low FPS (slides/text don't move).
+  // Bitrate budget is higher than camera to preserve sharpness.
+  Future<void> _applyScreenShareEncoding() async {
+    if (_pc == null || _screenStream == null) return;
+    try {
+      final senders = await _pc!.getSenders();
+      for (final sender in senders) {
+        if (sender.track?.kind != 'video') continue;
+        final params = await sender.getParameters();
+        if (params.encodings == null || params.encodings!.isEmpty) continue;
+        // Network-adaptive bitrate for screen share
+        final maxBps = switch (_netQuality) {
+          _NetQuality.good    => 2000000,  // 2 Mbps — crisp text
+          _NetQuality.fair    => 1000000,  // 1 Mbps
+          _NetQuality.poor    => 400000,   // 400 kbps — degrade gracefully
+          _NetQuality.unknown => 1000000,
+        };
+        for (final enc in params.encodings!) {
+          enc.maxBitrate = maxBps;
+          // Reduce FPS dynamically on poor networks to save bandwidth
+          enc.maxFramerate = _netQuality == _NetQuality.poor ? 5 : 15;
+        }
+        await sender.setParameters(params);
+      }
+    } catch (_) {}
+  }
+
+  // Restore camera encoding params after screen share stops
+  Future<void> _restoreCameraEncoding() async {
+    if (_pc == null) return;
+    try {
+      final senders = await _pc!.getSenders();
+      for (final sender in senders) {
+        if (sender.track?.kind != 'video') continue;
+        final params = await sender.getParameters();
+        if (params.encodings == null || params.encodings!.isEmpty) continue;
+        for (final enc in params.encodings!) {
+          enc.maxBitrate = 500000; // reset to medium camera default
+          enc.maxFramerate = 30;
+        }
+        await sender.setParameters(params);
+      }
+    } catch (_) {}
+  }
+
+
   Future<void> _toggleScreenShare() async {
     HapticFeedback.mediumImpact();
     if (_sharingScreen) {
@@ -1529,6 +1611,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             _localRenderer.srcObject = _localStream;
           });
         }
+        // Restore camera encoding parameters after screen share
+        await _restoreCameraEncoding();
+
         // Clear screen-share presence flag
         try {
           final uid = widget.userId;
@@ -1568,6 +1653,47 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             ));
           }
           return;
+        }
+
+        // ── Privacy warning ──────────────────────
+        // Warn the user to close sensitive windows before Android shows the
+        // system consent dialog (once the user taps "Start Now" we can't stop it).
+        if (mounted) {
+          final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: Theme.of(ctx).scaffoldBackgroundColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(children: [
+                const Icon(Icons.privacy_tip_outlined, color: Colors.orange, size: 24),
+                const SizedBox(width: 10),
+                Text(AppTranslations.t('screen_share_privacy_title', lang),
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 16)),
+              ]),
+              content: Text(
+                AppTranslations.t('screen_share_privacy_body', lang),
+                style: GoogleFonts.poppins(fontSize: 13),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(AppTranslations.t('cancel', lang),
+                      style: GoogleFonts.poppins(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(AppTranslations.t('continue_btn', lang),
+                      style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          );
+          if (confirmed != true) return;
         }
 
         // Android 10+ (API 29+): the foreground service MUST be running before
@@ -1696,6 +1822,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           _log.i('Screen share: track ended by system');
           if (mounted) _toggleScreenShare();
         };
+
+        // Apply screen-share specific encoding (high res, low FPS, bitrate-capped)
+        await _applyScreenShareEncoding();
 
         // Update presence so remote participants know screen share is active
         try {

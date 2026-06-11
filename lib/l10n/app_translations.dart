@@ -184,6 +184,9 @@ class AppTranslations {
       'screen_share_permission_denied': 'Permission refusée pour le partage d\'écran.',
       'screen_share_cancelled': 'Partage d\'écran annulé.',
       'screen_share_not_supported': 'Partage d\'écran non supporté sur cet appareil.',
+      'screen_share_privacy_title': 'Vie privée — partage d\'écran',
+      'screen_share_privacy_body': 'Votre écran sera visible par tous les participants. Fermez les fenêtres contenant des mots de passe, numéros de carte ou données sensibles avant de continuer.',
+      'continue_btn': 'Continuer',
       // New keys for video_call_screen and other screens
       'yt_stream_title': 'Retransmission YouTube',
       'yt_stream_desc': 'Configurez votre retransmission YouTube en direct',
@@ -482,6 +485,9 @@ class AppTranslations {
       'screen_share_permission_denied': 'Screen share permission denied.',
       'screen_share_cancelled': 'Screen sharing cancelled.',
       'screen_share_not_supported': 'Screen sharing not supported on this device.',
+      'screen_share_privacy_title': 'Privacy — Screen Share',
+      'screen_share_privacy_body': 'Your screen will be visible to all participants. Close any windows containing passwords, card numbers, or sensitive data before continuing.',
+      'continue_btn': 'Continue',
       // New keys for video_call_screen and other screens
       'yt_stream_title': 'YouTube Livestream',
       'yt_stream_desc': 'Configure your YouTube live stream',
