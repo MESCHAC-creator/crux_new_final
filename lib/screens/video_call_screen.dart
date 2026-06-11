@@ -1523,7 +1523,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       final senders = await _pc!.getSenders();
       for (final sender in senders) {
         if (sender.track?.kind != 'video') continue;
-        final params = await sender.getParameters();
+        final params = sender.parameters;
         if (params.encodings == null || params.encodings!.isEmpty) continue;
         final maxBps = switch (q) {
           _VideoQuality.low    => 150000,   // 150 kbps
@@ -1548,7 +1548,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       final senders = await _pc!.getSenders();
       for (final sender in senders) {
         if (sender.track?.kind != 'video') continue;
-        final params = await sender.getParameters();
+        final params = sender.parameters;
         if (params.encodings == null || params.encodings!.isEmpty) continue;
         // Network-adaptive bitrate for screen share
         final maxBps = switch (_netQuality) {
@@ -1574,7 +1574,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       final senders = await _pc!.getSenders();
       for (final sender in senders) {
         if (sender.track?.kind != 'video') continue;
-        final params = await sender.getParameters();
+        final params = sender.parameters;
         if (params.encodings == null || params.encodings!.isEmpty) continue;
         for (final enc in params.encodings!) {
           enc.maxBitrate = 500000; // reset to medium camera default
