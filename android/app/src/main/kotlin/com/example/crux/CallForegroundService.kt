@@ -77,10 +77,25 @@ class CallForegroundService : Service() {
 
     // Ensure we are already a foreground service before posting additional notifications.
     // Called before postScreenShareNotification() so Android 12+ doesn't kill the process.
+    // NOTE: FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION is intentionally NOT included here
+    // because Android 14+ requires passing a valid MediaProjection token with that type.
+    // flutter_webrtc's own ScreenCaptureService handles the mediaProjection type with
+    // the proper token obtained from the consent dialog result.
     private fun ensureForeground() {
         try {
-            startForeground(NOTIFICATION_ID, buildCallNotification())
-        } catch (_: Exception) {}
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildCallNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildCallNotification())
+            }
+        } catch (_: Exception) {
+            try { startForeground(NOTIFICATION_ID, buildCallNotification()) } catch (_: Exception) {}
+        }
     }
 
     private fun showCallNotification() {

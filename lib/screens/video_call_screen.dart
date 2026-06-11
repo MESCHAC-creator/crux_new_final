@@ -1529,6 +1529,15 @@ class _VideoCallScreenState extends State<VideoCallScreen>
             _localRenderer.srcObject = _localStream;
           });
         }
+        // Clear screen-share presence flag
+        try {
+          final uid = widget.userId;
+          if (uid.isNotEmpty && widget.meetingId.isNotEmpty) {
+            _db.collection('meetings').doc(widget.meetingId)
+                .collection('presence').doc(uid)
+                .update({'isScreenSharing': false}).catchError((_) {});
+          }
+        } catch (_) {}
         // Signal Android service to dismiss screen share notification
         if (!kIsWeb && Platform.isAndroid) {
           try {
@@ -1561,11 +1570,17 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           return;
         }
 
+        // Android 10+ (API 29+): the foreground service MUST be running before
+        // MediaProjectionManager starts capture. Start it now, before the
+        // consent dialog appears, so flutter_webrtc's ScreenCaptureService can
+        // bind to an already-live foreground context.
+        if (!kIsWeb && Platform.isAndroid) {
+          try {
+            await _screenChannel.invokeMethod('screenShareStarted');
+          } catch (_) {}
+        }
+
         _log.i('Starting screen share - requesting display media');
-        // On Android, getDisplayMedia triggers a system consent dialog via
-        // MediaProjectionManager. Catch ALL throwables (Error + Exception +
-        // PlatformException) to prevent the app from crashing if the user
-        // denies permission or the device has any compatibility issue.
         MediaStream? stream;
         try {
           stream = await navigator.mediaDevices.getDisplayMedia({
@@ -1578,11 +1593,15 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           });
         } catch (e) {
           _log.w('Screen share: getDisplayMedia failed: $e');
-          // Graceful degradation — show message, do not crash
+          // Consent was denied or dialog cancelled — dismiss the notification
+          if (!kIsWeb && Platform.isAndroid) {
+            try { await _screenChannel.invokeMethod('screenShareStopped'); } catch (_) {}
+          }
           if (mounted) {
             final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
             final msg = e.toString().toLowerCase();
-            final isCancelled = msg.contains('cancel') || msg.contains('denied') || msg.contains('permission') || msg.contains('notallowed');
+            final isCancelled = msg.contains('cancel') || msg.contains('denied') ||
+                msg.contains('permission') || msg.contains('notallowed');
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text(
                 isCancelled
@@ -1601,6 +1620,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
         if (_screenStream == null) {
           _log.w('Screen share: getDisplayMedia returned null');
+          if (!kIsWeb && Platform.isAndroid) {
+            try { await _screenChannel.invokeMethod('screenShareStopped'); } catch (_) {}
+          }
           if (mounted) {
             final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -1619,6 +1641,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
           _log.w('Screen share: No video tracks in screen stream');
           await _screenStream?.dispose();
           _screenStream = null;
+          if (!kIsWeb && Platform.isAndroid) {
+            try { await _screenChannel.invokeMethod('screenShareStopped'); } catch (_) {}
+          }
           if (mounted) {
             final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -1632,55 +1657,70 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         }
 
         final screenTrack = tracks.first;
-        _log.i('Screen share: Got screen track, checking peer connection');
 
-        // If peer connection exists, replace the video track in senders
+        // Push the screen track to the peer connection.
+        // replaceTrack: swap the existing video sender (no renegotiation needed).
+        // addTrack: used as fallback when no video sender exists yet (e.g. camera off).
         if (_pc != null) {
           final senders = await _pc!.getSenders();
-          _log.i('Screen share: Found ${senders.length} senders');
+          _log.i('Screen share: ${senders.length} senders found');
 
           bool trackReplaced = false;
           for (final sender in senders) {
-            _log.i('Screen share: Sender track kind: ${sender.track?.kind}');
             if (sender.track?.kind == 'video') {
               try {
                 await sender.replaceTrack(screenTrack);
-                _log.i('Screen share: Track replaced successfully');
+                _log.i('Screen share: replaceTrack succeeded');
                 trackReplaced = true;
+                break;
               } catch (e, st) {
-                _log.e('Screen share: Error replacing track: $e', stackTrace: st);
+                _log.e('Screen share: replaceTrack failed: $e', stackTrace: st);
               }
             }
           }
+
           if (!trackReplaced) {
-            _log.w('Screen share: No video track was replaced (will add on peer connect)');
+            // No video sender — add track directly so remote peer receives it.
+            try {
+              await _pc!.addTrack(screenTrack, _screenStream!);
+              _log.i('Screen share: addTrack succeeded (no prior video sender)');
+            } catch (e, st) {
+              _log.e('Screen share: addTrack also failed: $e', stackTrace: st);
+            }
           }
         } else {
-          _log.i('Screen share: No peer connection yet — stream ready, will use on connection');
+          _log.i('Screen share: no peer connection yet — track will be used when connection establishes');
         }
 
         screenTrack.onEnded = () {
-          _log.i('Screen share: Track ended callback triggered');
+          _log.i('Screen share: track ended by system');
           if (mounted) _toggleScreenShare();
         };
+
+        // Update presence so remote participants know screen share is active
+        try {
+          final uid = widget.userId;
+          if (uid.isNotEmpty && widget.meetingId.isNotEmpty) {
+            _db.collection('meetings').doc(widget.meetingId)
+                .collection('presence').doc(uid)
+                .update({'isScreenSharing': true}).catchError((_) {});
+          }
+        } catch (_) {}
 
         if (mounted) {
           setState(() {
             _sharingScreen = true;
             _localRenderer.srcObject = _screenStream;
           });
-          _log.i('Screen share: State updated, sharing active');
-          // Signal Android service to show screen share notification
-          if (!kIsWeb && Platform.isAndroid) {
-            try {
-              await _screenChannel.invokeMethod('screenShareStarted');
-            } catch (_) {}
-          }
+          _log.i('Screen share: active');
         }
       } catch (e, st) {
-        _log.e('Screen share error: $e\nStackTrace: $st', stackTrace: st);
+        _log.e('Screen share error: $e', stackTrace: st);
         await _screenStream?.dispose();
         _screenStream = null;
+        if (!kIsWeb && Platform.isAndroid) {
+          try { await _screenChannel.invokeMethod('screenShareStopped'); } catch (_) {}
+        }
         if (mounted) {
           final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
           final errStr = e.toString().toLowerCase();
