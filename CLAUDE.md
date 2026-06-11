@@ -218,3 +218,32 @@ lib/
 | `graphify` | `~/.claude/skills/graphify/SKILL.md` | ✅ Active — knowledge graph is built at `graphify-out/` |
 
 > **Note:** The `graphify` skill is both bundled AND installed as a user skill with a custom SKILL.md. The user version takes precedence. The knowledge graph (`graphify-out/graph.json`, 1 673 nodes, 2 231 edges, 73 communities) is pre-built and ready — queries skip extraction and answer directly.
+
+---
+
+## External Anthropic Agents (platform.claude.ai)
+
+Config: `.claude/agents.json` | Script: `.claude/call_agent.sh`
+Requires: `ANTHROPIC_API_KEY` env var (set as GitHub Actions secret + local env)
+
+| Clé | Nom | ID | Rôle |
+|---|---|---|---|
+| `qa` | QA Optimization Engineer | `agent_015QMiVaMNm8hFVa6kPsFUeN` | Tests, qualité, lint, régression |
+| `engineer` | Software Engineer | `agent_01Fp1BYHo58i95pvXAmpjpJg` | Features, architecture, code review |
+| `designer` | UI UX Designer | `agent_01QttyRFst44bXDvuk8YvKEG` | UI/UX, design system, composants |
+| `architect` | Product Architect | `agent_012ueTDMb36eXpHtxqszhT7p` | Décisions techniques, scalabilité |
+| `orchestrator` | Project Orchestrator | `agent_015ieYimCRksmDf4Ab3pp8hF` | Coordination, planification |
+
+**Usage dans Claude Code (via Bash tool):**
+```bash
+.claude/call_agent.sh qa "Review this Dart code for test coverage: ..."
+.claude/call_agent.sh architect "Should we move to Riverpod or keep Provider?"
+.claude/call_agent.sh designer "Review this screen layout for UX issues: ..."
+```
+
+**Quand les utiliser:**
+- `orchestrator` → planification sprint, priorisation features
+- `architect` → changements d'architecture, choix techniques majeurs
+- `engineer` → implémentation complexe, PR review
+- `designer` → nouveaux écrans, design system, accessibilité
+- `qa` → avant chaque push, review code critique, tests manquants
