@@ -150,7 +150,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _joinById(String id) async {
     if (id.isEmpty) return;
-    final cleanId = id.trim().toUpperCase();
+    // Accept both raw codes and full deep-link URLs (crux://join/CODE)
+    String raw = id.trim();
+    if (raw.startsWith('crux://join/')) {
+      raw = raw.substring('crux://join/'.length);
+    } else if (raw.contains('/join/')) {
+      raw = raw.split('/join/').last;
+    }
+    final cleanId = raw.toUpperCase().split('?').first; // strip any query params
     final lang = context.read<LocaleProvider>().locale.languageCode;
 
     final meeting = await _meetingService.getMeetingOnce(cleanId);

@@ -15,6 +15,7 @@ import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/consent_screen.dart';
 import 'screens/guest_join_screen.dart';
+import 'screens/meeting_screen.dart';
 import 'models/user_model.dart';
 import 'providers/auth_provider.dart' show CruxAuthProvider;
 import 'providers/meeting_provider.dart';
@@ -256,20 +257,72 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   void _handleDeepLink(Uri uri) {
-    // crux://join/MEETING_ID
+    // crux://join/MEETING_ID  OR  https://*.*/join/MEETING_ID
+    String? meetingId;
     if (uri.scheme == 'crux' && uri.host == 'join') {
-      final meetingId = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
-      if (meetingId != null && meetingId.isNotEmpty) {
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => GuestJoinScreen(meetingId: meetingId),
-            ),
-          );
-        } else {
-          setState(() => _pendingMeetingId = meetingId);
-        }
+      meetingId = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+    } else if ((uri.scheme == 'https' || uri.scheme == 'http') &&
+        uri.pathSegments.length >= 2 &&
+        uri.pathSegments[uri.pathSegments.length - 2] == 'join') {
+      meetingId = uri.pathSegments.last;
+    }
+
+    if (meetingId == null || meetingId.isEmpty) return;
+    final mid = meetingId.trim().toUpperCase();
+
+    if (!mounted) {
+      setState(() => _pendingMeetingId = mid);
+      return;
+    }
+
+    // If already authenticated (non-anonymous), route to home-screen join flow
+    final current = FirebaseAuth.instance.currentUser;
+    if (current != null && !current.isAnonymous) {
+      _joinMeetingAsAuthenticatedUser(mid);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: mid)),
+      );
+    }
+  }
+
+  Future<void> _joinMeetingAsAuthenticatedUser(String meetingId) async {
+    // Fetch meeting, then push MeetingScreen (passcode handled inside MeetingScreen)
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('meetings')
+          .doc(meetingId)
+          .get();
+      if (!mounted) return;
+      if (!doc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Réunion introuvable')),
+        );
+        return;
+      }
+      final data = doc.data()!;
+      final current = FirebaseAuth.instance.currentUser!;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MeetingScreen(
+            meetingId: meetingId,
+            meetingName: data['title'] as String? ?? 'Réunion',
+            userId: current.uid,
+            userName: current.displayName ?? current.email ?? 'Invité',
+            userEmail: current.email,
+            isHost: false,
+          ),
+        ),
+      );
+    } catch (_) {
+      // Fallback to guest join screen on error
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: meetingId)),
+        );
       }
     }
   }

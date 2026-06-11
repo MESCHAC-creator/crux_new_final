@@ -24,6 +24,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
   String? _error;
   bool _needsPasscode = false;
   bool _meetingExists = true;
+  String _meetingTitle = 'Réunion';
 
   @override
   void initState() {
@@ -39,8 +40,8 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
       return;
     }
     setState(() {
-      _needsPasscode =
-          meeting.passcode != null && meeting.passcode!.isNotEmpty;
+      _needsPasscode = meeting.passcode != null && meeting.passcode!.isNotEmpty;
+      if (meeting.title.isNotEmpty) _meetingTitle = meeting.title;
     });
   }
 
@@ -92,7 +93,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
         MaterialPageRoute(
           builder: (_) => MeetingScreen(
             meetingId: widget.meetingId,
-            meetingName: 'Réunion',
+            meetingName: _meetingTitle,
             userId: uid,
             userName: name,
             userEmail: null,
@@ -177,13 +178,14 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
       ),
       const SizedBox(height: 20),
       Text(
-        'Rejoindre la réunion',
+        _meetingTitle,
+        textAlign: TextAlign.center,
         style: GoogleFonts.poppins(
             color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
       ),
       const SizedBox(height: 6),
       Text(
-        'Code: ${widget.meetingId}',
+        'Code : ${widget.meetingId}',
         style: GoogleFonts.poppins(
             color: Colors.white38, fontSize: 13, letterSpacing: 1),
       ),
