@@ -969,10 +969,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _shareMeetingLink(String meetingId, String title) {
-    final link = 'crux://join/$meetingId';
+    // Web link works in any browser; deep link opens the app if installed
+    const host = 'https://crux-8aa85.web.app';
+    final webLink = '$host/join/$meetingId';
     Share.share(
-      'Rejoins ma réunion "$title" sur CRUX !\n\nCode: $meetingId\nLien direct: $link\n\n(Aucun compte requis)',
-      subject: 'Invitation à rejoindre "$title"',
+      'Rejoins ma réunion "$title" sur CRUX !\n\n'
+      '🌐 Lien (navigateur) : $webLink\n'
+      '📱 Code de réunion   : $meetingId\n\n'
+      'Aucun compte requis.',
+      subject: 'Invitation CRUX — "$title"',
     );
   }
 }

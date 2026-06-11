@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.crux",
+      "sha256_cert_fingerprints": [
+        "2A:3B:45:5C:2D:45:32:3E:C9:96:89:F6:7D:2D:27:7B:C7:E4:7F:0E:40:71:10:99:6B:F4:18:3D:93:7E:E1:E2"
+      ]
+    }
+  }
+]
