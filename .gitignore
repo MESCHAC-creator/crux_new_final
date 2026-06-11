@@ -55,3 +55,4 @@ key.properties
 build_error.txt
 .claude/
 functions/node_modules/
+.firebase/
