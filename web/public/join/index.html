@@ -8,157 +8,53 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Poppins', sans-serif;
-      background: #0A0A14;
-      color: #fff;
-      min-height: 100vh;
-    }
+    body { font-family: 'Poppins', sans-serif; background: #0A0A14; color: #fff; min-height: 100vh; }
 
-    /* ── Lobby ─────────────────────────────── */
-    #lobby {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 24px;
-    }
-    .card {
-      background: #12121E;
-      border-radius: 20px;
-      padding: 40px 32px;
-      max-width: 440px;
-      width: 100%;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
-    }
-    .logo {
-      width: 64px; height: 64px;
-      border-radius: 18px;
-      background: linear-gradient(135deg, #B71C1C, #6A1B9A);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 28px;
-      margin: 0 auto 18px;
-    }
+    /* ── Lobby ── */
+    #lobby { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    .card { background: #12121E; border-radius: 20px; padding: 40px 32px; max-width: 440px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+    .logo { width: 64px; height: 64px; border-radius: 18px; background: linear-gradient(135deg,#B71C1C,#6A1B9A); display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 18px; }
     h1 { font-size: 22px; font-weight: 700; text-align: center; }
     .meeting-id { color: rgba(255,255,255,0.35); font-size: 13px; text-align: center; letter-spacing: 1px; margin-bottom: 28px; }
     label { display: block; font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 8px; }
     input[type="text"], input[type="password"] {
-      width: 100%;
-      background: rgba(255,255,255,0.06);
-      border: 1.5px solid rgba(255,255,255,0.1);
-      border-radius: 12px;
-      padding: 13px 16px;
-      font-family: 'Poppins', sans-serif;
-      font-size: 15px;
-      color: #fff;
-      outline: none;
-      margin-bottom: 16px;
-      transition: border-color .2s;
+      width: 100%; background: rgba(255,255,255,0.06); border: 1.5px solid rgba(255,255,255,0.1);
+      border-radius: 12px; padding: 13px 16px; font-family: 'Poppins',sans-serif; font-size: 15px;
+      color: #fff; outline: none; margin-bottom: 16px; transition: border-color .2s;
     }
     input:focus { border-color: #E74C3C; }
     input::placeholder { color: rgba(255,255,255,0.3); }
-    .btn {
-      display: block; width: 100%;
-      padding: 15px;
-      background: #E74C3C;
-      border: none; border-radius: 12px;
-      color: #fff;
-      font-family: 'Poppins', sans-serif;
-      font-size: 16px; font-weight: 600;
-      cursor: pointer;
-      transition: opacity .2s;
-    }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn:not(:disabled):hover { opacity: 0.88; }
-    .app-hint {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      margin-top: 18px;
-      padding: 13px;
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 10px;
-      font-size: 13px;
-      color: rgba(255,255,255,0.5);
-      text-decoration: none;
-    }
-    .app-hint:hover { border-color: rgba(255,255,255,0.25); }
-    .error { color: #E74C3C; font-size: 13px; margin: -8px 0 12px; display: none; }
-    .spinner {
-      display: inline-block; width: 20px; height: 20px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      vertical-align: middle; margin-right: 8px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn { display:block; width:100%; padding:15px; background:#E74C3C; border:none; border-radius:12px; color:#fff; font-family:'Poppins',sans-serif; font-size:16px; font-weight:600; cursor:pointer; transition:opacity .2s; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .btn:not(:disabled):hover { opacity:.88; }
+    .app-hint { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:18px; padding:13px; border:1px solid rgba(255,255,255,0.1); border-radius:10px; font-size:13px; color:rgba(255,255,255,0.5); text-decoration:none; }
+    .app-hint:hover { border-color:rgba(255,255,255,0.25); }
+    .error { color:#E74C3C; font-size:13px; margin:-8px 0 12px; }
+    .spinner { display:inline-block; width:20px; height:20px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:8px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .badge { display:inline-flex; align-items:center; gap:6px; background:rgba(46,204,113,0.15); border:1px solid rgba(46,204,113,0.3); color:#2ecc71; border-radius:20px; padding:4px 12px; font-size:12px; margin-bottom:16px; }
 
-    /* ── Call UI ────────────────────────────── */
-    #callUI {
-      display: none;
-      flex-direction: column;
-      height: 100vh;
-    }
-    .videos {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px;
-      background: #000;
-      overflow: hidden;
-    }
-    .videos.solo { grid-template-columns: 1fr; }
-    video {
-      width: 100%; height: 100%;
-      object-fit: cover;
-      background: #0d0d1a;
-    }
-    #localVideo { transform: scaleX(-1); }
-    .video-label {
-      position: absolute;
-      bottom: 8px; left: 10px;
-      font-size: 12px;
-      background: rgba(0,0,0,0.55);
-      padding: 2px 8px;
-      border-radius: 6px;
-    }
-    .video-wrap { position: relative; }
+    /* ── Call UI ── */
+    #callUI { display:none; flex-direction:column; height:100vh; }
+    .videos { flex:1; display:grid; grid-template-columns:1fr 1fr; gap:4px; background:#000; overflow:hidden; }
+    .videos.solo { grid-template-columns:1fr; }
+    video { width:100%; height:100%; object-fit:cover; background:#0d0d1a; display:block; }
+    #localVideo { transform:scaleX(-1); }
+    .video-wrap { position:relative; }
+    .video-label { position:absolute; bottom:8px; left:10px; font-size:12px; background:rgba(0,0,0,0.55); padding:2px 8px; border-radius:6px; }
+    .controls { background:#12121E; display:flex; align-items:center; justify-content:center; gap:12px; padding:16px; flex-shrink:0; }
+    .ctrl-btn { width:52px; height:52px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#fff; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .2s; }
+    .ctrl-btn:hover { background:rgba(255,255,255,0.18); }
+    .ctrl-btn.off { background:#E74C3C; }
+    .ctrl-btn.end { background:#c0392b; width:60px; height:60px; font-size:22px; }
+    .status-bar { background:rgba(0,0,0,0.6); text-align:center; padding:6px; font-size:12px; color:rgba(255,255,255,0.55); }
+    #connStatus { font-weight:600; }
 
-    .controls {
-      background: #12121E;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      padding: 16px;
-      flex-shrink: 0;
-    }
-    .ctrl-btn {
-      width: 52px; height: 52px;
-      border-radius: 50%;
-      border: none;
-      background: rgba(255,255,255,0.1);
-      color: #fff;
-      font-size: 20px;
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: background .2s;
-    }
-    .ctrl-btn:hover { background: rgba(255,255,255,0.18); }
-    .ctrl-btn.off { background: #E74C3C; }
-    .ctrl-btn.end { background: #c0392b; width: 60px; height: 60px; font-size: 22px; }
+    /* ── Not found ── */
+    #notFound { display:none; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
 
-    .status-bar {
-      background: rgba(0,0,0,0.6);
-      text-align: center;
-      padding: 6px;
-      font-size: 12px;
-      color: rgba(255,255,255,0.55);
-    }
-    #connStatus { font-weight: 600; }
-
-    /* Not found */
-    #notFound { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    /* ── Chat ── */
+    #chatPanel { display:none; position:fixed; bottom:90px; right:12px; width:280px; background:#1a1a2e; border-radius:14px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.5); z-index:100; }
   </style>
 </head>
 <body>
@@ -170,6 +66,10 @@
     <h1 id="meetingTitle">Réunion CRUX</h1>
     <p class="meeting-id" id="meetingCode">Code : …</p>
 
+    <div id="webBadge" style="text-align:center">
+      <span class="badge">🌐 Connexion directe depuis votre navigateur</span>
+    </div>
+
     <label for="nameInput">Votre prénom ou surnom</label>
     <input type="text" id="nameInput" placeholder="Ex: Marie Dupont" maxlength="40" />
 
@@ -178,14 +78,14 @@
       <input type="password" id="passcodeInput" placeholder="••••••" maxlength="10" />
     </div>
 
-    <p class="error" id="lobbyErr"></p>
+    <p class="error" id="lobbyErr" style="display:none"></p>
 
     <button class="btn" id="joinBtn" onclick="startJoin()">
-      Rejoindre la réunion
+      Rejoindre depuis le navigateur →
     </button>
 
-    <a id="appLink" class="app-hint" href="#">
-      📱 Ouvrir dans l'application CRUX
+    <a id="appLink" class="app-hint" href="#" onclick="openApp(event)">
+      📱 Vous avez l'application ? Ouvrir dans CRUX
     </a>
   </div>
 </div>
@@ -206,7 +106,7 @@
     CRUX Web — <span id="connStatus">Connexion…</span>
     &nbsp;|&nbsp; <span id="peerName">En attente de l'autre participant…</span>
   </div>
-  <div class="videos" id="videoGrid">
+  <div class="videos solo" id="videoGrid">
     <div class="video-wrap">
       <video id="localVideo" autoplay muted playsinline></video>
       <span class="video-label" id="localLabel">Vous</span>
@@ -222,37 +122,37 @@
     <button class="ctrl-btn" id="chatBtn" onclick="toggleChat()" title="Chat">💬</button>
     <button class="ctrl-btn end" onclick="endCall()" title="Quitter">📵</button>
   </div>
-  <!-- Simple chat panel -->
-  <div id="chatPanel" style="display:none;position:fixed;bottom:90px;right:12px;width:280px;background:#1a1a2e;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.5)">
+  <div id="chatPanel">
     <div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:14px">💬 Chat</div>
     <div id="chatMessages" style="height:200px;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:6px;font-size:13px"></div>
     <div style="display:flex;gap:8px;padding:8px 10px;border-top:1px solid rgba(255,255,255,0.08)">
-      <input type="text" id="chatInput" placeholder="Message…" style="flex:1;font-size:13px;padding:8px;margin-bottom:0" onkeydown="if(e.key==='Enter')sendChat(event)" />
+      <input type="text" id="chatInput" placeholder="Message…" style="flex:1;font-size:13px;padding:8px;margin-bottom:0" onkeydown="chatKey(event)" />
       <button onclick="sendChat()" style="background:#E74C3C;border:none;border-radius:8px;padding:8px 12px;color:#fff;cursor:pointer;font-size:13px">↑</button>
     </div>
   </div>
 </div>
 
-<!-- Firebase + WebRTC -->
 <script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, onSnapshot,
-  collection, serverTimestamp, deleteDoc
+  collection, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-// ── Firebase config (same project as Flutter app) ───────────────
+// ── Firebase ─────────────────────────────────────────────────────
 const app = initializeApp({
-  apiKey: 'AIzaSyDfVNAL2cV47g9WHPtXsaE8_4pWFpy3-Ls',
-  authDomain: 'crux-8aa85.firebaseapp.com',
-  projectId: 'crux-8aa85',
-  storageBucket: 'crux-8aa85.appspot.com',
+  apiKey:            'AIzaSyDfVNAL2cV47g9WHPtXsaE8_4pWFpy3-Ls',
+  authDomain:        'crux-8aa85.firebaseapp.com',
+  projectId:         'crux-8aa85',
+  storageBucket:     'crux-8aa85.appspot.com',
   messagingSenderId: '667181830171',
-  appId: '1:667181830171:android:85399beb4fc1d087c4e8be',
+  appId:             '1:667181830171:android:85399beb4fc1d087c4e8be',
 });
-const db = getFirestore(app);
+const auth = getAuth(app);
+const db   = getFirestore(app);
 
-// ── ICE config (mirrors Flutter app) ────────────────────────────
+// ── ICE (mirrors Flutter app) ────────────────────────────────────
 const ICE_CONFIG = {
   iceServers: [
     { urls: ['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302',
@@ -269,22 +169,25 @@ const ICE_CONFIG = {
 // ── State ────────────────────────────────────────────────────────
 let meetingId = '';
 let myName    = '';
+let myUid     = '';
 let localStream = null;
 let pc = null;
-let micOn = true;
-let camOn = true;
-let chatUnsub = null;
-let roomUnsub = null;
+let micOn = true, camOn = true;
+let chatUnsub = null, roomUnsub = null;
 let candidateUnsubs = [];
 
-// ── Extract meeting ID from URL path (/join/MEETING_ID) ──────────
+// ── Helpers ──────────────────────────────────────────────────────
 function getMeetingIdFromPath() {
   const segs = location.pathname.split('/').filter(Boolean);
-  // /join/<ID>  OR  /join/?id=<ID>
   if (segs.length >= 2 && segs[0] === 'join') return segs[1].toUpperCase();
-  const params = new URLSearchParams(location.search);
-  return (params.get('id') || '').toUpperCase();
+  return (new URLSearchParams(location.search).get('id') || '').toUpperCase();
 }
+function showErr(msg) {
+  const el = document.getElementById('lobbyErr');
+  el.textContent = msg; el.style.display = 'block';
+}
+function hideErr() { document.getElementById('lobbyErr').style.display = 'none'; }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ── Init ─────────────────────────────────────────────────────────
 async function init() {
@@ -292,18 +195,29 @@ async function init() {
   if (!meetingId) { showNotFound(); return; }
 
   document.getElementById('meetingCode').textContent = 'Code : ' + meetingId;
-  document.getElementById('appLink').href = 'crux://join/' + meetingId;
+  document.getElementById('appLink').dataset.meetingId = meetingId;
 
-  // Fetch meeting info from Firestore
-  const snap = await getDoc(doc(db, 'meetings', meetingId));
-  if (!snap.exists()) { showNotFound(); return; }
+  // Anonymous sign-in FIRST so Firestore rules (require auth != null) pass
+  try {
+    const cred = await signInAnonymously(auth);
+    myUid = cred.user.uid;
+  } catch (e) {
+    showErr('Erreur de connexion réseau. Vérifiez votre connexion et rechargez.');
+    return;
+  }
 
-  const data = snap.data();
-  document.getElementById('meetingTitle').textContent = data.title || 'Réunion CRUX';
-  document.title = 'CRUX — ' + (data.title || 'Réunion');
-
-  if (data.passcode && data.passcode.length > 0) {
-    document.getElementById('passcodeRow').style.display = 'block';
+  // Now read meeting info
+  try {
+    const snap = await getDoc(doc(db, 'meetings', meetingId));
+    if (!snap.exists()) { showNotFound(); return; }
+    const data = snap.data();
+    document.getElementById('meetingTitle').textContent = data.title || 'Réunion CRUX';
+    document.title = 'CRUX — ' + (data.title || 'Réunion');
+    if (data.passcode && data.passcode.length > 0) {
+      document.getElementById('passcodeRow').style.display = 'block';
+    }
+  } catch (e) {
+    showErr('Impossible de charger la réunion : ' + e.message);
   }
 }
 
@@ -312,75 +226,80 @@ function showNotFound() {
   document.getElementById('notFound').style.display = 'flex';
 }
 
-// ── Join button ──────────────────────────────────────────────────
-window.startJoin = async function() {
-  const name = document.getElementById('nameInput').value.trim();
-  const err  = document.getElementById('lobbyErr');
-  if (!name) { showErr(err, 'Entrez votre prénom pour continuer.'); return; }
+// ── "Open in app" button ─────────────────────────────────────────
+window.openApp = function(e) {
+  e.preventDefault();
+  const mid = document.getElementById('appLink').dataset.meetingId || meetingId;
+  // Try to open the native app. If not installed, the browser stays on page.
+  window.location.href = 'crux://join/' + mid;
+};
 
-  // Check passcode if required
-  const passcodeRow = document.getElementById('passcodeRow');
-  if (passcodeRow.style.display !== 'none') {
+// ── Join ─────────────────────────────────────────────────────────
+window.startJoin = async function() {
+  hideErr();
+  const name = document.getElementById('nameInput').value.trim();
+  if (!name) { showErr('Entrez votre prénom pour continuer.'); return; }
+
+  if (document.getElementById('passcodeRow').style.display !== 'none') {
     const entered = document.getElementById('passcodeInput').value.trim();
-    const snap = await getDoc(doc(db, 'meetings', meetingId));
-    const expected = snap.data()?.passcode || '';
-    if (entered !== expected) { showErr(err, 'Code d\'accès incorrect.'); return; }
+    try {
+      const snap = await getDoc(doc(db, 'meetings', meetingId));
+      const expected = snap.data()?.passcode || '';
+      if (entered !== expected) { showErr("Code d'accès incorrect."); return; }
+    } catch (_) {}
   }
 
-  err.style.display = 'none';
   myName = name;
-  document.getElementById('joinBtn').disabled = true;
-  document.getElementById('joinBtn').innerHTML = '<span class="spinner"></span>Connexion…';
+  // Update anonymous user display name
+  try { await auth.currentUser?.updateProfile?.({ displayName: name }); } catch (_) {}
+
+  const btn = document.getElementById('joinBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Démarrage de la caméra…';
 
   try {
     await startCall();
   } catch (e) {
-    console.error(e);
-    document.getElementById('joinBtn').disabled = false;
-    document.getElementById('joinBtn').textContent = 'Rejoindre la réunion';
-    showErr(err, 'Impossible d\'accéder à la caméra/micro. Vérifiez les permissions.');
+    btn.disabled = false;
+    btn.textContent = 'Rejoindre depuis le navigateur →';
+    const msg = e.name === 'NotAllowedError'
+      ? 'Accès refusé à la caméra/micro. Autorisez les permissions dans votre navigateur.'
+      : 'Erreur : ' + e.message;
+    showErr(msg);
   }
 };
 
-// ── WebRTC call ──────────────────────────────────────────────────
+// ── Call ─────────────────────────────────────────────────────────
 async function startCall() {
-  // 1. Get local media
   localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
   document.getElementById('localVideo').srcObject = localStream;
   document.getElementById('localLabel').textContent = myName + ' (vous)';
 
-  // 2. Show call UI
   document.getElementById('lobby').style.display = 'none';
   document.getElementById('callUI').style.display = 'flex';
 
-  // 3. Create PeerConnection
   pc = new RTCPeerConnection(ICE_CONFIG);
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-  // Add local tracks
-  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-  // Remote track handler
   pc.ontrack = e => {
-    const remoteVideo = document.getElementById('remoteVideo');
-    if (remoteVideo.srcObject !== e.streams[0]) {
-      remoteVideo.srcObject = e.streams[0];
+    const rv = document.getElementById('remoteVideo');
+    if (rv.srcObject !== e.streams[0]) {
+      rv.srcObject = e.streams[0];
       document.getElementById('remoteWrap').style.display = '';
       document.getElementById('videoGrid').classList.remove('solo');
     }
   };
 
-  // Status updates
   pc.oniceconnectionstatechange = () => {
     const s = pc.iceConnectionState;
     const el = document.getElementById('connStatus');
     const map = { checking:'Connexion…', connected:'Connecté ✓', completed:'Connecté ✓',
-                  disconnected:'Déconnecté', failed:'Échec de connexion', closed:'Fermé' };
+                  disconnected:'Déconnecté', failed:'Échec', closed:'Fermé' };
     el.textContent = map[s] || s;
-    if (s === 'connected' || s === 'completed') el.style.color = '#2ecc71';
-    else if (s === 'failed' || s === 'disconnected') el.style.color = '#E74C3C';
+    el.style.color = (s === 'connected' || s === 'completed') ? '#2ecc71'
+                   : (s === 'failed' || s === 'disconnected') ? '#E74C3C' : '';
   };
 
-  // 4. Decide role: if room doc has no offer → we are the offerer; else answerer
   const docId = 'room_' + meetingId.replace(/[^a-zA-Z0-9]/g, '_');
   const roomRef = doc(db, 'webrtc_rooms', docId);
   const roomSnap = await getDoc(roomRef);
@@ -391,36 +310,31 @@ async function startCall() {
     await doAnswer(roomSnap, roomRef, docId);
   }
 
-  // 5. Write presence
+  // Write presence (uid matches Firestore rule: request.auth.uid == userId)
   await setDoc(
-    doc(db, 'meetings', meetingId, 'presence', 'web_' + Date.now()),
-    { userId: 'web_user', name: myName, micOn: true, cameraOn: true,
+    doc(db, 'meetings', meetingId, 'presence', myUid),
+    { userId: myUid, name: myName, micOn: true, cameraOn: true,
       timestamp: serverTimestamp(), isWeb: true },
     { merge: true }
-  );
+  ).catch(() => {});
 
-  // 6. Subscribe to chat
   listenChat();
 }
 
 async function doOffer(roomRef, docId) {
-  // Collect ICE candidates before remote sets answer
   pc.onicecandidate = async e => {
     if (e.candidate) {
       await addDoc(collection(db, 'webrtc_rooms', docId, 'offerCandidates'), {
         candidate: e.candidate.candidate,
         sdpMid: e.candidate.sdpMid,
         sdpMLineIndex: e.candidate.sdpMLineIndex,
-      });
+      }).catch(() => {});
     }
   };
-
-  const offer = await pc.createOffer({ offerToReceiveVideo: 1, offerToReceiveAudio: 1 });
+  const offer = await pc.createOffer({ offerToReceiveVideo:1, offerToReceiveAudio:1 });
   await pc.setLocalDescription(offer);
-
   await setDoc(roomRef, { offer: { type: offer.type, sdp: offer.sdp } });
 
-  // Listen for answer
   roomUnsub = onSnapshot(roomRef, snap => {
     const data = snap.data();
     if (data?.answer && !pc.currentRemoteDescription) {
@@ -428,51 +342,41 @@ async function doOffer(roomRef, docId) {
       document.getElementById('peerName').textContent = 'Connecté';
     }
   });
-
-  // Listen for remote ICE candidates
-  const unsub = onSnapshot(collection(db, 'webrtc_rooms', docId, 'answerCandidates'), snap => {
+  candidateUnsubs.push(onSnapshot(collection(db, 'webrtc_rooms', docId, 'answerCandidates'), snap => {
     snap.docChanges().forEach(ch => {
       if (ch.type === 'added') {
         const d = ch.doc.data();
-        pc.addIceCandidate(new RTCIceCandidate({ candidate: d.candidate, sdpMid: d.sdpMid, sdpMLineIndex: d.sdpMLineIndex }));
+        pc.addIceCandidate(new RTCIceCandidate({ candidate:d.candidate, sdpMid:d.sdpMid, sdpMLineIndex:d.sdpMLineIndex })).catch(()=>{});
       }
     });
-  });
-  candidateUnsubs.push(unsub);
+  }));
 }
 
 async function doAnswer(roomSnap, roomRef, docId) {
-  // ICE candidates for answerer
   pc.onicecandidate = async e => {
     if (e.candidate) {
       await addDoc(collection(db, 'webrtc_rooms', docId, 'answerCandidates'), {
         candidate: e.candidate.candidate,
         sdpMid: e.candidate.sdpMid,
         sdpMLineIndex: e.candidate.sdpMLineIndex,
-      });
+      }).catch(() => {});
     }
   };
-
   const offerData = roomSnap.data().offer;
-  await pc.setRemoteDescription(new RTCSessionDescription({ type: offerData.type, sdp: offerData.sdp }));
-
+  await pc.setRemoteDescription(new RTCSessionDescription({ type:offerData.type, sdp:offerData.sdp }));
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
-
   await updateDoc(roomRef, { answer: { type: answer.type, sdp: answer.sdp } });
 
-  // Listen for remote ICE candidates
-  const unsub = onSnapshot(collection(db, 'webrtc_rooms', docId, 'offerCandidates'), snap => {
+  candidateUnsubs.push(onSnapshot(collection(db, 'webrtc_rooms', docId, 'offerCandidates'), snap => {
     snap.docChanges().forEach(ch => {
       if (ch.type === 'added') {
         const d = ch.doc.data();
-        pc.addIceCandidate(new RTCIceCandidate({ candidate: d.candidate, sdpMid: d.sdpMid, sdpMLineIndex: d.sdpMLineIndex }));
+        pc.addIceCandidate(new RTCIceCandidate({ candidate:d.candidate, sdpMid:d.sdpMid, sdpMLineIndex:d.sdpMLineIndex })).catch(()=>{});
       }
     });
-  });
-  candidateUnsubs.push(unsub);
-
-  document.getElementById('peerName').textContent = 'Connecté à l\'hôte';
+  }));
+  document.getElementById('peerName').textContent = "Connecté à l'hôte";
 }
 
 // ── Controls ─────────────────────────────────────────────────────
@@ -482,72 +386,52 @@ window.toggleMic = function() {
   document.getElementById('micBtn').classList.toggle('off', !micOn);
   document.getElementById('micBtn').textContent = micOn ? '🎤' : '🔇';
 };
-
 window.toggleCam = function() {
   camOn = !camOn;
   localStream?.getVideoTracks().forEach(t => t.enabled = camOn);
   document.getElementById('camBtn').classList.toggle('off', !camOn);
   document.getElementById('camBtn').textContent = camOn ? '📷' : '🚫';
 };
-
 window.toggleChat = function() {
-  const panel = document.getElementById('chatPanel');
-  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  const p = document.getElementById('chatPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
 };
-
-window.endCall = function() {
-  cleanup();
-  window.location.href = '/';
-};
+window.endCall = function() { cleanup(); window.location.href = '/'; };
 
 function cleanup() {
   pc?.close();
   localStream?.getTracks().forEach(t => t.stop());
-  roomUnsub?.();
-  candidateUnsubs.forEach(u => u());
-  chatUnsub?.();
+  roomUnsub?.(); candidateUnsubs.forEach(u => u()); chatUnsub?.();
 }
-
 window.addEventListener('beforeunload', cleanup);
 
 // ── Chat ─────────────────────────────────────────────────────────
 function listenChat() {
-  chatUnsub = onSnapshot(
-    collection(db, 'meetings', meetingId, 'chat'),
-    snap => {
-      const container = document.getElementById('chatMessages');
-      snap.docChanges().forEach(ch => {
-        if (ch.type === 'added') {
-          const d = ch.doc.data();
-          const div = document.createElement('div');
-          div.style.cssText = 'background:rgba(255,255,255,0.06);border-radius:8px;padding:6px 10px';
-          div.innerHTML = `<span style="color:#E74C3C;font-weight:600">${esc(d.sender || 'Anonyme')}</span><br/>${esc(d.text || '')}`;
-          container.appendChild(div);
-          container.scrollTop = container.scrollHeight;
-        }
-      });
-    }
-  );
-}
-
-window.sendChat = async function(e) {
-  if (e?.key === 'Enter' || !e?.key) {
-    const input = document.getElementById('chatInput');
-    const text = input.value.trim();
-    if (!text) return;
-    input.value = '';
-    await addDoc(collection(db, 'meetings', meetingId, 'chat'), {
-      sender: myName,
-      text,
-      timestamp: serverTimestamp(),
-      isWeb: true,
+  chatUnsub = onSnapshot(collection(db, 'meetings', meetingId, 'chat'), snap => {
+    const box = document.getElementById('chatMessages');
+    snap.docChanges().forEach(ch => {
+      if (ch.type === 'added') {
+        const d = ch.doc.data();
+        const div = document.createElement('div');
+        div.style.cssText = 'background:rgba(255,255,255,0.06);border-radius:8px;padding:6px 10px';
+        div.innerHTML = `<span style="color:#E74C3C;font-weight:600">${esc(d.sender||'Anonyme')}</span><br/>${esc(d.text||'')}`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+      }
     });
-  }
+  });
+}
+window.sendChat = async function() {
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  await addDoc(collection(db, 'meetings', meetingId, 'chat'), {
+    sender: myName, senderId: myUid,
+    text, timestamp: serverTimestamp(), isWeb: true,
+  }).catch(() => {});
 };
-
-// ── Helpers ──────────────────────────────────────────────────────
-function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+window.chatKey = function(e) { if (e.key === 'Enter') window.sendChat(); };
 
 // ── Boot ─────────────────────────────────────────────────────────
 init();
