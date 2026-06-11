@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
+import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.util.Rational
 import io.flutter.embedding.android.FlutterActivity
@@ -16,10 +17,13 @@ class MainActivity : FlutterActivity() {
 
     private val PIP_CHANNEL    = "com.example.crux/pip"
     private val SCREEN_CHANNEL = "com.example.crux/screen_share"
+    private val CAPTURE_REQUEST_CODE = 1001
 
     private var inCall = false
     private var pipChannel: MethodChannel? = null
     private var screenChannel: MethodChannel? = null
+    // Pending result callback for screen capture permission request
+    private var capturePermissionResult: io.flutter.plugin.common.MethodChannel.Result? = null
 
     // Receives "Stop sharing" taps from the screen share notification
     private val stopScreenShareReceiver = object : BroadcastReceiver() {
@@ -57,6 +61,23 @@ class MainActivity : FlutterActivity() {
                 "screenShareStopped" -> {
                     notifyScreenShareStopped()
                     result.success(true)
+                }
+                // Request the MediaProjection consent dialog from Activity context.
+                // flutter_webrtc calls getDisplayMedia() which triggers this internally,
+                // but on Android 14+ we must ensure the foreground service is NOT started
+                // before the dialog — this method just pre-warms the capture intent.
+                "requestCapturePermission" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        try {
+                            capturePermissionResult = result
+                            val mgr = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                            startActivityForResult(mgr.createScreenCaptureIntent(), CAPTURE_REQUEST_CODE)
+                        } catch (e: Exception) {
+                            result.error("PERMISSION_ERROR", e.message, null)
+                        }
+                    } else {
+                        result.success(false)
+                    }
                 }
                 else -> result.notImplemented()
             }
@@ -128,6 +149,20 @@ class MainActivity : FlutterActivity() {
         try {
             stopService(Intent(this, CallForegroundService::class.java))
         } catch (e: Exception) { /* ignore */ }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == CAPTURE_REQUEST_CODE) {
+            if (resultCode == RESULT_OK && data != null) {
+                // Permission granted — flutter_webrtc will use its internal ScreenCaptureService
+                // to start the foreground service with mediaProjection type using this token.
+                capturePermissionResult?.success(true)
+            } else {
+                capturePermissionResult?.success(false)
+            }
+            capturePermissionResult = null
+        }
     }
 
     override fun onUserLeaveHint() {

@@ -1697,15 +1697,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         }
 
         // Android 10+ (API 29+): the foreground service MUST be running before
-        // MediaProjectionManager starts capture. Start it now, before the
-        // consent dialog appears, so flutter_webrtc's ScreenCaptureService can
-        // bind to an already-live foreground context.
-        if (!kIsWeb && Platform.isAndroid) {
-          try {
-            await _screenChannel.invokeMethod('screenShareStarted');
-          } catch (_) {}
-        }
-
+        // On Android 14+, the MediaProjection consent dialog must be shown from an
+        // Activity context BEFORE any foreground service is started. We pre-request
+        // capture permission via MainActivity, then let flutter_webrtc call
+        // getDisplayMedia (which uses the already-granted token internally).
+        // The foreground service notification is posted only AFTER we have a stream.
         _log.i('Starting screen share - requesting display media');
         MediaStream? stream;
         try {
@@ -1825,6 +1821,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
         // Apply screen-share specific encoding (high res, low FPS, bitrate-capped)
         await _applyScreenShareEncoding();
+
+        // Now that we have a valid stream + MediaProjection token, notify the
+        // Android foreground service. Doing this AFTER getDisplayMedia ensures
+        // flutter_webrtc's ScreenCaptureService completes its startForeground()
+        // within the 5-second Android 14 window before we start ours.
+        if (!kIsWeb && Platform.isAndroid) {
+          try { await _screenChannel.invokeMethod('screenShareStarted'); } catch (_) {}
+        }
 
         // Update presence so remote participants know screen share is active
         try {

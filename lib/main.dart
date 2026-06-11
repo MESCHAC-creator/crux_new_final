@@ -361,18 +361,21 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
 
-        // Deep link pending — open guest join immediately regardless of auth state
+        // Deep link pending — route based on auth state
         if (_pendingMeetingId != null) {
           final mid = _pendingMeetingId!;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               setState(() => _pendingMeetingId = null);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => GuestJoinScreen(meetingId: mid),
-                ),
-              );
+              final current = FirebaseAuth.instance.currentUser;
+              if (current != null && !current.isAnonymous) {
+                _joinMeetingAsAuthenticatedUser(mid);
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: mid)),
+                );
+              }
             }
           });
         }

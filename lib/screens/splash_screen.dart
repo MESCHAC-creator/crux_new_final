@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -90,6 +91,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   Future<void> _navigateAfterReady() async {
     await Future.delayed(const Duration(milliseconds: 2200));
     if (!mounted) return;
+    // Firebase Auth may have restored a persisted session during the splash delay.
+    // If so, AuthWrapper already rebuilt and shows HomeScreen — don't navigate to login.
+    if (FirebaseAuth.instance.currentUser != null) return;
     Navigator.of(context).pushReplacementNamed('/login');
   }
 
