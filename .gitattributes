@@ -1,0 +1,5 @@
+# Gradle wrapper must stay LF + executable for Linux CI (Codemagic, GitHub Actions)
+android/gradlew text eol=lf
+android/gradlew.bat text eol=lf
+*.gradle text eol=lf
+*.gradle.kts text eol=lf

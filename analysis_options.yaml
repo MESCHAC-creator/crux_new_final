@@ -1,0 +1,17 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    missing_required_param: error
+    missing_return: error
+  exclude:
+    - lib/firebase_options.dart
+    - lib/api/**
+    - lib/database/**
+
+linter:
+  rules:
+    - avoid_empty_else
+    - avoid_print
+    - prefer_const_constructors
+    - prefer_final_fields

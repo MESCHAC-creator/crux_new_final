@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRUX — Rejoindre la réunion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Poppins', sans-serif; background: #0A0A14; color: #fff; min-height: 100vh; }
+
+    /* ── Lobby ── */
+    #lobby { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    .card { background: #12121E; border-radius: 20px; padding: 40px 32px; max-width: 440px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+    .logo { width: 64px; height: 64px; border-radius: 18px; background: linear-gradient(135deg,#B71C1C,#6A1B9A); display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 18px; }
+    h1 { font-size: 22px; font-weight: 700; text-align: center; }
+    .meeting-id { color: rgba(255,255,255,0.35); font-size: 13px; text-align: center; letter-spacing: 1px; margin-bottom: 28px; }
+    label { display: block; font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 8px; }
+    input[type="text"], input[type="password"] {
+      width: 100%; background: rgba(255,255,255,0.06); border: 1.5px solid rgba(255,255,255,0.1);
+      border-radius: 12px; padding: 13px 16px; font-family: 'Poppins',sans-serif; font-size: 15px;
+      color: #fff; outline: none; margin-bottom: 16px; transition: border-color .2s;
+    }
+    input:focus { border-color: #E74C3C; }
+    input::placeholder { color: rgba(255,255,255,0.3); }
+    .btn { display:block; width:100%; padding:15px; background:#E74C3C; border:none; border-radius:12px; color:#fff; font-family:'Poppins',sans-serif; font-size:16px; font-weight:600; cursor:pointer; transition:opacity .2s; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .btn:not(:disabled):hover { opacity:.88; }
+    .app-hint { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:18px; padding:13px; border:1px solid rgba(255,255,255,0.1); border-radius:10px; font-size:13px; color:rgba(255,255,255,0.5); text-decoration:none; }
+    .app-hint:hover { border-color:rgba(255,255,255,0.25); }
+    .error { color:#E74C3C; font-size:13px; margin:-8px 0 12px; }
+    .spinner { display:inline-block; width:20px; height:20px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:8px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .badge { display:inline-flex; align-items:center; gap:6px; background:rgba(46,204,113,0.15); border:1px solid rgba(46,204,113,0.3); color:#2ecc71; border-radius:20px; padding:4px 12px; font-size:12px; margin-bottom:16px; }
+
+    /* ── Call UI ── */
+    #callUI { display:none; flex-direction:column; height:100vh; }
+    .videos { flex:1; display:grid; grid-template-columns:1fr 1fr; gap:4px; background:#000; overflow:hidden; }
+    .videos.solo { grid-template-columns:1fr; }
+    video { width:100%; height:100%; object-fit:cover; background:#0d0d1a; display:block; }
+    #localVideo { transform:scaleX(-1); }
+    .video-wrap { position:relative; }
+    .video-label { position:absolute; bottom:8px; left:10px; font-size:12px; background:rgba(0,0,0,0.55); padding:2px 8px; border-radius:6px; }
+    .controls { background:#12121E; display:flex; align-items:center; justify-content:center; gap:12px; padding:16px; flex-shrink:0; }
+    .ctrl-btn { width:52px; height:52px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#fff; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .2s; }
+    .ctrl-btn:hover { background:rgba(255,255,255,0.18); }
+    .ctrl-btn.off { background:#E74C3C; }
+    .ctrl-btn.end { background:#c0392b; width:60px; height:60px; font-size:22px; }
+    .status-bar { background:rgba(0,0,0,0.6); text-align:center; padding:6px; font-size:12px; color:rgba(255,255,255,0.55); }
+    #connStatus { font-weight:600; }
+
+    /* ── Not found ── */
+    #notFound { display:none; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
+
+    /* ── Chat ── */
+    #chatPanel { display:none; position:fixed; bottom:90px; right:12px; width:280px; background:#1a1a2e; border-radius:14px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.5); z-index:100; }
+  </style>
+</head>
+<body>
+
+<!-- Lobby -->
+<div id="lobby">
+  <div class="card">
+    <div class="logo">📹</div>
+    <h1 id="meetingTitle">Réunion CRUX</h1>
+    <p class="meeting-id" id="meetingCode">Code : …</p>
+
+    <div id="webBadge" style="text-align:center">
+      <span class="badge">🌐 Connexion directe depuis votre navigateur</span>
+    </div>
+
+    <label for="nameInput">Votre prénom ou surnom</label>
+    <input type="text" id="nameInput" placeholder="Ex: Marie Dupont" maxlength="40" />
+
+    <div id="passcodeRow" style="display:none">
+      <label for="passcodeInput">Code d'accès</label>
+      <input type="password" id="passcodeInput" placeholder="••••••" maxlength="10" />
+    </div>
+
+    <p class="error" id="lobbyErr" style="display:none"></p>
+
+    <button class="btn" id="joinBtn" onclick="startJoin()">
+      Rejoindre depuis le navigateur →
+    </button>
+
+    <a id="appLink" class="app-hint" href="#" onclick="openApp(event)">
+      📱 Vous avez l'application ? Ouvrir dans CRUX
+    </a>
+  </div>
+</div>
+
+<!-- Not found -->
+<div id="notFound">
+  <div class="card" style="text-align:center">
+    <div style="font-size:52px;margin-bottom:16px">🔗</div>
+    <h1 style="margin-bottom:8px">Réunion introuvable</h1>
+    <p style="color:rgba(255,255,255,0.45);margin-bottom:24px">Ce code n'existe pas ou a expiré.</p>
+    <a href="/" class="btn" style="text-decoration:none;display:inline-block;padding:14px 32px;width:auto">Retour</a>
+  </div>
+</div>
+
+<!-- Active call -->
+<div id="callUI">
+  <div class="status-bar">
+    CRUX Web — <span id="connStatus">Connexion…</span>
+    &nbsp;|&nbsp; <span id="peerName">En attente de l'autre participant…</span>
+  </div>
+  <div class="videos solo" id="videoGrid">
+    <div class="video-wrap">
+      <video id="localVideo" autoplay muted playsinline></video>
+      <span class="video-label" id="localLabel">Vous</span>
+    </div>
+    <div class="video-wrap" id="remoteWrap" style="display:none">
+      <video id="remoteVideo" autoplay playsinline></video>
+      <span class="video-label" id="remoteLabel">Participant</span>
+    </div>
+  </div>
+  <div class="controls">
+    <button class="ctrl-btn" id="micBtn" onclick="toggleMic()" title="Micro">🎤</button>
+    <button class="ctrl-btn" id="camBtn" onclick="toggleCam()" title="Caméra">📷</button>
+    <button class="ctrl-btn" id="screenBtn" onclick="toggleScreenShare()" title="Partager l'écran">🖥️</button>
+    <button class="ctrl-btn" id="canvasBtn" onclick="toggleCanvas()" title="Tableau blanc">🎨</button>
+    <button class="ctrl-btn" id="lockBtn" style="display:none" onclick="toggleLock()" title="Verrouiller la réunion (Salle d'attente)">🔓</button>
+    <button class="ctrl-btn" id="chatBtn" onclick="toggleChat()" title="Chat">💬</button>
+    <button class="ctrl-btn end" onclick="endCall()" title="Quitter">📵</button>
+  </div>
+  <div id="chatPanel">
+    <div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:14px">💬 Chat</div>
+    <div id="chatMessages" style="height:200px;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:6px;font-size:13px"></div>
+    <div style="display:flex;gap:8px;padding:8px 10px;border-top:1px solid rgba(255,255,255,0.08)">
+      <input type="text" id="chatInput" placeholder="Message…" style="flex:1;font-size:13px;padding:8px;margin-bottom:0" onkeydown="chatKey(event)" />
+      <button onclick="sendChat()" style="background:#E74C3C;border:none;border-radius:8px;padding:8px 12px;color:#fff;cursor:pointer;font-size:13px">↑</button>
+    </div>
+  </div>
+
+  <!-- Canvas/Whiteboard Overlay -->
+  <div id="canvasPanel" style="display:none; position:fixed; inset:24px; background:#12121E; border:1px solid rgba(255,255,255,0.15); border-radius:20px; z-index:150; box-shadow:0 12px 50px rgba(0,0,0,0.6); flex-direction:column; overflow:hidden">
+    <div style="padding:16px 24px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center">
+      <div style="font-weight:600; font-size:16px; display:flex; align-items:center; gap:8px">🎨 Tableau Blanc Collaboratif</div>
+      <div style="display:flex; gap:12px; align-items:center">
+        <input type="color" id="canvasColor" value="#E74C3C" style="border:none; background:none; width:32px; height:32px; cursor:pointer" />
+        <button class="btn" style="padding:6px 12px; font-size:13px; width:auto; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.15); color:white; border-radius:8px; cursor:pointer" onclick="clearCanvas()">Effacer</button>
+        <button class="btn" style="padding:6px 12px; font-size:13px; width:auto; background:#c0392b; border:none; color:white; border-radius:8px; cursor:pointer" onclick="toggleCanvas()">Fermer</button>
+      </div>
+    </div>
+    <div style="flex:1; position:relative; background:#161625">
+      <canvas id="sharedCanvas" style="position:absolute; inset:0; width:100%; height:100%; cursor:crosshair"></canvas>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import {
+  getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, onSnapshot,
+  collection, serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ── Firebase ─────────────────────────────────────────────────────
+const app = initializeApp({
+  apiKey: "AIzaSyArg6eFPp6trk50fCRGC_xqPgslkIa5WTE",
+  authDomain: "crux-3c6be.firebaseapp.com",
+  projectId: "crux-3c6be",
+  storageBucket: "crux-3c6be.firebasestorage.app",
+  messagingSenderId: "33175700363",
+  appId: "1:33175700363:web:8dff2f40e10d1ead66658e",
+  measurementId: "G-6GVHG2D4YB"
+});
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// ── ICE (mirrors Flutter app) ────────────────────────────────────
+const ICE_CONFIG = {
+  iceServers: [
+    { urls: ['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302',
+             'stun:stun2.l.google.com:19302','stun:stun.cloudflare.com:3478',
+             'stun:stun.mozilla.com:3478'] },
+    { urls: ['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443',
+             'turn:openrelay.metered.ca:443?transport=tcp','turns:openrelay.metered.ca:443'],
+      username: 'openrelayproject', credential: 'openrelayproject' },
+  ],
+  sdpSemantics: 'unified-plan',
+  iceTransportPolicy: 'all',
+};
+
+// ── State ────────────────────────────────────────────────────────
+let meetingId = '';
+let myName    = '';
+let myUid     = '';
+let room      = null;
+let micOn     = true;
+let camOn     = true;
+let chatUnsub = null;
+let meetingUnsub = null;
+let meetingOrganizerId = '';
+
+// ── Helpers ──────────────────────────────────────────────────────
+function getMeetingIdFromPath() {
+  const segs = location.pathname.split('/').filter(Boolean);
+  if (segs.length >= 2 && segs[0] === 'join') return segs[1].toUpperCase();
+  return (new URLSearchParams(location.search).get('id') || '').toUpperCase();
+}
+function showErr(msg) {
+  const el = document.getElementById('lobbyErr');
+  el.textContent = msg; el.style.display = 'block';
+}
+function hideErr() { document.getElementById('lobbyErr').style.display = 'none'; }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Init ─────────────────────────────────────────────────────────
+async function init() {
+  meetingId = getMeetingIdFromPath();
+  if (!meetingId) { showNotFound(); return; }
+
+  document.getElementById('meetingCode').textContent = 'Code : ' + meetingId;
+  document.getElementById('appLink').dataset.meetingId = meetingId;
+
+  // Wait for auth to resolve its initial state
+  await new Promise(resolve => {
+    const unsub = auth.onAuthStateChanged(() => {
+      unsub();
+      resolve();
+    });
+  });
+
+  // Check if authenticated, otherwise sign in anonymously
+  try {
+    if (!auth.currentUser) {
+      const cred = await signInAnonymously(auth);
+      myUid = cred.user.uid;
+    } else {
+      myUid = auth.currentUser.uid;
+      // Pre-fill name if available
+      if (auth.currentUser.displayName) {
+        document.getElementById('nameInput').value = auth.currentUser.displayName;
+      } else if (auth.currentUser.email) {
+        document.getElementById('nameInput').value = auth.currentUser.email.split('@')[0];
+      }
+    }
+  } catch (e) {
+    showErr('Erreur de connexion réseau. Vérifiez votre connexion et rechargez.');
+    return;
+  }
+
+  // Real-time listener for the meeting info and lock state (Waiting Room / Salle d'attente)
+  meetingUnsub = onSnapshot(doc(db, 'meetings', meetingId), snap => {
+    if (!snap.exists()) { showNotFound(); return; }
+    const data = snap.data();
+    meetingOrganizerId = data.organizerId;
+
+    document.getElementById('meetingTitle').textContent = data.title || 'Réunion CRUX';
+    document.title = 'CRUX — ' + (data.title || 'Réunion');
+
+    if (data.passcode && data.passcode.length > 0) {
+      document.getElementById('passcodeRow').style.display = 'block';
+    } else {
+      document.getElementById('passcodeRow').style.display = 'none';
+    }
+
+    // "Salle d'attente" verification
+    const isHost = myUid && (data.organizerId === myUid);
+    const inWaitingRoom = data.isLocked && !isHost;
+
+    const joinBtn = document.getElementById('joinBtn');
+    if (inWaitingRoom) {
+      joinBtn.disabled = true;
+      joinBtn.innerHTML = '<span class="spinner"></span>Salle d\'attente active. En attente...';
+      showErr("La salle d'attente est active pour cette réunion. L'organisateur doit déverrouiller la réunion pour vous laisser entrer.");
+    } else {
+      joinBtn.disabled = false;
+      joinBtn.textContent = 'Rejoindre depuis le navigateur →';
+      // If we previously had the waiting room error, hide it once unlocked
+      if (document.getElementById('lobbyErr').textContent.includes("salle d'attente") || document.getElementById('lobbyErr').textContent.includes("Salle d'attente")) {
+        hideErr();
+      }
+    }
+  }, err => {
+    showErr('Impossible de charger la réunion : ' + err.message);
+  });
+}
+
+function showNotFound() {
+  document.getElementById('lobby').style.display = 'none';
+  document.getElementById('notFound').style.display = 'flex';
+}
+
+// ── "Open in app" button ─────────────────────────────────────────
+window.openApp = function(e) {
+  e.preventDefault();
+  const mid = document.getElementById('appLink').dataset.meetingId || meetingId;
+  window.location.href = 'crux://join/' + mid;
+};
+
+// ── Join ─────────────────────────────────────────────────────────
+window.startJoin = async function() {
+  hideErr();
+  const name = document.getElementById('nameInput').value.trim();
+  if (!name) { showErr('Entrez votre prénom pour continuer.'); return; }
+
+  if (document.getElementById('passcodeRow').style.display !== 'none') {
+    const entered = document.getElementById('passcodeInput').value.trim();
+    try {
+      const snap = await getDoc(doc(db, 'meetings', meetingId));
+      const expected = snap.data()?.passcode || '';
+      if (entered !== expected) { showErr("Code d'accès incorrect."); return; }
+    } catch (_) {}
+  }
+
+  myName = name;
+  try { await auth.currentUser?.updateProfile?.({ displayName: name }); } catch (_) {}
+
+  const btn = document.getElementById('joinBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Connexion à LiveKit Cloud…';
+
+  try {
+    await startCall();
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Rejoindre depuis le navigateur →';
+    const msg = e.name === 'NotAllowedError'
+      ? 'Accès refusé à la caméra/micro. Autorisez les permissions dans votre navigateur.'
+      : 'Erreur : ' + e.message;
+    showErr(msg);
+  }
+};
+
+// ── Call & LiveKit ───────────────────────────────────────────────
+function updateGridLayout() {
+  const grid = document.getElementById('videoGrid');
+  const tiles = grid.getElementsByClassName('video-wrap');
+  const count = tiles.length;
+
+  grid.className = 'videos';
+  if (count === 1) {
+    grid.classList.add('solo');
+    grid.style.gridTemplateColumns = '1fr';
+  } else if (count === 2) {
+    grid.style.gridTemplateColumns = '1fr 1fr';
+  } else if (count <= 4) {
+    grid.style.gridTemplateColumns = '1fr 1fr';
+    grid.style.gridTemplateRows = '1fr 1fr';
+  } else {
+    grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))';
+    grid.style.gridTemplateRows = 'auto';
+  }
+}
+
+function updateParticipantTile(participant) {
+  const tileId = 'tile_' + participant.identity;
+  let tile = document.getElementById(tileId);
+  const isLocal = participant === room.localParticipant;
+
+  if (!tile) {
+    tile = document.createElement('div');
+    tile.id = tileId;
+    tile.className = 'video-wrap';
+    tile.style.position = 'relative';
+
+    const video = document.createElement('video');
+    video.id = 'video_' + participant.identity;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.style.width = '100%';
+    video.style.height = '100%';
+    video.style.objectFit = 'cover';
+    video.style.borderRadius = '12px';
+    if (isLocal) {
+      video.muted = true;
+      video.style.transform = 'scaleX(-1)';
+    }
+    tile.appendChild(video);
+
+    const label = document.createElement('span');
+    label.className = 'video-label';
+    label.id = 'label_' + participant.identity;
+    label.textContent = (participant.name || participant.identity) + (isLocal ? ' (vous)' : '');
+    tile.appendChild(label);
+
+    document.getElementById('videoGrid').appendChild(tile);
+    updateGridLayout();
+  }
+
+  const videoElement = document.getElementById('video_' + participant.identity);
+  let placeholder = document.getElementById('placeholder_' + participant.identity);
+  
+  if (!placeholder) {
+    placeholder = document.createElement('div');
+    placeholder.id = 'placeholder_' + participant.identity;
+    placeholder.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#16162a;font-size:36px;font-weight:bold;color:rgba(255,255,255,0.4);border-radius:12px;z-index:1';
+    const initials = (participant.name || participant.identity || '?').slice(0, 2).toUpperCase();
+    placeholder.textContent = initials;
+    tile.appendChild(placeholder);
+  }
+
+  let videoTrack = null;
+  const pub = participant.getTrackPublication(LiveKit.Track.Source.Camera);
+  if (pub) {
+    if (isLocal) {
+      videoTrack = pub.track;
+    } else if (pub.isSubscribed) {
+      videoTrack = pub.track;
+    }
+  }
+
+  if (videoTrack) {
+    if (videoElement.srcObject !== videoTrack.mediaStream) {
+      videoTrack.attach(videoElement);
+    }
+    videoElement.style.display = 'block';
+    placeholder.style.display = 'none';
+  } else {
+    videoElement.style.display = 'none';
+    placeholder.style.display = 'flex';
+  }
+}
+
+function removeParticipantTile(participant) {
+  const tile = document.getElementById('tile_' + participant.identity);
+  if (tile) {
+    tile.remove();
+    updateGridLayout();
+  }
+}
+
+async function startCall() {
+  document.getElementById('videoGrid').innerHTML = '';
+
+  document.getElementById('lobby').style.display = 'none';
+  document.getElementById('callUI').style.display = 'flex';
+  document.getElementById('connStatus').textContent = 'Connexion…';
+
+  let token = null;
+  const tokenParams = `?room=${encodeURIComponent(meetingId)}&identity=${encodeURIComponent(myUid)}&name=${encodeURIComponent(myName)}`;
+  
+  try {
+    const localRes = await fetch('/livekit-token' + tokenParams);
+    if (localRes.ok) {
+      const data = await localRes.json();
+      token = data.token;
+    }
+  } catch (err) {
+    console.warn('Local token server failed, trying production fallback:', err);
+  }
+
+  if (!token) {
+    try {
+      const prodRes = await fetch('https://crux-new-final.onrender.com/livekit-token' + tokenParams);
+      if (prodRes.ok) {
+        const data = await prodRes.json();
+        token = data.token;
+      }
+    } catch (err) {
+      console.error('Production token server fallback failed:', err);
+    }
+  }
+
+  if (!token) {
+    throw new Error("Impossible d'obtenir un jeton de connexion LiveKit.");
+  }
+
+  room = new LiveKit.Room({
+    adaptiveStream: true,
+    dynacast: true,
+    videoCaptureDefaults: {
+      resolution: LiveKit.VideoPresets.h720.resolution,
+    }
+  });
+
+  room
+    .on(LiveKit.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      if (track.kind === 'video') {
+        if (publication.source === LiveKit.Track.Source.ScreenShare) {
+          updateParticipantScreenTile(participant);
+        } else {
+          updateParticipantTile(participant);
+        }
+      } else if (track.kind === 'audio') {
+        const audioMedia = track.attach();
+        document.body.appendChild(audioMedia);
+      }
+    })
+    .on(LiveKit.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+      if (track.kind === 'video') {
+        if (publication.source === LiveKit.Track.Source.ScreenShare) {
+          updateParticipantScreenTile(participant);
+        } else {
+          updateParticipantTile(participant);
+        }
+      } else if (track.kind === 'audio') {
+        track.detach();
+      }
+    })
+    .on(LiveKit.RoomEvent.ParticipantConnected, (participant) => {
+      updateParticipantTile(participant);
+    })
+    .on(LiveKit.RoomEvent.ParticipantDisconnected, (participant) => {
+      removeParticipantTile(participant);
+      const screenTile = document.getElementById('tile_screenshare_' + participant.identity);
+      if (screenTile) {
+        screenTile.remove();
+        updateGridLayout();
+      }
+    })
+    .on(LiveKit.RoomEvent.LocalTrackPublished, (publication) => {
+      if (publication.source === LiveKit.Track.Source.ScreenShare) {
+        updateParticipantScreenTile(room.localParticipant);
+      } else {
+        updateParticipantTile(room.localParticipant);
+      }
+    })
+    .on(LiveKit.RoomEvent.LocalTrackUnpublished, (publication) => {
+      if (publication.source === LiveKit.Track.Source.ScreenShare) {
+        updateParticipantScreenTile(room.localParticipant);
+      } else {
+        updateParticipantTile(room.localParticipant);
+      }
+    })
+    .on(LiveKit.RoomEvent.ActiveSpeakersChanged, (speakers) => {
+      document.querySelectorAll('.video-wrap').forEach(el => {
+        el.style.border = 'none';
+        el.style.boxShadow = 'none';
+      });
+      speakers.forEach(speaker => {
+        const tile = document.getElementById('tile_' + speaker.identity);
+        if (tile) {
+          tile.style.border = '2px solid #E74C3C';
+          tile.style.boxShadow = '0 0 16px rgba(231,76,60,0.4)';
+        }
+      });
+    })
+    .on(LiveKit.RoomEvent.Connected, () => {
+      const el = document.getElementById('connStatus');
+      el.textContent = 'Connecté ✓';
+      el.style.color = '#2ecc71';
+    })
+    .on(LiveKit.RoomEvent.Disconnected, () => {
+      const el = document.getElementById('connStatus');
+      el.textContent = 'Déconnecté';
+      el.style.color = '#E74C3C';
+    });
+
+  const livekitUrl = 'wss://crux-88fihb12.livekit.cloud';
+  await room.connect(livekitUrl, token);
+
+  await room.localParticipant.setMicrophoneEnabled(micOn);
+  await room.localParticipant.setCameraEnabled(camOn);
+  updateParticipantTile(room.localParticipant);
+
+  document.getElementById('peerName').textContent = 'LiveKit Room: ' + meetingId;
+
+  // Show Host Lock control if current user is the creator
+  if (myUid && meetingOrganizerId === myUid) {
+    const lockBtn = document.getElementById('lockBtn');
+    if (lockBtn) {
+      lockBtn.style.display = 'flex';
+      const snap = await getDoc(doc(db, 'meetings', meetingId));
+      if (snap.exists()) {
+        updateLockBtn(snap.data().isLocked);
+      }
+    }
+  }
+
+  await setDoc(
+    doc(db, 'meetings', meetingId, 'presence', myUid),
+    { userId: myUid, name: myName, micOn: micOn, cameraOn: camOn,
+      timestamp: serverTimestamp(), isWeb: true },
+    { merge: true }
+  ).catch(() => {});
+
+  listenChat();
+  listenCanvas();
+}
+
+// ── Controls ─────────────────────────────────────────────────────
+window.toggleMic = async function() {
+  micOn = !micOn;
+  if (room) {
+    await room.localParticipant.setMicrophoneEnabled(micOn);
+  }
+  document.getElementById('micBtn').classList.toggle('off', !micOn);
+  document.getElementById('micBtn').textContent = micOn ? '🎤' : '🔇';
+};
+window.toggleCam = async function() {
+  camOn = !camOn;
+  if (room) {
+    await room.localParticipant.setCameraEnabled(camOn);
+    updateParticipantTile(room.localParticipant);
+  }
+  document.getElementById('camBtn').classList.toggle('off', !camOn);
+  document.getElementById('camBtn').textContent = camOn ? '📷' : '🚫';
+};
+window.toggleChat = function() {
+  const p = document.getElementById('chatPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+};
+window.endCall = function() { cleanup(); window.location.href = '/'; };
+
+// ── Screen Sharing ───────────────────────────────────────────────
+let screenShareOn = false;
+window.toggleScreenShare = async function() {
+  if (!room) return;
+  try {
+    screenShareOn = !screenShareOn;
+    await room.localParticipant.setScreenShareEnabled(screenShareOn);
+    const btn = document.getElementById('screenBtn');
+    btn.classList.toggle('off', screenShareOn);
+    btn.textContent = screenShareOn ? '🛑' : '🖥️';
+    updateParticipantScreenTile(room.localParticipant);
+  } catch (err) {
+    console.error("Erreur de partage d'écran:", err);
+    screenShareOn = false;
+    document.getElementById('screenBtn').classList.remove('off');
+    document.getElementById('screenBtn').textContent = '🖥️';
+    alert("Impossible d'activer le partage d'écran ou action annulée.");
+  }
+};
+
+function updateParticipantScreenTile(participant) {
+  const screenId = 'screenshare_' + participant.identity;
+  const tileId = 'tile_' + screenId;
+  let tile = document.getElementById(tileId);
+  const isLocal = participant === room.localParticipant;
+
+  const screenPub = participant.getTrackPublication(LiveKit.Track.Source.ScreenShare);
+  let screenTrack = null;
+  if (screenPub) {
+    if (isLocal) screenTrack = screenPub.track;
+    else if (screenPub.isSubscribed) screenTrack = screenPub.track;
+  }
+
+  if (!screenTrack) {
+    if (tile) {
+      tile.remove();
+      updateGridLayout();
+    }
+    return;
+  }
+
+  if (!tile) {
+    tile = document.createElement('div');
+    tile.id = tileId;
+    tile.className = 'video-wrap screenshare-wrap';
+    tile.style.position = 'relative';
+
+    const video = document.createElement('video');
+    video.id = 'video_' + screenId;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.style.width = '100%';
+    video.style.height = '100%';
+    video.style.objectFit = 'contain';
+    video.style.borderRadius = '12px';
+    video.style.background = '#000';
+    tile.appendChild(video);
+
+    const label = document.createElement('span');
+    label.className = 'video-label';
+    label.id = 'label_' + screenId;
+    label.style.background = '#E74C3C';
+    label.textContent = "Écran de " + (participant.name || participant.identity) + (isLocal ? ' (vous)' : '');
+    tile.appendChild(label);
+
+    document.getElementById('videoGrid').appendChild(tile);
+    updateGridLayout();
+  }
+
+  const videoElement = document.getElementById('video_' + screenId);
+  if (videoElement && videoElement.srcObject !== screenTrack.mediaStream) {
+    screenTrack.attach(videoElement);
+  }
+}
+
+// ── Room Lock & Waiting Room Controls ────────────────────────────
+window.toggleLock = async function() {
+  const snap = await getDoc(doc(db, 'meetings', meetingId));
+  if (snap.exists()) {
+    const nextLocked = !snap.data().isLocked;
+    await updateDoc(doc(db, 'meetings', meetingId), { isLocked: nextLocked });
+    updateLockBtn(nextLocked);
+  }
+};
+
+function updateLockBtn(locked) {
+  const btn = document.getElementById('lockBtn');
+  if (btn) {
+    btn.textContent = locked ? '🔒' : '🔓';
+    btn.classList.toggle('off', locked);
+  }
+}
+
+// ── Collaborative Whiteboard Canvas ──────────────────────────────
+let canvasUnsub = null;
+let isDrawing = false;
+let lastX = 0;
+let lastY = 0;
+let currentColor = '#E74C3C';
+
+function initCanvas() {
+  const canvas = document.getElementById('sharedCanvas');
+  const colorInput = document.getElementById('canvasColor');
+  
+  colorInput.addEventListener('change', (e) => {
+    currentColor = e.target.value;
+  });
+
+  window.addEventListener('resize', resizeCanvas);
+  
+  canvas.addEventListener('mousedown', startDrawing);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDrawing);
+  canvas.addEventListener('mouseleave', stopDrawing);
+
+  canvas.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    isDrawing = true;
+    lastX = t.clientX - rect.left;
+    lastY = t.clientY - rect.top;
+  }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => {
+    if (!isDrawing) return;
+    const t = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = t.clientX - rect.left;
+    const y = t.clientY - rect.top;
+    drawSegmentLocallyAndSync(lastX, lastY, x, y, currentColor);
+    lastX = x;
+    lastY = y;
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchend', stopDrawing);
+}
+
+function resizeCanvas() {
+  const canvas = document.getElementById('sharedCanvas');
+  if (canvas && canvas.parentElement) {
+    const temp = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    canvas.width = canvas.parentElement.clientWidth;
+    canvas.height = canvas.parentElement.clientHeight;
+    canvas.getContext('2d').putImageData(temp, 0, 0);
+  }
+}
+
+function startDrawing(e) {
+  isDrawing = true;
+  const canvas = document.getElementById('sharedCanvas');
+  const rect = canvas.getBoundingClientRect();
+  lastX = e.clientX - rect.left;
+  lastY = e.clientY - rect.top;
+}
+
+function draw(e) {
+  if (!isDrawing) return;
+  const canvas = document.getElementById('sharedCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  drawSegmentLocallyAndSync(lastX, lastY, x, y, currentColor);
+  lastX = x;
+  lastY = y;
+}
+
+function stopDrawing() {
+  isDrawing = false;
+}
+
+async function drawSegmentLocallyAndSync(x1, y1, x2, y2, color) {
+  const canvas = document.getElementById('sharedCanvas');
+  const w = canvas.width;
+  const h = canvas.height;
+
+  drawSegment(x1, y1, x2, y2, color);
+
+  if (meetingId) {
+    await addDoc(collection(db, 'meetings', meetingId, 'drawings'), {
+      x1: x1 / w,
+      y1: y1 / h,
+      x2: x2 / w,
+      y2: y2 / h,
+      color: color,
+      senderId: myUid,
+      timestamp: serverTimestamp()
+    }).catch(() => {});
+  }
+}
+
+function drawSegment(x1, y1, x2, y2, color) {
+  const canvas = document.getElementById('sharedCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+}
+
+function listenCanvas() {
+  initCanvas();
+  resizeCanvas();
+
+  canvasUnsub = onSnapshot(collection(db, 'meetings', meetingId, 'drawings'), snap => {
+    const canvas = document.getElementById('sharedCanvas');
+    const w = canvas.width;
+    const h = canvas.height;
+
+    snap.docChanges().forEach(ch => {
+      if (ch.type === 'added') {
+        const d = ch.doc.data();
+        if (d.action === 'clear') {
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, w, h);
+        } else if (d.senderId !== myUid) {
+          drawSegment(d.x1 * w, d.y1 * h, d.x2 * w, d.y2 * h, d.color);
+        }
+      }
+    });
+  });
+}
+
+window.toggleCanvas = function() {
+  const p = document.getElementById('canvasPanel');
+  if (p.style.display === 'none') {
+    p.style.display = 'flex';
+    setTimeout(resizeCanvas, 50);
+  } else {
+    p.style.display = 'none';
+  }
+};
+
+window.clearCanvas = async function() {
+  if (confirm("Effacer le tableau blanc pour tout le monde ?")) {
+    await addDoc(collection(db, 'meetings', meetingId, 'drawings'), {
+      action: 'clear',
+      senderId: myUid,
+      timestamp: serverTimestamp()
+    }).catch(() => {});
+  }
+};
+
+function cleanup() {
+  if (room) {
+    room.disconnect();
+    room = null;
+  }
+  chatUnsub?.();
+  meetingUnsub?.();
+  canvasUnsub?.();
+}
+window.addEventListener('beforeunload', cleanup);
+
+// ── Chat ─────────────────────────────────────────────────────────
+function listenChat() {
+  chatUnsub = onSnapshot(collection(db, 'meetings', meetingId, 'chat'), snap => {
+    const box = document.getElementById('chatMessages');
+    snap.docChanges().forEach(ch => {
+      if (ch.type === 'added') {
+        const d = ch.doc.data();
+        const div = document.createElement('div');
+        div.style.cssText = 'background:rgba(255,255,255,0.06);border-radius:8px;padding:6px 10px';
+        div.innerHTML = `<span style="color:#E74C3C;font-weight:600">${esc(d.sender||'Anonyme')}</span><br/>${esc(d.text||'')}`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+      }
+    });
+  });
+}
+window.sendChat = async function() {
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  await addDoc(collection(db, 'meetings', meetingId, 'chat'), {
+    sender: myName, senderId: myUid,
+    text, timestamp: serverTimestamp(), isWeb: true,
+  }).catch(() => {});
+};
+window.chatKey = function(e) { if (e.key === 'Enter') window.sendChat(); };
+
+// ── Boot ─────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "agents": {
+    "qa": {
+      "name": "QA Optimization Engineer",
+      "id": "agent_015QMiVaMNm8hFVa6kPsFUeN",
+      "role": "Tests, qualité, lint, régression, edge cases"
+    },
+    "engineer": {
+      "name": "Software Engineer",
+      "id": "agent_01Fp1BYHo58i95pvXAmpjpJg",
+      "role": "Implémentation features, architecture, review code"
+    },
+    "designer": {
+      "name": "UI UX Designer",
+      "id": "agent_01QttyRFst44bXDvuk8YvKEG",
+      "role": "UI/UX, accessibilité, design system, composants visuels"
+    },
+    "architect": {
+      "name": "Product Architect",
+      "id": "agent_012ueTDMb36eXpHtxqszhT7p",
+      "role": "Architecture produit, décisions techniques, scalabilité"
+    },
+    "orchestrator": {
+      "name": "Project Orchestrator",
+      "id": "agent_015ieYimCRksmDf4Ab3pp8hF",
+      "role": "Coordination, planification, priorisation des tâches"
+    }
+  },
+  "api_base": "https://api.anthropic.com/v1",
+  "model": "claude-opus-4-8"
+}
