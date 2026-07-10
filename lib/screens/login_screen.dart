@@ -267,7 +267,7 @@ class _LoginScreenState extends State<LoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF0A0E1A), Color(0xFF121624), Color(0xFF020205)],
+            colors: [Color(0xFF0A0A0F), Color(0xFF14141F), Color(0xFF000000)],
           ),
         ),
         child: SafeArea(
@@ -277,28 +277,23 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  ShaderMask(
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [Color(0xFF00E5FF), Color(0xFF7C5CFF)],
-                    ).createShader(bounds),
-                    child: Text(
-                      'CRUX',
-                      style: GoogleFonts.spaceGrotesk(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 6,
-                      ),
+                  Text(
+                    'CRUX',
+                    style: GoogleFonts.poppins(
+                      fontSize: 48,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 6,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     AppTranslations.t('connecting', lang).toUpperCase(),
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 11,
-                      color: const Color(0xFF8A8FA3),
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: const Color(0xFF8A8A94),
                       letterSpacing: 2,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
                   const SizedBox(height: 48),
@@ -328,7 +323,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: () => _showForgotPasswordDialog(lang),
                         child: Text(
                           AppTranslations.t('forgot_password', lang),
-                          style: GoogleFonts.spaceGrotesk(color: Colors.white38, fontSize: 13, fontWeight: FontWeight.w500),
+                          style: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
                         ),
                       ),
                     ],
@@ -347,20 +342,22 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           AppTranslations.t('or_divider', lang).toUpperCase(),
-                          style: GoogleFonts.spaceGrotesk(color: Colors.white10, fontSize: 10, fontWeight: FontWeight.bold),
+                          style: GoogleFonts.poppins(color: Colors.white10, fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
                       const Expanded(child: Divider(color: Colors.white10)),
                     ],
                   ),
                   const SizedBox(height: 24),
+                  
                   _buildSocialButton(
                     onPressed: _isGoogleLoading ? null : _handleGoogleLogin,
                     label: AppTranslations.t('sign_in_google', lang),
                     icon: Icons.g_mobiledata,
                     loading: _isGoogleLoading,
                   ),
-                  const SizedBox(height: 32),
+                  
+                  const SizedBox(height: 48),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -472,20 +469,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   Text(label, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 14)),
                 ],
               ),
-      ),
-    );
-  }
-
-  Widget _buildSmallSocialButton({required VoidCallback onPressed, required IconData icon, required Color color}) {
-    return SizedBox(
-      height: 54,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: Colors.white.withOpacity(0.1)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        child: Icon(icon, color: color, size: 24),
       ),
     );
   }
