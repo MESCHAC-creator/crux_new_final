@@ -77,9 +77,12 @@ if "%user_msg%"=="" (
 
 echo.
 echo [3/4] Indexation des fichiers...
+if exist "android\gradle\wrapper\gradle-wrapper.jar" (
+    git rm --cached "android\gradle\wrapper\gradle-wrapper.jar" >nul 2>&1
+)
 git add .
 if exist "android\gradle\wrapper\gradle-wrapper.jar" (
-    git add -f android\gradle\wrapper\gradle-wrapper.jar
+    git add -f "android\gradle\wrapper\gradle-wrapper.jar"
 )
 
 echo.
