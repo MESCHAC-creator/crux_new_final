@@ -75,6 +75,10 @@ COMMIT_MSG=${user_msg:-$DEFAULT_MSG}
 # Stage all changes
 echo -e "\n${CYAN}[3/4] Staging files...${NC}"
 git add .
+# Force add gradle-wrapper.jar to guarantee it is pushed to GitHub and not ignored by global patterns
+if [ -f "android/gradle/wrapper/gradle-wrapper.jar" ]; then
+    git add -f android/gradle/wrapper/gradle-wrapper.jar
+fi
 
 # Commit changes
 echo -e "${CYAN}Committing changes...${NC}"

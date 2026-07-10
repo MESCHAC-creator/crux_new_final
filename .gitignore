@@ -61,3 +61,7 @@ functions/node_modules/
 backend/.env
 *.env
 .env.local
+
+# Gradle wrapper jar exception to prevent CI/CD build issues (Codemagic)
+!**/gradle/wrapper/gradle-wrapper.jar
+!gradle-wrapper.jar
