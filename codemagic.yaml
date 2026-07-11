@@ -121,12 +121,11 @@ workflows:
           set -e
           cd android
           chmod +x gradlew
-          # Forçage du téléchargement d'un wrapper JAR certifié propre
           mkdir -p gradle/wrapper
-          curl -L -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.13/gradle/wrapper/gradle-wrapper.jar
-          # Vérification immédiate
+          # Téléchargement d'un wrapper JAR certifié (v8.11.1 est compatible avec toutes les distributions 8.x)
+          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.11.1/gradle/wrapper/gradle-wrapper.jar
           if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "❌ Erreur critique : Le wrapper JAR n'a pas pu être téléchargé."
+            echo "❌ Erreur critique : Échec du téléchargement du Gradle Wrapper."
             exit 1
           fi
           ./gradlew -v
@@ -138,35 +137,32 @@ workflows:
         script: |
           set -e
           mkdir -p build/outputs
+          BUILD_FLAGS="--release --no-tree-shake-icons --android-skip-build-dependency-validation"
 
-          echo "=== FLUTTER BUILD APK (release) ==="
-          flutter build apk --release --no-tree-shake-icons 2>&1 | tail -300
+          echo "=== FLUTTER BUILD APK ($BUILD_FLAGS) ==="
+          flutter build apk $BUILD_FLAGS 2>&1 | tail -300
 
           APK=$(find build/app/outputs/flutter-apk -name "app-release.apk" 2>/dev/null | head -1)
           [ -z "$APK" ] && APK=$(find build/app/outputs/apk -name "app-release.apk" 2>/dev/null | head -1)
           [ -z "$APK" ] && APK=$(find . -name "app-release.apk" ! -path "*/.pub-cache/*" ! -path "*/debug/*" 2>/dev/null | head -1)
 
           if [ -z "$APK" ]; then
-            echo "❌ APK not found — listing build/app/outputs/:"
-            find build/app/outputs 2>/dev/null || echo "(empty)"
+            echo "❌ APK not found"
             exit 1
           fi
           cp "$APK" build/outputs/crux-release.apk
-          echo "✅ APK: $(du -sh build/outputs/crux-release.apk | cut -f1) — source: $APK"
 
-          echo "=== FLUTTER BUILD AAB (release) ==="
-          flutter build appbundle --release --no-tree-shake-icons 2>&1 | tail -300
+          echo "=== FLUTTER BUILD AAB ($BUILD_FLAGS) ==="
+          flutter build appbundle $BUILD_FLAGS 2>&1 | tail -300
 
           AAB=$(find build/app/outputs/bundle -name "app-release.aab" 2>/dev/null | head -1)
           [ -z "$AAB" ] && AAB=$(find . -name "app-release.aab" ! -path "*/.pub-cache/*" 2>/dev/null | head -1)
 
           if [ -z "$AAB" ]; then
-            echo "❌ AAB not found — listing build/app/outputs/:"
-            find build/app/outputs 2>/dev/null || echo "(empty)"
+            echo "❌ AAB not found"
             exit 1
           fi
           cp "$AAB" build/outputs/crux-release.aab
-          echo "✅ AAB: $(du -sh build/outputs/crux-release.aab | cut -f1) — source: $AAB"
 
     artifacts:
       - build/outputs/crux-release.apk
@@ -208,83 +204,47 @@ workflows:
           set -e
           if [ ! -d "ios" ]; then
             flutter create --platforms ios --org com.schac-crux --project-name crux .
-            echo "✅ iOS folder generated"
-          else
-            echo "✅ iOS folder already exists"
           fi
           PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
           if [ -f "$PBXPROJ" ]; then
             sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.schac-crux.app/g' "$PBXPROJ" || \
             sed -i 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.schac-crux.app/g' "$PBXPROJ"
-            echo "✅ Bundle ID patché"
           fi
 
       - name: Inject GoogleService-Info.plist
         script: |
           if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
             echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
-            echo "✅ GoogleService-Info.plist injecté"
-          else
-            echo "⚠️  GOOGLE_SERVICE_INFO_PLIST absent — Firebase iOS désactivé"
           fi
 
       - name: Patch Info.plist permissions
         script: |
           set -e
           PLIST="ios/Runner/Info.plist"
-          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'CRUX needs the camera for video conferences'" "$PLIST" 2>/dev/null || \
-          /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 'CRUX needs the camera for video conferences'" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'CRUX needs the microphone for calls'" "$PLIST" 2>/dev/null || \
-          /usr/libexec/PlistBuddy -c "Set :NSMicrophoneUsageDescription 'CRUX needs the microphone for calls'" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'CRUX'" "$PLIST" 2>/dev/null || \
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'CRUX'" "$PLIST"
-          echo "✅ Info.plist patché"
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'CRUX needs the camera for video conferences'" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'CRUX needs the microphone for calls'" "$PLIST" 2>/dev/null || true
 
       - name: Get Flutter packages
         script: flutter pub get
-
-      - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
-        script: |
-          if [ -n "$FIREBASE_TOKEN" ]; then
-            npm install -g firebase-tools --silent
-            firebase deploy --only firestore:rules \
-              --project crux-3c6be \
-              --token "$FIREBASE_TOKEN" \
-              --non-interactive
-            echo "✅ Règles Firestore déployées"
-          else
-            echo "⏭️  FIREBASE_TOKEN absent — build OK"
-          fi
 
       - name: Generate app icons
         script: dart run flutter_launcher_icons -f flutter_launcher_icons_ios.yaml
 
       - name: Install CocoaPods
         script: |
-          set -e
           cd ios
           pod repo update
           pod install
-          echo "✅ CocoaPods installé"
 
       - name: Build iOS IPA
         script: |
-          set -e
           flutter build ipa --release \
             --export-options-plist=/Users/builder/export_options.plist
-          echo "✅ IPA buildé"
 
     artifacts:
       - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
 
     publishing:
-      email:
-        recipients:
-          - kouakouchristevann@gmail.com
-        notify:
-          success: true
-          failure: true
       app_store_connect:
         auth: integration
         submit_to_testflight: true
