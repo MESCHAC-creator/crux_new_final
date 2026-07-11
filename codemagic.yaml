@@ -123,7 +123,7 @@ workflows:
           chmod +x gradlew
           # Forçage du téléchargement d'un wrapper JAR certifié propre
           mkdir -p gradle/wrapper
-          curl -L -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.11.1/gradle/wrapper/gradle-wrapper.jar
+          curl -L -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.13/gradle/wrapper/gradle-wrapper.jar
           # Vérification immédiate
           if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
             echo "❌ Erreur critique : Le wrapper JAR n'a pas pu être téléchargé."
