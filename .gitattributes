@@ -3,3 +3,10 @@ android/gradlew text eol=lf
 android/gradlew.bat text eol=lf
 *.gradle text eol=lf
 *.gradle.kts text eol=lf
+
+# Ensure binary files are not corrupted by line ending transformations
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.jks binary
