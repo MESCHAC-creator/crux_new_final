@@ -121,12 +121,13 @@ workflows:
           set -e
           cd android
           chmod +x gradlew
-          # Failsafe: Téléchargement d'un wrapper propre si celui du repo est corrompu
-          WRAPPER_JAR="gradle/wrapper/gradle-wrapper.jar"
-          if [ ! -f "$WRAPPER_JAR" ] || [ $(stat -c%s "$WRAPPER_JAR") -lt 50000 ]; then
-            echo "📥 Gradle wrapper manquant ou corrompu. Téléchargement d'une version saine..."
-            mkdir -p gradle/wrapper
-            curl -L -o "$WRAPPER_JAR" "https://github.com/gradle/gradle/raw/v8.11.1/gradle/wrapper/gradle-wrapper.jar"
+          # Forçage du téléchargement d'un wrapper JAR certifié propre
+          mkdir -p gradle/wrapper
+          curl -L -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.11.1/gradle/wrapper/gradle-wrapper.jar
+          # Vérification immédiate
+          if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "❌ Erreur critique : Le wrapper JAR n'a pas pu être téléchargé."
+            exit 1
           fi
           ./gradlew -v
 
