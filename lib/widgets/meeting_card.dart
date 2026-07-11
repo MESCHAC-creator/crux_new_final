@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import '../theme/colors.dart';
 import '../models/meeting_model.dart';
 
@@ -39,7 +38,7 @@ class MeetingCard extends StatelessWidget {
   }
 
   String _formatTime(DateTime time) {
-    return DateFormat('HH:mm').format(time);
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -55,7 +54,7 @@ class MeetingCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.whiteBg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: Colors.white12),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
@@ -102,10 +101,10 @@ class MeetingCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.person,
                           size: 12,
-                          color: AppColors.textTertiary,
+                          color: AppColors.textSecondary,
                         ),
                         const SizedBox(width: 4),
                         Expanded(
@@ -113,24 +112,24 @@ class MeetingCard extends StatelessWidget {
                             meeting.organizer,
                             style: GoogleFonts.poppins(
                               fontSize: 12,
-                              color: AppColors.textTertiary,
+                              color: AppColors.textSecondary,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Icon(
+                        Icon(
                           Icons.access_time,
                           size: 12,
-                          color: AppColors.textTertiary,
+                          color: AppColors.textSecondary,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           _formatTime(meeting.startTime),
                           style: GoogleFonts.poppins(
                             fontSize: 12,
-                            color: AppColors.textTertiary,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],

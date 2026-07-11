@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
@@ -55,6 +56,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
   bool _screenShareOn = false;
   bool _loading = true;
   String? _error;
+  String? _organizerId;
 
   List<RemoteParticipant> _remoteParticipants = [];
   String? _activeSpeakerId;
@@ -238,7 +240,33 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
           if (e.speakers.isNotEmpty) {
             setState(() => _activeSpeakerId = e.speakers.first.identity);
           }
+        })
+        ..on<DataReceivedEvent>((e) {
+          try {
+            final text = utf8.decode(e.data);
+            final msg = jsonDecode(text) as Map<String, dynamic>;
+            if (msg['type'] == 'mute_all') {
+              if (e.participant?.identity == _organizerId) {
+                if (_micOn) {
+                  _toggleMic();
+                  _announce("L'organisateur a coupé votre micro.");
+                }
+              }
+            }
+          } catch (err) {
+            if (kDebugMode) print('Error handling data received: $err');
+          }
         });
+
+      // Fetch organizerId
+      try {
+        final doc = await _db.collection('meetings').doc(widget.meetingId).get();
+        if (doc.exists) {
+          _organizerId = doc.data()?['organizerId'] as String?;
+        }
+      } catch (e) {
+        if (kDebugMode) print("Error fetching organizerId: $e");
+      }
 
       await _room!.connect(AppConfig.livekitUrl, token);
       await _room!.localParticipant?.setCameraEnabled(_camOn);
@@ -271,6 +299,39 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
   Future<void> _toggleCam() async {
     setState(() => _camOn = !_camOn);
     await _room?.localParticipant?.setCameraEnabled(_camOn);
+  }
+
+  Future<void> _muteAllOthers() async {
+    final confirmMute = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text("Muter tout le monde ?", style: TextStyle(color: Colors.white)),
+        content: const Text("Voulez-vous couper le micro de tous les autres participants ?", style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annuler")),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text("Couper"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmMute == true && _room != null) {
+      try {
+        final data = utf8.encode(jsonEncode({'type': 'mute_all'}));
+        await _room!.localParticipant?.publishData(data, reliable: true);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Demande de coupure micro envoyée.")),
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) print("Error muting all: $e");
+      }
+    }
   }
 
   Future<void> _toggleRaiseHand() async {
@@ -748,6 +809,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
                   'senderId': widget.userId,
                   'sender': widget.userName,
                   'message': ctrl.text,
+                  'text': ctrl.text,
                   'timestamp': FieldValue.serverTimestamp(),
                   'isPrivate': _privateRecipientId != null,
                   'recipientId': _privateRecipientId
@@ -757,30 +819,119 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
         ]));
   }
 
-  Widget _buildParticipantsPanel() => _BasePanel(
-      title: "Membres (${[if (_room?.localParticipant != null) 1, ..._remoteParticipants].length})",
+  Widget _buildParticipantsPanel() {
+    final local = _room?.localParticipant;
+    final List<Participant> allParticipants = [
+      if (local != null) local,
+      ..._remoteParticipants,
+    ];
+
+    final isMeOrganizer = widget.isHost || widget.userId == _organizerId;
+
+    return _BasePanel(
+      title: "Membres (${allParticipants.length})",
       onClose: () => setState(() => _showParticipants = false),
-      child: ListView(children: [
-        for (final Participant p in [if (_room?.localParticipant != null) _room!.localParticipant!, ..._remoteParticipants])
-          ListTile(
-            leading: _buildAvatar(p.name ?? p.identity),
-            title: Text(p.name ?? p.identity, style: const TextStyle(color: Colors.white, fontSize: 14)),
-            trailing: Wrap(children: [
-              if (_raisedHands.contains(p.identity)) const Icon(Icons.back_hand, color: Colors.orange, size: 16),
-              IconButton(
-                  icon: const Icon(Icons.message_outlined, color: Colors.white38),
-                  onPressed: () {
-                    if (p.identity == widget.userId) return;
-                    setState(() {
-                      _privateRecipientId = p.identity;
-                      _privateRecipientName = p.name ?? p.identity;
-                      _showParticipants = false;
-                      _showChat = true;
-                    });
-                  }),
-            ]),
-          )
-      ]));
+      child: Column(
+        children: [
+          if (isMeOrganizer)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _muteAllOthers,
+                  icon: const Icon(Icons.mic_off, color: Colors.white, size: 18),
+                  label: const Text(
+                    "Muter tous les autres",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: allParticipants.length,
+              itemBuilder: (context, index) {
+                final p = allParticipants[index];
+                final isLocal = p == local;
+                final isOrganizer = p.identity == _organizerId;
+
+                bool isMicMuted = true;
+                if (isLocal) {
+                  isMicMuted = !_micOn;
+                } else {
+                  for (final pub in p.audioTrackPublications) {
+                    if (!pub.muted) {
+                      isMicMuted = false;
+                      break;
+                    }
+                  }
+                }
+
+                String displayName = p.name ?? p.identity;
+                if (isLocal) {
+                  displayName += " (vous)";
+                }
+                if (isOrganizer) {
+                  displayName += " 👑";
+                }
+
+                return ListTile(
+                  leading: _buildAvatar(p.name ?? p.identity),
+                  title: Text(
+                    displayName,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  subtitle: Text(
+                    isMicMuted ? "Micro désactivé" : "Micro actif",
+                    style: TextStyle(
+                      color: isMicMuted ? Colors.white38 : Colors.greenAccent,
+                      fontSize: 11,
+                    ),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isMicMuted ? Icons.mic_off : Icons.mic,
+                        color: isMicMuted ? Colors.white38 : Colors.greenAccent,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      if (_raisedHands.contains(p.identity))
+                        const Padding(
+                          padding: EdgeInsets.only(right: 8.0),
+                          child: Icon(Icons.back_hand, color: Colors.orange, size: 16),
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.message_outlined, color: Colors.white38),
+                        onPressed: () {
+                          if (p.identity == widget.userId) return;
+                          setState(() {
+                            _privateRecipientId = p.identity;
+                            _privateRecipientName = p.name ?? p.identity;
+                            _showParticipants = false;
+                            _showChat = true;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildNotesPanel() {
     return _BasePanel(
@@ -845,21 +996,62 @@ class _ChatBubble extends StatelessWidget {
   final bool isMe;
   const _ChatBubble({required this.data, required this.isMe});
   @override
-  Widget build(BuildContext context) => Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-              color: isMe ? AppColors.primary : Colors.white12, borderRadius: BorderRadius.circular(16)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (!isMe)
-              Text(data['sender'], style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold)),
-            Text(data['message'], style: const TextStyle(color: Colors.white, fontSize: 13)),
-            if (data['isPrivate'] == true)
-              const Padding(
-                  padding: EdgeInsets.only(top: 4),
-                  child: Text("🔒 Privé",
-                      style: TextStyle(color: AppColors.primary, fontSize: 8, fontWeight: FontWeight.bold))),
-          ])));
+  Widget build(BuildContext context) {
+    String timeStr = '';
+    if (data['timestamp'] != null) {
+      final ts = data['timestamp'];
+      DateTime? dt;
+      if (ts is Timestamp) {
+        dt = ts.toDate();
+      } else if (ts is int) {
+        dt = DateTime.fromMillisecondsSinceEpoch(ts);
+      }
+      if (dt != null) {
+        final localDt = dt.toLocal();
+        final hour = localDt.hour.toString().padLeft(2, '0');
+        final minute = localDt.minute.toString().padLeft(2, '0');
+        timeStr = "$hour:$minute";
+      }
+    }
+    if (timeStr.isEmpty) {
+      final now = DateTime.now();
+      final hour = now.hour.toString().padLeft(2, '0');
+      final minute = now.minute.toString().padLeft(2, '0');
+      timeStr = "$hour:$minute";
+    }
+
+    return Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: isMe ? AppColors.primary : Colors.white12, borderRadius: BorderRadius.circular(16)),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!isMe)
+                    Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(data['sender'] ?? 'Anonyme',
+                            style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold))),
+                  Text(data['message'] ?? data['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Align(
+                      alignment: Alignment.centerRight,
+                      child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (data['isPrivate'] == true) ...[
+                              const Icon(Icons.lock, color: Colors.amber, size: 10),
+                              const SizedBox(width: 4),
+                              const Text("Privé",
+                                  style: TextStyle(color: Colors.amber, fontSize: 9, fontWeight: FontWeight.bold)),
+                              const SizedBox(width: 8),
+                            ],
+                            Text(timeStr, style: const TextStyle(color: Colors.white38, fontSize: 9)),
+                          ])),
+                ])));
+  }
 }

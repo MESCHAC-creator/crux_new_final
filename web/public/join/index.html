@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CRUX — Rejoindre la réunion</title>
+  <link rel="icon" type="image/png" href="/favicon.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
@@ -123,6 +124,7 @@
     <button class="ctrl-btn" id="screenBtn" onclick="toggleScreenShare()" title="Partager l'écran">🖥️</button>
     <button class="ctrl-btn" id="canvasBtn" onclick="toggleCanvas()" title="Tableau blanc">🎨</button>
     <button class="ctrl-btn" id="lockBtn" style="display:none" onclick="toggleLock()" title="Verrouiller la réunion (Salle d'attente)">🔓</button>
+    <button class="ctrl-btn" id="participantsBtn" onclick="toggleParticipants()" title="Participants">👥</button>
     <button class="ctrl-btn" id="chatBtn" onclick="toggleChat()" title="Chat">💬</button>
     <button class="ctrl-btn end" onclick="endCall()" title="Quitter">📵</button>
   </div>
@@ -132,6 +134,20 @@
     <div style="display:flex;gap:8px;padding:8px 10px;border-top:1px solid rgba(255,255,255,0.08)">
       <input type="text" id="chatInput" placeholder="Message…" style="flex:1;font-size:13px;padding:8px;margin-bottom:0" onkeydown="chatKey(event)" />
       <button onclick="sendChat()" style="background:#E74C3C;border:none;border-radius:8px;padding:8px 12px;color:#fff;cursor:pointer;font-size:13px">↑</button>
+    </div>
+  </div>
+
+  <div id="participantsPanel" style="display:none; position:fixed; bottom:90px; right:304px; width:280px; background:#1a1a2e; border-radius:14px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.5); z-index:100; flex-direction:column">
+    <div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center">
+      <span>👥 Participants</span>
+      <span id="participantCount" style="font-size:12px;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:10px">1</span>
+    </div>
+    <!-- Organisateur controls -->
+    <div id="organizerControls" style="display:none; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.08); background:rgba(231,76,60,0.05)">
+      <button class="btn" id="muteAllBtn" onclick="toggleMuteAll()" style="font-size:12px; padding:8px 10px; width:100%; background:#E74C3C; border:none; border-radius:8px; font-weight:600">🔇 Muter tous les autres</button>
+    </div>
+    <div id="participantsList" style="height:200px;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;font-size:13px">
+      <!-- List of participants dynamically generated -->
     </div>
   </div>
 
@@ -156,7 +172,7 @@ import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/fir
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, onSnapshot,
-  collection, serverTimestamp
+  collection, serverTimestamp, query, orderBy, limit
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ── Firebase ─────────────────────────────────────────────────────
@@ -482,6 +498,7 @@ async function startCall() {
         const audioMedia = track.attach();
         document.body.appendChild(audioMedia);
       }
+      if (typeof updateParticipantsList === 'function') updateParticipantsList();
     })
     .on(LiveKit.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
       if (track.kind === 'video') {
@@ -493,9 +510,11 @@ async function startCall() {
       } else if (track.kind === 'audio') {
         track.detach();
       }
+      if (typeof updateParticipantsList === 'function') updateParticipantsList();
     })
     .on(LiveKit.RoomEvent.ParticipantConnected, (participant) => {
       updateParticipantTile(participant);
+      if (typeof updateParticipantsList === 'function') updateParticipantsList();
     })
     .on(LiveKit.RoomEvent.ParticipantDisconnected, (participant) => {
       removeParticipantTile(participant);
@@ -504,6 +523,7 @@ async function startCall() {
         screenTile.remove();
         updateGridLayout();
       }
+      if (typeof updateParticipantsList === 'function') updateParticipantsList();
     })
     .on(LiveKit.RoomEvent.LocalTrackPublished, (publication) => {
       if (publication.source === LiveKit.Track.Source.ScreenShare) {
@@ -511,12 +531,37 @@ async function startCall() {
       } else {
         updateParticipantTile(room.localParticipant);
       }
+      if (typeof updateParticipantsList === 'function') updateParticipantsList();
     })
     .on(LiveKit.RoomEvent.LocalTrackUnpublished, (publication) => {
       if (publication.source === LiveKit.Track.Source.ScreenShare) {
         updateParticipantScreenTile(room.localParticipant);
       } else {
         updateParticipantTile(room.localParticipant);
+      }
+      if (typeof updateParticipantsList === 'function') updateParticipantsList();
+    })
+    .on(LiveKit.RoomEvent.TrackMuted, (publication, participant) => {
+      if (typeof updateParticipantsList === 'function') updateParticipantsList();
+    })
+    .on(LiveKit.RoomEvent.TrackUnmuted, (publication, participant) => {
+      if (typeof updateParticipantsList === 'function') updateParticipantsList();
+    })
+    .on(LiveKit.RoomEvent.DataReceived, (payload, participant) => {
+      try {
+        const decoder = new TextDecoder();
+        const text = decoder.decode(payload);
+        const msg = JSON.parse(text);
+        if (msg.type === 'mute_all') {
+          // If the sender is the meeting creator, mute the microphone
+          if (participant && participant.identity === meetingOrganizerId) {
+            if (micOn) {
+              toggleMic();
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error handling data received:', err);
       }
     })
     .on(LiveKit.RoomEvent.ActiveSpeakersChanged, (speakers) => {
@@ -536,11 +581,13 @@ async function startCall() {
       const el = document.getElementById('connStatus');
       el.textContent = 'Connecté ✓';
       el.style.color = '#2ecc71';
+      if (typeof updateParticipantsList === 'function') updateParticipantsList();
     })
     .on(LiveKit.RoomEvent.Disconnected, () => {
       const el = document.getElementById('connStatus');
       el.textContent = 'Déconnecté';
       el.style.color = '#E74C3C';
+      if (typeof updateParticipantsList === 'function') updateParticipantsList();
     });
 
   const livekitUrl = 'wss://crux-88fihb12.livekit.cloud';
@@ -573,6 +620,13 @@ async function startCall() {
 
   listenChat();
   listenCanvas();
+
+  // Show Organizer controls in participants panel if creator
+  if (myUid && meetingOrganizerId === myUid) {
+    const orgCtrl = document.getElementById('organizerControls');
+    if (orgCtrl) orgCtrl.style.display = 'block';
+  }
+  if (typeof updateParticipantsList === 'function') updateParticipantsList();
 }
 
 // ── Controls ─────────────────────────────────────────────────────
@@ -583,6 +637,7 @@ window.toggleMic = async function() {
   }
   document.getElementById('micBtn').classList.toggle('off', !micOn);
   document.getElementById('micBtn').textContent = micOn ? '🎤' : '🔇';
+  if (typeof updateParticipantsList === 'function') updateParticipantsList();
 };
 window.toggleCam = async function() {
   camOn = !camOn;
@@ -592,6 +647,7 @@ window.toggleCam = async function() {
   }
   document.getElementById('camBtn').classList.toggle('off', !camOn);
   document.getElementById('camBtn').textContent = camOn ? '📷' : '🚫';
+  if (typeof updateParticipantsList === 'function') updateParticipantsList();
 };
 window.toggleChat = function() {
   const p = document.getElementById('chatPanel');
@@ -857,18 +913,48 @@ window.addEventListener('beforeunload', cleanup);
 
 // ── Chat ─────────────────────────────────────────────────────────
 function listenChat() {
-  chatUnsub = onSnapshot(collection(db, 'meetings', meetingId, 'chat'), snap => {
+  const q = query(
+    collection(db, 'meetings', meetingId, 'chat'),
+    orderBy('timestamp', 'desc'),
+    limit(100)
+  );
+  chatUnsub = onSnapshot(q, snap => {
     const box = document.getElementById('chatMessages');
-    snap.docChanges().forEach(ch => {
-      if (ch.type === 'added') {
-        const d = ch.doc.data();
-        const div = document.createElement('div');
-        div.style.cssText = 'background:rgba(255,255,255,0.06);border-radius:8px;padding:6px 10px';
-        div.innerHTML = `<span style="color:#E74C3C;font-weight:600">${esc(d.sender||'Anonyme')}</span><br/>${esc(d.text||'')}`;
-        box.appendChild(div);
-        box.scrollTop = box.scrollHeight;
+    box.innerHTML = '';
+    
+    // Sort chronological: oldest to newest (since query is desc to get latest 100)
+    const docs = [...snap.docs].reverse();
+    
+    docs.forEach(doc => {
+      const d = doc.data();
+      const messageText = d.message || d.text || '';
+      const senderName = d.sender || 'Anonyme';
+      
+      let timeStr = '';
+      if (d.timestamp) {
+        const date = d.timestamp.toDate ? d.timestamp.toDate() : new Date(d.timestamp);
+        const hrs = String(date.getHours()).padStart(2, '0');
+        const mins = String(date.getMinutes()).padStart(2, '0');
+        timeStr = `${hrs}:${mins}`;
+      } else {
+        const date = new Date();
+        const hrs = String(date.getHours()).padStart(2, '0');
+        const mins = String(date.getMinutes()).padStart(2, '0');
+        timeStr = `${hrs}:${mins}`;
       }
+      
+      const div = document.createElement('div');
+      div.style.cssText = 'background:rgba(255,255,255,0.06);border-radius:8px;padding:6px 10px;margin-bottom:4px;word-break:break-word';
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:2px">
+          <span style="color:#E74C3C;font-weight:600">${esc(senderName)}</span>
+          <span style="color:rgba(255,255,255,0.4);font-size:10px">${timeStr}</span>
+        </div>
+        <div style="color:rgba(255,255,255,0.9);line-height:1.4">${esc(messageText)}</div>
+      `;
+      box.appendChild(div);
     });
+    box.scrollTop = box.scrollHeight;
   });
 }
 window.sendChat = async function() {
@@ -877,11 +963,94 @@ window.sendChat = async function() {
   if (!text) return;
   inp.value = '';
   await addDoc(collection(db, 'meetings', meetingId, 'chat'), {
-    sender: myName, senderId: myUid,
-    text, timestamp: serverTimestamp(), isWeb: true,
+    sender: myName,
+    senderId: myUid,
+    text,
+    message: text,
+    timestamp: serverTimestamp(),
+    isWeb: true,
   }).catch(() => {});
 };
 window.chatKey = function(e) { if (e.key === 'Enter') window.sendChat(); };
+
+// ── Participants List & Mute Controls ─────────────────────────────
+window.toggleParticipants = function() {
+  const p = document.getElementById('participantsPanel');
+  if (p) {
+    const isHidden = p.style.display === 'none';
+    p.style.display = isHidden ? 'flex' : 'none';
+    if (isHidden) {
+      window.updateParticipantsList();
+    }
+  }
+};
+
+window.toggleMuteAll = async function() {
+  if (!room) return;
+  if (confirm("Muter tous les autres participants ?")) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(JSON.stringify({ type: 'mute_all' }));
+    try {
+      await room.localParticipant.publishData(data, { reliable: true });
+      alert("La demande de coupure micro a été envoyée avec succès.");
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l'envoi de la commande de coupure micro.");
+    }
+  }
+};
+
+window.updateParticipantsList = function() {
+  const listEl = document.getElementById('participantsList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+
+  const allParticipants = [];
+  if (room && room.localParticipant) {
+    allParticipants.push(room.localParticipant);
+  }
+  if (room && room.remoteParticipants) {
+    room.remoteParticipants.forEach(p => allParticipants.push(p));
+  }
+
+  const countEl = document.getElementById('participantCount');
+  if (countEl) countEl.textContent = allParticipants.length;
+
+  allParticipants.forEach(p => {
+    const isLocal = p === room.localParticipant;
+    const isOrganizer = p.identity === meetingOrganizerId;
+    
+    let isMicMuted = false;
+    if (isLocal) {
+      isMicMuted = !micOn;
+    } else {
+      let hasActiveAudio = false;
+      p.trackPublications.forEach(pub => {
+        if (pub.kind === 'audio' && !pub.isMuted) {
+          hasActiveAudio = true;
+        }
+      });
+      isMicMuted = !hasActiveAudio;
+    }
+
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04)';
+    
+    let nameLabel = p.name || p.identity;
+    if (isLocal) nameLabel += ' (vous)';
+    if (isOrganizer) nameLabel += ' 👑';
+
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-weight:500;color:#fff">${esc(nameLabel)}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:16px">${isMicMuted ? '🔇' : '🎤'}</span>
+      </div>
+    `;
+    listEl.appendChild(div);
+  });
+};
 
 // ── Boot ─────────────────────────────────────────────────────────
 init();

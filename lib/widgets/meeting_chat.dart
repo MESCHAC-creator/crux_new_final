@@ -35,7 +35,9 @@ class _MeetingChatState extends State<MeetingChat> {
     _messageController.clear();
     _db.collection('meetings').doc(widget.meetingId).collection('chat').add({
       'sender': _userName,
+      'senderId': 'You',
       'message': text,
+      'text': text,
       'timestamp': FieldValue.serverTimestamp(),
     });
   }
@@ -98,13 +100,13 @@ class _MeetingChatState extends State<MeetingChat> {
                     return _ChatMessageWidget(
                       message: ChatMessage(
                         sender: d['sender'] ?? '?',
-                        message: d['message'] ?? '',
+                        message: d['message'] ?? d['text'] ?? '',
                         timestamp:
                             (d['timestamp'] as Timestamp?)?.toDate() ??
                             DateTime.now(),
                         isSystem: d['isSystem'] == true,
                       ),
-                      isMine: d['sender'] == _userName,
+                      isMine: d['sender'] == _userName || d['senderId'] == 'You',
                     );
                   },
                 );
@@ -201,6 +203,10 @@ class _ChatMessageWidget extends StatelessWidget {
       );
     }
 
+    final hour = message.timestamp.hour.toString().padLeft(2, '0');
+    final minute = message.timestamp.minute.toString().padLeft(2, '0');
+    final timeStr = "$hour:$minute";
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Align(
@@ -218,14 +224,18 @@ class _ChatMessageWidget extends StatelessWidget {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               if (!isMine)
-                Text(
-                  message.sender,
-                  style: GoogleFonts.poppins(
-                    color: PremiumColors.textTertiary,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    message.sender,
+                    style: GoogleFonts.poppins(
+                      color: PremiumColors.textTertiary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               Text(
@@ -235,6 +245,19 @@ class _ChatMessageWidget extends StatelessWidget {
                       ? PremiumColors.snowWhite
                       : PremiumColors.textPrimary,
                   fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  timeStr,
+                  style: GoogleFonts.poppins(
+                    color: isMine
+                        ? PremiumColors.snowWhite.withOpacity(0.5)
+                        : PremiumColors.textTertiary.withOpacity(0.7),
+                    fontSize: 9,
+                  ),
                 ),
               ),
             ],
