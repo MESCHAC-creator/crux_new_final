@@ -87,9 +87,9 @@ workflows:
           sed -i 's/\r$//' gradlew
           chmod +x gradlew
           
-          # Ensure healthy wrapper binary (8.12.0 for Java 21 compatibility)
+          # Ensure healthy wrapper binary (8.13.0 for Java 21/compileSdk 36 compatibility)
           mkdir -p gradle/wrapper
-          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradle/wrapper/gradle-wrapper.jar
+          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.13.0/gradle/wrapper/gradle-wrapper.jar
 
           ./gradlew -v
 
