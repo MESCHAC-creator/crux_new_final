@@ -120,14 +120,21 @@ workflows:
         script: |
           set -e
           cd android
-          chmod +x gradlew
+          # Nettoyage de l'ancien wrapper potentiellement corrompu
+          rm -f gradle/wrapper/gradle-wrapper.jar
           mkdir -p gradle/wrapper
-          # Téléchargement d'un wrapper JAR certifié (v8.11.1 est compatible avec toutes les distributions 8.x)
-          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.11.1/gradle/wrapper/gradle-wrapper.jar
-          if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "❌ Erreur critique : Échec du téléchargement du Gradle Wrapper."
-            exit 1
+          
+          # Tentative de génération via le Gradle du système (plus propre)
+          if command -v gradle >/dev/null 2>&1; then
+            echo "🛠️ Génération du wrapper via Gradle système..."
+            gradle wrapper --gradle-version 8.12
+          else
+            echo "📥 Gradle système absent. Téléchargement manuel du JAR..."
+            curl -L -f -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradle/wrapper/gradle-wrapper.jar
           fi
+          
+          chmod +x gradlew
+          # Validation finale avant de continuer
           ./gradlew -v
 
       - name: Generate app icons
