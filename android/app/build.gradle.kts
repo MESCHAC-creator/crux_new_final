@@ -16,7 +16,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.schac_crux.app"
-    compileSdk = 35 // Stable Android 14
+    compileSdk = 36
     ndkVersion = "28.2.13676358"
 
     signingConfigs {
