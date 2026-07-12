@@ -94,15 +94,23 @@ workflows:
         script: |
           set -e
           cd android
+          # Clear potentially corrupt wrapper
+          rm -rf gradle/wrapper gradlew gradlew.bat
+          
+          # Use system gradle to generate a clean wrapper in a isolated way
+          echo "🛠️ Generating fresh Gradle wrapper..."
+          mkdir -p temp_wrapper
+          cd temp_gradle_gen 2>/dev/null || mkdir temp_gradle_gen
+          cd temp_gradle_gen
+          gradle wrapper --gradle-version 8.12 --distribution-type all
+          cp gradlew ..
+          mkdir -p ../gradle/wrapper
+          cp gradle/wrapper/gradle-wrapper.jar ../gradle/wrapper/
+          cp gradle/wrapper/gradle-wrapper.properties ../gradle/wrapper/
+          cd ..
+          rm -rf temp_gradle_gen
+          
           chmod +x gradlew
-          
-          # Only download if missing or corrupted
-          if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "📥 Downloading Gradle Wrapper JAR..."
-            mkdir -p gradle/wrapper
-            curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradle/wrapper/gradle-wrapper.jar
-          fi
-          
           ./gradlew -v
 
       - name: Generate app icons

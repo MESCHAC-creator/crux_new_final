@@ -1,6 +1,3 @@
-import java.util.Properties
-import java.io.FileInputStream
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -8,10 +5,10 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-val keystoreProperties = Properties()
+val keystoreProperties = java.util.Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
-    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
+    java.io.FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
 }
 
 android {
