@@ -62,7 +62,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
-          side: BorderSide(color: AppColors.textSecondary.withValues(alpha: 0.3), width: 1.5),
+          side: BorderSide(color: AppColors.textSecondary.withOpacity(0.3), width: 1.5),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w600, fontSize: 15),
@@ -73,7 +73,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16), // 16px cards
-          side: BorderSide(color: AppColors.textSecondary.withValues(alpha: 0.08), width: 1),
+          side: BorderSide(color: AppColors.textSecondary.withOpacity(0.08), width: 1),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -81,17 +81,17 @@ class AppTheme {
         fillColor: AppColors.surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.textSecondary.withValues(alpha: 0.15)),
+          borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.15)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.textSecondary.withValues(alpha: 0.1)),
+          borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.1)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
-        hintStyle: GoogleFonts.interTight(color: AppColors.textSecondary.withValues(alpha: 0.6)),
+        hintStyle: GoogleFonts.interTight(color: AppColors.textSecondary.withOpacity(0.6)),
         labelStyle: GoogleFonts.spaceGrotesk(color: AppColors.textSecondary),
       ),
     );

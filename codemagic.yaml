@@ -9,8 +9,8 @@ workflows:
     max_build_duration: 120
 
     environment:
-      flutter: stable
-      java: 21
+      flutter: 3.24.4 # Use a specific stable version for predictability
+      java: 17 # Stick to 17 for better Gradle 8.x compatibility
       android_signing:
         - crux_keystore
       groups:
@@ -83,14 +83,11 @@ workflows:
         script: |
           set -e
           cd android
-          # Téléchargement direct d'un wrapper certifié stable
+          chmod +x gradlew
+          # Fresh download of wrapper to avoid any corruption
           mkdir -p gradle/wrapper
           curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.12.0/gradle/wrapper/gradle-wrapper.jar
-          if [ ! -f gradlew ]; then
-            curl -L -f -s -o gradlew https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradlew
-          fi
           sed -i 's/\r$//' gradlew
-          chmod +x gradlew
           ./gradlew -v
 
       - name: Generate app icons
@@ -151,7 +148,7 @@ workflows:
       app_store_connect: codemagic_api_key
 
     environment:
-      flutter: stable
+      flutter: 3.24.4
       xcode: latest
       cocoapods: default
       ios_signing:

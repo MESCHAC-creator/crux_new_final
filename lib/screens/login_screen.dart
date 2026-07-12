@@ -204,7 +204,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
                       prefixIcon: const Icon(Icons.email_outlined, color: Colors.white60, size: 20),
                       filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.05),
+                      fillColor: Colors.white.withOpacity(0.05),
                       errorText: dialogError,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -407,22 +407,22 @@ class _LoginScreenState extends State<LoginScreen> {
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.05),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: errorText != null ? Colors.redAccent.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.1)),
-          ),
-          child: TextField(
-            controller: controller,
-            obscureText: obscure,
-            style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: GoogleFonts.poppins(color: Colors.white24, fontSize: 15),
-              prefixIcon: Icon(icon, color: Colors.white38, size: 20),
-              suffixIcon: suffix,
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            ),
+            border: Border.all(color: errorText != null ? Colors.redAccent.withOpacity(0.5) : Colors.white.withOpacity(0.1)),
+        ),
+        child: TextField(
+          controller: controller,
+          obscureText: obscure,
+          style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: GoogleFonts.poppins(color: Colors.white24, fontSize: 15),
+            prefixIcon: Icon(icon, color: Colors.white38, size: 20),
+            suffixIcon: suffix,
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
         ),
+      ),
         if (errorText != null)
           Padding(
             padding: const EdgeInsets.only(left: 16, top: 8),

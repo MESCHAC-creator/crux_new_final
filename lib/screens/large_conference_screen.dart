@@ -4,7 +4,6 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -602,8 +601,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isSpeaking ? AppColors.primary : Colors.white.withValues(alpha: 0.05), width: 2),
-        boxShadow: isSpeaking ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 15)] : [],
+        border: Border.all(color: isSpeaking ? AppColors.primary : Colors.white.withOpacity(0.05), width: 2),
+        boxShadow: isSpeaking ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 15)] : [],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
@@ -635,7 +634,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
               left: 12,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.8), borderRadius: BorderRadius.circular(6)),
+                decoration: BoxDecoration(color: Colors.red.withOpacity(0.8), borderRadius: BorderRadius.circular(6)),
                 child: const Row(
                   children: [
                     Icon(Icons.screen_share, color: Colors.white, size: 12),
@@ -673,7 +672,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-                color: Colors.black54, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
+                color: Colors.black54, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.1))),
             child: Text(_currentTranscription,
                 textAlign: TextAlign.center, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, height: 1.4)),
           ),
@@ -711,9 +710,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
               child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.2),
+                      color: AppColors.error.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.error.withValues(alpha: 0.5))),
+                      border: Border.all(color: AppColors.error.withOpacity(0.5))),
                   child: const Text("Quitter",
                       style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 12))),
             ),
