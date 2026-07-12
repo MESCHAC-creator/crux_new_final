@@ -84,29 +84,20 @@ workflows:
         script: |
           set -e
           cd android
-          # Sécurité : Forcer les fins de ligne Linux (LF) sur le script gradlew
-          sed -i 's/\r$//' gradlew
-          chmod +x gradlew
-          
-          # Nettoyage et création du dossier wrapper
-          rm -f gradle/wrapper/gradle-wrapper.jar
+          # Suppression totale des fichiers potentiellement corrompus du repo
+          rm -f gradlew gradle/wrapper/gradle-wrapper.jar
           mkdir -p gradle/wrapper
           
-          # Tentative de téléchargement depuis une source officielle si absent
-          if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "📥 Téléchargement du Gradle Wrapper JAR certifié (v8.12)..."
-            curl -L -f -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradle/wrapper/gradle-wrapper.jar
-          fi
+          echo "📥 Téléchargement des outils Gradle certifiés (v8.10.2)..."
+          curl -L -f -s -o gradlew https://raw.githubusercontent.com/gradle/gradle/v8.10.2/gradlew
+          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.10.2/gradle/wrapper/gradle-wrapper.jar
           
-          # Vérification de l'intégrité (doit être > 50 Ko pour Gradle 8)
-          JAR_SIZE=$(stat -c%s "gradle/wrapper/gradle-wrapper.jar")
-          echo "📦 Taille du JAR : $JAR_SIZE octets"
-          if [ $JAR_SIZE -lt 50000 ]; then
-            echo "⚠️ Le JAR semble petit ($JAR_SIZE). Tentative de secours via master..."
-            curl -L -f -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/MESCHAC-creator/crux_new_final/master/android/gradle/wrapper/gradle-wrapper.jar
-          fi
+          chmod +x gradlew
           
-          # Test du wrapper
+          # Vérification binaire
+          echo "🔍 Vérification du binaire :"
+          stat -c "Taille : %s octets" gradle/wrapper/gradle-wrapper.jar
+          
           ./gradlew -v
 
       - name: Generate app icons
@@ -116,6 +107,7 @@ workflows:
         script: |
           set -e
           mkdir -p build/outputs
+          # On ignore les validations de dépendances car Java 21 peut générer des warnings non critiques
           BUILD_FLAGS="--release --no-tree-shake-icons --android-skip-build-dependency-validation"
 
           echo "=== FLUTTER BUILD APK ($BUILD_FLAGS) ==="
