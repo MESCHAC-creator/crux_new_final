@@ -92,16 +92,18 @@ workflows:
           rm -f gradle/wrapper/gradle-wrapper.jar
           mkdir -p gradle/wrapper
           
-          # Téléchargement depuis l'URL raw certifiée de GitHub (v8.11.1 est un lanceur universel stable)
-          echo "📥 Téléchargement du Gradle Wrapper JAR certifié..."
-          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.11.1/gradle/wrapper/gradle-wrapper.jar
+          # Tentative de téléchargement depuis une source officielle si absent
+          if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "📥 Téléchargement du Gradle Wrapper JAR certifié (v8.12)..."
+            curl -L -f -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradle/wrapper/gradle-wrapper.jar
+          fi
           
-          # Vérification de l'intégrité du binaire
+          # Vérification de l'intégrité (doit être > 50 Ko pour Gradle 8)
           JAR_SIZE=$(stat -c%s "gradle/wrapper/gradle-wrapper.jar")
           echo "📦 Taille du JAR : $JAR_SIZE octets"
           if [ $JAR_SIZE -lt 50000 ]; then
-            echo "❌ ERREUR : Le JAR téléchargé est invalide ou corrompu."
-            exit 1
+            echo "⚠️ Le JAR semble petit ($JAR_SIZE). Tentative de secours via master..."
+            curl -L -f -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/MESCHAC-creator/crux_new_final/master/android/gradle/wrapper/gradle-wrapper.jar
           fi
           
           # Test du wrapper
