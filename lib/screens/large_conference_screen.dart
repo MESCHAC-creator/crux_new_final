@@ -635,7 +635,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
               left: 12,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: Colors.red.withOpacity(0.8), borderRadius: BorderRadius.circular(6)),
+                decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.8), borderRadius: BorderRadius.circular(6)),
                 child: const Row(
                   children: [
                     Icon(Icons.screen_share, color: Colors.white, size: 12),
@@ -673,7 +673,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-                color: Colors.black54, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white10)),
+                color: Colors.black54, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
             child: Text(_currentTranscription,
                 textAlign: TextAlign.center, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, height: 1.4)),
           ),
@@ -711,9 +711,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
               child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.2),
+                      color: AppColors.error.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.error.withOpacity(0.5))),
+                      border: Border.all(color: AppColors.error.withValues(alpha: 0.5))),
                   child: const Text("Quitter",
                       style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 12))),
             ),
