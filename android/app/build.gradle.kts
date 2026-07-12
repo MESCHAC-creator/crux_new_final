@@ -16,8 +16,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.schac_crux.app"
-    compileSdk = 35
-    ndkVersion = "28.2.13676358"
+    compileSdk = 36
 
     signingConfigs {
         create("release") {
@@ -31,7 +30,7 @@ android {
     defaultConfig {
         applicationId = "com.schac_crux.app"
         minSdk = 21
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 3
         versionName = "2.38.0"
         multiDexEnabled = true

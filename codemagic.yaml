@@ -10,7 +10,7 @@ workflows:
 
     environment:
       flutter: stable
-      java: 17 # Stick to 17 for better Gradle 8.x compatibility
+      java: 21
       android_signing:
         - crux_keystore
       groups:
@@ -83,11 +83,14 @@ workflows:
         script: |
           set -e
           cd android
-          chmod +x gradlew
-          # Fresh download of wrapper to avoid any corruption
-          mkdir -p gradle/wrapper
-          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.12.0/gradle/wrapper/gradle-wrapper.jar
+          # Force Linux line endings on gradlew
           sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+          
+          # Ensure healthy wrapper binary (8.12.0 for Java 21 compatibility)
+          mkdir -p gradle/wrapper
+          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradle/wrapper/gradle-wrapper.jar
+
           ./gradlew -v
 
       - name: Generate app icons
