@@ -88,9 +88,9 @@ workflows:
           rm -f gradlew gradle/wrapper/gradle-wrapper.jar
           mkdir -p gradle/wrapper
           
-          echo "📥 Téléchargement des outils Gradle certifiés (v8.10.2)..."
-          curl -L -f -s -o gradlew https://raw.githubusercontent.com/gradle/gradle/v8.10.2/gradlew
-          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.10.2/gradle/wrapper/gradle-wrapper.jar
+          echo "📥 Téléchargement des outils Gradle certifiés (v8.12)..."
+          curl -L -f -s -o gradlew https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradlew
+          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradle/wrapper/gradle-wrapper.jar
           
           chmod +x gradlew
           
@@ -107,7 +107,6 @@ workflows:
         script: |
           set -e
           mkdir -p build/outputs
-          # On ignore les validations de dépendances car Java 21 peut générer des warnings non critiques
           BUILD_FLAGS="--release --no-tree-shake-icons --android-skip-build-dependency-validation"
 
           echo "=== FLUTTER BUILD APK ($BUILD_FLAGS) ==="
