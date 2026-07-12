@@ -80,10 +80,18 @@ const List<LocalizationsDelegate<dynamic>> _localizationsDelegates = [
 // ---------------------------------------------------------------------------
 
 void main() {
+  // Capture Flutter framework errors
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    logger.e('Flutter Framework Error: ${details.exception}',
+        error: details.exception, stackTrace: details.stack);
+  };
+
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
     try {
+      // 2. Ensure Firebase.initializeApp() is awaited
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
@@ -114,7 +122,6 @@ void main() {
     }
 
     try {
-      // Background initialization
       unawaited(NotificationService().initialize());
     } catch (e) {
       logger.e('Notification init error: $e');
@@ -122,7 +129,8 @@ void main() {
 
     runApp(const MyApp());
   }, (error, stack) {
-    logger.e('🔥 Global Crash: $error', stackTrace: stack);
+    // Capture asynchronous errors
+    logger.e('🔥 Global Crash: $error', error: error, stackTrace: stack);
     runApp(_ErrorApp(title: 'Erreur au démarrage', message: error.toString()));
   });
 }
@@ -350,7 +358,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
               if (current != null && !current.isAnonymous) {
                 _joinMeetingAsAuthenticatedUser(mid);
               } else {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: mid)));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: mid)),
+                );
               }
             }
           });

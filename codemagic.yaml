@@ -23,6 +23,25 @@ workflows:
           echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
           flutter --version
 
+      - name: Inject Secrets (.env & google-services.json)
+        script: |
+          # 1. Decode google-services.json if GOOGLE_SERVICES_JSON is set
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+            echo "✅ android/app/google-services.json injecté"
+          else
+            echo "⚠️ GOOGLE_SERVICES_JSON non défini dans les variables Codemagic"
+          fi
+
+          # 2. Create .env from environment variables if needed
+          # Even if not used by flutter_dotenv yet, we create it to prevent crashes if added.
+          echo "SUPABASE_URL=$SUPABASE_URL" > .env
+          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> .env
+          echo "LIVEKIT_URL=$LIVEKIT_URL" >> .env
+          echo "LIVEKIT_API_KEY=$LIVEKIT_API_KEY" >> .env
+          echo "LIVEKIT_API_SECRET=$LIVEKIT_API_SECRET" >> .env
+          echo "✅ Fichier .env généré"
+
       - name: Set up key.properties
         script: |
           cat > android/key.properties <<EOF
@@ -87,9 +106,9 @@ workflows:
           sed -i 's/\r$//' gradlew
           chmod +x gradlew
           
-          # Ensure healthy wrapper binary (8.13.0 for Java 21/compileSdk 36 compatibility)
+          # Ensure healthy wrapper binary (8.12.0 for Java 21 compatibility)
           mkdir -p gradle/wrapper
-          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.13.0/gradle/wrapper/gradle-wrapper.jar
+          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradle/wrapper/gradle-wrapper.jar
 
           ./gradlew -v
 
