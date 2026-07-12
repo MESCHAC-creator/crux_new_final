@@ -55,8 +55,10 @@ android {
 
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // DISABLING MINIFY/SHRINK to prevent launch crash "comporte un bug"
+            // common for complex WebRTC/LiveKit/Firebase projects.
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

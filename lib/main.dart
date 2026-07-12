@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -30,26 +32,13 @@ import 'widgets/elegant_toast.dart';
 final logger = Logger();
 
 // ---------------------------------------------------------------------------
-// Locales that flutter_localizations does NOT support natively.
-// Any locale outside this set falls back to French for Material/Cupertino
-// internals (button labels, date pickers, etc.) while our AppTranslations
-// handles all visible app text in the correct language.
-// ---------------------------------------------------------------------------
 const _flutterUnsupportedLocales = {'ha', 'yo', 'mg', 'wo'};
 
-/// Returns the locale to use for Material/Cupertino widgets.
-/// For locales unsupported by flutter_localizations, falls back to French
-/// so widgets never throw a "no localizations found" error.
 Locale _materialFallback(Locale locale) =>
     _flutterUnsupportedLocales.contains(locale.languageCode)
     ? const Locale('fr')
     : locale;
 
-// ---------------------------------------------------------------------------
-// Fallback delegates — accept every locale, load French for unsupported ones.
-// Applied globally in MaterialApp AND in _DeviceBlockedApp so the grey-screen
-// can NEVER appear regardless of which screen is shown.
-// ---------------------------------------------------------------------------
 class _FallbackMaterialLocalizationsDelegate
     extends LocalizationsDelegate<MaterialLocalizations> {
   const _FallbackMaterialLocalizationsDelegate();
@@ -82,7 +71,6 @@ class _FallbackCupertinoLocalizationsDelegate
   bool shouldReload(_FallbackCupertinoLocalizationsDelegate old) => false;
 }
 
-// The shared delegate list used in EVERY MaterialApp in this app.
 const List<LocalizationsDelegate<dynamic>> _localizationsDelegates = [
   _FallbackMaterialLocalizationsDelegate.instance,
   _FallbackCupertinoLocalizationsDelegate.instance,
@@ -91,60 +79,63 @@ const List<LocalizationsDelegate<dynamic>> _localizationsDelegates = [
 
 // ---------------------------------------------------------------------------
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  // ── 1. Firebase ─────────────────────────────
-  String? firebaseError;
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    logger.i('✅ Firebase initialisé');
-    FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: true,
-      cacheSizeBytes: 40 * 1024 * 1024,
-    );
-  } catch (e) {
-    logger.e('❌ Firebase init error: $e');
-    firebaseError = e.toString();
-  }
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: 40 * 1024 * 1024,
+      );
+      logger.i('✅ Firebase initialisé');
+    } catch (e) {
+      logger.e('❌ Firebase init error: $e');
+      runApp(_ErrorApp(title: 'Erreur Firebase', message: e.toString()));
+      return;
+    }
 
-  if (firebaseError != null) {
-    runApp(_FirebaseErrorApp(error: firebaseError));
-    return;
-  }
+    bool isSecure = true;
+    String blockReason = '';
+    try {
+      final result = await DeviceVerificationService.instance.verifyDeviceSecurity();
+      isSecure = result.$1;
+      blockReason = result.$2;
+    } catch (e) {
+      logger.e('Device verification crash: $e');
+    }
 
-  // ── 2. Device verification (before runApp — cannot be bypassed) ─
-  final (isSecure, blockReason) = await DeviceVerificationService.instance
-      .verifyDeviceSecurity();
+    if (!isSecure) {
+      runApp(_DeviceBlockedApp(reason: blockReason));
+      return;
+    }
 
-  // ── 3. Notifications ─────────────────────────
-  try {
-    await NotificationService().initialize();
-  } catch (e) {
-    logger.e('Notification init error: $e');
-  }
+    try {
+      // Background initialization
+      unawaited(NotificationService().initialize());
+    } catch (e) {
+      logger.e('Notification init error: $e');
+    }
 
-  if (!isSecure) {
-    runApp(_DeviceBlockedApp(reason: blockReason));
-    return;
-  }
-
-  runApp(const MyApp());
+    runApp(const MyApp());
+  }, (error, stack) {
+    logger.e('🔥 Global Crash: $error', stackTrace: stack);
+    runApp(_ErrorApp(title: 'Erreur au démarrage', message: error.toString()));
+  });
 }
 
-/// Shown when Firebase fails to initialize.
-class _FirebaseErrorApp extends StatelessWidget {
-  final String error;
-  const _FirebaseErrorApp({required this.error});
+class _ErrorApp extends StatelessWidget {
+  final String title;
+  final String message;
+  const _ErrorApp({required this.title, required this.message});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      localizationsDelegates: _localizationsDelegates,
-      supportedLocales: const [Locale('fr'), Locale('en')],
       home: Scaffold(
         backgroundColor: const Color(0xFF0F0C1A),
         body: Center(
@@ -153,36 +144,13 @@ class _FirebaseErrorApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.cloud_off_rounded,
-                  color: Colors.orange,
-                  size: 72,
-                ),
+                const Icon(Icons.bug_report, color: Colors.red, size: 72),
                 const SizedBox(height: 24),
-                const Text(
-                  'Impossible de démarrer',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                const Text(
-                  'La connexion au serveur a échoué.\nVérifiez votre connexion et relancez l\'app.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    height: 1.6,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  error,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white30, fontSize: 11),
-                ),
+                Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                const SizedBox(height: 32),
+                ElevatedButton(onPressed: () => exit(0), child: const Text('Quitter')),
               ],
             ),
           ),
@@ -192,8 +160,6 @@ class _FirebaseErrorApp extends StatelessWidget {
   }
 }
 
-/// Shown when the device fails security checks.
-/// Uses the same fallback delegates so it never grey-screens on any locale.
 class _DeviceBlockedApp extends StatelessWidget {
   final String reason;
   const _DeviceBlockedApp({required this.reason});
@@ -203,7 +169,7 @@ class _DeviceBlockedApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       localizationsDelegates: _localizationsDelegates,
-      supportedLocales: LocaleProvider.languages.values.toList(),
+      supportedLocales: const [Locale('fr')],
       home: Scaffold(
         backgroundColor: const Color(0xFF0F0C1A),
         body: Center(
@@ -212,26 +178,11 @@ class _DeviceBlockedApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.security, color: Colors.red, size: 72),
+                const Icon(Icons.security, color: Colors.orange, size: 72),
                 const SizedBox(height: 24),
-                const Text(
-                  'Appareil non compatible',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                const Text('Appareil restreint', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                Text(
-                  reason,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    height: 1.6,
-                  ),
-                ),
+                Text(reason, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.6)),
               ],
             ),
           ),
@@ -243,8 +194,6 @@ class _DeviceBlockedApp extends StatelessWidget {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
-  // Stable navigator key — prevents navigation reset when locale/theme rebuilds
   static final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
@@ -261,25 +210,11 @@ class MyApp extends StatelessWidget {
         builder: (context, themeProvider, localeProvider, _) {
           return MaterialApp(
             navigatorKey: MyApp._navigatorKey,
-            title: 'CRUX - Premium Video Conference',
+            title: 'CRUX',
             debugShowCheckedModeBanner: false,
-            // Every locale the app supports — drives the language picker.
             supportedLocales: LocaleProvider.languages.values.toList(),
-            // Force the user-chosen locale; Flutter won't override it.
             locale: localeProvider.locale,
-            // Shared delegates: accept all locales, fall back to French for
-            // the 4 locales (ha, yo, mg, wo) not in flutter_localizations.
             localizationsDelegates: _localizationsDelegates,
-            // Safety net: if somehow locale ends up outside supportedLocales
-            // (e.g. system locale on first launch), default to French.
-            localeResolutionCallback: (locale, supported) {
-              if (locale == null) return const Locale('fr');
-              // Exact match first
-              for (final s in supported) {
-                if (s.languageCode == locale.languageCode) return s;
-              }
-              return const Locale('fr');
-            },
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
@@ -292,10 +227,8 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// StatefulWidget so terms & auth are cached — no re-run on locale/theme rebuild
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
-
   @override
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
@@ -303,7 +236,7 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   bool? _termsAccepted;
   late final Stream<User?> _authStream;
-  String? _pendingMeetingId; // set when app is opened via a deep link
+  String? _pendingMeetingId;
 
   @override
   void initState() {
@@ -314,22 +247,17 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _initDeepLinks() async {
-    final appLinks = AppLinks();
-
-    // App already open — stream of incoming links
-    appLinks.uriLinkStream.listen((uri) {
-      _handleDeepLink(uri);
-    });
-
-    // App started cold via a link
-    final initialUri = await appLinks.getInitialLink();
-    if (initialUri != null) {
-      _handleDeepLink(initialUri);
+    try {
+      final appLinks = AppLinks();
+      appLinks.uriLinkStream.listen((uri) => _handleDeepLink(uri));
+      final initialUri = await appLinks.getInitialLink();
+      if (initialUri != null) _handleDeepLink(initialUri);
+    } catch (e) {
+      logger.w('Deep link init error: $e');
     }
   }
 
   void _handleDeepLink(Uri uri) {
-    // crux://join/MEETING_ID  OR  https://*.*/join/MEETING_ID
     String? meetingId;
     if (uri.scheme == 'crux' && uri.host == 'join') {
       meetingId = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
@@ -337,47 +265,30 @@ class _AuthWrapperState extends State<AuthWrapper> {
         uri.pathSegments.length >= 2 &&
         uri.pathSegments[uri.pathSegments.length - 2] == 'join') {
       meetingId = uri.pathSegments.last;
-    } else if (uri.queryParameters.containsKey('id')) {
-      // Fallback: ?id=MEETING_ID
-      meetingId = uri.queryParameters['id'];
     }
 
     if (meetingId == null || meetingId.isEmpty) return;
     final mid = meetingId.trim().toUpperCase();
 
     if (!mounted) {
-      // Widget not mounted yet — store pending meeting ID for processing in build()
-      _pendingMeetingId = mid; // direct assignment, no setState needed
+      _pendingMeetingId = mid;
       return;
     }
 
-    // If already authenticated (non-anonymous), route to home-screen join flow
     final current = FirebaseAuth.instance.currentUser;
     if (current != null && !current.isAnonymous) {
       _joinMeetingAsAuthenticatedUser(mid);
     } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: mid)),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: mid)));
     }
   }
 
   Future<void> _joinMeetingAsAuthenticatedUser(String meetingId) async {
-    // Fetch meeting, then push MeetingScreen (passcode handled inside MeetingScreen)
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('meetings')
-          .doc(meetingId)
-          .get();
+      final doc = await FirebaseFirestore.instance.collection('meetings').doc(meetingId).get();
       if (!mounted) return;
       if (!doc.exists) {
-        ElegantToast.show(
-          context,
-          title: 'Erreur',
-          message: 'Réunion introuvable',
-          type: ElegantToastType.error,
-        );
+        ElegantToast.show(context, title: 'Erreur', message: 'Réunion introuvable', type: ElegantToastType.error);
         return;
       }
       final data = doc.data()!;
@@ -396,42 +307,27 @@ class _AuthWrapperState extends State<AuthWrapper> {
         ),
       );
     } catch (_) {
-      // Fallback to guest join screen on error
       if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => GuestJoinScreen(meetingId: meetingId),
-          ),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: meetingId)));
       }
     }
   }
 
   Future<void> _loadTerms() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(
-        () => _termsAccepted = prefs.getBool('crux_terms_accepted') ?? false,
-      );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) setState(() => _termsAccepted = prefs.getBool('crux_terms_accepted') ?? false);
+    } catch (e) {
+      if (mounted) setState(() => _termsAccepted = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0A0A0F) : AppColors.whiteBg;
-
-    // While SharedPreferences hasn't loaded yet, show spinner
     if (_termsAccepted == null) {
-      return Scaffold(
-        backgroundColor: bg,
-        body: const Center(
-          child: CircularProgressIndicator(
-            color: AppColors.primary,
-            strokeWidth: 3,
-          ),
-        ),
+      return const Scaffold(
+        backgroundColor: Color(0xFF0A0A0F),
+        body: Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3)),
       );
     }
 
@@ -439,18 +335,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
       stream: _authStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            backgroundColor: bg,
-            body: const Center(
-              child: CircularProgressIndicator(
-                color: AppColors.primary,
-                strokeWidth: 3,
-              ),
-            ),
+          return const Scaffold(
+            backgroundColor: Color(0xFF0A0A0F),
+            body: Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3)),
           );
         }
 
-        // Deep link pending — route based on auth state
         if (_pendingMeetingId != null) {
           final mid = _pendingMeetingId!;
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -460,12 +350,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
               if (current != null && !current.isAnonymous) {
                 _joinMeetingAsAuthenticatedUser(mid);
               } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => GuestJoinScreen(meetingId: mid),
-                  ),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: mid)));
               }
             }
           });
