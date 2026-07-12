@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,16 +8,15 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-val keystoreProperties = java.util.Properties()
+val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
-    java.io.FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
+    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
 }
 
 android {
     namespace = "com.schac_crux.app"
-    compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    compileSdk = 35
 
     signingConfigs {
         create("release") {
@@ -28,7 +30,7 @@ android {
     defaultConfig {
         applicationId = "com.schac_crux.app"
         minSdk = 21
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 3
         versionName = "2.38.0"
         multiDexEnabled = true

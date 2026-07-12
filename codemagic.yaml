@@ -15,16 +15,6 @@ workflows:
         - crux_keystore
       groups:
         - firebase_deploy
-      vars:
-        # Cache Flutter and Gradle for faster subsequent builds
-        FLUTTER_DOWNLOAD_URL: "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.24.4-stable.tar.xz"
-
-    cache:
-      cache_paths:
-        - $HOME/.pub-cache
-        - $HOME/.gradle/caches
-        - $HOME/.gradle/wrapper
-        - build
 
     scripts:
       - name: Set up local.properties
@@ -45,8 +35,7 @@ workflows:
 
       - name: Get Flutter packages
         script: |
-          # Use incremental fetch
-          flutter pub get --no-example
+          flutter pub get
 
       - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
         script: |
@@ -94,22 +83,13 @@ workflows:
         script: |
           set -e
           cd android
-          # Clear potentially corrupt wrapper
-          rm -rf gradle/wrapper gradlew gradlew.bat
-          
-          # Use system gradle to generate a clean wrapper in a isolated way
-          echo "🛠️ Generating fresh Gradle wrapper..."
-          mkdir -p temp_wrapper
-          cd temp_gradle_gen 2>/dev/null || mkdir temp_gradle_gen
-          cd temp_gradle_gen
-          gradle wrapper --gradle-version 8.12 --distribution-type all
-          cp gradlew ..
-          mkdir -p ../gradle/wrapper
-          cp gradle/wrapper/gradle-wrapper.jar ../gradle/wrapper/
-          cp gradle/wrapper/gradle-wrapper.properties ../gradle/wrapper/
-          cd ..
-          rm -rf temp_gradle_gen
-          
+          # Téléchargement direct d'un wrapper certifié stable
+          mkdir -p gradle/wrapper
+          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.12.0/gradle/wrapper/gradle-wrapper.jar
+          if [ ! -f gradlew ]; then
+            curl -L -f -s -o gradlew https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradlew
+          fi
+          sed -i 's/\r$//' gradlew
           chmod +x gradlew
           ./gradlew -v
 
