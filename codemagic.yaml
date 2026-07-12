@@ -10,7 +10,7 @@ workflows:
 
     environment:
       flutter: stable
-      java: 21
+      java: 17
       android_signing:
         - crux_keystore
       groups:
@@ -80,61 +80,17 @@ workflows:
                   print(f'No changes needed: {path}')
           PYEOF
 
-      - name: Install Gradle init script to fix afterEvaluate
-        script: |
-          mkdir -p ~/.gradle/init.d
-          cat > ~/.gradle/init.d/flutter-ae-fix.gradle << 'INIT_EOF'
-          // Intercept project.afterEvaluate calls and handle already-evaluated projects
-          gradle.beforeProject { project ->
-              project.metaClass.afterEvaluate = { Closure action ->
-                  def p = delegate
-                  if (p.state.executed) {
-                      // Project already evaluated — run action immediately
-                      action.delegate = p
-                      action.resolveStrategy = Closure.DELEGATE_FIRST
-                      action()
-                  } else {
-                      // Call original Java implementation via reflection (bypasses metaclass recursion)
-                      def javaClass = p.class
-                      while (javaClass != null && javaClass != Object.class) {
-                          try {
-                              def m = javaClass.getDeclaredMethod('afterEvaluate', [groovy.lang.Closure] as Class[])
-                              m.accessible = true
-                              m.invoke(p, action)
-                              return
-                          } catch (NoSuchMethodException ignored) {
-                              javaClass = javaClass.superclass
-                          }
-                      }
-                      // Fallback: try Action-based variant
-                      p.afterEvaluate(new org.gradle.api.Action<org.gradle.api.Project>() {
-                          void execute(org.gradle.api.Project proj) { action.call() }
-                      })
-                  }
-              }
-          }
-          INIT_EOF
-          echo "✅ Gradle init script installed: ~/.gradle/init.d/flutter-ae-fix.gradle"
-
       - name: Prepare Gradle wrapper
         script: |
           set -e
           cd android
-          # Nettoyage de l'ancien wrapper potentiellement corrompu
-          rm -f gradle/wrapper/gradle-wrapper.jar
-          mkdir -p gradle/wrapper
-          
-          # Tentative de génération via le Gradle du système (plus propre)
-          if command -v gradle >/dev/null 2>&1; then
-            echo "🛠️ Génération du wrapper via Gradle système..."
-            gradle wrapper --gradle-version 8.12
-          else
-            echo "📥 Gradle système absent. Téléchargement manuel du JAR..."
-            curl -L -f -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradle/wrapper/gradle-wrapper.jar
-          fi
-          
           chmod +x gradlew
-          # Validation finale avant de continuer
+          # Si le JAR est corrompu ou manquant, on le télécharge proprement
+          if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "📥 Téléchargement manuel du Gradle Wrapper JAR..."
+            mkdir -p gradle/wrapper
+            curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.11.1/gradle/wrapper/gradle-wrapper.jar
+          fi
           ./gradlew -v
 
       - name: Generate app icons
