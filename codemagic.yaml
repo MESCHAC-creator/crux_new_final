@@ -10,7 +10,7 @@ workflows:
 
     environment:
       flutter: stable
-      java: 17
+      java: 21
       android_signing:
         - crux_keystore
       groups:
@@ -84,13 +84,10 @@ workflows:
         script: |
           set -e
           cd android
+          mkdir -p gradle/wrapper
+          # Téléchargement d'un JAR sain compatible Java 21 (v8.12)
+          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.12.0/gradle/wrapper/gradle-wrapper.jar
           chmod +x gradlew
-          # Si le JAR est corrompu ou manquant, on le télécharge proprement
-          if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "📥 Téléchargement manuel du Gradle Wrapper JAR..."
-            mkdir -p gradle/wrapper
-            curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.11.1/gradle/wrapper/gradle-wrapper.jar
-          fi
           ./gradlew -v
 
       - name: Generate app icons
