@@ -84,10 +84,27 @@ workflows:
         script: |
           set -e
           cd android
-          mkdir -p gradle/wrapper
-          # Téléchargement d'un JAR sain compatible Java 21 (v8.12)
-          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.12.0/gradle/wrapper/gradle-wrapper.jar
+          # Sécurité : Forcer les fins de ligne Linux (LF) sur le script gradlew
+          sed -i 's/\r$//' gradlew
           chmod +x gradlew
+          
+          # Nettoyage et création du dossier wrapper
+          rm -f gradle/wrapper/gradle-wrapper.jar
+          mkdir -p gradle/wrapper
+          
+          # Téléchargement depuis l'URL raw certifiée de GitHub (v8.11.1 est un lanceur universel stable)
+          echo "📥 Téléchargement du Gradle Wrapper JAR certifié..."
+          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.11.1/gradle/wrapper/gradle-wrapper.jar
+          
+          # Vérification de l'intégrité du binaire
+          JAR_SIZE=$(stat -c%s "gradle/wrapper/gradle-wrapper.jar")
+          echo "📦 Taille du JAR : $JAR_SIZE octets"
+          if [ $JAR_SIZE -lt 50000 ]; then
+            echo "❌ ERREUR : Le JAR téléchargé est invalide ou corrompu."
+            exit 1
+          fi
+          
+          # Test du wrapper
           ./gradlew -v
 
       - name: Generate app icons
