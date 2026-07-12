@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -612,8 +613,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
                 ? VideoTrackRenderer(
                     videoTrack,
                     fit: isScreenShare
-                        ? VideoViewObjectFit.contain
-                        : VideoViewObjectFit.cover,
+                        ? RTCVideoViewObjectFit.RTCVideoViewObjectFitContain
+                        : RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                   )
                 : Center(child: _buildAvatar(p.name ?? p.identity, large: true)),
           ),

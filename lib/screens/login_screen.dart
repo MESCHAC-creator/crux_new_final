@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../theme/colors.dart';
 import '../services/auth_service.dart';
 import '../services/error_handler_service.dart';
 import '../providers/locale_provider.dart';
@@ -86,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   bool _validateFields() {
-    final lang = context.read<LocaleProvider>().locale.languageCode;
+    context.read<LocaleProvider>().locale.languageCode;
     String? emailErr;
     String? passErr;
 
@@ -205,7 +204,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
                       prefixIcon: const Icon(Icons.email_outlined, color: Colors.white60, size: 20),
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
+                      fillColor: Colors.white.withValues(alpha: 0.05),
                       errorText: dialogError,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -408,7 +407,7 @@ class _LoginScreenState extends State<LoginScreen> {
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.05),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: errorText != null ? Colors.redAccent.withOpacity(0.5) : Colors.white.withOpacity(0.1)),
+            border: Border.all(color: errorText != null ? Colors.redAccent.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.1)),
           ),
           child: TextField(
             controller: controller,
