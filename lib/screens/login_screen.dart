@@ -85,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   bool _validateFields() {
-    context.read<LocaleProvider>().locale.languageCode;
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     String? emailErr;
     String? passErr;
 
