@@ -612,8 +612,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
                 ? VideoTrackRenderer(
                     videoTrack,
                     fit: isScreenShare
-                        ? RTCVideoViewObjectFit.RTCVideoViewObjectFitContain
-                        : RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                        ? VideoViewObjectFit.contain
+                        : VideoViewObjectFit.cover,
                   )
                 : Center(child: _buildAvatar(p.name ?? p.identity, large: true)),
           ),
