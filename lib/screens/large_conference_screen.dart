@@ -590,7 +590,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
       for (final pub in p.videoTrackPublications) {
         if (pub.track != null && pub.track is VideoTrack && pub.muted == false) {
           videoTrack = pub.track as VideoTrack;
-          isScreenShare = pub.source == TrackSource.screenShare;
+          isScreenShare = pub.source == TrackSource.screenShareVideo;
           hasVideo = true;
           break;
         }
@@ -602,8 +602,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isSpeaking ? AppColors.primary : Colors.white.withOpacity(0.05), width: 2),
-        boxShadow: isSpeaking ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 15)] : [],
+        border: Border.all(color: isSpeaking ? AppColors.primary : Colors.white.withValues(alpha: 0.05), width: 2),
+        boxShadow: isSpeaking ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 15)] : [],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
@@ -613,8 +613,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
                 ? VideoTrackRenderer(
                     videoTrack,
                     fit: isScreenShare
-                        ? RTCVideoViewObjectFit.RTCVideoViewObjectFitContain
-                        : RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                        ? VideoViewFit.contain
+                        : VideoViewFit.cover,
                   )
                 : Center(child: _buildAvatar(p.name ?? p.identity, large: true)),
           ),

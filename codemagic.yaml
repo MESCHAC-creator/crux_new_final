@@ -15,6 +15,16 @@ workflows:
         - crux_keystore
       groups:
         - firebase_deploy
+      vars:
+        # Cache Flutter and Gradle for faster subsequent builds
+        FLUTTER_DOWNLOAD_URL: "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.24.4-stable.tar.xz"
+
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+        - build
 
     scripts:
       - name: Set up local.properties
@@ -35,8 +45,8 @@ workflows:
 
       - name: Get Flutter packages
         script: |
-          rm -f pubspec.lock
-          flutter pub get
+          # Use incremental fetch
+          flutter pub get --no-example
 
       - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
         script: |
@@ -84,19 +94,14 @@ workflows:
         script: |
           set -e
           cd android
-          # Suppression totale des fichiers potentiellement corrompus du repo
-          rm -f gradlew gradle/wrapper/gradle-wrapper.jar
-          mkdir -p gradle/wrapper
-          
-          echo "📥 Téléchargement des outils Gradle certifiés (v8.12)..."
-          curl -L -f -s -o gradlew https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradlew
-          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradle/wrapper/gradle-wrapper.jar
-          
           chmod +x gradlew
           
-          # Vérification binaire
-          echo "🔍 Vérification du binaire :"
-          stat -c "Taille : %s octets" gradle/wrapper/gradle-wrapper.jar
+          # Only download if missing or corrupted
+          if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "📥 Downloading Gradle Wrapper JAR..."
+            mkdir -p gradle/wrapper
+            curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradle/wrapper/gradle-wrapper.jar
+          fi
           
           ./gradlew -v
 
