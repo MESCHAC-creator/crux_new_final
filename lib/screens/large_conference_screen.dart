@@ -589,7 +589,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
       for (final pub in p.videoTrackPublications) {
         if (pub.track != null && pub.track is VideoTrack && pub.muted == false) {
           videoTrack = pub.track as VideoTrack;
-          isScreenShare = pub.source == TrackSource.screenShareVideo;
+          isScreenShare = pub.source == TrackSource.screenShare;
           hasVideo = true;
           break;
         }
@@ -612,8 +612,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
                 ? VideoTrackRenderer(
                     videoTrack,
                     fit: isScreenShare
-                        ? VideoViewFit.contain
-                        : VideoViewFit.cover,
+                        ? RTCVideoViewObjectFit.RTCVideoViewObjectFitContain
+                        : RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                   )
                 : Center(child: _buildAvatar(p.name ?? p.identity, large: true)),
           ),
@@ -672,7 +672,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-                color: Colors.black54, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.1))),
+                color: Colors.black54, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white10)),
             child: Text(_currentTranscription,
                 textAlign: TextAlign.center, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, height: 1.4)),
           ),

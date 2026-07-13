@@ -6,13 +6,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
-/// Firebase Background Message Handler
-/// Extracting this outside of any class and decorating with @pragma('vm:entry-point')
-/// is CRITICAL for Android background isolates to function without crashing.
 @pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Safe logging only in background
-  Logger().d('Background Message Received: ${message.notification?.title}');
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Safe top-level background handler to prevent crashes on Android
+  try {
+    print('Background message received: ${message.messageId}');
+  } catch (e) {
+    print('Error handling background message: $e');
+  }
 }
 
 /// Manages FCM, local notifications, and periodic engagement reminders.
@@ -78,10 +79,7 @@ class NotificationService {
       await _createChannels();
 
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-      
-      // Register the global background handler
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
       FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpen);
 
       _initialized = true;

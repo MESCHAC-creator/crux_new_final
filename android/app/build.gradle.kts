@@ -1,6 +1,3 @@
-import java.util.Properties
-import java.io.FileInputStream
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -8,32 +5,32 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-val keystoreProperties = Properties()
+val keystoreProperties = java.util.Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
-    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
+    keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
 }
 
 android {
     namespace = "com.schac_crux.app"
     compileSdk = 36
-    ndkVersion = "28.2.13676358"
+    ndkVersion = "27.0.12077973"
 
     signingConfigs {
         create("release") {
-            keyAlias = keystoreProperties.getProperty("keyAlias") ?: ""
-            keyPassword = keystoreProperties.getProperty("keyPassword") ?: ""
-            storeFile = keystoreProperties.getProperty("storeFile")?.let { rootProject.file(it) }
-            storePassword = keystoreProperties.getProperty("storePassword") ?: ""
+            keyAlias = keystoreProperties["keyAlias"] as String? ?: ""
+            keyPassword = keystoreProperties["keyPassword"] as String? ?: ""
+            storeFile = if (keystoreProperties["storeFile"] != null) file(keystoreProperties["storeFile"] as String) else null
+            storePassword = keystoreProperties["storePassword"] as String? ?: ""
         }
     }
 
     defaultConfig {
         applicationId = "com.schac_crux.app"
-        minSdk = 24 // Higher minSdk for better LiveKit performance
-        targetSdk = 35
-        versionCode = 4
-        versionName = "2.38.1"
+        minSdk = 21
+        targetSdk = 36
+        versionCode = 3
+        versionName = "2.38.0"
         multiDexEnabled = true
     }
 
@@ -78,8 +75,10 @@ flutter {
 
 dependencies {
     "coreLibraryDesugaring"("com.android.tools:desugar_jdk_libs:2.0.4")
-    implementation("androidx.multidex:multidex:2.0.1")
+    implementation(platform("com.google.firebase:firebase-bom:34.15.0"))
+    implementation("com.google.firebase:firebase-analytics")
     implementation("androidx.core:core:1.13.1")
+    implementation("androidx.multidex:multidex:2.0.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
 }

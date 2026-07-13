@@ -23,25 +23,6 @@ workflows:
           echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
           flutter --version
 
-      - name: Inject Secrets (.env & google-services.json)
-        script: |
-          # 1. Decode google-services.json if GOOGLE_SERVICES_JSON is set
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
-            echo "✅ android/app/google-services.json injecté"
-          else
-            echo "⚠️ GOOGLE_SERVICES_JSON non défini dans les variables Codemagic"
-          fi
-
-          # 2. Create .env from environment variables if needed
-          # Even if not used by flutter_dotenv yet, we create it to prevent crashes if added.
-          echo "SUPABASE_URL=$SUPABASE_URL" > .env
-          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> .env
-          echo "LIVEKIT_URL=$LIVEKIT_URL" >> .env
-          echo "LIVEKIT_API_KEY=$LIVEKIT_API_KEY" >> .env
-          echo "LIVEKIT_API_SECRET=$LIVEKIT_API_SECRET" >> .env
-          echo "✅ Fichier .env généré"
-
       - name: Set up key.properties
         script: |
           cat > android/key.properties <<EOF
@@ -54,6 +35,7 @@ workflows:
 
       - name: Get Flutter packages
         script: |
+          rm -f pubspec.lock
           flutter pub get
 
       - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
@@ -98,19 +80,88 @@ workflows:
                   print(f'No changes needed: {path}')
           PYEOF
 
+      - name: Install Gradle init script to fix afterEvaluate
+        script: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/flutter-ae-fix.gradle << 'INIT_EOF'
+          // Intercept project.afterEvaluate calls and handle already-evaluated projects
+          gradle.beforeProject { project ->
+              project.metaClass.afterEvaluate = { Closure action ->
+                  def p = delegate
+                  if (p.state.executed) {
+                      // Project already evaluated — run action immediately
+                      action.delegate = p
+                      action.resolveStrategy = Closure.DELEGATE_FIRST
+                      action()
+                  } else {
+                      // Call original Java implementation via reflection (bypasses metaclass recursion)
+                      def javaClass = p.class
+                      while (javaClass != null && javaClass != Object.class) {
+                          try {
+                              def m = javaClass.getDeclaredMethod('afterEvaluate', [groovy.lang.Closure] as Class[])
+                              m.accessible = true
+                              m.invoke(p, action)
+                              return
+                          } catch (NoSuchMethodException ignored) {
+                              javaClass = javaClass.superclass
+                          }
+                      }
+                      // Fallback: try Action-based variant
+                      p.afterEvaluate(new org.gradle.api.Action<org.gradle.api.Project>() {
+                          void execute(org.gradle.api.Project proj) { action.call() }
+                      })
+                  }
+              }
+          }
+          INIT_EOF
+          echo "✅ Gradle init script installed: ~/.gradle/init.d/flutter-ae-fix.gradle"
+
       - name: Prepare Gradle wrapper
         script: |
           set -e
-          cd android
-          # Force Linux line endings on gradlew
-          sed -i 's/\r$//' gradlew
-          chmod +x gradlew
-          
-          # Ensure healthy wrapper binary (8.12.0 for Java 21 compatibility)
-          mkdir -p gradle/wrapper
-          curl -L -f -s -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.12.0/gradle/wrapper/gradle-wrapper.jar
+          # Linux CI requires executable bit; Windows/git checkouts often drop it.
+          if [ -f android/gradlew ]; then
+            chmod +x android/gradlew
+          else
+            echo "❌ android/gradlew missing — commit Gradle wrapper files"
+            exit 1
+          fi
 
-          ./gradlew -v
+          JAR_PATH="android/gradle/wrapper/gradle-wrapper.jar"
+          DOWNLOAD_URL="https://raw.githubusercontent.com/gradle/gradle/v8.11.1/gradle/wrapper/gradle-wrapper.jar"
+          
+          needs_download=false
+          if [ ! -f "$JAR_PATH" ]; then
+            echo "⚠️  Gradle wrapper JAR is missing."
+            needs_download=true
+          elif ! unzip -t "$JAR_PATH" &>/dev/null && ! python3 -m zipfile -t "$JAR_PATH" &>/dev/null; then
+            echo "⚠️  Gradle wrapper JAR is corrupted or invalid."
+            needs_download=true
+          fi
+
+          if [ "$needs_download" = true ]; then
+            echo "📥 Downloading a fresh, uncorrupted Gradle wrapper JAR..."
+            mkdir -p "$(dirname "$JAR_PATH")"
+            if command -v curl &>/dev/null; then
+              curl -L -o "$JAR_PATH" "$DOWNLOAD_URL"
+            elif command -v wget &>/dev/null; then
+              wget -O "$JAR_PATH" "$DOWNLOAD_URL"
+            else
+              echo "❌ Neither curl nor wget is available. Cannot repair Gradle wrapper."
+              exit 1
+            fi
+            
+            # Verify downloaded file
+            if unzip -t "$JAR_PATH" &>/dev/null || python3 -m zipfile -t "$JAR_PATH" &>/dev/null; then
+              echo "✅ Fresh Gradle wrapper JAR downloaded and verified successfully."
+            else
+              echo "❌ Downloaded Gradle wrapper JAR is invalid."
+              exit 1
+            fi
+          else
+            echo "✅ Gradle wrapper JAR is present and valid."
+          fi
+          echo "✅ Gradle wrapper ready ($(ls -la android/gradlew))"
 
       - name: Generate app icons
         script: dart run flutter_launcher_icons -f flutter_launcher_icons_android.yaml
@@ -119,32 +170,35 @@ workflows:
         script: |
           set -e
           mkdir -p build/outputs
-          BUILD_FLAGS="--release --no-tree-shake-icons --android-skip-build-dependency-validation"
 
-          echo "=== FLUTTER BUILD APK ($BUILD_FLAGS) ==="
-          flutter build apk $BUILD_FLAGS 2>&1 | tail -300
+          echo "=== FLUTTER BUILD APK (release) ==="
+          flutter build apk --release --no-tree-shake-icons 2>&1 | tail -300
 
           APK=$(find build/app/outputs/flutter-apk -name "app-release.apk" 2>/dev/null | head -1)
           [ -z "$APK" ] && APK=$(find build/app/outputs/apk -name "app-release.apk" 2>/dev/null | head -1)
           [ -z "$APK" ] && APK=$(find . -name "app-release.apk" ! -path "*/.pub-cache/*" ! -path "*/debug/*" 2>/dev/null | head -1)
 
           if [ -z "$APK" ]; then
-            echo "❌ APK not found"
+            echo "❌ APK not found — listing build/app/outputs/:"
+            find build/app/outputs 2>/dev/null || echo "(empty)"
             exit 1
           fi
           cp "$APK" build/outputs/crux-release.apk
+          echo "✅ APK: $(du -sh build/outputs/crux-release.apk | cut -f1) — source: $APK"
 
-          echo "=== FLUTTER BUILD AAB ($BUILD_FLAGS) ==="
-          flutter build appbundle $BUILD_FLAGS 2>&1 | tail -300
+          echo "=== FLUTTER BUILD AAB (release) ==="
+          flutter build appbundle --release --no-tree-shake-icons 2>&1 | tail -300
 
           AAB=$(find build/app/outputs/bundle -name "app-release.aab" 2>/dev/null | head -1)
           [ -z "$AAB" ] && AAB=$(find . -name "app-release.aab" ! -path "*/.pub-cache/*" 2>/dev/null | head -1)
 
           if [ -z "$AAB" ]; then
-            echo "❌ AAB not found"
+            echo "❌ AAB not found — listing build/app/outputs/:"
+            find build/app/outputs 2>/dev/null || echo "(empty)"
             exit 1
           fi
           cp "$AAB" build/outputs/crux-release.aab
+          echo "✅ AAB: $(du -sh build/outputs/crux-release.aab | cut -f1) — source: $AAB"
 
     artifacts:
       - build/outputs/crux-release.apk
@@ -186,47 +240,83 @@ workflows:
           set -e
           if [ ! -d "ios" ]; then
             flutter create --platforms ios --org com.schac-crux --project-name crux .
+            echo "✅ iOS folder generated"
+          else
+            echo "✅ iOS folder already exists"
           fi
           PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
           if [ -f "$PBXPROJ" ]; then
             sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.schac-crux.app/g' "$PBXPROJ" || \
             sed -i 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.schac-crux.app/g' "$PBXPROJ"
+            echo "✅ Bundle ID patché"
           fi
 
       - name: Inject GoogleService-Info.plist
         script: |
           if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
             echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            echo "✅ GoogleService-Info.plist injecté"
+          else
+            echo "⚠️  GOOGLE_SERVICE_INFO_PLIST absent — Firebase iOS désactivé"
           fi
 
       - name: Patch Info.plist permissions
         script: |
           set -e
           PLIST="ios/Runner/Info.plist"
-          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'CRUX needs the camera for video conferences'" "$PLIST" 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'CRUX needs the microphone for calls'" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'CRUX needs the camera for video conferences'" "$PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 'CRUX needs the camera for video conferences'" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'CRUX needs the microphone for calls'" "$PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :NSMicrophoneUsageDescription 'CRUX needs the microphone for calls'" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'CRUX'" "$PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'CRUX'" "$PLIST"
+          echo "✅ Info.plist patché"
 
       - name: Get Flutter packages
         script: flutter pub get
+
+      - name: Deploy Firestore rules (if FIREBASE_TOKEN is set)
+        script: |
+          if [ -n "$FIREBASE_TOKEN" ]; then
+            npm install -g firebase-tools --silent
+            firebase deploy --only firestore:rules \
+              --project crux-3c6be \
+              --token "$FIREBASE_TOKEN" \
+              --non-interactive
+            echo "✅ Règles Firestore déployées"
+          else
+            echo "⏭️  FIREBASE_TOKEN absent — build OK"
+          fi
 
       - name: Generate app icons
         script: dart run flutter_launcher_icons -f flutter_launcher_icons_ios.yaml
 
       - name: Install CocoaPods
         script: |
+          set -e
           cd ios
           pod repo update
           pod install
+          echo "✅ CocoaPods installé"
 
       - name: Build iOS IPA
         script: |
+          set -e
           flutter build ipa --release \
             --export-options-plist=/Users/builder/export_options.plist
+          echo "✅ IPA buildé"
 
     artifacts:
       - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
 
     publishing:
+      email:
+        recipients:
+          - kouakouchristevann@gmail.com
+        notify:
+          success: true
+          failure: true
       app_store_connect:
         auth: integration
         submit_to_testflight: true

@@ -282,6 +282,16 @@
       ]
     },
     {
+      "name": "app_links",
+      "version": "6.4.1",
+      "dependencies": [
+        "app_links_linux",
+        "app_links_platform_interface",
+        "app_links_web",
+        "flutter"
+      ]
+    },
+    {
       "name": "logger",
       "version": "2.7.0",
       "dependencies": [
@@ -1046,6 +1056,33 @@
       ]
     },
     {
+      "name": "app_links_web",
+      "version": "1.0.4",
+      "dependencies": [
+        "app_links_platform_interface",
+        "flutter",
+        "flutter_web_plugins",
+        "web"
+      ]
+    },
+    {
+      "name": "app_links_platform_interface",
+      "version": "2.0.4",
+      "dependencies": [
+        "flutter",
+        "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "app_links_linux",
+      "version": "1.0.3",
+      "dependencies": [
+        "app_links_platform_interface",
+        "flutter",
+        "gtk"
+      ]
+    },
+    {
       "name": "nested",
       "version": "1.0.0",
       "dependencies": [
@@ -1506,6 +1543,15 @@
       ]
     },
     {
+      "name": "gtk",
+      "version": "2.2.0",
+      "dependencies": [
+        "ffi",
+        "flutter",
+        "meta"
+      ]
+    },
+    {
       "name": "google_identity_services_web",
       "version": "0.3.3+1",
       "dependencies": [
@@ -1588,52 +1634,6 @@
         "collection",
         "meta",
         "pub_semver"
-      ]
-    },
-    {
-      "name": "app_links",
-      "version": "6.4.1",
-      "dependencies": [
-        "app_links_linux",
-        "app_links_platform_interface",
-        "app_links_web",
-        "flutter"
-      ]
-    },
-    {
-      "name": "app_links_web",
-      "version": "1.0.4",
-      "dependencies": [
-        "app_links_platform_interface",
-        "flutter",
-        "flutter_web_plugins",
-        "web"
-      ]
-    },
-    {
-      "name": "app_links_platform_interface",
-      "version": "2.0.4",
-      "dependencies": [
-        "flutter",
-        "plugin_platform_interface"
-      ]
-    },
-    {
-      "name": "app_links_linux",
-      "version": "1.0.3",
-      "dependencies": [
-        "app_links_platform_interface",
-        "flutter",
-        "gtk"
-      ]
-    },
-    {
-      "name": "gtk",
-      "version": "2.2.0",
-      "dependencies": [
-        "ffi",
-        "flutter",
-        "meta"
       ]
     }
   ],

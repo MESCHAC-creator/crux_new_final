@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/colors.dart';
 import '../services/auth_service.dart';
 import '../services/error_handler_service.dart';
 import '../providers/locale_provider.dart';
@@ -408,21 +409,21 @@ class _LoginScreenState extends State<LoginScreen> {
             color: Colors.white.withOpacity(0.05),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: errorText != null ? Colors.redAccent.withOpacity(0.5) : Colors.white.withOpacity(0.1)),
-        ),
-        child: TextField(
-          controller: controller,
-          obscureText: obscure,
-          style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: GoogleFonts.poppins(color: Colors.white24, fontSize: 15),
-            prefixIcon: Icon(icon, color: Colors.white38, size: 20),
-            suffixIcon: suffix,
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          ),
+          child: TextField(
+            controller: controller,
+            obscureText: obscure,
+            style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: GoogleFonts.poppins(color: Colors.white24, fontSize: 15),
+              prefixIcon: Icon(icon, color: Colors.white38, size: 20),
+              suffixIcon: suffix,
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            ),
           ),
         ),
-      ),
         if (errorText != null)
           Padding(
             padding: const EdgeInsets.only(left: 16, top: 8),
