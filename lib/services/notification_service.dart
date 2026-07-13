@@ -6,6 +6,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+/// Firebase Background Message Handler
+/// Extracting this outside of any class and decorating with @pragma('vm:entry-point')
+/// is CRITICAL for Android background isolates to function without crashing.
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Safe logging only in background
+  Logger().d('Background Message Received: ${message.notification?.title}');
+}
+
 /// Manages FCM, local notifications, and periodic engagement reminders.
 class NotificationService {
   static final NotificationService _instance = NotificationService._();
@@ -69,7 +78,10 @@ class NotificationService {
       await _createChannels();
 
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-      FirebaseMessaging.onBackgroundMessage(_handleBackgroundMessage);
+      
+      // Register the global background handler
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
       FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpen);
 
       _initialized = true;
@@ -217,11 +229,6 @@ class NotificationService {
   void _handleForegroundMessage(RemoteMessage message) {
     _log.d('Foreground: ${message.notification?.title}');
     _showLocalNotification(message);
-  }
-
-  static Future<void> _handleBackgroundMessage(RemoteMessage message) {
-    Logger().d('Background: ${message.notification?.title}');
-    return Future.value();
   }
 
   void _handleMessageOpen(RemoteMessage message) {
