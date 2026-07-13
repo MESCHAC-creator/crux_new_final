@@ -85,19 +85,23 @@ class DeviceVerificationService {
   Future<bool> _isRooted() async {
     if (!Platform.isAndroid) return false;
 
-    // Check for common root indicators
-    final files = [
-      '/system/app/Superuser.apk',
-      '/system/xbin/su',
-      '/system/bin/su',
-      '/data/local/xbin/su',
-      '/data/local/bin/su',
-    ];
+    try {
+      // Check for common root indicators
+      final files = [
+        '/system/app/Superuser.apk',
+        '/system/xbin/su',
+        '/system/bin/su',
+        '/data/local/xbin/su',
+        '/data/local/bin/su',
+      ];
 
-    for (final file in files) {
-      if (await File(file).exists()) {
-        return true;
+      for (final file in files) {
+        if (await File(file).exists()) {
+          return true;
+        }
       }
+    } catch (_) {
+      // Gracefully ignore any filesystem exceptions
     }
     return false;
   }

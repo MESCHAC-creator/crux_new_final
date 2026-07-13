@@ -180,7 +180,13 @@ class NotificationService {
       }
       await prefs.setInt(_lastScheduledKey, now);
 
-      final location = tz.local;
+      tz.Location location;
+      try {
+        location = tz.local;
+      } catch (e) {
+        _log.w('Could not resolve tz.local: $e. Falling back to UTC.');
+        location = tz.UTC;
+      }
       final baseTime = tz.TZDateTime.now(location);
 
       for (int i = 0; i < _reminderMessages.length; i++) {
