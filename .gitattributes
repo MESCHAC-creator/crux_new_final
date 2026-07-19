@@ -1,10 +1,13 @@
-# Gradle wrapper must stay LF + executable for Linux CI (Codemagic, GitHub Actions)
+# Force LF for Gradle scripts
 android/gradlew text eol=lf
 android/gradlew.bat text eol=lf
 *.gradle text eol=lf
 *.gradle.kts text eol=lf
 
-# Force jar files to be treated as binary to prevent corruption during transfers/Git operations
+# Force binary treatment for sensitive files to prevent corruption
 *.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.jks binary
 android/gradle/wrapper/gradle-wrapper.jar binary
-
