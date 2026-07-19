@@ -35,6 +35,9 @@
   &quot;fromUser&quot;: false
 }</component>
   <component name="ProjectId" id="3GH50ke6NqzlOreVDxiYAJbx3Lh" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
