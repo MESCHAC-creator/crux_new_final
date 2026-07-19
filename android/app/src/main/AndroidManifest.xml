@@ -37,7 +37,6 @@
         android:name="androidx.multidex.MultiDexApplication"
         android:label="CRUX"
         android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
         android:usesCleartextTraffic="true"
         android:enableOnBackInvokedCallback="true"
         android:supportsRtl="true">

@@ -3,4 +3,5 @@
     <color name="app_background">#09090B</color>
     <color name="app_primary">#6366F1</color>
     <color name="app_surface">#18181B</color>
+	<color name="ic_launcher_background">#12121E</color>
 </resources>
