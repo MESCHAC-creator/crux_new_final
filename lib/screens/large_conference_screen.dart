@@ -589,7 +589,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
       for (final pub in p.videoTrackPublications) {
         if (pub.track != null && pub.track is VideoTrack && pub.muted == false) {
           videoTrack = pub.track as VideoTrack;
-          isScreenShare = pub.source == TrackSource.screenShare;
+          isScreenShare = pub.source == TrackSource.screenShareVideo;
           hasVideo = true;
           break;
         }
@@ -612,8 +612,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
                 ? VideoTrackRenderer(
                     videoTrack,
                     fit: isScreenShare
-                        ? RTCVideoViewObjectFit.RTCVideoViewObjectFitContain
-                        : RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                        ? VideoViewFit.contain
+                        : VideoViewFit.cover,
                   )
                 : Center(child: _buildAvatar(p.name ?? p.identity, large: true)),
           ),
