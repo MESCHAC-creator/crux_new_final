@@ -999,29 +999,30 @@ class _SettingsScreenState extends State<SettingsScreen>
                                                           .locale
                                                           .languageCode,
                                                     )),
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 16,
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 16,
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      _loadingPro
-                                          ? ''
-                                          : (_isPro
-                                                ? _proExpiryText()
-                                                : AppTranslations.t(
-                                                    'pro_inactive_sub',
-                                                    localeProvider
-                                                        .locale
-                                                        .languageCode,
-                                                  )),
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.white.withOpacity(0.85),
-                                        fontSize: 12,
+                                      Text(
+                                        _loadingPro
+                                            ? ''
+                                            : (_isPro
+                                                  ? _proExpiryText()
+                                                  : AppTranslations.t(
+                                                      'pro_inactive_sub',
+                                                      localeProvider
+                                                          .locale
+                                                          .languageCode,
+                                                    )),
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.white.withOpacity(0.85),
+                                          fontSize: 12,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                                 if (_loadingPro)
                                   const SizedBox(
