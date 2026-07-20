@@ -282,9 +282,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
       });
     } catch (e, st) {
       logger.e('❌ Room initialization failed', error: e, stackTrace: st);
+      final lang = context.read<LocaleProvider>().locale.languageCode;
       setState(() {
         _loading = false;
-        _error = "Erreur de connexion : $e";
+        _error = ErrorHandlerService().getMeetingErrorMessageL(e.toString(), lang);
         _room = null;
       });
     }

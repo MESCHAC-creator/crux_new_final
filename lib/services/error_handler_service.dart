@@ -311,6 +311,14 @@ class ErrorHandlerService {
     if (msg.contains('cancelled') || msg.contains('canceled')) {
       return 'Opération annulée.';
     }
+    
+    // ── LiveKit / WebRTC ──
+    if (msg.contains('ConnectException') || msg.contains('Signal error')) {
+      return 'Impossible de joindre le serveur de réunion. Vérifiez votre connexion.';
+    }
+    if (msg.contains('Track record failed') || msg.contains('media device')) {
+      return 'Erreur d\'accès au micro ou à la caméra. Vérifiez les permissions.';
+    }
 
     // If message is already clean and readable, return as-is (max 120 chars)
     if (msg.length < 120 && !msg.contains('[') && !msg.contains('{')) {

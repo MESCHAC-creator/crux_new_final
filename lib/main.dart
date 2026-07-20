@@ -139,12 +139,29 @@ class _ErrorApp extends StatelessWidget {
                 const SizedBox(height: 24),
                 Text(title, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                Text(
+                  _getUXFriendlyMessage(message),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                ),
                 const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: () => exit(0),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.white10),
-                  child: const Text('Exit Application', style: TextStyle(color: Colors.white)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () => exit(0),
+                      icon: const Icon(Icons.close, size: 18),
+                      label: const Text('Quitter'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white10, foregroundColor: Colors.white),
+                    ),
+                    const SizedBox(width: 16),
+                    ElevatedButton.icon(
+                      onPressed: () => main(), // Simple retry
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Réessayer'),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.black),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -152,6 +169,12 @@ class _ErrorApp extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _getUXFriendlyMessage(String msg) {
+    if (msg.contains('DefaultFirebaseOptions')) return 'Configuration serveur manquante. Veuillez réinstaller l\'application.';
+    if (msg.contains('network')) return 'Connexion impossible. Vérifiez votre accès Internet.';
+    return 'Une erreur inattendue empêche l\'application de démarrer. Code: ${msg.split(':').last}';
   }
 }
 
