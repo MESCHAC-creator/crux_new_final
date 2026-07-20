@@ -9,7 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_links/app_links.dart';
-import 'utils/logger.dart';
+import 'utils/crux.logger.dart' as crux;
 import 'services/notification_service.dart';
 import 'services/device_verification_service.dart';
 import 'firebase_options.dart';
@@ -81,7 +81,7 @@ void main() {
   // Capture all Flutter framework errors
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
-    logger.e('Flutter Framework Error', error: details.exception, stackTrace: details.stack);
+    crux.logger.e('Flutter Framework Error', error: details.exception, stackTrace: details.stack);
   };
 
   runZonedGuarded(() async {
@@ -96,9 +96,9 @@ void main() {
         persistenceEnabled: true,
         cacheSizeBytes: 40 * 1024 * 1024,
       );
-      logger.i('✅ Firebase initialized');
+      crux.logger.i('✅ Firebase initialized');
     } catch (e) {
-      logger.e('❌ Firebase init error', error: e);
+      crux.logger.e('❌ Firebase init error', error: e);
       // Don't crash, show error UI
       runApp(_ErrorApp(title: 'Firebase Error', message: e.toString()));
       return;
@@ -106,14 +106,14 @@ void main() {
 
     // Attempt services initialization without blocking startup if they fail
     try {
-      NotificationService().initialize().catchError((e) => logger.e('Notification init failed', error: e));
+      NotificationService().initialize().catchError((e) => crux.logger.e('Notification init failed', error: e));
     } catch (e) {
-      logger.e('Notification Service crash', error: e);
+      crux.logger.e('Notification Service crash', error: e);
     }
 
     runApp(const MyApp());
   }, (error, stack) {
-    logger.e('🔥 Global App Crash', error: error, stackTrace: stack);
+    crux.logger.e('🔥 Global App Crash', error: error, stackTrace: stack);
     runApp(_ErrorApp(title: 'Startup Error', message: error.toString()));
   });
 }
@@ -246,7 +246,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) _handleDeepLink(initialUri);
     } catch (e) {
-      logger.w('Deep link error', error: e);
+      crux.logger.w('Deep link error', error: e);
     }
   }
 
@@ -308,7 +308,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         ),
       );
     } catch (e) {
-      logger.e('_joinMeetingAsAuthenticatedUser error', error: e);
+      crux.logger.e('_joinMeetingAsAuthenticatedUser error', error: e);
       if (mounted) {
         Navigator.push(context, MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: meetingId)));
       }

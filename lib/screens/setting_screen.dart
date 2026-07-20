@@ -182,37 +182,38 @@ class _SettingsScreenState extends State<SettingsScreen>
                 parent: BouncingScrollPhysics(),
               ),
               slivers: [
-              // ── Glass App Bar ──────────────────────────────
-              SliverAppBar(
-                expandedHeight: 120,
-                pinned: true,
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                flexibleSpace: ClipRect(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                    child: FlexibleSpaceBar(
-                      background: Container(
-                        decoration: BoxDecoration(
-                          gradient: colorProvider.gradient,
-                        ),
-                        child: SafeArea(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                            child: Align(
-                              alignment: Alignment.bottomLeft,
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: Text(
-                                  AppTranslations.t(
-                                    'settings',
-                                    localeProvider.locale.languageCode,
-                                  ),
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                    letterSpacing: -0.5,
+                // ── Glass App Bar ──────────────────────────────
+                SliverAppBar(
+                  expandedHeight: 120,
+                  pinned: true,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  flexibleSpace: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                      child: FlexibleSpaceBar(
+                        background: Container(
+                          decoration: BoxDecoration(
+                            gradient: colorProvider.gradient,
+                          ),
+                          child: SafeArea(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                              child: Align(
+                                alignment: Alignment.bottomLeft,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Text(
+                                    AppTranslations.t(
+                                      'settings',
+                                      localeProvider.locale.languageCode,
+                                    ),
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      letterSpacing: -0.5,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -222,783 +223,782 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ),
                     ),
                   ),
-                ),
-                leading: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: _GlassButton(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(
-                      Icons.arrow_back_ios_new,
-                      color: Colors.white,
-                      size: 18,
+                  leading: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: _GlassButton(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── PROFIL ─────────────────────────────────────────
-                      _SectionLabel(
-                        AppTranslations.t(
-                          'profile',
-                          localeProvider.locale.languageCode,
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── PROFIL ─────────────────────────────────────────
+                        _SectionLabel(
+                          AppTranslations.t(
+                            'profile',
+                            localeProvider.locale.languageCode,
+                          ),
+                          colorProvider.primary,
                         ),
-                        colorProvider.primary,
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pushNamed(context, '/profile'),
-                        child: _GlassCard(
+                        GestureDetector(
+                          onTap: () => Navigator.pushNamed(context, '/profile'),
+                          child: _GlassCard(
+                            isDark: isDark,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Builder(
+                                    builder: (_) {
+                                      final user =
+                                          FirebaseAuth.instance.currentUser;
+                                      final initials =
+                                          (user?.displayName?.isNotEmpty == true)
+                                          ? user!.displayName!
+                                                .split(' ')
+                                                .take(2)
+                                                .map((w) => w[0].toUpperCase())
+                                                .join()
+                                          : (user?.email?[0].toUpperCase() ??
+                                                'U');
+                                      return Container(
+                                        width: 56,
+                                        height: 56,
+                                        decoration: BoxDecoration(
+                                          gradient: colorProvider.gradient,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: ClipOval(
+                                          child: user?.photoURL != null
+                                              ? Image.network(
+                                                  user!.photoURL!,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) =>
+                                                      Center(
+                                                        child: Text(
+                                                          initials,
+                                                          style:
+                                                              GoogleFonts.poppins(
+                                                                color:
+                                                                    Colors.white,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800,
+                                                                fontSize: 22,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                )
+                                              : Center(
+                                                  child: Text(
+                                                    initials,
+                                                    style: GoogleFonts.poppins(
+                                                      color: Colors.white,
+                                                      fontWeight: FontWeight.w800,
+                                                      fontSize: 22,
+                                                    ),
+                                                  ),
+                                                ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          FirebaseAuth
+                                                  .instance
+                                                  .currentUser
+                                                  ?.displayName ??
+                                              FirebaseAuth
+                                                  .instance
+                                                  .currentUser
+                                                  ?.email
+                                                  ?.split('@')[0] ??
+                                              'Utilisateur',
+                                          style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15,
+                                            color: isDark
+                                                ? Colors.white
+                                                : Colors.black87,
+                                          ),
+                                        ),
+                                        Text(
+                                          FirebaseAuth
+                                                  .instance
+                                                  .currentUser
+                                                  ?.email ??
+                                              '',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 12,
+                                            color: isDark
+                                                ? Colors.white54
+                                                : Colors.black45,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.chevron_right,
+                                    color: isDark
+                                        ? Colors.white30
+                                        : Colors.black26,
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // ── COULEUR D'ACCENT ─────────────────────────────
+                        _SectionLabel(
+                          AppTranslations.t(
+                            'app_color',
+                            localeProvider.locale.languageCode,
+                          ),
+                          colorProvider.primary,
+                        ),
+                        _GlassCard(
                           isDark: isDark,
                           child: Padding(
                             padding: const EdgeInsets.all(16),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Builder(
-                                  builder: (_) {
-                                    final user =
-                                        FirebaseAuth.instance.currentUser;
-                                    final initials =
-                                        (user?.displayName?.isNotEmpty == true)
-                                        ? user!.displayName!
-                                              .split(' ')
-                                              .take(2)
-                                              .map((w) => w[0].toUpperCase())
-                                              .join()
-                                        : (user?.email?[0].toUpperCase() ??
-                                              'U');
-                                    return Container(
-                                      width: 56,
-                                      height: 56,
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
                                       decoration: BoxDecoration(
                                         gradient: colorProvider.gradient,
                                         shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: colorProvider.primary
+                                                .withOpacity(0.4),
+                                            blurRadius: 12,
+                                          ),
+                                        ],
                                       ),
-                                      child: ClipOval(
-                                        child: user?.photoURL != null
-                                            ? Image.network(
-                                                user!.photoURL!,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) =>
-                                                    Center(
-                                                      child: Text(
-                                                        initials,
-                                                        style:
-                                                            GoogleFonts.poppins(
-                                                              color:
-                                                                  Colors.white,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w800,
-                                                              fontSize: 22,
-                                                            ),
-                                                      ),
-                                                    ),
-                                              )
-                                            : Center(
-                                                child: Text(
-                                                  initials,
-                                                  style: GoogleFonts.poppins(
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.w800,
-                                                    fontSize: 22,
-                                                  ),
-                                                ),
-                                              ),
+                                      child: const Icon(
+                                        Icons.palette_outlined,
+                                        color: Colors.white,
+                                        size: 20,
                                       ),
-                                    );
-                                  },
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          AppTranslations.t(
+                                            'current_theme',
+                                            localeProvider.locale.languageCode,
+                                          ),
+                                          style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15,
+                                            color: isDark
+                                                ? Colors.white
+                                                : Colors.black87,
+                                          ),
+                                        ),
+                                        Text(
+                                          colorProvider.name,
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 12,
+                                            color: isDark
+                                                ? Colors.white54
+                                                : Colors.black45,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        FirebaseAuth
-                                                .instance
-                                                .currentUser
-                                                ?.displayName ??
-                                            FirebaseAuth
-                                                .instance
-                                                .currentUser
-                                                ?.email
-                                                ?.split('@')[0] ??
-                                            'Utilisateur',
-                                        style: GoogleFonts.poppins(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 15,
-                                          color: isDark
-                                              ? Colors.white
-                                              : Colors.black87,
+                                const SizedBox(height: 16),
+                                // Color orbs grid
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: List.generate(
+                                    ColorProvider.palette.length,
+                                    (i) {
+                                      final opt = ColorProvider.palette[i];
+                                      final selected =
+                                          colorProvider.selectedIndex == i;
+                                      return GestureDetector(
+                                        onTap: () {
+                                          HapticFeedback.selectionClick();
+                                          colorProvider.setColor(i);
+                                        },
+                                        child: AnimatedContainer(
+                                          duration: const Duration(
+                                            milliseconds: 250,
+                                          ),
+                                          width: 52,
+                                          height: 52,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [opt.start, opt.end],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            shape: BoxShape.circle,
+                                            border: selected
+                                                ? Border.all(
+                                                    color: Colors.white,
+                                                    width: 3,
+                                                  )
+                                                : null,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: opt.start.withOpacity(
+                                                  selected ? 0.6 : 0.25,
+                                                ),
+                                                blurRadius: selected ? 16 : 6,
+                                                spreadRadius: selected ? 2 : 0,
+                                              ),
+                                            ],
+                                          ),
+                                          child: selected
+                                              ? const Icon(
+                                                  Icons.check,
+                                                  color: Colors.white,
+                                                  size: 22,
+                                                )
+                                              : null,
                                         ),
-                                      ),
-                                      Text(
-                                        FirebaseAuth
-                                                .instance
-                                                .currentUser
-                                                ?.email ??
-                                            '',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 12,
-                                          color: isDark
-                                              ? Colors.white54
-                                              : Colors.black45,
-                                        ),
-                                      ),
-                                    ],
+                                      );
+                                    },
                                   ),
                                 ),
-                                Icon(
-                                  Icons.chevron_right,
-                                  color: isDark
-                                      ? Colors.white30
-                                      : Colors.black26,
-                                  size: 20,
+                                const SizedBox(height: 8),
+                                // Color names
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 6,
+                                  children: List.generate(
+                                    ColorProvider.palette.length,
+                                    (i) {
+                                      final opt = ColorProvider.palette[i];
+                                      final selected =
+                                          colorProvider.selectedIndex == i;
+                                      return AnimatedContainer(
+                                        duration: const Duration(
+                                          milliseconds: 250,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: selected
+                                              ? colorProvider.primary.withOpacity(
+                                                  0.15,
+                                                )
+                                              : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          opt.name,
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 10,
+                                            fontWeight: selected
+                                                ? FontWeight.w700
+                                                : FontWeight.w400,
+                                            color: selected
+                                                ? colorProvider.primary
+                                                : (isDark
+                                                      ? Colors.white38
+                                                      : Colors.black38),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                      ),
 
-                      const SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
-                      // ── COULEUR D'ACCENT ─────────────────────────────
-                      _SectionLabel(
-                        AppTranslations.t(
-                          'app_color',
-                          localeProvider.locale.languageCode,
+                        // ── APPARENCE ────────────────────────────────────
+                        _SectionLabel(
+                          AppTranslations.t(
+                            'appearance',
+                            localeProvider.locale.languageCode,
+                          ),
+                          colorProvider.primary,
                         ),
-                        colorProvider.primary,
-                      ),
-                      _GlassCard(
-                        isDark: isDark,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
+                        _GlassCard(
+                          isDark: isDark,
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      gradient: colorProvider.gradient,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: colorProvider.primary
-                                              .withOpacity(0.4),
-                                          blurRadius: 12,
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.palette_outlined,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
+                              _GlassTile(
+                                icon: isDark
+                                    ? Icons.dark_mode
+                                    : Icons.light_mode_outlined,
+                                iconColor: isDark
+                                    ? const Color(0xFF6366F1)
+                                    : const Color(0xFFF59E0B),
+                                title: AppTranslations.t(
+                                  'dark_mode',
+                                  localeProvider.locale.languageCode,
+                                ),
+                                subtitle: isDark
+                                    ? AppTranslations.t(
+                                        'enabled',
+                                        localeProvider.locale.languageCode,
+                                      )
+                                    : AppTranslations.t(
+                                        'disabled',
+                                        localeProvider.locale.languageCode,
+                                      ),
+                                isDark: isDark,
+                                trailing: _GlassSwitch(
+                                  value: isDark,
+                                  activeColor: colorProvider.primary,
+                                  onChanged: (val) {
+                                    HapticFeedback.selectionClick();
+                                    context.read<ThemeProvider>().setDarkMode(
+                                      val,
+                                    );
+                                  },
+                                ),
+                              ),
+                              _GlassDivider(isDark: isDark),
+                              _GlassTile(
+                                icon: Icons.language_outlined,
+                                iconColor: const Color(0xFF10B981),
+                                title: AppTranslations.t(
+                                  'language',
+                                  localeProvider.locale.languageCode,
+                                ),
+                                subtitle: localeProvider.languageLabel,
+                                isDark: isDark,
+                                trailing: Icon(
+                                  Icons.chevron_right,
+                                  color: isDark ? Colors.white30 : Colors.black26,
+                                  size: 20,
+                                ),
+                                onTap: () => _showLanguageDialog(
+                                  localeProvider,
+                                  colorProvider,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // ── RÉUNION ──────────────────────────────────────
+                        _SectionLabel(
+                          AppTranslations.t(
+                            'meeting_settings',
+                            localeProvider.locale.languageCode,
+                          ),
+                          colorProvider.primary,
+                        ),
+                        _GlassCard(
+                          isDark: isDark,
+                          child: Column(
+                            children: [
+                              _GlassTile(
+                                icon: Icons.hd_outlined,
+                                iconColor: const Color(0xFF0EA5E9),
+                                title: AppTranslations.t(
+                                  'video_quality',
+                                  localeProvider.locale.languageCode,
+                                ),
+                                subtitle: _videoQuality,
+                                isDark: isDark,
+                                trailing: Icon(
+                                  Icons.chevron_right,
+                                  color: isDark ? Colors.white30 : Colors.black26,
+                                  size: 20,
+                                ),
+                                onTap: () => _showQualityDialog(colorProvider),
+                              ),
+                              _GlassDivider(isDark: isDark),
+                              _GlassTile(
+                                icon: Icons.mic_outlined,
+                                iconColor: const Color(0xFF27AE60),
+                                title: AppTranslations.t(
+                                  'mic_default',
+                                  localeProvider.locale.languageCode,
+                                ),
+                                isDark: isDark,
+                                trailing: _GlassSwitch(
+                                  value: _micDefault,
+                                  activeColor: colorProvider.primary,
+                                  onChanged: (val) async {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _micDefault = val);
+                                    final p =
+                                        await SharedPreferences.getInstance();
+                                    p.setBool('crux_mic_default', val);
+                                  },
+                                ),
+                              ),
+                              _GlassDivider(isDark: isDark),
+                              _GlassTile(
+                                icon: Icons.videocam_outlined,
+                                iconColor: colorProvider.primary,
+                                title: AppTranslations.t(
+                                  'cam_default',
+                                  localeProvider.locale.languageCode,
+                                ),
+                                isDark: isDark,
+                                trailing: _GlassSwitch(
+                                  value: _camDefault,
+                                  activeColor: colorProvider.primary,
+                                  onChanged: (val) async {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _camDefault = val);
+                                    final p =
+                                        await SharedPreferences.getInstance();
+                                    p.setBool('crux_cam_default', val);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // ── NOTIFICATIONS ────────────────────────────────
+                        _SectionLabel(
+                          AppTranslations.t(
+                            'notifications',
+                            localeProvider.locale.languageCode,
+                          ),
+                          colorProvider.primary,
+                        ),
+                        _GlassCard(
+                          isDark: isDark,
+                          child: Column(
+                            children: [
+                              _GlassTile(
+                                icon: Icons.notifications_outlined,
+                                iconColor: const Color(0xFFF59E0B),
+                                title: AppTranslations.t(
+                                  'push_notifs',
+                                  localeProvider.locale.languageCode,
+                                ),
+                                subtitle: _notificationsEnabled
+                                    ? AppTranslations.t(
+                                        'enabled',
+                                        localeProvider.locale.languageCode,
+                                      )
+                                    : AppTranslations.t(
+                                        'disabled',
+                                        localeProvider.locale.languageCode,
+                                      ),
+                                isDark: isDark,
+                                trailing: _GlassSwitch(
+                                  value: _notificationsEnabled,
+                                  activeColor: colorProvider.primary,
+                                  onChanged: (val) async {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _notificationsEnabled = val);
+                                    final p =
+                                        await SharedPreferences.getInstance();
+                                    p.setBool('crux_notifications', val);
+                                  },
+                                ),
+                              ),
+                              _GlassDivider(isDark: isDark),
+                              // DND toggle
+                              _GlassTile(
+                                icon: Icons.do_not_disturb_on_outlined,
+                                iconColor: const Color(0xFF8B5CF6),
+                                title: 'Ne pas déranger',
+                                subtitle: _dndEnabled
+                                    ? 'De ${_formatTime(_dndStart)} à ${_formatTime(_dndEnd)}'
+                                    : 'Désactivé',
+                                isDark: isDark,
+                                trailing: _GlassSwitch(
+                                  value: _dndEnabled,
+                                  activeColor: const Color(0xFF8B5CF6),
+                                  onChanged: (val) async {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _dndEnabled = val);
+                                    final p =
+                                        await SharedPreferences.getInstance();
+                                    p.setBool('crux_dnd', val);
+                                  },
+                                ),
+                              ),
+                              // DND time pickers — shown only when DND is on
+                              if (_dndEnabled) ...[
+                                _GlassDivider(isDark: isDark),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 10,
                                   ),
-                                  const SizedBox(width: 12),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: () =>
+                                              _pickDndTime(isStart: true),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 10,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: isDark
+                                                  ? Colors.white.withOpacity(0.07)
+                                                  : Colors.black.withOpacity(
+                                                      0.04,
+                                                    ),
+                                              borderRadius: BorderRadius.circular(
+                                                10,
+                                              ),
+                                            ),
+                                            child: Column(
+                                              children: [
+                                                Text(
+                                                  AppTranslations.t(
+                                                    'start_label',
+                                                    localeProvider
+                                                        .locale
+                                                        .languageCode,
+                                                  ),
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 10,
+                                                    color: isDark
+                                                        ? Colors.white38
+                                                        : Colors.black38,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  _formatTime(_dndStart),
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: const Color(
+                                                      0xFF8B5CF6,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
+                                        child: Text(
+                                          '→',
+                                          style: GoogleFonts.poppins(
+                                            color: isDark
+                                                ? Colors.white38
+                                                : Colors.black38,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: () =>
+                                              _pickDndTime(isStart: false),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 10,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: isDark
+                                                  ? Colors.white.withOpacity(0.07)
+                                                  : Colors.black.withOpacity(
+                                                      0.04,
+                                                    ),
+                                              borderRadius: BorderRadius.circular(
+                                                10,
+                                              ),
+                                            ),
+                                            child: Column(
+                                              children: [
+                                                Text(
+                                                  AppTranslations.t(
+                                                    'end_label',
+                                                    localeProvider
+                                                        .locale
+                                                        .languageCode,
+                                                  ),
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 10,
+                                                    color: isDark
+                                                        ? Colors.white38
+                                                        : Colors.black38,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  _formatTime(_dndEnd),
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: const Color(
+                                                      0xFF8B5CF6,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // ── ABONNEMENT ───────────────────────────────────
+                        _SectionLabel(
+                          AppTranslations.t(
+                            'subscription',
+                            localeProvider.locale.languageCode,
+                          ),
+                          colorProvider.primary,
+                        ),
+                        GestureDetector(
+                          onTap: () async {
+                            HapticFeedback.mediumImpact();
+                            final uid =
+                                FirebaseAuth.instance.currentUser?.uid ?? '';
+                            if (_isPro) {
+                              _errorHandler.showInfoSnackBar(
+                                context,
+                                '✅ CRUX PRO actif — ${_proExpiryText()}',
+                              );
+                            } else {
+                              try {
+                                await _proService.startPayment(
+                                  userId: uid,
+                                  userName:
+                                      FirebaseAuth
+                                          .instance
+                                          .currentUser
+                                          ?.displayName ??
+                                      'Utilisateur',
+                                );
+                              } catch (_) {}
+                            }
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: _isPro
+                                  ? const LinearGradient(
+                                      colors: [
+                                        Color(0xFF1B5E20),
+                                        Color(0xFF2E7D32),
+                                        Color(0xFF43A047),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    )
+                                  : const LinearGradient(
+                                      colors: [
+                                        Color(0xFFFFD700),
+                                        Color(0xFFFFA500),
+                                        Color(0xFFFF6B35),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      (_isPro
+                                              ? const Color(0xFF43A047)
+                                              : const Color(0xFFFFD700))
+                                          .withOpacity(0.4),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    _isPro
+                                        ? Icons.verified
+                                        : Icons.workspace_premium,
+                                    color: Colors.white,
+                                    size: 26,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        AppTranslations.t(
-                                          'current_theme',
-                                          localeProvider.locale.languageCode,
-                                        ),
-                                        style: GoogleFonts.poppins(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 15,
-                                          color: isDark
-                                              ? Colors.white
-                                              : Colors.black87,
-                                        ),
-                                      ),
-                                      Text(
-                                        colorProvider.name,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 12,
-                                          color: isDark
-                                              ? Colors.white54
-                                              : Colors.black45,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              // Color orbs grid
-                              Wrap(
-                                spacing: 10,
-                                runSpacing: 10,
-                                children: List.generate(
-                                  ColorProvider.palette.length,
-                                  (i) {
-                                    final opt = ColorProvider.palette[i];
-                                    final selected =
-                                        colorProvider.selectedIndex == i;
-                                    return GestureDetector(
-                                      onTap: () {
-                                        HapticFeedback.selectionClick();
-                                        colorProvider.setColor(i);
-                                      },
-                                      child: AnimatedContainer(
-                                        duration: const Duration(
-                                          milliseconds: 250,
-                                        ),
-                                        width: 52,
-                                        height: 52,
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [opt.start, opt.end],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                          ),
-                                          shape: BoxShape.circle,
-                                          border: selected
-                                              ? Border.all(
-                                                  color: Colors.white,
-                                                  width: 3,
-                                                )
-                                              : null,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: opt.start.withOpacity(
-                                                selected ? 0.6 : 0.25,
-                                              ),
-                                              blurRadius: selected ? 16 : 6,
-                                              spreadRadius: selected ? 2 : 0,
-                                            ),
-                                          ],
-                                        ),
-                                        child: selected
-                                            ? const Icon(
-                                                Icons.check,
-                                                color: Colors.white,
-                                                size: 22,
+                                        _loadingPro
+                                            ? AppTranslations.t(
+                                                'loading',
+                                                localeProvider
+                                                    .locale
+                                                    .languageCode,
                                               )
-                                            : null,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              // Color names
-                              Wrap(
-                                spacing: 10,
-                                runSpacing: 6,
-                                children: List.generate(
-                                  ColorProvider.palette.length,
-                                  (i) {
-                                    final opt = ColorProvider.palette[i];
-                                    final selected =
-                                        colorProvider.selectedIndex == i;
-                                    return AnimatedContainer(
-                                      duration: const Duration(
-                                        milliseconds: 250,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: selected
-                                            ? colorProvider.primary.withOpacity(
-                                                0.15,
-                                              )
-                                            : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        opt.name,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 10,
-                                          fontWeight: selected
-                                              ? FontWeight.w700
-                                              : FontWeight.w400,
-                                          color: selected
-                                              ? colorProvider.primary
-                                              : (isDark
-                                                    ? Colors.white38
-                                                    : Colors.black38),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // ── APPARENCE ────────────────────────────────────
-                      _SectionLabel(
-                        AppTranslations.t(
-                          'appearance',
-                          localeProvider.locale.languageCode,
-                        ),
-                        colorProvider.primary,
-                      ),
-                      _GlassCard(
-                        isDark: isDark,
-                        child: Column(
-                          children: [
-                            _GlassTile(
-                              icon: isDark
-                                  ? Icons.dark_mode
-                                  : Icons.light_mode_outlined,
-                              iconColor: isDark
-                                  ? const Color(0xFF6366F1)
-                                  : const Color(0xFFF59E0B),
-                              title: AppTranslations.t(
-                                'dark_mode',
-                                localeProvider.locale.languageCode,
-                              ),
-                              subtitle: isDark
-                                  ? AppTranslations.t(
-                                      'enabled',
-                                      localeProvider.locale.languageCode,
-                                    )
-                                  : AppTranslations.t(
-                                      'disabled',
-                                      localeProvider.locale.languageCode,
-                                    ),
-                              isDark: isDark,
-                              trailing: _GlassSwitch(
-                                value: isDark,
-                                activeColor: colorProvider.primary,
-                                onChanged: (val) {
-                                  HapticFeedback.selectionClick();
-                                  context.read<ThemeProvider>().setDarkMode(
-                                    val,
-                                  );
-                                },
-                              ),
-                            ),
-                            _GlassDivider(isDark: isDark),
-                            _GlassTile(
-                              icon: Icons.language_outlined,
-                              iconColor: const Color(0xFF10B981),
-                              title: AppTranslations.t(
-                                'language',
-                                localeProvider.locale.languageCode,
-                              ),
-                              subtitle: localeProvider.languageLabel,
-                              isDark: isDark,
-                              trailing: Icon(
-                                Icons.chevron_right,
-                                color: isDark ? Colors.white30 : Colors.black26,
-                                size: 20,
-                              ),
-                              onTap: () => _showLanguageDialog(
-                                localeProvider,
-                                colorProvider,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // ── RÉUNION ──────────────────────────────────────
-                      _SectionLabel(
-                        AppTranslations.t(
-                          'meeting_settings',
-                          localeProvider.locale.languageCode,
-                        ),
-                        colorProvider.primary,
-                      ),
-                      _GlassCard(
-                        isDark: isDark,
-                        child: Column(
-                          children: [
-                            _GlassTile(
-                              icon: Icons.hd_outlined,
-                              iconColor: const Color(0xFF0EA5E9),
-                              title: AppTranslations.t(
-                                'video_quality',
-                                localeProvider.locale.languageCode,
-                              ),
-                              subtitle: _videoQuality,
-                              isDark: isDark,
-                              trailing: Icon(
-                                Icons.chevron_right,
-                                color: isDark ? Colors.white30 : Colors.black26,
-                                size: 20,
-                              ),
-                              onTap: () => _showQualityDialog(colorProvider),
-                            ),
-                            _GlassDivider(isDark: isDark),
-                            _GlassTile(
-                              icon: Icons.mic_outlined,
-                              iconColor: const Color(0xFF27AE60),
-                              title: AppTranslations.t(
-                                'mic_default',
-                                localeProvider.locale.languageCode,
-                              ),
-                              isDark: isDark,
-                              trailing: _GlassSwitch(
-                                value: _micDefault,
-                                activeColor: colorProvider.primary,
-                                onChanged: (val) async {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _micDefault = val);
-                                  final p =
-                                      await SharedPreferences.getInstance();
-                                  p.setBool('crux_mic_default', val);
-                                },
-                              ),
-                            ),
-                            _GlassDivider(isDark: isDark),
-                            _GlassTile(
-                              icon: Icons.videocam_outlined,
-                              iconColor: colorProvider.primary,
-                              title: AppTranslations.t(
-                                'cam_default',
-                                localeProvider.locale.languageCode,
-                              ),
-                              isDark: isDark,
-                              trailing: _GlassSwitch(
-                                value: _camDefault,
-                                activeColor: colorProvider.primary,
-                                onChanged: (val) async {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _camDefault = val);
-                                  final p =
-                                      await SharedPreferences.getInstance();
-                                  p.setBool('crux_cam_default', val);
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // ── NOTIFICATIONS ────────────────────────────────
-                      _SectionLabel(
-                        AppTranslations.t(
-                          'notifications',
-                          localeProvider.locale.languageCode,
-                        ),
-                        colorProvider.primary,
-                      ),
-                      _GlassCard(
-                        isDark: isDark,
-                        child: Column(
-                          children: [
-                            _GlassTile(
-                              icon: Icons.notifications_outlined,
-                              iconColor: const Color(0xFFF59E0B),
-                              title: AppTranslations.t(
-                                'push_notifs',
-                                localeProvider.locale.languageCode,
-                              ),
-                              subtitle: _notificationsEnabled
-                                  ? AppTranslations.t(
-                                      'enabled',
-                                      localeProvider.locale.languageCode,
-                                    )
-                                  : AppTranslations.t(
-                                      'disabled',
-                                      localeProvider.locale.languageCode,
-                                    ),
-                              isDark: isDark,
-                              trailing: _GlassSwitch(
-                                value: _notificationsEnabled,
-                                activeColor: colorProvider.primary,
-                                onChanged: (val) async {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _notificationsEnabled = val);
-                                  final p =
-                                      await SharedPreferences.getInstance();
-                                  p.setBool('crux_notifications', val);
-                                },
-                              ),
-                            ),
-                            _GlassDivider(isDark: isDark),
-                            // DND toggle
-                            _GlassTile(
-                              icon: Icons.do_not_disturb_on_outlined,
-                              iconColor: const Color(0xFF8B5CF6),
-                              title: 'Ne pas déranger',
-                              subtitle: _dndEnabled
-                                  ? 'De ${_formatTime(_dndStart)} à ${_formatTime(_dndEnd)}'
-                                  : 'Désactivé',
-                              isDark: isDark,
-                              trailing: _GlassSwitch(
-                                value: _dndEnabled,
-                                activeColor: const Color(0xFF8B5CF6),
-                                onChanged: (val) async {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _dndEnabled = val);
-                                  final p =
-                                      await SharedPreferences.getInstance();
-                                  p.setBool('crux_dnd', val);
-                                },
-                              ),
-                            ),
-                            // DND time pickers — shown only when DND is on
-                            if (_dndEnabled) ...[
-                              _GlassDivider(isDark: isDark),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () =>
-                                            _pickDndTime(isStart: true),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 10,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: isDark
-                                                ? Colors.white.withOpacity(0.07)
-                                                : Colors.black.withOpacity(
-                                                    0.04,
-                                                  ),
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                          ),
-                                          child: Column(
-                                            children: [
-                                              Text(
-                                                AppTranslations.t(
-                                                  'start_label',
-                                                  localeProvider
-                                                      .locale
-                                                      .languageCode,
-                                                ),
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 10,
-                                                  color: isDark
-                                                      ? Colors.white38
-                                                      : Colors.black38,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                _formatTime(_dndStart),
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: const Color(
-                                                    0xFF8B5CF6,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                      ),
-                                      child: Text(
-                                        '→',
-                                        style: GoogleFonts.poppins(
-                                          color: isDark
-                                              ? Colors.white38
-                                              : Colors.black38,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () =>
-                                            _pickDndTime(isStart: false),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 10,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: isDark
-                                                ? Colors.white.withOpacity(0.07)
-                                                : Colors.black.withOpacity(
-                                                    0.04,
-                                                  ),
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                          ),
-                                          child: Column(
-                                            children: [
-                                              Text(
-                                                AppTranslations.t(
-                                                  'end_label',
-                                                  localeProvider
-                                                      .locale
-                                                      .languageCode,
-                                                ),
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 10,
-                                                  color: isDark
-                                                      ? Colors.white38
-                                                      : Colors.black38,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                _formatTime(_dndEnd),
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: const Color(
-                                                    0xFF8B5CF6,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // ── ABONNEMENT ───────────────────────────────────
-                      _SectionLabel(
-                        AppTranslations.t(
-                          'subscription',
-                          localeProvider.locale.languageCode,
-                        ),
-                        colorProvider.primary,
-                      ),
-                      GestureDetector(
-                        onTap: () async {
-                          HapticFeedback.mediumImpact();
-                          final uid =
-                              FirebaseAuth.instance.currentUser?.uid ?? '';
-                          if (_isPro) {
-                            _errorHandler.showInfoSnackBar(
-                              context,
-                              '✅ CRUX PRO actif — ${_proExpiryText()}',
-                            );
-                          } else {
-                            try {
-                              await _proService.startPayment(
-                                userId: uid,
-                                userName:
-                                    FirebaseAuth
-                                        .instance
-                                        .currentUser
-                                        ?.displayName ??
-                                    'Utilisateur',
-                              );
-                            } catch (_) {}
-                          }
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            gradient: _isPro
-                                ? const LinearGradient(
-                                    colors: [
-                                      Color(0xFF1B5E20),
-                                      Color(0xFF2E7D32),
-                                      Color(0xFF43A047),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  )
-                                : const LinearGradient(
-                                    colors: [
-                                      Color(0xFFFFD700),
-                                      Color(0xFFFFA500),
-                                      Color(0xFFFF6B35),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color:
-                                    (_isPro
-                                            ? const Color(0xFF43A047)
-                                            : const Color(0xFFFFD700))
-                                        .withOpacity(0.4),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  _isPro
-                                      ? Icons.verified
-                                      : Icons.workspace_premium,
-                                  color: Colors.white,
-                                  size: 26,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _loadingPro
-                                          ? AppTranslations.t(
-                                              'loading',
-                                              localeProvider
-                                                  .locale
-                                                  .languageCode,
-                                            )
-                                          : (_isPro
-                                                ? AppTranslations.t(
-                                                    'pro_active',
-                                                    localeProvider
-                                                        .locale
-                                                        .languageCode,
-                                                  )
-                                                : AppTranslations.t(
-                                                    'pro_inactive',
-                                                    localeProvider
-                                                        .locale
-                                                        .languageCode,
-                                                  )),
+                                            : (_isPro
+                                                  ? AppTranslations.t(
+                                                      'pro_active',
+                                                      localeProvider
+                                                          .locale
+                                                          .languageCode,
+                                                    )
+                                                  : AppTranslations.t(
+                                                      'pro_inactive',
+                                                      localeProvider
+                                                          .locale
+                                                          .languageCode,
+                                                    )),
                                       style: GoogleFonts.poppins(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w800,
@@ -1023,166 +1023,166 @@ class _SettingsScreenState extends State<SettingsScreen>
                                     ),
                                   ],
                                 ),
-                              ),
-                              if (_loadingPro)
-                                const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              else if (!_isPro)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    AppTranslations.t(
-                                      'activate',
-                                      localeProvider.locale.languageCode,
+                                if (_loadingPro)
+                                  const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
                                     ),
-                                    style: GoogleFonts.poppins(
-                                      color: const Color(0xFFFFA500),
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 13,
+                                  )
+                                else if (!_isPro)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 8,
                                     ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      AppTranslations.t(
+                                        'activate',
+                                        localeProvider.locale.languageCode,
+                                      ),
+                                      style: GoogleFonts.poppins(
+                                        color: const Color(0xFFFFA500),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.white,
+                                    size: 24,
                                   ),
-                                )
-                              else
-                                const Icon(
-                                  Icons.check_circle,
-                                  color: Colors.white,
-                                  size: 24,
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // ── LÉGAL ────────────────────────────────────────
+                        _SectionLabel(
+                          AppTranslations.t(
+                            'legal',
+                            localeProvider.locale.languageCode,
+                          ),
+                          colorProvider.primary,
+                        ),
+                        _GlassCard(
+                          isDark: isDark,
+                          child: Column(
+                            children: [
+                              _GlassTile(
+                                icon: Icons.shield_outlined,
+                                iconColor: const Color(0xFF6366F1),
+                                title: AppTranslations.t(
+                                  'privacy_policy',
+                                  localeProvider.locale.languageCode,
                                 ),
+                                isDark: isDark,
+                                trailing: Icon(
+                                  Icons.chevron_right,
+                                  color: isDark ? Colors.white30 : Colors.black26,
+                                  size: 20,
+                                ),
+                                onTap: () =>
+                                    Navigator.pushNamed(context, '/privacy'),
+                              ),
+                              _GlassDivider(isDark: isDark),
+                              _GlassTile(
+                                icon: Icons.gavel_outlined,
+                                iconColor: const Color(0xFFEF4444),
+                                title: AppTranslations.t(
+                                  'terms_of_use',
+                                  localeProvider.locale.languageCode,
+                                ),
+                                isDark: isDark,
+                                trailing: Icon(
+                                  Icons.chevron_right,
+                                  color: isDark ? Colors.white30 : Colors.black26,
+                                  size: 20,
+                                ),
+                                onTap: () =>
+                                    Navigator.pushNamed(context, '/terms'),
+                              ),
+                              _GlassDivider(isDark: isDark),
+                              _GlassTile(
+                                icon: Icons.headset_mic_outlined,
+                                iconColor: const Color(0xFF0EA5E9),
+                                title: AppTranslations.t(
+                                  'support_label',
+                                  localeProvider.locale.languageCode,
+                                ),
+                                subtitle: 'kouakouchristevann@gmail.com',
+                                isDark: isDark,
+                                trailing: Icon(
+                                  Icons.chevron_right,
+                                  color: isDark ? Colors.white30 : Colors.black26,
+                                  size: 20,
+                                ),
+                                onTap: () async {
+                                  final uri = Uri(
+                                    scheme: 'mailto',
+                                    path: 'kouakouchristevann@gmail.com',
+                                    query: 'subject=Support CRUX',
+                                  );
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                         ),
-                      ),
 
-                      const SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
-                      // ── LÉGAL ────────────────────────────────────────
-                      _SectionLabel(
-                        AppTranslations.t(
-                          'legal',
-                          localeProvider.locale.languageCode,
+                        // ── À PROPOS ─────────────────────────────────────
+                        _GlassCard(
+                          isDark: isDark,
+                          child: Column(
+                            children: [
+                              _GlassTile(
+                                icon: Icons.info_outline,
+                                iconColor: Colors.grey,
+                                title: AppTranslations.t(
+                                  'version',
+                                  localeProvider.locale.languageCode,
+                                ),
+                                subtitle: '2.38.0',
+                                isDark: isDark,
+                                trailing: const SizedBox(),
+                              ),
+                              _GlassDivider(isDark: isDark),
+                              _GlassTile(
+                                icon: Icons.code,
+                                iconColor: colorProvider.primary,
+                                title: AppTranslations.t(
+                                  'built_by',
+                                  localeProvider.locale.languageCode,
+                                ),
+                                subtitle: 'MESCHAC_</>',
+                                isDark: isDark,
+                                trailing: const SizedBox(),
+                              ),
+                            ],
+                          ),
                         ),
-                        colorProvider.primary,
-                      ),
-                      _GlassCard(
-                        isDark: isDark,
-                        child: Column(
-                          children: [
-                            _GlassTile(
-                              icon: Icons.shield_outlined,
-                              iconColor: const Color(0xFF6366F1),
-                              title: AppTranslations.t(
-                                'privacy_policy',
-                                localeProvider.locale.languageCode,
-                              ),
-                              isDark: isDark,
-                              trailing: Icon(
-                                Icons.chevron_right,
-                                color: isDark ? Colors.white30 : Colors.black26,
-                                size: 20,
-                              ),
-                              onTap: () =>
-                                  Navigator.pushNamed(context, '/privacy'),
-                            ),
-                            _GlassDivider(isDark: isDark),
-                            _GlassTile(
-                              icon: Icons.gavel_outlined,
-                              iconColor: const Color(0xFFEF4444),
-                              title: AppTranslations.t(
-                                'terms_of_use',
-                                localeProvider.locale.languageCode,
-                              ),
-                              isDark: isDark,
-                              trailing: Icon(
-                                Icons.chevron_right,
-                                color: isDark ? Colors.white30 : Colors.black26,
-                                size: 20,
-                              ),
-                              onTap: () =>
-                                  Navigator.pushNamed(context, '/terms'),
-                            ),
-                            _GlassDivider(isDark: isDark),
-                            _GlassTile(
-                              icon: Icons.headset_mic_outlined,
-                              iconColor: const Color(0xFF0EA5E9),
-                              title: AppTranslations.t(
-                                'support_label',
-                                localeProvider.locale.languageCode,
-                              ),
-                              subtitle: 'kouakouchristevann@gmail.com',
-                              isDark: isDark,
-                              trailing: Icon(
-                                Icons.chevron_right,
-                                color: isDark ? Colors.white30 : Colors.black26,
-                                size: 20,
-                              ),
-                              onTap: () async {
-                                final uri = Uri(
-                                  scheme: 'mailto',
-                                  path: 'kouakouchristevann@gmail.com',
-                                  query: 'subject=Support CRUX',
-                                );
-                                if (await canLaunchUrl(uri)) {
-                                  await launchUrl(uri);
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
 
-                      const SizedBox(height: 24),
-
-                      // ── À PROPOS ─────────────────────────────────────
-                      _GlassCard(
-                        isDark: isDark,
-                        child: Column(
-                          children: [
-                            _GlassTile(
-                              icon: Icons.info_outline,
-                              iconColor: Colors.grey,
-                              title: AppTranslations.t(
-                                'version',
-                                localeProvider.locale.languageCode,
-                              ),
-                              subtitle: '2.38.0',
-                              isDark: isDark,
-                              trailing: const SizedBox(),
-                            ),
-                            _GlassDivider(isDark: isDark),
-                            _GlassTile(
-                              icon: Icons.code,
-                              iconColor: colorProvider.primary,
-                              title: AppTranslations.t(
-                                'built_by',
-                                localeProvider.locale.languageCode,
-                              ),
-                              subtitle: 'MESCHAC_</>',
-                              isDark: isDark,
-                              trailing: const SizedBox(),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 40),
-                    ],
+                        const SizedBox(height: 40),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

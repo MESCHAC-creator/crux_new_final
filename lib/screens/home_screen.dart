@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../utils/logger.dart';
+import '../utils/crux.logger.dart' as crux;
 import '../theme/colors.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
@@ -85,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (e) {
-      logger.e('_loadLocalPhoto error', error: e);
+      crux.logger.e('_loadLocalPhoto error', error: e);
     }
   }
 
@@ -96,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (fb?.email?.isNotEmpty == true && fb!.email!.contains('@')) return fb.email!.split('@')[0];
       return widget.user?.name ?? 'Utilisateur';
     } catch (e) {
-      logger.e('_displayName error', error: e);
+      crux.logger.e('_displayName error', error: e);
       return 'Utilisateur';
     }
   }

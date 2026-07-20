@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:livekit_client/livekit_client.dart' hide Logger;
+import 'package:livekit_client/livekit_client.dart' hide Logger, logger;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -14,10 +14,11 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/logger.dart';
+import '../utils/crux.logger.dart' as crux;
 import '../config/app_config.dart';
 import '../services/livekit_service.dart';
 import '../services/meeting_service.dart';
+import '../services/error_handler_service.dart';
 import '../models/meeting_model.dart';
 import '../services/note_service.dart';
 import '../theme/colors.dart';
@@ -161,7 +162,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
         });
       }
     } catch (e) {
-      logger.w('Speech recognition error', error: e);
+      crux.logger.w('Speech recognition error', error: e);
     }
   }
 
@@ -192,7 +193,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
         _camOn = prefs.getBool('crux_cam_default') ?? true;
       });
     } catch (e) {
-      logger.w('Prefs load error', error: e);
+      crux.logger.w('Prefs load error', error: e);
     }
 
     // 1. Register presence & update status
@@ -281,7 +282,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
         _remoteParticipants = _room!.remoteParticipants.values.toList();
       });
     } catch (e, st) {
-      logger.e('❌ Room initialization failed', error: e, stackTrace: st);
+      crux.logger.e('❌ Room initialization failed', error: e, stackTrace: st);
       final lang = context.read<LocaleProvider>().locale.languageCode;
       setState(() {
         _loading = false;
