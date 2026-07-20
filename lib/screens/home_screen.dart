@@ -83,14 +83,21 @@ class _HomeScreenState extends State<HomeScreen> {
           if (mounted) setState(() => _localPhotoPath = dest);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      logger.e('_loadLocalPhoto error', error: e);
+    }
   }
 
   String _displayName() {
-    final fb = FirebaseAuth.instance.currentUser;
-    if (fb?.displayName?.trim().isNotEmpty == true) return fb!.displayName!;
-    if (fb?.email?.contains('@') == true) return fb!.email!.split('@')[0];
-    return widget.user.name;
+    try {
+      final fb = FirebaseAuth.instance.currentUser;
+      if (fb?.displayName?.trim().isNotEmpty == true) return fb!.displayName!;
+      if (fb?.email?.isNotEmpty == true && fb!.email!.contains('@')) return fb.email!.split('@')[0];
+      return widget.user?.name ?? 'Utilisateur';
+    } catch (e) {
+      logger.e('_displayName error', error: e);
+      return 'Utilisateur';
+    }
   }
 
   Future<void> _createMeeting() async {
