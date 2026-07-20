@@ -9,7 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_links/app_links.dart';
-import 'utils/crux.logger.dart' as crux;
+import 'utils/logger.dart' as crux;
 import 'services/notification_service.dart';
 import 'services/device_verification_service.dart';
 import 'firebase_options.dart';
