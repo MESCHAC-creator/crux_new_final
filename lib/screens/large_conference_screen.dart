@@ -14,7 +14,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/crux.logger.dart' as crux;
+import '../utils/logger.dart' as crux;
 import '../config/app_config.dart';
 import '../services/livekit_service.dart';
 import '../services/meeting_service.dart';
@@ -48,6 +48,7 @@ class LargeConferenceScreen extends StatefulWidget {
 }
 
 class _LargeConferenceScreenState extends State<LargeConferenceScreen> with WidgetsBindingObserver {
+  final _errorHandler = ErrorHandlerService();
   Room? _room;
   EventsListener<RoomEvent>? _roomListener;
   final FlutterTts _tts = FlutterTts();
@@ -286,7 +287,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
       final lang = context.read<LocaleProvider>().locale.languageCode;
       setState(() {
         _loading = false;
-        _error = ErrorHandlerService().getMeetingErrorMessageL(e.toString(), lang);
+        _error = _errorHandler.getMeetingErrorMessageL(e.toString(), lang);
         _room = null;
       });
     }
