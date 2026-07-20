@@ -159,7 +159,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
           if (mounted) setState(() => _currentTranscription = val.recognizedWords);
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      logger.w('Speech recognition error', error: e);
+    }
   }
 
   void _initPresenceListener() {
@@ -188,7 +190,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
         _micOn = prefs.getBool('crux_mic_default') ?? true;
         _camOn = prefs.getBool('crux_cam_default') ?? true;
       });
-    } catch (_) {}
+    } catch (e) {
+      logger.w('Prefs load error', error: e);
+    }
 
     // 1. Register presence & update status
     await MeetingService().registerPresence(widget.meetingId, widget.userId, widget.userName);
@@ -275,16 +279,18 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
         _loading = false;
         _remoteParticipants = _room!.remoteParticipants.values.toList();
       });
-    } catch (e) {
+    } catch (e, st) {
+      logger.e('❌ Room initialization failed', error: e, stackTrace: st);
       setState(() {
         _loading = false;
-        _error = "Erreur fatale : $e";
+        _error = "Erreur de connexion : $e";
+        _room = null;
       });
     }
   }
 
   void _refresh() {
-    if (mounted) {
+    if (mounted && _room != null) {
       setState(() => _remoteParticipants = _room!.remoteParticipants.values.toList());
     }
   }
