@@ -94,7 +94,7 @@ workflows:
           ./gradlew -v
 
       - name: Generate app icons
-        script: dart run flutter_launcher_icons -f flutter_launcher_icons.yaml
+        script: dart run flutter_launcher_icons -f flutter_launcher_icons_android.yaml
 
       - name: Build APK and AAB
         script: |
@@ -191,7 +191,7 @@ workflows:
         script: flutter pub get
 
       - name: Generate app icons
-        script: dart run flutter_launcher_icons -f flutter_launcher_icons.yaml
+        script: dart run flutter_launcher_icons -f flutter_launcher_icons_ios.yaml
 
       - name: Install CocoaPods
         script: |
