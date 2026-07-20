@@ -7,9 +7,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_links/app_links.dart';
+import 'utils/logger.dart';
 import 'services/notification_service.dart';
 import 'services/device_verification_service.dart';
 import 'firebase_options.dart';
@@ -28,8 +28,6 @@ import 'routes/app_routes.dart';
 import 'theme/colors.dart';
 import 'theme/theme.dart';
 import 'widgets/elegant_toast.dart';
-
-final logger = Logger();
 
 // ---------------------------------------------------------------------------
 const _flutterUnsupportedLocales = {'ha', 'yo', 'mg', 'wo'};

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/logger.dart';
 import '../theme/colors.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
