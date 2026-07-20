@@ -557,20 +557,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHomeTab(String lang) {
     final displayName = _displayName();
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Salutation ──
-          _buildGreetingHeader(displayName),
-          const SizedBox(height: 24),
-          // ── Bento Grid layout (Actions rapides & IA) ──
-          _buildBentoGrid(lang),
-          const SizedBox(height: 28),
-          // ── Réunions récentes ──
-          _buildRecentMeetings(lang),
-        ],
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() {});
+        await _loadLocalPhoto();
+      },
+      color: AppColors.primary,
+      backgroundColor: const Color(0xFF1A1A2E),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Salutation ──
+            _buildGreetingHeader(displayName),
+            const SizedBox(height: 24),
+            // ── Bento Grid layout (Actions rapides & IA) ──
+            _buildBentoGrid(lang),
+            const SizedBox(height: 28),
+            // ── Réunions récentes ──
+            _buildRecentMeetings(lang),
+          ],
+        ),
       ),
     );
   }
@@ -1037,25 +1046,36 @@ class _HomeScreenState extends State<HomeScreen> {
   // ── Onglet 1 : Chat (placeholder) ─────────────────────────────────────────
 
   Widget _buildChatTab() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return RefreshIndicator(
+      onRefresh: () async => setState(() {}),
+      color: AppColors.primary,
+      backgroundColor: const Color(0xFF1A1A2E),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          const Icon(
-            Icons.chat_bubble_outline,
-            color: Colors.white12,
-            size: 60,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Chat bientôt disponible',
-            style: GoogleFonts.poppins(color: Colors.white30, fontSize: 15),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Échangez avec vos participants\ndans les réunions',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(color: Colors.white12, fontSize: 12),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.chat_bubble_outline,
+                  color: Colors.white12,
+                  size: 60,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Chat bientôt disponible',
+                  style: GoogleFonts.poppins(color: Colors.white30, fontSize: 15),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Échangez avec vos participants\ndans les réunions',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(color: Colors.white12, fontSize: 12),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1068,84 +1088,96 @@ class _HomeScreenState extends State<HomeScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const SizedBox.shrink();
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('meetings')
-          .where('organizerId', isEqualTo: uid)
-          .orderBy('createdAt', descending: true)
-          .limit(20)
-          .snapshots(),
-      builder: (ctx, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Color(0xFFE53935),
-            ),
-          );
-        }
-        final docs = snap.data?.docs ?? [];
-        if (docs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+    return RefreshIndicator(
+      onRefresh: () async => setState(() {}),
+      color: AppColors.primary,
+      backgroundColor: const Color(0xFF1A1A2E),
+      child: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('meetings')
+            .where('organizerId', isEqualTo: uid)
+            .orderBy('createdAt', descending: true)
+            .limit(20)
+            .snapshots(),
+        builder: (ctx, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFFE53935),
+              ),
+            );
+          }
+          final docs = snap.data?.docs ?? [];
+          if (docs.isEmpty) {
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               children: [
-                const Icon(
-                  Icons.video_camera_front_outlined,
-                  color: Colors.white12,
-                  size: 60,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Aucune réunion',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white30,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Vos réunions créées apparaîtront ici',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white12,
-                    fontSize: 12,
+                SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.video_camera_front_outlined,
+                        color: Colors.white12,
+                        size: 60,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Aucune réunion',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white30,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Vos réunions créées apparaîtront ici',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white12,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ),
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          itemCount: docs.length,
-          itemBuilder: (_, i) {
-            final d = docs[i].data() as Map<String, dynamic>;
-            return _MeetingCard(
-              data: d,
-              onJoin: () {
-                final id = d['id'] as String? ?? docs[i].id;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => MeetingScreen(
-                      meetingId: id,
-                      meetingName: d['title'] as String? ?? 'Réunion',
-                      userId: uid,
-                      userName: _displayName(),
-                      userEmail: widget.user.email,
-                      isHost: d['organizerId'] == uid,
-                    ),
-                  ),
-                );
-              },
-              onShare: () {
-                final id = d['id'] as String? ?? docs[i].id;
-                _shareMeetingLink(id, d['title'] as String? ?? 'Réunion');
-              },
             );
-          },
-        );
-      },
+          }
+          return ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            itemCount: docs.length,
+            itemBuilder: (_, i) {
+              final d = docs[i].data() as Map<String, dynamic>;
+              return _MeetingCard(
+                data: d,
+                onJoin: () {
+                  final id = d['id'] as String? ?? docs[i].id;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MeetingScreen(
+                        meetingId: id,
+                        meetingName: d['title'] as String? ?? 'Réunion',
+                        userId: uid,
+                        userName: _displayName(),
+                        userEmail: widget.user.email,
+                        isHost: d['organizerId'] == uid,
+                      ),
+                    ),
+                  );
+                },
+                onShare: () {
+                  final id = d['id'] as String? ?? docs[i].id;
+                  _shareMeetingLink(id, d['title'] as String? ?? 'Réunion');
+                },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 

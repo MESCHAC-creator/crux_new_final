@@ -170,9 +170,18 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
         child: FadeTransition(
           opacity: _fadeAnim,
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
+          child: RefreshIndicator(
+            onRefresh: () async {
+              HapticFeedback.lightImpact();
+              await _load();
+            },
+            color: colorProvider.primary,
+            backgroundColor: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
               // ── Glass App Bar ──────────────────────────────
               SliverAppBar(
                 expandedHeight: 120,
