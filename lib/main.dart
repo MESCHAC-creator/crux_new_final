@@ -263,8 +263,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
         ElegantToast.show(context, title: 'Erreur', message: 'Réunion introuvable', type: ElegantToastType.error);
         return;
       }
-      final data = doc.data()!;
-      final current = FirebaseAuth.instance.currentUser!;
+      final data = doc.data();
+      if (data == null) {
+        if (mounted) ElegantToast.show(context, title: 'Erreur', message: 'Données réunion corrompues', type: ElegantToastType.error);
+        return;
+      }
+      final current = FirebaseAuth.instance.currentUser;
+      if (current == null) {
+        if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: meetingId)));
+        return;
+      }
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -278,7 +286,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
           ),
         ),
       );
-    } catch (_) {
+    } catch (e) {
+      logger.e('_joinMeetingAsAuthenticatedUser error', error: e);
       if (mounted) {
         Navigator.push(context, MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: meetingId)));
       }
