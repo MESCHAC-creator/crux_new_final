@@ -2,7 +2,7 @@
 
 CRUX is a high-performance, secure mobile video conferencing application built with Flutter. It supports real-time communication using WebRTC and LiveKit, with a robust backend powered by Firebase.
 
-## 🚀 Features
+## Features
 
 - **High-Quality Video/Audio:** Powered by LiveKit & WebRTC for low-latency P2P and hosted calls.
 - **Secure Meetings:** End-to-end encryption, passcode protection (4-6 digits), and secure device verification.
@@ -13,7 +13,7 @@ CRUX is a high-performance, secure mobile video conferencing application built w
 - **Customization:** 8-color accent palette and persistent Dark/Light mode.
 - **Meeting Tools:** Real-time meeting notes saved to history and automated meeting reports.
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Frontend:** Flutter (Material 3)
 - **State Management:** Provider
@@ -21,7 +21,7 @@ CRUX is a high-performance, secure mobile video conferencing application built w
 - **Video Infrastructure:** LiveKit / WebRTC
 - **Native Integration:** Kotlin (Android) for Picture-in-Picture (PiP) and Foreground Services.
 
-## 📦 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -55,7 +55,7 @@ CRUX is a high-performance, secure mobile video conferencing application built w
    flutter run
    ```
 
-## 🏗 Architecture
+## Architecture
 
 The project follows a modular service-based architecture:
 
@@ -65,16 +65,17 @@ The project follows a modular service-based architecture:
 - `lib/widgets/`: Reusable UI components.
 - `lib/theme/`: Centralized styling and color schemes.
 
-## 🔐 Security & Compliance
+## Security & Compliance
 
 - **Device Gate:** Mandatory security checks (root/jailbreak detection, disk space, OS version).
 - **Authentication:** Supports Google Sign-In, Email/Password, and Anonymous guest access.
 - **Permissions:** Runtime requests for Microphone, Camera, and Storage.
 
-## 🌍 Localization
+## Localization
 
 CRUX is localized into 32 languages. Translations are managed in `lib/l10n/app_translations.dart` and through `.arb` files.
 
 ---
 
 Developed with ❤️ for a seamless conferencing experience.
+SMALL GUY WITH BIG GOD🔥
