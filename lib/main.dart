@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:io' show Platform;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -11,7 +11,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_links/app_links.dart';
 import 'utils/logger.dart' as crux;
 import 'services/notification_service.dart';
-import 'services/device_verification_service.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
@@ -34,8 +33,8 @@ const _flutterUnsupportedLocales = {'ha', 'yo', 'mg', 'wo'};
 
 Locale _materialFallback(Locale locale) =>
     _flutterUnsupportedLocales.contains(locale.languageCode)
-    ? const Locale('fr')
-    : locale;
+        ? const Locale('fr')
+        : locale;
 
 class _FallbackMaterialLocalizationsDelegate
     extends LocalizationsDelegate<MaterialLocalizations> {
@@ -99,7 +98,6 @@ void main() {
       crux.logger.i('✅ Firebase initialized');
     } catch (e) {
       crux.logger.e('❌ Firebase init error', error: e);
-      // Don't crash, show error UI
       runApp(_ErrorApp(title: 'Firebase Error', message: e.toString()));
       return;
     }
@@ -149,14 +147,24 @@ class _ErrorApp extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     ElevatedButton.icon(
-                      onPressed: () => exit(0),
+                      onPressed: () {
+                        // Utiliser SystemNavigator.pop au lieu de exit(0) pour compatibilité iOS
+                        if (Platform.isAndroid) {
+                          // Android: fermer l'app
+                          SystemNavigator.pop();
+                        }
+                      },
                       icon: const Icon(Icons.close, size: 18),
                       label: const Text('Quitter'),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.white10, foregroundColor: Colors.white),
                     ),
                     const SizedBox(width: 16),
                     ElevatedButton.icon(
-                      onPressed: () => main(), // Simple retry
+                      onPressed: () {
+                        // Relancer l'app proprement
+                        WidgetsFlutterBinding.ensureInitialized();
+                        main();
+                      },
                       icon: const Icon(Icons.refresh, size: 18),
                       label: const Text('Réessayer'),
                       style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.black),
@@ -174,6 +182,8 @@ class _ErrorApp extends StatelessWidget {
   String _getUXFriendlyMessage(String msg) {
     if (msg.contains('DefaultFirebaseOptions')) return 'Configuration serveur manquante. Veuillez réinstaller l\'application.';
     if (msg.contains('network')) return 'Connexion impossible. Vérifiez votre accès Internet.';
+    if (msg.contains('api-key')) return 'Clé API invalide. Contactez le support.';
+    if (msg.contains('project-not-found')) return 'Projet Firebase introuvable.';
     return 'Une erreur inattendue empêche l\'application de démarrer. Code: ${msg.split(':').last}';
   }
 }
@@ -223,7 +233,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool? _termsAccepted;
   late final Stream<User?> _authStream;
   String? _pendingMeetingId;
-  StreamSubscription? _deepLinkSubscription;
+  StreamSubscription<Uri>? _deepLinkSubscription;
   final _appLinks = AppLinks();
 
   @override
