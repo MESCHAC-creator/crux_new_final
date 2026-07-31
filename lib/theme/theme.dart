@@ -53,9 +53,9 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
-          foregroundColor: Colors.black, // Dark text on Electric Cyan for premium high contrast
+          foregroundColor: Colors.black,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // 12px buttons
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5),
         ),
       ),
@@ -68,11 +68,11 @@ class AppTheme {
           textStyle: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w600, fontSize: 15),
         ),
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme( // ✅ CORRIGÉ : CardTheme au lieu de CardThemeData
         color: AppColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16), // 16px cards
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: AppColors.textSecondary.withOpacity(0.08), width: 1),
         ),
       ),
@@ -97,6 +97,5 @@ class AppTheme {
     );
   }
 
-  static ThemeData get lightTheme => darkTheme; // On unifie pour le look Premium Obsidian
+  static ThemeData get lightTheme => darkTheme;
 }
-
