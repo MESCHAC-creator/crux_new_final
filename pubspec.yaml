@@ -42,7 +42,7 @@ dependencies:
 
   # Vidéo / WebRTC / LiveKit
   flutter_webrtc: ^0.12.12
-  livekit_client: ^2.4.0
+  livekit_client: ^2.3.6
 
   # Notifications
   flutter_local_notifications: ^19.1.0
