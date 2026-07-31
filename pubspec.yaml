@@ -1,7 +1,7 @@
 name: crux
-description: Application Flutter
+description: Application Flutter de visioconférence premium CRUX
 publish_to: "none"
-version: 1.0.1+2
+version: 2.38.1+4
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -12,45 +12,71 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
+  # UI
   cupertino_icons: ^1.0.8
-  http: ^1.2.1
-  shared_preferences: ^2.2.2
-  firebase_core: ^3.15.2
-  firebase_auth: ^5.0.0
-  cloud_firestore: ^5.6.2
-  firebase_messaging: ^15.2.1
   google_fonts: ^6.2.1
-  google_sign_in: ^6.2.1
-  provider: ^6.1.2
-  logger: ^2.4.0
-  app_links: ^7.2.0
-  speech_to_text: ^7.4.0
-  url_launcher: ^6.2.6
+  flutter_animate: ^4.5.2
+
+  # Réseau
+  http: ^1.2.2
+  url_launcher: ^6.3.1
   share_plus: ^11.0.0
-  permission_handler: ^11.3.1
-  image_picker: ^1.1.2
+  app_links: ^7.2.0
+
+  # Stockage
+  shared_preferences: ^2.5.3
+  flutter_secure_storage: ^9.2.4
   path_provider: ^2.1.5
-  device_info_plus: ^11.3.0
-  package_info_plus: ^8.1.1
-  livekit_client: ^2.3.0
-  flutter_tts: ^4.1.1
+
+  # Firebase
+  firebase_core: ^3.13.0
+  firebase_auth: ^5.5.2
+  cloud_firestore: ^5.6.6
+  firebase_messaging: ^15.2.5
+
+  # Auth
+  google_sign_in: ^6.2.2
+
+  # State Management
+  provider: ^6.1.4
+
+  # Vidéo / WebRTC / LiveKit
+  flutter_webrtc: ^0.12.12
+  livekit_client: ^2.4.0
+
+  # Notifications
+  flutter_local_notifications: ^19.1.0
+  timezone: ^0.10.0
+
+  # Permissions
+  permission_handler: ^11.4.0
+
+  # Média
+  image_picker: ^1.1.2
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.2
+
+  # Utilitaires
+  logger: ^2.5.0
   uuid: ^4.5.1
-  flutter_local_notifications: ^18.0.1
-  flutter_secure_storage: ^9.2.2
-  timezone: ^0.9.4
-  flutter_animate: ^4.5.0
+  crypto: ^3.0.6
+  device_info_plus: ^11.4.0
+  package_info_plus: ^8.3.0
+  collection: ^1.19.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.1
-  flutter_launcher_icons: ^0.14.1
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
 
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/icon.png"
-  min_sdk_android: 21
+  min_sdk_android: 24
+  adaptive_icon_background: "#0A0E1A"
+  adaptive_icon_foreground: "assets/images/icon.png"
 
 flutter:
   uses-material-design: true
