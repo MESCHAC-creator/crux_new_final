@@ -4,11 +4,11 @@ workflows:
   # ═══════════════════════════════════════════════════════
   android-release:
     name: Android Release - CRUX
-    instance_type: linux_x2  # Plus puissant pour builds lourds
+    instance_type: linux_x2
     max_build_duration: 120
 
     environment:
-      flutter: 3.27.0  # ✅ VERSION PINNÉE (stable, reproductible)
+      flutter: 3.27.0
       java: 17
       android_signing:
         - crux_keystore
@@ -81,7 +81,7 @@ workflows:
           failure: true
       firebase_app_distribution:
         android:
-          app_id: 1:YOUR_APP_ID:android:YOUR_APP_ID
+          app_id: 1:33175700363:android:47532d59f11f2e1a66658e
           groups:
             - testers
 
@@ -97,7 +97,7 @@ workflows:
       app_store_connect: codemagic_api_key
 
     environment:
-      flutter: 3.27.0  # ✅ VERSION PINNÉE
+      flutter: 3.27.0
       xcode: latest
       cocoapods: default
       ios_signing:
