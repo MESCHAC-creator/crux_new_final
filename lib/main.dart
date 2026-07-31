@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -95,9 +96,9 @@ void main() {
         persistenceEnabled: true,
         cacheSizeBytes: 40 * 1024 * 1024,
       );
-      crux.logger.i('✅ Firebase initialized');
+      crux.logger.i('Firebase initialized');
     } catch (e) {
-      crux.logger.e('❌ Firebase init error', error: e);
+      crux.logger.e('Firebase init error', error: e);
       runApp(_ErrorApp(title: 'Firebase Error', message: e.toString()));
       return;
     }
@@ -111,7 +112,7 @@ void main() {
 
     runApp(const MyApp());
   }, (error, stack) {
-    crux.logger.e('🔥 Global App Crash', error: error, stackTrace: stack);
+    crux.logger.e('Global App Crash', error: error, stackTrace: stack);
     runApp(_ErrorApp(title: 'Startup Error', message: error.toString()));
   });
 }
@@ -148,9 +149,7 @@ class _ErrorApp extends StatelessWidget {
                   children: [
                     ElevatedButton.icon(
                       onPressed: () {
-                        // Utiliser SystemNavigator.pop au lieu de exit(0) pour compatibilité iOS
                         if (Platform.isAndroid) {
-                          // Android: fermer l'app
                           SystemNavigator.pop();
                         }
                       },
@@ -161,7 +160,6 @@ class _ErrorApp extends StatelessWidget {
                     const SizedBox(width: 16),
                     ElevatedButton.icon(
                       onPressed: () {
-                        // Relancer l'app proprement
                         WidgetsFlutterBinding.ensureInitialized();
                         main();
                       },
@@ -184,7 +182,7 @@ class _ErrorApp extends StatelessWidget {
     if (msg.contains('network')) return 'Connexion impossible. Vérifiez votre accès Internet.';
     if (msg.contains('api-key')) return 'Clé API invalide. Contactez le support.';
     if (msg.contains('project-not-found')) return 'Projet Firebase introuvable.';
-    return 'Une erreur inattendue empêche l\'application de démarrer. Code: ${msg.split(':').last}';
+    return 'Une erreur inattendue empêche l\'application de démarrer.';
   }
 }
 
