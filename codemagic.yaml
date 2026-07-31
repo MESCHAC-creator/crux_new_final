@@ -30,17 +30,16 @@ workflows:
           rm -rf android/gradle/wrapper/gradle-wrapper.properties
           flutter config --android-sdk $ANDROID_SDK_ROOT
           flutter build apk --config-only || true
-          if [ ! -f "android/gradle/wrapper/gradle-wrapper.jar" ]; then
-            mkdir -p android/gradle/wrapper
-            curl -L https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
-            echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
-            echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
-            echo "distributionUrl=https://services.gradle.org/distributions/gradle-8.9-all.zip" >> android/gradle/wrapper/gradle-wrapper.properties
-            echo "networkTimeout=10000" >> android/gradle/wrapper/gradle-wrapper.properties
-            echo "validateDistributionUrl=true" >> android/gradle/wrapper/gradle-wrapper.properties
-            echo "zipStoreBase=GRADLE_USER_HOME" >> android/gradle/wrapper/gradle-wrapper.properties
-            echo "zipStorePath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
-          fi
+          mkdir -p android/gradle/wrapper
+          curl -L https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+          echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
+          echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "distributionUrl=https://services.gradle.org/distributions/gradle-8.9-all.zip" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "networkTimeout=10000" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "validateDistributionUrl=true" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "zipStoreBase=GRADLE_USER_HOME" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "zipStorePath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
+          cat android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Set up local.properties
         script: |
@@ -64,6 +63,8 @@ workflows:
 
       - name: Build APK
         script: |
+          cd android && ./gradlew wrapper --gradle-version 8.9 --distribution-type all || true
+          cd ..
           flutter build apk --release \
             --target-platform android-arm64 \
             --build-name=2.38.1 \
