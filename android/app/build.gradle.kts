@@ -16,8 +16,8 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.schac_crux.app"
-    compileSdk = 36
-    ndkVersion = "28.2.13676358" // Updated to match recommended or recent stable
+    compileSdk = 35
+    ndkVersion = "27.0.12077973"
 
     signingConfigs {
         create("release") {
@@ -30,10 +30,10 @@ android {
 
     defaultConfig {
         applicationId = "com.schac_crux.app"
-        minSdk = 21
-        targetSdk = 36
-        versionCode = 3
-        versionName = "2.38.0"
+        minSdk = 24
+        targetSdk = 35
+        versionCode = 4
+        versionName = "2.38.1"
         multiDexEnabled = true
     }
 
@@ -56,10 +56,13 @@ android {
 
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("release")
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
         getByName("debug") {
             isDebuggable = true
@@ -68,7 +71,14 @@ android {
     }
 
     lint {
-        disable.addAll(listOf("MissingDimensionRegistration", "GradleDependency", "MissingTranslation", "ExtraTranslation"))
+        disable.addAll(
+            listOf(
+                "MissingDimensionRegistration",
+                "GradleDependency",
+                "MissingTranslation",
+                "ExtraTranslation"
+            )
+        )
     }
 }
 
@@ -77,10 +87,10 @@ flutter {
 }
 
 dependencies {
-    "coreLibraryDesugaring"("com.android.tools:desugar_jdk_libs:2.0.4")
-    implementation(platform("com.google.firebase:firebase-bom:34.15.0"))
+    "coreLibraryDesugaring"("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
     implementation("com.google.firebase:firebase-analytics")
-    implementation("androidx.core:core:1.13.1")
+    implementation("androidx.core:core:1.15.0")
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
