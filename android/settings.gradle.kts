@@ -5,9 +5,11 @@ pluginManagement {
         if (propertiesFile.exists()) {
             propertiesFile.inputStream().use { properties.load(it) }
         }
-        val sdkPath = properties.getProperty("flutter.sdk") ?: System.getenv("FLUTTER_ROOT") ?: System.getenv("FLUTTER_SDK")
+        val sdkPath = properties.getProperty("flutter.sdk") 
+            ?: System.getenv("FLUTTER_ROOT") 
+            ?: System.getenv("FLUTTER_SDK")
         if (sdkPath == null) {
-            throw GradleException("Flutter SDK not found.")
+            throw GradleException("Flutter SDK not found. Set flutter.sdk in local.properties or FLUTTER_ROOT environment variable.")
         }
         sdkPath
     }()
@@ -24,8 +26,8 @@ pluginManagement {
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("dev.flutter.flutter-gradle-plugin") apply false
-    id("com.android.application") version "8.11.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+    id("com.android.application") version "8.7.3" apply false
+    id("org.jetbrains.kotlin.android") version "2.1.0" apply false
     id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
