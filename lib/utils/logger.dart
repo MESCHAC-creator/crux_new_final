@@ -1,12 +1,12 @@
-import 'package:logger/logger.dart' as logger_pkg;
+import 'package:logger/logger.dart';
 
-final logger = logger_pkg.Logger(
-  printer: logger_pkg.PrettyPrinter(
+final logger = Logger(
+  printer: PrettyPrinter(
     methodCount: 2,
     errorMethodCount: 8,
     lineLength: 120,
     colors: true,
     printEmojis: true,
-    printTime: false,
+    printTime: true,
   ),
 );
