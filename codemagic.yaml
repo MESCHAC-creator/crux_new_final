@@ -1,6 +1,6 @@
 workflows:
   # ═══════════════════════════════════════════════════════
-  # ANDROID RELEASE
+  # ANDROID RELEASE — APK + AAB
   # ═══════════════════════════════════════════════════════
   android-release:
     name: Android Release - CRUX
@@ -13,7 +13,7 @@ workflows:
       android_signing:
         - crux_keystore
       groups:
-        - firebase_deploy
+        - firebase_credentials
 
     cache:
       cache_paths:
@@ -68,6 +68,15 @@ workflows:
           cp build/app/outputs/flutter-apk/app-release.apk build/outputs/crux-release.apk
           cp build/app/outputs/bundle/release/app-release.aab build/outputs/crux-release.aab
 
+      - name: Deploy to Firebase App Distribution
+        script: |
+          curl -sL https://firebase.tools | bash
+          firebase appdistribution:distribute build/outputs/crux-release.apk \
+            --app "1:33175700363:android:47532d59f11f2e1a66658e" \
+            --groups "testers" \
+            --release-notes "CRUX v2.38.1 Build 4" \
+            --token "$FIREBASE_TOKEN"
+
     artifacts:
       - build/outputs/crux-release.apk
       - build/outputs/crux-release.aab
@@ -79,90 +88,3 @@ workflows:
         notify:
           success: true
           failure: true
-      firebase_app_distribution:
-        android:
-          app_id: 1:33175700363:android:47532d59f11f2e1a66658e
-          groups:
-            - testers
-
-  # ═══════════════════════════════════════════════════════
-  # iOS RELEASE
-  # ═══════════════════════════════════════════════════════
-  ios-release:
-    name: iOS Release - CRUX
-    instance_type: mac_mini_m2
-    max_build_duration: 120
-
-    integrations:
-      app_store_connect: codemagic_api_key
-
-    environment:
-      flutter: 3.27.0
-      xcode: latest
-      cocoapods: default
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.schac-crux.app
-      groups:
-        - firebase_ios
-        - firebase_deploy
-
-    cache:
-      cache_paths:
-        - $FLUTTER_ROOT/.pub-cache
-        - ios/Pods
-
-    scripts:
-      - name: Clean and setup
-        script: |
-          flutter clean
-          flutter pub get
-
-      - name: Generate iOS project files
-        script: |
-          set -e
-          if [ ! -d "ios" ]; then
-            flutter create --platforms ios --org com.schac-crux --project-name crux .
-          fi
-          PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
-          if [ -f "$PBXPROJ" ]; then
-            sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.schac-crux.app/g' "$PBXPROJ" || \
-            sed -i 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = com.schac-crux.app/g' "$PBXPROJ"
-          fi
-
-      - name: Inject GoogleService-Info.plist
-        script: |
-          if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
-            echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
-          fi
-
-      - name: Patch Info.plist permissions
-        script: |
-          set -e
-          PLIST="ios/Runner/Info.plist"
-          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'CRUX needs the camera for video conferences'" "$PLIST" 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'CRUX needs the microphone for calls'" "$PLIST" 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'CRUX needs access to photos for profile pictures'" "$PLIST" 2>/dev/null || true
-
-      - name: Generate app icons
-        script: |
-          dart run flutter_launcher_icons -f flutter_launcher_icons_ios.yaml
-
-      - name: Install CocoaPods
-        script: |
-          cd ios
-          pod repo update
-          pod install --repo-update
-
-      - name: Build iOS IPA
-        script: |
-          flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist
-
-    artifacts:
-      - build/ios/ipa/*.ipa
-
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
