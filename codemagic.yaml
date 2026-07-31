@@ -33,15 +33,13 @@ workflows:
           if [ ! -f "android/gradle/wrapper/gradle-wrapper.jar" ]; then
             mkdir -p android/gradle/wrapper
             curl -L https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
-            cat > android/gradle/wrapper/gradle-wrapper.properties <<EOF
-            distributionBase=GRADLE_USER_HOME
-            distributionPath=wrapper/dists
-            distributionUrl=https\://services.gradle.org/distributions/gradle-8.9-bin.zip
-            networkTimeout=10000
-            validateDistributionUrl=true
-            zipStoreBase=GRADLE_USER_HOME
-            zipStorePath=wrapper/dists
-            EOF
+            echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
+            echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
+            echo "distributionUrl=https://services.gradle.org/distributions/gradle-8.9-bin.zip" >> android/gradle/wrapper/gradle-wrapper.properties
+            echo "networkTimeout=10000" >> android/gradle/wrapper/gradle-wrapper.properties
+            echo "validateDistributionUrl=true" >> android/gradle/wrapper/gradle-wrapper.properties
+            echo "zipStoreBase=GRADLE_USER_HOME" >> android/gradle/wrapper/gradle-wrapper.properties
+            echo "zipStorePath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
           fi
 
       - name: Set up local.properties
@@ -51,12 +49,10 @@ workflows:
 
       - name: Set up key.properties
         script: |
-          cat > android/key.properties <<EOF
-          storePassword=$CM_KEYSTORE_PASSWORD
-          keyPassword=$CM_KEY_PASSWORD
-          keyAlias=$CM_KEY_ALIAS
-          storeFile=$CM_KEYSTORE_PATH
-          EOF
+          echo "storePassword=$CM_KEYSTORE_PASSWORD" > android/key.properties
+          echo "keyPassword=$CM_KEY_PASSWORD" >> android/key.properties
+          echo "keyAlias=$CM_KEY_ALIAS" >> android/key.properties
+          echo "storeFile=$CM_KEYSTORE_PATH" >> android/key.properties
 
       - name: Analyze code
         script: |
