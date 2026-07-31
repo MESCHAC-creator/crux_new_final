@@ -68,7 +68,7 @@ class AppTheme {
           textStyle: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w600, fontSize: 15),
         ),
       ),
-      cardTheme: CardTheme( // ✅ CORRIGÉ : CardTheme au lieu de CardThemeData
+      cardTheme: CardTheme(
         color: AppColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
