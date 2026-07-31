@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart' show kDebugMode;
@@ -50,7 +49,8 @@ class LargeConferenceScreen extends StatefulWidget {
 class _LargeConferenceScreenState extends State<LargeConferenceScreen> with WidgetsBindingObserver {
   final _errorHandler = ErrorHandlerService();
   Room? _room;
-  EventsListener<RoomEvent>? _roomListener;
+  // ✅ CORRIGÉ: EventsListener remplacé par StreamSubscription pour LiveKit v2.x
+  StreamSubscription<RoomEvent>? _roomEventsSubscription;
   final FlutterTts _tts = FlutterTts();
   final stt.SpeechToText _speech = stt.SpeechToText();
 
@@ -129,7 +129,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
         content: const Text("Limite de 30 minutes atteinte. Passez à CRUX Pro pour des appels illimités."),
         actions: [
           TextButton(onPressed: () => _leave(), child: const Text("Quitter")),
-          ElevatedButton(onPressed: () => ProService().startPayment(userId: widget.userId, userName: widget.userName), child: const Text("Devenir Pro")),
+          ElevatedButton(
+            onPressed: () => ProService().startPayment(userId: widget.userId, userName: widget.userName),
+            child: const Text("Devenir Pro"),
+          ),
         ],
       ),
     );
@@ -140,6 +143,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
     _callTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _presenceSubscription?.cancel();
+    // ✅ CORRIGÉ: Cleanup StreamSubscription au lieu de EventsListener
+    _roomEventsSubscription?.cancel();
     _room?.disconnect();
     _room?.dispose();
     _tts.stop();
@@ -214,7 +219,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
     if (token == null) {
       setState(() {
         _loading = false;
-        _error = "Le serveur de réunion ne répond pas.\n\n"
+        _error = "Le serveur de réunion ne répond pas.\\n\\n"
             "Si c'est la première utilisation de la journée, il peut mettre 60 secondes à démarrer. Veuillez réessayer dans un instant.";
       });
       return;
@@ -223,47 +228,84 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
     try {
       _room = Room(
         roomOptions: const RoomOptions(
-          adaptiveStream: true, // Crucial for 1000+ participants
+          adaptiveStream: true,
           dynacast: true,
           defaultVideoPublishOptions: VideoPublishOptions(
             simulcast: true,
           ),
         ),
       );
-      _roomListener = _room!.createListener();
-      _roomListener!
-        ..on<RoomConnectedEvent>((_) {
-          _refresh();
-        })
-        ..on<ParticipantConnectedEvent>((e) {
-          _announce("${e.participant.name} vient de nous rejoindre.");
-          _refresh();
-        })
-        ..on<ParticipantDisconnectedEvent>((e) {
-          _announce("${e.participant.name} a quitté la salle.");
-          _refresh();
-        })
-        ..on<ActiveSpeakersChangedEvent>((e) {
-          if (e.speakers.isNotEmpty) {
-            setState(() => _activeSpeakerId = e.speakers.first.identity);
-          }
-        })
-        ..on<DataReceivedEvent>((e) {
-          try {
-            final text = utf8.decode(e.data);
-            final msg = jsonDecode(text) as Map<String, dynamic>;
-            if (msg['type'] == 'mute_all') {
-              if (e.participant?.identity == _organizerId) {
-                if (_micOn) {
-                  _toggleMic();
-                  _announce("L'organisateur a coupé votre micro.");
+
+      // ✅ CORRIGÉ: Utilisation de _room!.events (Stream<RoomEvent>) pour LiveKit v2.x
+      // au lieu de createListener() (obsolète dans v2.x)
+      _roomEventsSubscription = _room!.events.listen((event) {
+        switch (event) {
+          case RoomEvent.connected:
+            _refresh();
+            break;
+          case RoomEvent.disconnected:
+            if (mounted) {
+              setState(() {
+                _error = "Déconnecté de la réunion.";
+              });
+            }
+            break;
+          case RoomEvent.reconnecting:
+            crux.logger.w('Reconnecting to room...');
+            break;
+          case RoomEvent.reconnected:
+            crux.logger.i('Reconnected to room');
+            _refresh();
+            break;
+          case RoomEvent.participantConnected:
+            final e = event as ParticipantConnectedEvent;
+            _announce("${e.participant.name} vient de nous rejoindre.");
+            _refresh();
+            break;
+          case RoomEvent.participantDisconnected:
+            final e = event as ParticipantDisconnectedEvent;
+            _announce("${e.participant.name} a quitté la salle.");
+            _refresh();
+            break;
+          case RoomEvent.activeSpeakersChanged:
+            final e = event as ActiveSpeakersChangedEvent;
+            if (e.speakers.isNotEmpty) {
+              setState(() => _activeSpeakerId = e.speakers.first.identity);
+            }
+            break;
+          case RoomEvent.dataReceived:
+            final e = event as DataReceivedEvent;
+            try {
+              final text = utf8.decode(e.data);
+              final msg = jsonDecode(text) as Map<String, dynamic>;
+              if (msg['type'] == 'mute_all') {
+                if (e.participant?.identity == _organizerId) {
+                  if (_micOn) {
+                    _toggleMic();
+                    _announce("L'organisateur a coupé votre micro.");
+                  }
                 }
               }
+            } catch (err) {
+              if (kDebugMode) print('Error handling data received: $err');
             }
-          } catch (err) {
-            if (kDebugMode) print('Error handling data received: $err');
-          }
-        });
+            break;
+          case RoomEvent.trackSubscribed:
+            _refresh();
+            break;
+          case RoomEvent.trackUnsubscribed:
+            _refresh();
+            break;
+          case RoomEvent.localTrackPublished:
+            _refresh();
+            break;
+          case RoomEvent.localTrackUnpublished:
+            _refresh();
+            break;
+          default:
+            break;
+        }
+      });
 
       // Fetch organizerId
       try {
@@ -283,7 +325,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
         _remoteParticipants = _room!.remoteParticipants.values.toList();
       });
     } catch (e, st) {
-      crux.logger.e('❌ Room initialization failed', error: e, stackTrace: st);
+      crux.logger.e('Room initialization failed', error: e, stackTrace: st);
       final lang = context.read<LocaleProvider>().locale.languageCode;
       setState(() {
         _loading = false;
@@ -440,7 +482,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
               onTap: () {
                 Navigator.pop(context);
                 final joinUrl = 'https://crux-3c6be.web.app/join/${widget.meetingId}';
-                Share.share("Rejoins ma réunion CRUX : ${widget.meetingName}\nID : ${widget.meetingId}\nLien : $joinUrl");
+                Share.share("Rejoins ma réunion CRUX : ${widget.meetingName}\\nID : ${widget.meetingId}\\nLien : $joinUrl");
               },
             ),
           ],
@@ -510,6 +552,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
 
   void _leave() {
     MeetingService().removePresence(widget.meetingId, widget.userId);
+    _roomEventsSubscription?.cancel();
     _room?.disconnect();
     _room?.dispose();
     Navigator.pop(context);
@@ -572,7 +615,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
       if (local != null) local,
       ..._remoteParticipants,
     ];
-    // Limit visible tiles to maintain performance in 1000+ sessions
     final visible = all.take(AppConfig.livekitVisibleTileCap).toList();
 
     return Padding(
@@ -594,7 +636,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen> with Widg
     bool isScreenShare = false;
     bool hasVideo = false;
 
-    // Look for active, unmuted video tracks (either camera or screen share)
     if (p.videoTrackPublications != null) {
       for (final pub in p.videoTrackPublications) {
         if (pub.track != null && pub.track is VideoTrack && pub.muted == false) {
