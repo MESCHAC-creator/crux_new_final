@@ -8,7 +8,7 @@ workflows:
       flutter: 3.27.0
       java: 17
       android_signing:
-        - crux_keystore
+        - mon_keystore
       groups:
         - firebase_credentials
 
