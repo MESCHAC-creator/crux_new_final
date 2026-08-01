@@ -51,8 +51,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     with WidgetsBindingObserver {
   final _errorHandler = ErrorHandlerService();
   Room? _room;
-  // ✅ CORRIGÉ: EventsListener remplacé par StreamSubscription pour LiveKit v2.x
-  StreamSubscription? _roomEventsSubscription;
+  // ✅ CORRIGÉ: LiveKit v2.x utilise EventsListener, pas StreamSubscription
+  EventsListener<RoomEvent>? _roomEventsListener;
   final FlutterTts _tts = FlutterTts();
   final stt.SpeechToText _speech = stt.SpeechToText();
 
@@ -149,8 +149,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     _callTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _presenceSubscription?.cancel();
-    // ✅ CORRIGÉ: Cleanup StreamSubscription au lieu de EventsListener
-    _roomEventsSubscription?.cancel();
+    // ✅ CORRIGÉ: dispose() pour EventsListener
+    _roomEventsListener?.dispose();
     _room?.disconnect();
     _room?.dispose();
     _tts.stop();
@@ -244,72 +244,52 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         ),
       );
 
-      // ✅ CORRIGÉ: Utilisation de _room!.events (Stream) pour LiveKit v2.x
-      // avec pattern matching sur les classes d'événements concrètes
-      _roomEventsSubscription = _room!.events.listen((event) {
-        switch (event) {
-          case RoomConnectedEvent():
-            _refresh();
-            break;
-          case RoomDisconnectedEvent():
-            if (mounted) {
-              setState(() {
-                _error = "Déconnecté de la réunion.";
-              });
-            }
-            break;
-          case RoomReconnectingEvent():
-            crux.logger.w('Reconnecting to room...');
-            break;
-          case RoomReconnectedEvent():
-            crux.logger.i('Reconnected to room');
-            _refresh();
-            break;
-          case ParticipantConnectedEvent e:
-            _announce("${e.participant.name} vient de nous rejoindre.");
-            _refresh();
-            break;
-          case ParticipantDisconnectedEvent e:
-            _announce("${e.participant.name} a quitté la salle.");
-            _refresh();
-            break;
-          case ActiveSpeakersChangedEvent e:
-            if (e.speakers.isNotEmpty) {
-              setState(() => _activeSpeakerId = e.speakers.first.identity);
-            }
-            break;
-          case DataReceivedEvent e:
-            try {
-              final text = utf8.decode(e.data);
-              final msg = jsonDecode(text) as Map<String, dynamic>;
-              if (msg['type'] == 'mute_all') {
-                if (e.participant?.identity == _organizerId) {
-                  if (_micOn) {
-                    _toggleMic();
-                    _announce("L'organisateur a coupé votre micro.");
-                  }
+      // ✅ CORRIGÉ: LiveKit v2.x utilise createListener() + .on<EventType>()
+      _roomEventsListener = _room!.createListener()
+        ..on<RoomConnectedEvent>((_) => _refresh())
+        ..on<RoomDisconnectedEvent>((_) {
+          if (mounted) {
+            setState(() => _error = "Déconnecté de la réunion.");
+          }
+        })
+        ..on<RoomReconnectingEvent>((_) => crux.logger.w('Reconnecting to room...'))
+        ..on<RoomReconnectedEvent>((_) {
+          crux.logger.i('Reconnected to room');
+          _refresh();
+        })
+        ..on<ParticipantConnectedEvent>((e) {
+          _announce("${e.participant.name} vient de nous rejoindre.");
+          _refresh();
+        })
+        ..on<ParticipantDisconnectedEvent>((e) {
+          _announce("${e.participant.name} a quitté la salle.");
+          _refresh();
+        })
+        ..on<ActiveSpeakersChangedEvent>((e) {
+          if (e.speakers.isNotEmpty) {
+            setState(() => _activeSpeakerId = e.speakers.first.identity);
+          }
+        })
+        ..on<DataReceivedEvent>((e) {
+          try {
+            final text = utf8.decode(e.data);
+            final msg = jsonDecode(text) as Map<String, dynamic>;
+            if (msg['type'] == 'mute_all') {
+              if (e.participant?.identity == _organizerId) {
+                if (_micOn) {
+                  _toggleMic();
+                  _announce("L'organisateur a coupé votre micro.");
                 }
               }
-            } catch (err) {
-              if (kDebugMode) print('Error handling data received: $err');
             }
-            break;
-          case TrackSubscribedEvent():
-            _refresh();
-            break;
-          case TrackUnsubscribedEvent():
-            _refresh();
-            break;
-          case LocalTrackPublishedEvent():
-            _refresh();
-            break;
-          case LocalTrackUnpublishedEvent():
-            _refresh();
-            break;
-          default:
-            break;
-        }
-      });
+          } catch (err) {
+            if (kDebugMode) print('Error handling data received: $err');
+          }
+        })
+        ..on<TrackSubscribedEvent>((_) => _refresh())
+        ..on<TrackUnsubscribedEvent>((_) => _refresh())
+        ..on<LocalTrackPublishedEvent>((_) => _refresh())
+        ..on<LocalTrackUnpublishedEvent>((_) => _refresh());
 
       // Fetch organizerId
       try {
@@ -590,7 +570,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
   void _leave() {
     MeetingService().removePresence(widget.meetingId, widget.userId);
-    _roomEventsSubscription?.cancel();
+    _roomEventsListener?.dispose();
     _room?.disconnect();
     _room?.dispose();
     Navigator.pop(context);
@@ -718,9 +698,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
             child: hasVideo && videoTrack != null
                 ? VideoTrackRenderer(
                     videoTrack,
+                    // ✅ CORRIGÉ: LiveKit v2.3.6 utilise BoxFit, pas VideoViewFit
                     fit: isScreenShare
-                        ? VideoViewFit.contain
-                        : VideoViewFit.cover,
+                        ? BoxFit.contain
+                        : BoxFit.cover,
                   )
                 : Center(
                     child: _buildAvatar(p.name ?? p.identity, large: true)),
@@ -1190,9 +1171,8 @@ class _ActionBtn extends StatelessWidget {
   const _ActionBtn({required this.icon, required this.onTap, this.color});
 
   @override
-  Widget build(BuildContext context) => IconButton(
-      icon: Icon(icon, color: color ?? Colors.white70, size: 26),
-      onPressed: onTap);
+  Widget build(BuildContext context) =>
+      IconButton(icon: Icon(icon, color: color ?? Colors.white70, size: 26), onPressed: onTap);
 }
 
 class _BasePanel extends StatelessWidget {
@@ -1216,8 +1196,7 @@ class _BasePanel extends StatelessWidget {
                     style: GoogleFonts.poppins(
                         fontWeight: FontWeight.bold, fontSize: 16)),
                 leading: IconButton(
-                    icon: const Icon(Icons.close), onPressed: onClose),
-              ),
+                    icon: const Icon(Icons.close), onPressed: onClose)),
               Expanded(child: child),
             ]),
           ),
