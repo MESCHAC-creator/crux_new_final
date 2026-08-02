@@ -37,7 +37,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoading = true;
   bool _isPro = false;
@@ -180,7 +181,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     try {
       final fb = FirebaseAuth.instance.currentUser;
       if (fb?.displayName?.trim().isNotEmpty == true) return fb!.displayName!;
-      if (fb?.email?.isNotEmpty == true && fb!.email!.contains('@')) return fb.email!.split('@')[0];
+      if (fb?.email?.isNotEmpty == true && fb!.email!.contains('@'))
+        return fb.email!.split('@')[0];
       return widget.user.name;
     } catch (e) {
       crux.logger.e('_displayName error', error: e);
@@ -200,32 +202,47 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: Text('Nouvelle réunion', style: GoogleFonts.spaceGrotesk(color: Colors.white)),
+        title: Text('Nouvelle réunion',
+            style: GoogleFonts.spaceGrotesk(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.video_call, color: AppColors.primary),
-              title: const Text('Réunion standard', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Jusqu\'à 25 participants', style: TextStyle(color: Colors.white54)),
+              title: const Text('Réunion standard',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Jusqu\'à 25 participants',
+                  style: TextStyle(color: Colors.white54)),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateMeetingScreen()));
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const CreateMeetingScreen()));
               },
             ),
             ListTile(
               leading: const Icon(Icons.groups, color: AppColors.secondary),
-              title: const Text('Grande conférence', style: TextStyle(color: Colors.white)),
+              title: const Text('Grande conférence',
+                  style: TextStyle(color: Colors.white)),
               subtitle: Text(
                 _isPro ? 'Jusqu\'à 1000 participants' : 'Passez Pro pour 1000+',
-                style: TextStyle(color: _isPro ? Colors.white54 : Colors.amber),
+                style: TextStyle(
+                    color: _isPro ? Colors.white54 : Colors.amber),
               ),
               onTap: () {
                 Navigator.pop(context);
                 if (_isPro) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateMeetingScreen(largeConference: true)));
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const CreateMeetingScreen(
+                              largeConference: true)));
                 } else {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ProScreen()));
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ProScreen()));
                 }
               },
             ),
@@ -236,7 +253,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   void _joinMeeting() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const JoinMeetingScreen()));
+    Navigator.push(context,
+        MaterialPageRoute(builder: (_) => const JoinMeetingScreen()));
   }
 
   void _showMeetingOptions(Map<String, dynamic> meeting) {
@@ -253,7 +271,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           children: [
             ListTile(
               leading: const Icon(Icons.login, color: Colors.white),
-              title: const Text('Rejoindre', style: TextStyle(color: Colors.white)),
+              title: const Text('Rejoindre',
+                  style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 _enterMeeting(meeting['id'], meeting['title']);
@@ -261,16 +280,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
             ListTile(
               leading: const Icon(Icons.share, color: Colors.white),
-              title: const Text('Partager', style: TextStyle(color: Colors.white)),
+              title: const Text('Partager',
+                  style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
-                final joinUrl = 'https://crux-3c6be.web.app/join/${meeting['id']}';
-                Share.share('Rejoins ma réunion CRUX : ${meeting['title']}\nID : ${meeting['id']}\nLien : $joinUrl');
+                final joinUrl =
+                    'https://crux-3c6be.web.app/join/${meeting['id']}';
+                Share.share(
+                    'Rejoins ma réunion CRUX : ${meeting['title']}\nID : ${meeting['id']}\nLien : $joinUrl');
               },
             ),
             ListTile(
               leading: const Icon(Icons.delete, color: AppColors.error),
-              title: const Text('Quitter la réunion', style: TextStyle(color: AppColors.error)),
+              title: const Text('Quitter la réunion',
+                  style: TextStyle(color: AppColors.error)),
               onTap: () {
                 Navigator.pop(context);
                 _leaveMeeting(meeting['id']);
@@ -284,10 +307,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Future<void> _enterMeeting(String meetingId, String meetingName) async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('meetings').doc(meetingId).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('meetings')
+          .doc(meetingId)
+          .get();
       if (!doc.exists) {
         if (mounted) {
-          ElegantToast.show(context, title: 'Erreur', message: 'Réunion introuvable', type: ElegantToastType.error);
+          ElegantToast.show(context,
+              title: 'Erreur',
+              message: 'Réunion introuvable',
+              type: ElegantToastType.error);
         }
         return;
       }
@@ -328,19 +357,28 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     } catch (e) {
       crux.logger.e('Error entering meeting', error: e);
       if (mounted) {
-        ElegantToast.show(context, title: 'Erreur', message: 'Impossible de rejoindre la réunion', type: ElegantToastType.error);
+        ElegantToast.show(context,
+            title: 'Erreur',
+            message: 'Impossible de rejoindre la réunion',
+            type: ElegantToastType.error);
       }
     }
   }
 
   Future<void> _leaveMeeting(String meetingId) async {
     try {
-      await FirebaseFirestore.instance.collection('meetings').doc(meetingId).update({
+      await FirebaseFirestore.instance
+          .collection('meetings')
+          .doc(meetingId)
+          .update({
         'participants': FieldValue.arrayRemove([widget.user.uid]),
       });
       _loadMeetings();
       if (mounted) {
-        ElegantToast.show(context, title: 'Succès', message: 'Vous avez quitté la réunion', type: ElegantToastType.success);
+        ElegantToast.show(context,
+            title: 'Succès',
+            message: 'Vous avez quitté la réunion',
+            type: ElegantToastType.success);
       }
     } catch (e) {
       crux.logger.e('Error leaving meeting', error: e);
@@ -388,19 +426,34 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               actions: [
                 if (!_isPro)
                   TextButton.icon(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProScreen())),
-                    icon: const Icon(Icons.star, color: Colors.amber, size: 18),
-                    label: Text('PRO', style: GoogleFonts.spaceGrotesk(color: Colors.amber, fontWeight: FontWeight.bold)),
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const ProScreen())),
+                    icon: const Icon(Icons.star,
+                        color: Colors.amber, size: 18),
+                    label: Text('PRO',
+                        style: GoogleFonts.spaceGrotesk(
+                            color: Colors.amber,
+                            fontWeight: FontWeight.bold)),
                   ),
                 IconButton(
-                  icon: const Icon(Icons.settings, color: Colors.white70),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                  icon: const Icon(Icons.settings,
+                      color: Colors.white70),
+                  onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              const SettingsScreen())),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.logout, color: Colors.white70),
+                  icon: const Icon(Icons.logout,
+                      color: Colors.white70),
                   onPressed: () async {
                     await AuthService().signOut();
-                    if (mounted) Navigator.pushReplacementNamed(context, '/');
+                    if (mounted)
+                      Navigator.pushReplacementNamed(
+                          context, '/');
                   },
                 ),
               ],
@@ -422,7 +475,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     const SizedBox(height: 8),
                     Text(
                       widget.user.email,
-                      style: GoogleFonts.interTight(color: Colors.white54, fontSize: 14),
+                      style: GoogleFonts.interTight(
+                          color: Colors.white54, fontSize: 14),
                     ),
                     const SizedBox(height: 24),
                     Row(
@@ -550,4 +604,249 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
-    if (_history.isEmpty)
+    if (_history.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history, size: 64, color: Colors.white24),
+            const SizedBox(height: 16),
+            Text(
+              'Aucun historique',
+              style: GoogleFonts.interTight(color: Colors.white54, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Vos réunions passées apparaîtront ici',
+              style: GoogleFonts.interTight(color: Colors.white38, fontSize: 14),
+            ),
+          ],
+        ),
+      );
+    }
+    return ListView.builder(
+      itemCount: _history.length,
+      itemBuilder: (context, index) {
+        final item = _history[index];
+        final endedAt = item['endedAt'] != null
+            ? (item['endedAt'] as Timestamp).toDate()
+            : null;
+        final dateStr = endedAt != null
+            ? DateFormat('dd/MM/yyyy HH:mm').format(endedAt)
+            : 'Date inconnue';
+
+        return _MeetingCard(
+          title: item['title'],
+          organizer: dateStr,
+          participantCount: null,
+          subtitle: 'Durée: ${_formatDuration(item['duration'] ?? 0)}',
+          onTap: () {},
+          onMore: () {},
+        ).animate().fadeIn(duration: 400.ms, delay: (index * 100).ms);
+      },
+    );
+  }
+}
+
+class _ActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: GoogleFonts.spaceGrotesk(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: GoogleFonts.interTight(
+                color: Colors.white54,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color? iconColor;
+
+  const _StatCard({
+    required this.value,
+    required this.label,
+    required this.icon,
+    this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: iconColor ?? Colors.white70, size: 20),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: GoogleFonts.spaceGrotesk(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: GoogleFonts.interTight(
+                color: Colors.white54,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MeetingCard extends StatelessWidget {
+  final String title;
+  final String organizer;
+  final int? participantCount;
+  final String? subtitle;
+  final VoidCallback onTap;
+  final VoidCallback onMore;
+
+  const _MeetingCard({
+    required this.title,
+    required this.organizer,
+    this.participantCount,
+    this.subtitle,
+    required this.onTap,
+    required this.onMore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.video_call, color: Colors.white),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.spaceGrotesk(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle ?? 'Organisateur: $organizer',
+                    style: GoogleFonts.interTight(
+                      color: Colors.white54,
+                      fontSize: 12,
+                    ),
+                  ),
+                  if (participantCount != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.people, color: Colors.white38, size: 12),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$participantCount participant${participantCount == 1 ? '' : 's'}',
+                          style: GoogleFonts.interTight(
+                            color: Colors.white38,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.more_vert, color: Colors.white54),
+              onPressed: onMore,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
