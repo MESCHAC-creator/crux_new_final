@@ -23,7 +23,7 @@ import '../widgets/elegant_toast.dart';
 import 'create_meeting_screen.dart';
 import 'join_meeting_screen.dart';
 import 'meeting_history_screen.dart';
-import 'settings_screen.dart';
+import 'setting_screen.dart';
 import 'pro_screen.dart';
 import 'meeting_screen.dart';
 import 'large_conference_screen.dart';
