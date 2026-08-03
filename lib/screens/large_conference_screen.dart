@@ -1,12 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:livekit_client/livekit_client.dart' hide Logger, logger;
+
+import 'package:livekit_client/livekit_client.dart'
+    hide Logger, logger, Navigator;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -14,7 +19,10 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:webrtc_interface/webrtc_interface.dart' hide Navigator;
+
+import 'package:webrtc_interface/webrtc_interface.dart'
+    hide Navigator;
+
 import '../utils/logger.dart' as crux;
 import '../config/app_config.dart';
 import '../services/livekit_service.dart';
