@@ -20,8 +20,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:webrtc_interface/webrtc_interface.dart'
-    hide Navigator;
+import 'package:webrtc_interface/webrtc_interface.dart' hide Navigator;
 
 import '../utils/logger.dart' as crux;
 import '../config/app_config.dart';
@@ -84,11 +83,13 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   bool _showNotes = false;
   String? _privateRecipientId;
   String? _privateRecipientName;
-  bool _voiceAssistant = true;
+  bool _voiceAssistant = false;
+  bool _liveCaptions = false;
   bool _handRaised = false;
   List<String> _raisedHands = [];
 
   final TextEditingController _noteController = TextEditingController();
+  final TextEditingController _chatController = TextEditingController();
   final _db = FirebaseFirestore.instance;
   StreamSubscription? _presenceSubscription;
 
@@ -98,7 +99,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     WidgetsBinding.instance.addObserver(this);
     _checkPro();
     _init();
-    _initSTT();
     _initPresenceListener();
     _announce("Réunion commencée. Je suis votre assistant Crux.");
   }
@@ -116,7 +116,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       if (!_isPro) {
         final limitSeconds = AppConfig.freeMeetingDurationMinutes * 60;
         if (_secondsElapsed == limitSeconds - 300) {
-          _announce("Attention, votre appel gratuit se terminera dans 5 minutes.");
+          _announce(
+              "Attention, votre appel gratuit se terminera dans 5 minutes.");
         }
         if (_secondsElapsed >= limitSeconds) {
           timer.cancel();
@@ -126,18 +127,46 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     });
   }
 
+  String _formatElapsedDuration() {
+    final minutes = (_secondsElapsed ~/ 60).toString().padLeft(2, '0');
+    final seconds = (_secondsElapsed % 60).toString().padLeft(2, '0');
+    final hours = _secondsElapsed ~/ 3600;
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:$minutes:$seconds';
+    }
+    return '$minutes:$seconds';
+  }
+
+  String get _joinUrl => 'https://crux-3c6be.web.app/join/${widget.meetingId}';
+
+  void _copyInviteLink() {
+    Clipboard.setData(ClipboardData(text: _joinUrl));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Lien de réunion copié.")),
+    );
+  }
+
+  void _shareInvite() {
+    Share.share(
+      "Rejoins ma réunion CRUX : ${widget.meetingName}\nID : ${widget.meetingId}\nLien : $_joinUrl",
+    );
+  }
+
   void _showPaywall() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text("Temps écoulé", style: TextStyle(color: Colors.white)),
-        content: const Text("Limite de 30 minutes atteinte. Passez à CRUX Pro pour des appels illimités."),
+        title:
+            const Text("Temps écoulé", style: TextStyle(color: Colors.white)),
+        content: const Text(
+            "Limite de 30 minutes atteinte. Passez à CRUX Pro pour des appels illimités."),
         actions: [
           TextButton(onPressed: () => _leave(), child: const Text("Quitter")),
           ElevatedButton(
-            onPressed: () => ProService().startPayment(userId: widget.userId, userName: widget.userName),
+            onPressed: () => ProService()
+                .startPayment(userId: widget.userId, userName: widget.userName),
             child: const Text("Devenir Pro"),
           ),
         ],
@@ -155,6 +184,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     _room?.dispose();
     _tts.stop();
     _speech.stop();
+    _noteController.dispose();
+    _chatController.dispose();
     super.dispose();
   }
 
@@ -170,12 +201,29 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       bool available = await _speech.initialize();
       if (available) {
         _speech.listen(onResult: (val) {
-          if (mounted) setState(() => _currentTranscription = val.recognizedWords);
+          if (mounted)
+            setState(() => _currentTranscription = val.recognizedWords);
         });
       }
     } catch (e) {
       crux.logger.w('Speech recognition error', error: e);
     }
+  }
+
+  Future<void> _toggleLiveCaptions() async {
+    if (_liveCaptions) {
+      await _speech.stop();
+      if (mounted) {
+        setState(() {
+          _liveCaptions = false;
+          _currentTranscription = "";
+        });
+      }
+      return;
+    }
+
+    if (mounted) setState(() => _liveCaptions = true);
+    await _initSTT();
   }
 
   void _initPresenceListener() {
@@ -246,7 +294,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         ..on<RoomDisconnectedEvent>((_) {
           if (mounted) setState(() => _error = "Déconnecté de la réunion.");
         })
-        ..on<RoomReconnectingEvent>((_) => crux.logger.w('Reconnecting to room...'))
+        ..on<RoomReconnectingEvent>(
+            (_) => crux.logger.w('Reconnecting to room...'))
         ..on<RoomReconnectedEvent>((_) {
           crux.logger.i('Reconnected to room');
           _refresh();
@@ -286,7 +335,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         ..on<LocalTrackUnpublishedEvent>((_) => _refresh());
 
       try {
-        final doc = await _db.collection('meetings').doc(widget.meetingId).get();
+        final doc =
+            await _db.collection('meetings').doc(widget.meetingId).get();
         if (doc.exists) {
           _organizerId = doc.data()?['organizerId'] as String?;
         }
@@ -314,7 +364,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
   void _refresh() {
     if (mounted && _room != null) {
-      setState(() => _remoteParticipants = _room!.remoteParticipants.values.toList());
+      setState(() =>
+          _remoteParticipants = _room!.remoteParticipants.values.toList());
     }
   }
 
@@ -333,10 +384,15 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text("Muter tout le monde ?", style: TextStyle(color: Colors.white)),
-        content: const Text("Voulez-vous couper le micro de tous les autres participants ?", style: TextStyle(color: Colors.white70)),
+        title: const Text("Muter tout le monde ?",
+            style: TextStyle(color: Colors.white)),
+        content: const Text(
+            "Voulez-vous couper le micro de tous les autres participants ?",
+            style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annuler")),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text("Annuler")),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -392,10 +448,12 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     if (videoTrack == null) return;
 
     final currentOptions = videoTrack.currentOptions;
-    final currentPosition =
-        currentOptions is CameraCaptureOptions ? currentOptions.cameraPosition : null;
-    final nextPosition =
-        currentPosition == CameraPosition.front ? CameraPosition.back : CameraPosition.front;
+    final currentPosition = currentOptions is CameraCaptureOptions
+        ? currentOptions.cameraPosition
+        : null;
+    final nextPosition = currentPosition == CameraPosition.front
+        ? CameraPosition.back
+        : CameraPosition.front;
 
     try {
       await videoTrack.restartTrack(
@@ -421,31 +479,64 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           children: [
             ListTile(
               leading: const Icon(Icons.info_outline, color: Colors.white),
-              title: const Text("Informations de la réunion", style: TextStyle(color: Colors.white)),
+              title: const Text("Informations de la réunion",
+                  style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 _showMeetingInfo();
               },
             ),
             ListTile(
-              leading: Icon(Icons.back_hand, color: _handRaised ? AppColors.primary : Colors.white),
-              title: Text(_handRaised ? "Baisser la main" : "Lever la main", style: const TextStyle(color: Colors.white)),
+              leading: Icon(Icons.back_hand,
+                  color: _handRaised ? AppColors.primary : Colors.white),
+              title: Text(_handRaised ? "Baisser la main" : "Lever la main",
+                  style: const TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 _toggleRaiseHand();
               },
             ),
             ListTile(
-              leading: Icon(Icons.screen_share, color: _screenShareOn ? AppColors.primary : Colors.white),
-              title: Text(_screenShareOn ? "Arrêter le partage" : "Partager l'écran", style: const TextStyle(color: Colors.white)),
+              leading: Icon(
+                Icons.closed_caption_outlined,
+                color: _liveCaptions ? AppColors.primary : Colors.white,
+              ),
+              title: Text(
+                _liveCaptions
+                    ? "Désactiver les sous-titres"
+                    : "Sous-titres en direct",
+                style: const TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _toggleLiveCaptions();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.screen_share,
+                  color: _screenShareOn ? AppColors.primary : Colors.white),
+              title: Text(
+                  _screenShareOn ? "Arrêter le partage" : "Partager l'écran",
+                  style: const TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 _toggleScreenShare();
               },
             ),
             ListTile(
+              leading:
+                  const Icon(Icons.monitor_heart_outlined, color: Colors.white),
+              title: const Text("Santé de la réunion",
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _showHealthDashboard();
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.cameraswitch, color: Colors.white),
-              title: const Text("Changer de caméra", style: TextStyle(color: Colors.white)),
+              title: const Text("Changer de caméra",
+                  style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 _switchCamera();
@@ -453,11 +544,14 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
             ),
             ListTile(
               leading: const Icon(Icons.share, color: Colors.white),
-              title: const Text("Inviter des participants", style: TextStyle(color: Colors.white)),
+              title: const Text("Inviter des participants",
+                  style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
-                final joinUrl = 'https://crux-3c6be.web.app/join/${widget.meetingId}';
-                Share.share("Rejoins ma réunion CRUX : ${widget.meetingName}\nID : ${widget.meetingId}\nLien : $joinUrl");
+                final joinUrl =
+                    'https://crux-3c6be.web.app/join/${widget.meetingId}';
+                Share.share(
+                    "Rejoins ma réunion CRUX : ${widget.meetingName}\nID : ${widget.meetingId}\nLien : $joinUrl");
               },
             ),
           ],
@@ -465,6 +559,66 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       ),
     );
   }
+
+  void _showHealthDashboard() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Santé de la réunion",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 18),
+            _healthRow("Durée", _formatElapsedDuration(), Icons.timer_outlined),
+            _healthRow("Participants", "${_remoteParticipants.length + 1}",
+                Icons.people_outline),
+            _healthRow("Micro", _micOn ? "Actif" : "Désactivé",
+                _micOn ? Icons.mic : Icons.mic_off),
+            _healthRow("Caméra", _camOn ? "Active" : "Désactivée",
+                _camOn ? Icons.videocam : Icons.videocam_off),
+            _healthRow("Sous-titres", _liveCaptions ? "Actifs" : "Inactifs",
+                Icons.closed_caption_outlined),
+            _healthRow("Partage écran", _screenShareOn ? "Actif" : "Inactif",
+                Icons.screen_share_outlined),
+            _healthRow(
+                "Réseau",
+                _room == null ? "Déconnecté" : "LiveKit adaptatif",
+                Icons.network_check),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _healthRow(String label, String value, IconData icon) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.primary, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+                child:
+                    Text(label, style: const TextStyle(color: Colors.white60))),
+            Text(value,
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      );
 
   void _showMeetingInfo() {
     showModalBottomSheet(
@@ -480,14 +634,23 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Détails de la réunion", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+            Text("Détails de la réunion",
+                style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18)),
             const SizedBox(height: 20),
             _infoRow("Nom", widget.meetingName),
             _infoRow("Code", widget.meetingId),
             _infoRow("Hôte", widget.isHost ? "Vous" : "Un autre utilisateur"),
             const SizedBox(height: 20),
-            Text("Sécurité", style: GoogleFonts.poppins(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 14)),
-            const Text("Le chiffrement SSL est actif.", style: TextStyle(color: Colors.white54, fontSize: 12)),
+            Text("Sécurité",
+                style: GoogleFonts.poppins(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14)),
+            const Text("Le chiffrement SSL est actif.",
+                style: TextStyle(color: Colors.white54, fontSize: 12)),
           ],
         ),
       ),
@@ -510,9 +673,12 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
         title: const Text("Quitter?", style: TextStyle(color: Colors.white)),
-        content: const Text("Voulez-vous quitter la réunion en cours?", style: TextStyle(color: Colors.white70)),
+        content: const Text("Voulez-vous quitter la réunion en cours?",
+            style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Rester")),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text("Rester")),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -524,11 +690,19 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     if (leave == true) _leave();
   }
 
-  void _leave() {
-    MeetingService().removePresence(widget.meetingId, widget.userId);
+  Future<void> _leave() async {
+    await MeetingService().saveMeetingHistoryForUser(
+      meetingId: widget.meetingId,
+      userId: widget.userId,
+      title: widget.meetingName,
+      durationSeconds: _secondsElapsed,
+      endMeeting: widget.isHost,
+    );
+    await MeetingService().removePresence(widget.meetingId, widget.userId);
     _roomEventsListener?.dispose();
     _room?.disconnect();
     _room?.dispose();
+    if (!mounted) return;
     Navigator.pop(context);
   }
 
@@ -543,11 +717,16 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.error_outline, color: AppColors.error, size: 64),
+                const Icon(Icons.error_outline,
+                    color: AppColors.error, size: 64),
                 const SizedBox(height: 16),
-                Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+                Text(_error!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70)),
                 const SizedBox(height: 24),
-                ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("Retour"))
+                ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Retour"))
               ],
             ),
           ),
@@ -575,9 +754,12 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+            const CircularProgressIndicator(
+                color: AppColors.primary, strokeWidth: 2),
             const SizedBox(height: 20),
-            Text("Préparation de votre espace...", style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13)),
+            Text("Préparation de votre espace...",
+                style:
+                    GoogleFonts.poppins(color: Colors.white54, fontSize: 13)),
           ],
         ),
       );
@@ -595,7 +777,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       child: GridView.builder(
         padding: const EdgeInsets.fromLTRB(0, 90, 0, 110),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.8),
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.8),
         itemCount: visible.length,
         itemBuilder: (_, i) => _buildParticipantTile(visible[i]),
       ),
@@ -611,7 +796,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
     if (p.videoTrackPublications != null) {
       for (final pub in p.videoTrackPublications) {
-        if (pub.track != null && pub.track is VideoTrack && pub.muted == false) {
+        if (pub.track != null &&
+            pub.track is VideoTrack &&
+            pub.muted == false) {
           videoTrack = pub.track as VideoTrack;
           isScreenShare = pub.source == TrackSource.screenShareVideo;
           hasVideo = true;
@@ -626,10 +813,14 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-            color: isSpeaking ? AppColors.primary : Colors.white.withOpacity(0.05),
+            color:
+                isSpeaking ? AppColors.primary : Colors.white.withOpacity(0.05),
             width: 2),
         boxShadow: isSpeaking
-            ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 15)]
+            ? [
+                BoxShadow(
+                    color: AppColors.primary.withOpacity(0.3), blurRadius: 15)
+              ]
             : [],
       ),
       child: ClipRRect(
@@ -640,35 +831,51 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                 ? VideoTrackRenderer(
                     videoTrack,
                     fit: isScreenShare
-    ? RTCVideoViewObjectFit.RTCVideoViewObjectFitContain
-    : RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                        ? RTCVideoViewObjectFit.RTCVideoViewObjectFitContain
+                        : RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                   )
-                : Center(child: _buildAvatar(p.name ?? p.identity, large: true)),
+                : Center(
+                    child: _buildAvatar(p.name ?? p.identity, large: true)),
           ),
           Positioned(
             bottom: 12,
             left: 12,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(8)),
-              child: Text((p.name != null && p.name!.isNotEmpty) ? p.name! : "Invité",
-                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+              decoration: BoxDecoration(
+                  color: Colors.black45,
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text(
+                  (p.name != null && p.name!.isNotEmpty) ? p.name! : "Invité",
+                  style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600)),
             ),
           ),
           if (_raisedHands.contains(p.identity))
-            const Positioned(top: 12, right: 12, child: Icon(Icons.back_hand, color: Colors.orange, size: 20)),
+            const Positioned(
+                top: 12,
+                right: 12,
+                child: Icon(Icons.back_hand, color: Colors.orange, size: 20)),
           if (isScreenShare)
             Positioned(
               top: 12,
               left: 12,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: Colors.red.withOpacity(0.8), borderRadius: BorderRadius.circular(6)),
+                decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(6)),
                 child: const Row(
                   children: [
                     Icon(Icons.screen_share, color: Colors.white, size: 12),
                     SizedBox(width: 4),
-                    Text("ÉCRAN PARTAGÉ", style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                    Text("ÉCRAN PARTAGÉ",
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -682,10 +889,14 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     return Container(
       width: large ? 60 : 32,
       height: large ? 60 : 32,
-      decoration: BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
+      decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient, shape: BoxShape.circle),
       child: Center(
         child: Text(name.isNotEmpty ? name[0].toUpperCase() : "?",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: large ? 24 : 14)),
+            style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: large ? 24 : 14)),
       ),
     );
   }
@@ -702,9 +913,13 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-                color: Colors.black54, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white10)),
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white10)),
             child: Text(_currentTranscription,
-                textAlign: TextAlign.center, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, height: 1.4)),
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontSize: 13, height: 1.4)),
           ),
         ),
       ),
@@ -720,29 +935,74 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
         decoration: const BoxDecoration(
             gradient: LinearGradient(
-                begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black87, Colors.transparent])),
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.black87, Colors.transparent])),
         child: SafeArea(
           child: Row(children: [
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(widget.meetingName,
-                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
-              Text("ID: ${widget.meetingId}", style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11)),
-            ]),
+            Flexible(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.meetingName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16),
+                    ),
+                    Text(
+                      "ID: ${widget.meetingId}",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                          color: Colors.white38, fontSize: 11),
+                    ),
+                  ]),
+            ),
             const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black45,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Text(
+                _formatElapsedDuration(),
+                style: GoogleFonts.poppins(
+                  color: Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            _ActionBtn(icon: Icons.link, onTap: _copyInviteLink),
+            const SizedBox(width: 8),
             _ActionBtn(
                 icon: _voiceAssistant ? Icons.volume_up : Icons.volume_off,
-                onTap: () => setState(() => _voiceAssistant = !_voiceAssistant)),
+                onTap: () =>
+                    setState(() => _voiceAssistant = !_voiceAssistant)),
             const SizedBox(width: 8),
             GestureDetector(
-              onTap: () => _announce("Voulez-vous vraiment quitter ?").then((_) => _confirmLeave()),
+              onTap: () => _announce("Voulez-vous vraiment quitter ?")
+                  .then((_) => _confirmLeave()),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                     color: AppColors.error.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.error.withOpacity(0.5))),
+                    border:
+                        Border.all(color: AppColors.error.withOpacity(0.5))),
                 child: const Text("Quitter",
-                    style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 12)),
+                    style: TextStyle(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12)),
               ),
             ),
           ]),
@@ -759,14 +1019,26 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         decoration: const BoxDecoration(
-            color: AppColors.surface, borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-          _ActionBtn(icon: _micOn ? Icons.mic : Icons.mic_off, color: _micOn ? null : AppColors.error, onTap: _toggleMic),
           _ActionBtn(
-              icon: _camOn ? Icons.videocam : Icons.videocam_off, color: _camOn ? null : AppColors.error, onTap: _toggleCam),
-          _ActionBtn(icon: Icons.chat_bubble_outline, onTap: () => setState(() => _showChat = true)),
-          _ActionBtn(icon: Icons.note_alt_outlined, onTap: () => setState(() => _showNotes = true)),
-          _ActionBtn(icon: Icons.people_outline, onTap: () => setState(() => _showParticipants = true)),
+              icon: _micOn ? Icons.mic : Icons.mic_off,
+              color: _micOn ? null : AppColors.error,
+              onTap: _toggleMic),
+          _ActionBtn(
+              icon: _camOn ? Icons.videocam : Icons.videocam_off,
+              color: _camOn ? null : AppColors.error,
+              onTap: _toggleCam),
+          _ActionBtn(
+              icon: Icons.chat_bubble_outline,
+              onTap: () => setState(() => _showChat = true)),
+          _ActionBtn(
+              icon: Icons.note_alt_outlined,
+              onTap: () => setState(() => _showNotes = true)),
+          _ActionBtn(
+              icon: Icons.people_outline,
+              onTap: () => setState(() => _showParticipants = true)),
           _ActionBtn(icon: Icons.more_horiz, onTap: _showMoreOptions),
         ]),
       ),
@@ -774,7 +1046,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   }
 
   Widget _buildChatPanel() => _BasePanel(
-        title: "Chat ${_privateRecipientName != null ? '(Privé à $_privateRecipientName)' : ''}",
+        title:
+            "Chat ${_privateRecipientName != null ? '(Privé à $_privateRecipientName)' : ''}",
         onClose: () => setState(() => _showChat = false),
         child: Column(children: [
           if (_privateRecipientId != null)
@@ -782,7 +1055,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
               color: AppColors.primary.withOpacity(0.1),
               child: ListTile(
                 title: Text("Mode privé actif",
-                    style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: GoogleFonts.poppins(
+                        color: AppColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold)),
                 trailing: IconButton(
                   icon: const Icon(Icons.close, size: 16),
                   onPressed: () => setState(() {
@@ -805,7 +1081,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                 final messages = snap.data!.docs.where((d) {
                   final data = d.data() as Map<String, dynamic>;
                   if (data['isPrivate'] == true) {
-                    return data['recipientId'] == widget.userId || data['senderId'] == widget.userId;
+                    return data['recipientId'] == widget.userId ||
+                        data['senderId'] == widget.userId;
                   }
                   return true;
                 }).toList();
@@ -825,19 +1102,20 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       );
 
   Widget _buildChatInput() {
-    final ctrl = TextEditingController();
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: Row(children: [
         Expanded(
           child: TextField(
-            controller: ctrl,
+            controller: _chatController,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: "Écrire...",
               filled: true,
               fillColor: Colors.white.withOpacity(0.05),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none),
             ),
           ),
         ),
@@ -845,17 +1123,22 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         IconButton(
           icon: const Icon(Icons.send, color: AppColors.primary),
           onPressed: () {
-            if (ctrl.text.trim().isEmpty) return;
-            _db.collection('meetings').doc(widget.meetingId).collection('chat').add({
+            final text = _chatController.text.trim();
+            if (text.isEmpty) return;
+            _db
+                .collection('meetings')
+                .doc(widget.meetingId)
+                .collection('chat')
+                .add({
               'senderId': widget.userId,
               'sender': widget.userName,
-              'message': ctrl.text,
-              'text': ctrl.text,
+              'message': text,
+              'text': text,
               'timestamp': FieldValue.serverTimestamp(),
               'isPrivate': _privateRecipientId != null,
               'recipientId': _privateRecipientId
             });
-            ctrl.clear();
+            _chatController.clear();
           },
         ),
       ]),
@@ -883,12 +1166,16 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _muteAllOthers,
-                  icon: const Icon(Icons.mic_off, color: Colors.white, size: 18),
-                  label: const Text("Muter tous les autres", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  icon:
+                      const Icon(Icons.mic_off, color: Colors.white, size: 18),
+                  label: const Text("Muter tous les autres",
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.error,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
@@ -920,19 +1207,31 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                 return ListTile(
                   leading: _buildAvatar(p.name ?? p.identity),
                   title: Text(displayName,
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500)),
                   subtitle: Text(isMicMuted ? "Micro désactivé" : "Micro actif",
-                      style: TextStyle(color: isMicMuted ? Colors.white38 : Colors.greenAccent, fontSize: 11)),
+                      style: TextStyle(
+                          color:
+                              isMicMuted ? Colors.white38 : Colors.greenAccent,
+                          fontSize: 11)),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(isMicMuted ? Icons.mic_off : Icons.mic,
-                          color: isMicMuted ? Colors.white38 : Colors.greenAccent, size: 18),
+                          color:
+                              isMicMuted ? Colors.white38 : Colors.greenAccent,
+                          size: 18),
                       const SizedBox(width: 8),
                       if (_raisedHands.contains(p.identity))
-                        const Padding(padding: EdgeInsets.only(right: 8.0), child: Icon(Icons.back_hand, color: Colors.orange, size: 16)),
+                        const Padding(
+                            padding: EdgeInsets.only(right: 8.0),
+                            child: Icon(Icons.back_hand,
+                                color: Colors.orange, size: 16)),
                       IconButton(
-                        icon: const Icon(Icons.message_outlined, color: Colors.white38),
+                        icon: const Icon(Icons.message_outlined,
+                            color: Colors.white38),
                         onPressed: () {
                           if (p.identity == widget.userId) return;
                           setState(() {
@@ -974,7 +1273,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           maxLines: null,
           style: GoogleFonts.poppins(color: Colors.white, height: 1.6),
           decoration: const InputDecoration(
-            hintText: "Tapez vos notes ici... elles seront liées à l'historique de cette réunion.",
+            hintText:
+                "Tapez vos notes ici... elles seront liées à l'historique de cette réunion.",
             hintStyle: TextStyle(color: Colors.white24),
             border: InputBorder.none,
           ),
@@ -991,15 +1291,17 @@ class _ActionBtn extends StatelessWidget {
   const _ActionBtn({required this.icon, required this.onTap, this.color});
 
   @override
-  Widget build(BuildContext context) =>
-      IconButton(icon: Icon(icon, color: color ?? Colors.white70, size: 26), onPressed: onTap);
+  Widget build(BuildContext context) => IconButton(
+      icon: Icon(icon, color: color ?? Colors.white70, size: 26),
+      onPressed: onTap);
 }
 
 class _BasePanel extends StatelessWidget {
   final String title;
   final Widget child;
   final VoidCallback onClose;
-  const _BasePanel({required this.title, required this.child, required this.onClose});
+  const _BasePanel(
+      {required this.title, required this.child, required this.onClose});
 
   @override
   Widget build(BuildContext context) => Positioned.fill(
@@ -1009,15 +1311,19 @@ class _BasePanel extends StatelessWidget {
             color: Colors.black.withOpacity(0.9),
             child: Column(children: [
               AppBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
-                leading: IconButton(icon: const Icon(Icons.close), onPressed: onClose)),
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  title: Text(title,
+                      style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold, fontSize: 16)),
+                  leading: IconButton(
+                      icon: const Icon(Icons.close), onPressed: onClose)),
               Expanded(child: child),
             ]),
           ),
         ),
-      ).animate().slideY(begin: 1, end: 0, duration: 400.ms, curve: Curves.easeOutCubic);
+      ).animate().slideY(
+          begin: 1, end: 0, duration: 400.ms, curve: Curves.easeOutCubic);
 }
 
 class _ChatBubble extends StatelessWidget {
@@ -1045,7 +1351,8 @@ class _ChatBubble extends StatelessWidget {
     }
     if (timeStr.isEmpty) {
       final now = DateTime.now();
-      timeStr = "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+      timeStr =
+          "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
     }
 
     return Align(
@@ -1054,7 +1361,8 @@ class _ChatBubble extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-            color: isMe ? AppColors.primary : Colors.white12, borderRadius: BorderRadius.circular(16)),
+            color: isMe ? AppColors.primary : Colors.white12,
+            borderRadius: BorderRadius.circular(16)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -1063,7 +1371,10 @@ class _ChatBubble extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(data['sender'] ?? 'Anonyme',
-                    style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold)),
               ),
             Text(data['message'] ?? data['text'] ?? '',
                 style: const TextStyle(color: Colors.white, fontSize: 13)),
@@ -1076,10 +1387,16 @@ class _ChatBubble extends StatelessWidget {
                   if (data['isPrivate'] == true) ...[
                     const Icon(Icons.lock, color: Colors.amber, size: 10),
                     const SizedBox(width: 4),
-                    const Text("Privé", style: TextStyle(color: Colors.amber, fontSize: 9, fontWeight: FontWeight.bold)),
+                    const Text("Privé",
+                        style: TextStyle(
+                            color: Colors.amber,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold)),
                     const SizedBox(width: 8),
                   ],
-                  Text(timeStr, style: const TextStyle(color: Colors.white38, fontSize: 9)),
+                  Text(timeStr,
+                      style:
+                          const TextStyle(color: Colors.white38, fontSize: 9)),
                 ],
               ),
             ),

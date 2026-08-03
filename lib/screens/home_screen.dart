@@ -45,6 +45,10 @@ class _HomeScreenState extends State<HomeScreen>
   List<Map<String, dynamic>> _history = [];
   int _meetingCount = 0;
   int _totalDuration = 0;
+  int _selectedIndex = 0;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _meetingsSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _historySub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _statsSub;
 
   @override
   void initState() {
@@ -58,6 +62,9 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _meetingsSub?.cancel();
+    _historySub?.cancel();
+    _statsSub?.cancel();
     super.dispose();
   }
 
@@ -90,11 +97,9 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      await Future.wait([
-        _loadMeetings(),
-        _loadHistory(),
-        _loadStats(),
-      ]);
+      _listenMeetings();
+      _listenHistory();
+      _listenStats();
     } catch (e) {
       crux.logger.e('Error loading home data', error: e);
     } finally {
@@ -102,78 +107,99 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  Future<void> _loadMeetings() async {
+  void _listenMeetings() {
     try {
-      final snapshot = await FirebaseFirestore.instance
+      _meetingsSub?.cancel();
+      _meetingsSub = FirebaseFirestore.instance
           .collection('meetings')
           .where('participants', arrayContains: widget.user.uid)
-          .where('status', isEqualTo: 'active')
-          .orderBy('createdAt', descending: true)
-          .limit(10)
-          .get();
+          .snapshots()
+          .listen((snapshot) {
+        final meetings = snapshot.docs
+            .map((doc) {
+              final data = doc.data();
+              return {
+                'id': doc.id,
+                'title': data['title'] ?? 'Sans titre',
+                'organizer':
+                    data['organizerName'] ?? data['organizer'] ?? 'Inconnu',
+                'createdAt': data['createdAt'],
+                'participantCount':
+                    (data['participants'] as List?)?.length ?? 0,
+                'status': data['status'] ?? 'scheduled',
+              };
+            })
+            .where((meeting) =>
+                meeting['status'] == 'ongoing' || meeting['status'] == 'active')
+            .toList()
+          ..sort((a, b) => _dateFromAny(b['createdAt'])
+              .compareTo(_dateFromAny(a['createdAt'])));
 
-      final meetings = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          'title': data['title'] ?? 'Sans titre',
-          'organizer': data['organizerName'] ?? 'Inconnu',
-          'createdAt': data['createdAt'],
-          'participantCount': (data['participants'] as List?)?.length ?? 0,
-        };
-      }).toList();
-
-      if (mounted) setState(() => _meetings = meetings);
+        if (mounted) setState(() => _meetings = meetings.take(10).toList());
+      }, onError: (e) => crux.logger.e('Meetings stream error', error: e));
     } catch (e) {
       crux.logger.e('Error loading meetings', error: e);
     }
   }
 
-  Future<void> _loadHistory() async {
+  void _listenHistory() {
     try {
-      final snapshot = await FirebaseFirestore.instance
+      _historySub?.cancel();
+      _historySub = FirebaseFirestore.instance
           .collection('users')
           .doc(widget.user.uid)
           .collection('meeting_history')
           .orderBy('endedAt', descending: true)
           .limit(20)
-          .get();
+          .snapshots()
+          .listen((snapshot) {
+        final history = snapshot.docs.map((doc) {
+          final data = doc.data();
+          return {
+            'id': doc.id,
+            'title': data['title'] ?? 'Sans titre',
+            'endedAt': data['endedAt'],
+            'duration': data['duration'] ?? 0,
+          };
+        }).toList();
 
-      final history = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          'title': data['title'] ?? 'Sans titre',
-          'endedAt': data['endedAt'],
-          'duration': data['duration'] ?? 0,
-        };
-      }).toList();
-
-      if (mounted) setState(() => _history = history);
+        if (mounted) setState(() => _history = history);
+      }, onError: (e) => crux.logger.e('History stream error', error: e));
     } catch (e) {
       crux.logger.e('Error loading history', error: e);
     }
   }
 
-  Future<void> _loadStats() async {
+  void _listenStats() {
     try {
-      final userDoc = await FirebaseFirestore.instance
+      _statsSub?.cancel();
+      _statsSub = FirebaseFirestore.instance
           .collection('users')
           .doc(widget.user.uid)
-          .get();
-
-      if (userDoc.exists) {
-        final data = userDoc.data();
-        if (mounted) {
-          setState(() {
-            _meetingCount = data?['meetingCount'] ?? 0;
-            _totalDuration = data?['totalDuration'] ?? 0;
-          });
+          .snapshots()
+          .listen((userDoc) {
+        if (userDoc.exists) {
+          final data = userDoc.data();
+          if (mounted) {
+            setState(() {
+              _meetingCount = data?['meetingCount'] ?? 0;
+              _totalDuration = data?['totalDuration'] ?? 0;
+            });
+          }
         }
-      }
+      }, onError: (e) => crux.logger.e('Stats stream error', error: e));
     } catch (e) {
       crux.logger.e('Error loading stats', error: e);
     }
+  }
+
+  DateTime _dateFromAny(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   String _displayName() {
@@ -226,8 +252,7 @@ class _HomeScreenState extends State<HomeScreen>
                   style: TextStyle(color: Colors.white)),
               subtitle: Text(
                 _isPro ? 'Jusqu\'à 1000 participants' : 'Passez Pro pour 1000+',
-                style: TextStyle(
-                    color: _isPro ? Colors.white54 : Colors.amber),
+                style: TextStyle(color: _isPro ? Colors.white54 : Colors.amber),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -238,10 +263,8 @@ class _HomeScreenState extends State<HomeScreen>
                           builder: (_) => const CreateMeetingScreen(
                               largeConference: true)));
                 } else {
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const ProScreen()));
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const ProScreen()));
                 }
               },
             ),
@@ -252,8 +275,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _joinMeeting() {
-    Navigator.push(context,
-        MaterialPageRoute(builder: (_) => const JoinMeetingScreen()));
+    Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const JoinMeetingScreen()));
   }
 
   void _showMeetingOptions(Map<String, dynamic> meeting) {
@@ -279,8 +302,8 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             ListTile(
               leading: const Icon(Icons.share, color: Colors.white),
-              title: const Text('Partager',
-                  style: TextStyle(color: Colors.white)),
+              title:
+                  const Text('Partager', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 final joinUrl =
@@ -372,7 +395,7 @@ class _HomeScreenState extends State<HomeScreen>
           .update({
         'participants': FieldValue.arrayRemove([widget.user.uid]),
       });
-      _loadMeetings();
+      _loadData();
       if (mounted) {
         ElegantToast.show(context,
             title: 'Succès',
@@ -390,6 +413,46 @@ class _HomeScreenState extends State<HomeScreen>
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppColors.border.withOpacity(0.75)),
+          ),
+          child: BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            onTap: (index) {
+              setState(() => _selectedIndex = index);
+              if (index > 0) _tabController.animateTo(index - 1);
+            },
+            type: BottomNavigationBarType.fixed,
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            selectedItemColor: AppColors.primary,
+            unselectedItemColor: Colors.white54,
+            selectedLabelStyle:
+                GoogleFonts.interTight(fontWeight: FontWeight.w700),
+            unselectedLabelStyle: GoogleFonts.interTight(),
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_rounded),
+                label: 'Accueil',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.video_call_rounded),
+                label: 'Actives',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.history_rounded),
+                label: 'Historique',
+              ),
+            ],
+          ),
+        ),
+      ),
       body: RefreshIndicator(
         color: AppColors.primary,
         backgroundColor: AppColors.surface,
@@ -397,7 +460,7 @@ class _HomeScreenState extends State<HomeScreen>
         child: CustomScrollView(
           slivers: [
             SliverAppBar(
-              expandedHeight: 200,
+              expandedHeight: 112,
               floating: false,
               pinned: true,
               backgroundColor: AppColors.background,
@@ -425,34 +488,25 @@ class _HomeScreenState extends State<HomeScreen>
               actions: [
                 if (!_isPro)
                   TextButton.icon(
-                    onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const ProScreen())),
-                    icon: const Icon(Icons.star,
-                        color: Colors.amber, size: 18),
+                    onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const ProScreen())),
+                    icon: const Icon(Icons.star, color: Colors.amber, size: 18),
                     label: Text('PRO',
                         style: GoogleFonts.spaceGrotesk(
-                            color: Colors.amber,
-                            fontWeight: FontWeight.bold)),
+                            color: Colors.amber, fontWeight: FontWeight.bold)),
                   ),
                 IconButton(
-                  icon: const Icon(Icons.settings,
-                      color: Colors.white70),
+                  icon: const Icon(Icons.settings, color: Colors.white70),
                   onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) =>
-                              const SettingsScreen())),
+                          builder: (_) => const SettingsScreen())),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.logout,
-                      color: Colors.white70),
+                  icon: const Icon(Icons.logout, color: Colors.white70),
                   onPressed: () async {
                     await AuthService().signOut();
-                    if (mounted)
-                      Navigator.pushReplacementNamed(
-                          context, '/');
+                    if (mounted) Navigator.pushReplacementNamed(context, '/');
                   },
                 ),
               ],
@@ -506,10 +560,13 @@ class _HomeScreenState extends State<HomeScreen>
                     const SizedBox(height: 32),
                     TabBar(
                       controller: _tabController,
+                      onTap: (index) =>
+                          setState(() => _selectedIndex = index + 1),
                       indicatorColor: AppColors.primary,
                       labelColor: AppColors.primary,
                       unselectedLabelColor: Colors.white54,
-                      labelStyle: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold),
+                      labelStyle:
+                          GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold),
                       tabs: const [
                         Tab(text: 'RÉUNIONS ACTIVES'),
                         Tab(text: 'HISTORIQUE'),
@@ -562,7 +619,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildMeetingsList() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      return const Center(
+          child: CircularProgressIndicator(color: AppColors.primary));
     }
     if (_meetings.isEmpty) {
       return Center(
@@ -573,12 +631,14 @@ class _HomeScreenState extends State<HomeScreen>
             const SizedBox(height: 16),
             Text(
               'Aucune réunion active',
-              style: GoogleFonts.interTight(color: Colors.white54, fontSize: 16),
+              style:
+                  GoogleFonts.interTight(color: Colors.white54, fontSize: 16),
             ),
             const SizedBox(height: 8),
             Text(
               'Créez ou rejoignez une réunion',
-              style: GoogleFonts.interTight(color: Colors.white38, fontSize: 14),
+              style:
+                  GoogleFonts.interTight(color: Colors.white38, fontSize: 14),
             ),
           ],
         ),
@@ -601,7 +661,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildHistoryList() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      return const Center(
+          child: CircularProgressIndicator(color: AppColors.primary));
     }
     if (_history.isEmpty) {
       return Center(
@@ -612,12 +673,14 @@ class _HomeScreenState extends State<HomeScreen>
             const SizedBox(height: 16),
             Text(
               'Aucun historique',
-              style: GoogleFonts.interTight(color: Colors.white54, fontSize: 16),
+              style:
+                  GoogleFonts.interTight(color: Colors.white54, fontSize: 16),
             ),
             const SizedBox(height: 8),
             Text(
               'Vos réunions passées apparaîtront ici',
-              style: GoogleFonts.interTight(color: Colors.white38, fontSize: 14),
+              style:
+                  GoogleFonts.interTight(color: Colors.white38, fontSize: 14),
             ),
           ],
         ),
@@ -627,9 +690,8 @@ class _HomeScreenState extends State<HomeScreen>
       itemCount: _history.length,
       itemBuilder: (context, index) {
         final item = _history[index];
-        final endedAt = item['endedAt'] != null
-            ? (item['endedAt'] as Timestamp).toDate()
-            : null;
+        final endedAt =
+            item['endedAt'] != null ? _dateFromAny(item['endedAt']) : null;
         final dateStr = endedAt != null
             ? DateFormat('dd/MM/yyyy HH:mm').format(endedAt)
             : 'Date inconnue';
@@ -824,7 +886,8 @@ class _MeetingCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.people, color: Colors.white38, size: 12),
+                        const Icon(Icons.people,
+                            color: Colors.white38, size: 12),
                         const SizedBox(width: 4),
                         Text(
                           '$participantCount participant${participantCount == 1 ? '' : 's'}',

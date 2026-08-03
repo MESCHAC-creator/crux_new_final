@@ -36,11 +36,8 @@ class MeetingService {
       final userId = _getCurrentUserId();
       final finalOrganizerID = organizerId ?? userId;
 
-      final meetingId = const Uuid()
-          .v4()
-          .replaceAll('-', '')
-          .substring(0, 12)
-          .toUpperCase();
+      final meetingId =
+          const Uuid().v4().replaceAll('-', '').substring(0, 12).toUpperCase();
       final now = DateTime.now();
 
       final meeting = MeetingModel(
@@ -76,7 +73,7 @@ class MeetingService {
           }
         }
       }
-      
+
       if (!written) {
         _log.e('❌ Écriture Firestore échouée après 3 tentatives');
         throw Exception('firestore_write_failed');
@@ -119,11 +116,8 @@ class MeetingService {
       final userId = _getCurrentUserId();
       final finalOrganizerID = organizerId ?? userId;
 
-      final meetingId = const Uuid()
-          .v4()
-          .replaceAll('-', '')
-          .substring(0, 12)
-          .toUpperCase();
+      final meetingId =
+          const Uuid().v4().replaceAll('-', '').substring(0, 12).toUpperCase();
 
       final meeting = MeetingModel(
         id: meetingId,
@@ -156,7 +150,7 @@ class MeetingService {
           }
         }
       }
-      
+
       if (!written) {
         throw Exception('firestore_write_failed');
       }
@@ -172,11 +166,7 @@ class MeetingService {
   }
 
   Stream<MeetingModel?> getMeeting(String meetingId) {
-    return _firestore
-        .collection('meetings')
-        .doc(meetingId)
-        .snapshots()
-        .map(
+    return _firestore.collection('meetings').doc(meetingId).snapshots().map(
           (snap) => snap.exists ? MeetingModel.fromJson(snap.data()!) : null,
         );
   }
@@ -190,10 +180,8 @@ class MeetingService {
       return snap.exists ? MeetingModel.fromJson(snap.data()!) : null;
     } catch (_) {
       try {
-        final snap = await _firestore
-            .collection('meetings')
-            .doc(meetingId)
-            .get();
+        final snap =
+            await _firestore.collection('meetings').doc(meetingId).get();
         return snap.exists ? MeetingModel.fromJson(snap.data()!) : null;
       } catch (_) {
         return null;
@@ -201,7 +189,8 @@ class MeetingService {
     }
   }
 
-  Future<void> updateMeetingStatus(String meetingId, MeetingStatus status) async {
+  Future<void> updateMeetingStatus(
+      String meetingId, MeetingStatus status) async {
     try {
       await _firestore.collection('meetings').doc(meetingId).update({
         'status': status.toString().split('.').last,
@@ -231,7 +220,8 @@ class MeetingService {
     }
   }
 
-  Future<void> registerPresence(String meetingId, String userId, String userName) async {
+  Future<void> registerPresence(
+      String meetingId, String userId, String userName) async {
     try {
       await _firestore
           .collection('meetings')
@@ -239,14 +229,14 @@ class MeetingService {
           .collection('presence')
           .doc(userId)
           .set({
-            'userId': userId,
-            'name': userName,
-            'micOn': true,
-            'camOn': true,
-            'handRaised': false,
-            'isSpeaking': false,
-            'joinedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+        'userId': userId,
+        'name': userName,
+        'micOn': true,
+        'camOn': true,
+        'handRaised': false,
+        'isSpeaking': false,
+        'joinedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } catch (e) {
       _log.e('registerPresence error: $e');
     }
@@ -262,6 +252,57 @@ class MeetingService {
           .delete();
     } catch (e) {
       _log.e('removePresence error: $e');
+    }
+  }
+
+  Future<void> saveMeetingHistoryForUser({
+    required String meetingId,
+    required String userId,
+    required String title,
+    required int durationSeconds,
+    bool endMeeting = false,
+  }) async {
+    try {
+      final userRef = _firestore.collection('users').doc(userId);
+      final historyRef = userRef.collection('meeting_history').doc(meetingId);
+      final meetingRef = _firestore.collection('meetings').doc(meetingId);
+      final safeDuration = durationSeconds < 0 ? 0 : durationSeconds;
+
+      await _firestore.runTransaction((transaction) async {
+        final existingHistory = await transaction.get(historyRef);
+        transaction.set(
+          historyRef,
+          {
+            'meetingId': meetingId,
+            'title': title,
+            'duration': safeDuration,
+            'endedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
+        if (!existingHistory.exists) {
+          transaction.set(
+            userRef,
+            {
+              'meetingCount': FieldValue.increment(1),
+              'totalDuration': FieldValue.increment(safeDuration),
+            },
+            SetOptions(merge: true),
+          );
+        }
+        if (endMeeting) {
+          transaction.set(
+            meetingRef,
+            {
+              'status': MeetingStatus.ended.toString().split('.').last,
+              'endedAt': FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true),
+          );
+        }
+      });
+    } catch (e) {
+      _log.e('saveMeetingHistoryForUser error: $e');
     }
   }
 
