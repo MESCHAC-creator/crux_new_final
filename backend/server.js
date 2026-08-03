@@ -13,7 +13,7 @@ const PORT               = process.env.PORT || 3000;
 const TOKEN_TTL_SECONDS  = 86400; // 24h
 
 // Health check and root route
-app.get('/', (req, res) =>
+app.get('/livekit-token', async (req, res) => {
   res.json({ status: 'ok', message: 'Crux LiveKit Token Server is running', endpoints: ['/ping', '/livekit-token'] })
 );
 
@@ -55,8 +55,13 @@ app.get('/livekit-token', (req, res) => {
     });
   }
 
-  const token = at.toJwt();
-  return res.json({ token, room, identity });
+  const token = await at.toJwt();
+
+return res.json({ 
+  token, 
+  room, 
+  identity 
+});
 });
 
 app.listen(PORT, () =>
