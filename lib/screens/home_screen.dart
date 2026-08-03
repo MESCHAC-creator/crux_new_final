@@ -64,7 +64,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _verifyDevice() async {
     try {
-      final deviceService = DeviceVerificationService();
+      final (isSecure, reason) =
+    await DeviceVerificationService.instance.verifyDeviceSecurity();
       final isVerified = await deviceService.verifyDevice(widget.user.uid);
       if (!isVerified && mounted) {
         ElegantToast.show(
