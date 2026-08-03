@@ -25,7 +25,6 @@ import '../services/note_service.dart';
 import '../theme/colors.dart';
 import '../providers/locale_provider.dart';
 import '../services/pro_service.dart';
-import 'package:webrtc_interface/webrtc_interface.dart';
 
 class LargeConferenceScreen extends StatefulWidget {
   final String meetingId;
