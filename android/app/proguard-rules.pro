@@ -44,3 +44,7 @@
 
 # Keep model classes
 -keep class com.schac_crux.app.** { *; }
+
+# Flutter Deferred Components / Google Play Core optionnel
+-dontwarn com.google.android.play.core.**
+-keep class com.google.android.play.core.** { *; }
