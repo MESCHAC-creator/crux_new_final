@@ -22,7 +22,6 @@ import '../theme/colors.dart';
 import '../widgets/elegant_toast.dart';
 import 'create_meeting_screen.dart';
 import 'join_meeting_screen.dart';
-import 'meeting_history_screen.dart';
 import 'setting_screen.dart';
 import 'pro_screen.dart';
 import 'meeting_screen.dart';
@@ -65,13 +64,12 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _verifyDevice() async {
     try {
       final (isSecure, reason) =
-    await DeviceVerificationService.instance.verifyDeviceSecurity();
-      final isVerified = await deviceService.verifyDevice(widget.user.uid);
-      if (!isVerified && mounted) {
+          await DeviceVerificationService.instance.verifyDeviceSecurity();
+      if (!isSecure && mounted) {
         ElegantToast.show(
           context,
           title: 'Sécurité',
-          message: 'Nouvel appareil détecté. Veuillez vérifier votre email.',
+          message: reason,
           type: ElegantToastType.warning,
         );
       }
