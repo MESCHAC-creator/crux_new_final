@@ -14,7 +14,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:webrtc_interface/webrtc_interface.dart';
+import 'package:webrtc_interface/webrtc_interface.dart' hide Navigator;
 import '../utils/logger.dart' as crux;
 import '../config/app_config.dart';
 import '../services/livekit_service.dart';
