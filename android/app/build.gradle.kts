@@ -106,7 +106,4 @@ dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
-
-    // Google Play Core (Split Install / Deferred Components)
-    implementation("com.google.android.play:core:1.10.3")
 }
