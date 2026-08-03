@@ -11,7 +11,9 @@ plugins {
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
-    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
+    FileInputStream(keystorePropertiesFile).use {
+        keystoreProperties.load(it)
+    }
 }
 
 android {
@@ -23,7 +25,9 @@ android {
         create("release") {
             keyAlias = keystoreProperties.getProperty("keyAlias") ?: ""
             keyPassword = keystoreProperties.getProperty("keyPassword") ?: ""
-            storeFile = keystoreProperties.getProperty("storeFile")?.let { rootProject.file(it) }
+            storeFile = keystoreProperties.getProperty("storeFile")?.let {
+                rootProject.file(it)
+            }
             storePassword = keystoreProperties.getProperty("storePassword") ?: ""
         }
     }
@@ -59,11 +63,13 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             signingConfig = signingConfigs.getByName("release")
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
+
         getByName("debug") {
             isDebuggable = true
             signingConfig = signingConfigs.getByName("debug")
@@ -87,11 +93,20 @@ flutter {
 }
 
 dependencies {
-    "coreLibraryDesugaring"("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // Java 17 desugaring
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // Firebase
     implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
     implementation("com.google.firebase:firebase-analytics")
+
+    // AndroidX
     implementation("androidx.core:core:1.15.0")
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
+
+    // Google Play Core (Split Install / Deferred Components)
+    implementation("com.google.android.play:core:1.10.3")
 }
