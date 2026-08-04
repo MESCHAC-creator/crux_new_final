@@ -1,15 +1,8 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/colors.dart';
 import '../services/auth_service.dart';
-import '../services/error_handler_service.dart';
-import '../providers/locale_provider.dart';
-import '../l10n/app_translations.dart';
-import '../models/user_model.dart';
-import 'signup_screen.dart';
+import '../utils/logger.dart' as crux;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,395 +11,357 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _authService = AuthService();
-  final _errorHandler = ErrorHandlerService();
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
-  bool _isLoading = false;
-  bool _isGoogleLoading = false;
-  bool _showPassword = false;
-  bool _rememberEmail = false;
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
 
-  static const _emailPrefKey = 'crux_remembered_email';
-  static const _rememberPrefKey = 'crux_remember_email';
-
-  String? _emailError;
-  String? _passwordError;
+  bool _loading = false;
+  bool _obscurePassword = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadRememberedEmail();
-  }
-
-  Future<void> _loadRememberedEmail() async {
-    final prefs = await SharedPreferences.getInstance();
-    final remember = prefs.getBool(_rememberPrefKey) ?? false;
-    if (remember) {
-      final email = prefs.getString(_emailPrefKey) ?? '';
-      if (mounted) {
-        setState(() {
-          _rememberEmail = true;
-          _emailController.text = email;
-        });
-      }
-    }
-  }
-
-  Future<void> _saveRememberedEmail(String email) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (_rememberEmail) {
-      await prefs.setBool(_rememberPrefKey, true);
-      await prefs.setString(_emailPrefKey, email);
-    } else {
-      await prefs.remove(_rememberPrefKey);
-      await prefs.remove(_emailPrefKey);
-    }
-  }
-
-  void _goHome() {
-    final fb = FirebaseAuth.instance.currentUser;
-    final user = fb == null
-        ? null
-        : UserModel(
-            uid: fb.uid,
-            email: fb.email ?? '',
-            name: fb.displayName ?? fb.email?.split('@')[0] ?? 'Utilisateur',
-          );
-    Navigator.of(context).pushReplacementNamed('/home', arguments: user);
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _shakeAnimation = Tween(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _shakeController, curve: Curves.elasticOut),
+    );
   }
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _shakeController.dispose();
     super.dispose();
   }
 
-  bool _validateFields() {
-    final lang = context.read<LocaleProvider>().locale.languageCode;
-    String? emailErr;
-    String? passErr;
-
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-
-    if (email.isEmpty) {
-      emailErr = AppTranslations.t('val_email_required', lang);
-    } else if (!email.contains('@')) {
-      emailErr = AppTranslations.t('val_email_invalid', lang);
-    }
-
-    if (password.isEmpty) {
-      passErr = AppTranslations.t('val_pwd_required', lang);
-    }
-
-    setState(() {
-      _emailError = emailErr;
-      _passwordError = passErr;
-    });
-
-    return emailErr == null && passErr == null;
+  void _shakeError(String msg) {
+    setState(() => _error = msg);
+    _shakeController.forward(from: 0);
+    HapticFeedback.mediumImpact();
   }
 
-  Future<void> _handleGoogleLogin() async {
-    setState(() => _isGoogleLoading = true);
-    try {
-      final user = await _authService.signInWithGoogle();
-      if (user != null && mounted) {
-        _goHome();
-      }
-    } catch (e) {
-      if (mounted) {
-        final lang = context.read<LocaleProvider>().locale.languageCode;
-        _errorHandler.showErrorDialog(
-          context,
-          '❌ ${AppTranslations.t('google_failed', lang)}',
-          e.toString().replaceFirst('Exception: ', ''),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isGoogleLoading = false);
-    }
-  }
+  Future<void> _signIn() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() { _loading = true; _error = null; });
 
-  Future<void> _handleLogin() async {
-    if (!_validateFields()) return;
-
-    setState(() => _isLoading = true);
-    final email = _emailController.text.trim();
     try {
-      await _authService.signIn(
-        email: email,
-        password: _passwordController.text,
+      await AuthService.instance.signInWithEmailAndPassword(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
       );
-      await _saveRememberedEmail(email);
-      if (mounted) _goHome();
+      // Navigation gérée par AuthWrapper dans main.dart
+    } on AuthException catch (e) {
+      if (mounted) _shakeError(e.friendlyMessage);
     } catch (e) {
-      if (!mounted) return;
-      final lang = context.read<LocaleProvider>().locale.languageCode;
-      final msg = e.toString().replaceFirst('Exception: ', '');
-
-      if (msg.contains('wrong-password') ||
-          msg.contains('invalid-credential') ||
-          msg.contains('INVALID_LOGIN_CREDENTIALS') ||
-          msg.contains('incorrect')) {
-        setState(() => _passwordError = AppTranslations.t('auth_wrong_pwd', lang));
-      } else if (msg.contains('user-not-found') || msg.contains('no user') || msg.contains('non trouvé')) {
-        setState(() => _emailError = AppTranslations.t('auth_no_account', lang));
-      } else if (msg.contains('invalid-email') || msg.contains('invalide')) {
-        setState(() => _emailError = AppTranslations.t('auth_invalid_email_fmt', lang));
-      } else {
-        _errorHandler.showErrorDialog(
-          context,
-          '❌ ${AppTranslations.t('error', lang)}',
-          _errorHandler.cleanErrorMessageL(msg, lang),
-        );
-      }
+      crux.logger.e('Login error: $e');
+      if (mounted) _shakeError('Erreur de connexion. Vérifiez votre connexion internet.');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _showForgotPasswordDialog(String lang) async {
-    final emailController = TextEditingController();
-    String? dialogError;
-    bool sending = false;
+  Future<void> _signInWithGoogle() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      await AuthService.instance.signInWithGoogle();
+    } on AuthException catch (e) {
+      if (mounted) _shakeError(e.friendlyMessage);
+    } catch (e) {
+      crux.logger.e('Google sign-in error: $e');
+      if (mounted) _shakeError('Connexion Google annulée ou échouée');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
-    await showDialog(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF14141F),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Text(
-                AppTranslations.t('forgot_password', lang),
-                style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppTranslations.t('reset_prompt', lang),
-                    style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: AppTranslations.t('reset_email_hint', lang),
-                      hintStyle: GoogleFonts.poppins(color: Colors.white38, fontSize: 13),
-                      prefixIcon: const Icon(Icons.email_outlined, color: Colors.white60, size: 20),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
-                      errorText: dialogError,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                      ),
-                    ),
-                    onChanged: (_) => setDialogState(() => dialogError = null),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text(AppTranslations.t('cancel', lang), style: GoogleFonts.poppins(color: Colors.white38)),
-                ),
-                TextButton(
-                  onPressed: sending
-                      ? null
-                      : () async {
-                          final email = emailController.text.trim();
-                          if (email.isEmpty || !email.contains('@')) {
-                            setDialogState(() => dialogError = AppTranslations.t('reset_valid_email', lang));
-                            return;
-                          }
-                          setDialogState(() => sending = true);
-                          try {
-                            await _authService.resetPassword(email);
-                            if (ctx.mounted) {
-                              Navigator.pop(ctx);
-                              if (mounted) {
-                                _errorHandler.showSuccessSnackBar(context, AppTranslations.t('reset_sent', lang));
-                              }
-                            }
-                          } catch (e) {
-                            setDialogState(() {
-                              dialogError = e.toString().replaceFirst('Exception: ', '');
-                              sending = false;
-                            });
-                          }
-                        },
-                  child: sending
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70))
-                      : Text(AppTranslations.t('reset_send', lang), style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            );
-          },
+  Future<void> _resetPassword() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) {
+      _shakeError('Entrez votre email d\'abord');
+      return;
+    }
+    try {
+      await AuthService.instance.sendPasswordResetEmail(email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Email envoyé à $email'),
+            backgroundColor: AppColors.surface,
+          ),
         );
-      },
-    );
+      }
+    } catch (_) {
+      if (mounted) _shakeError('Impossible d\'envoyer l\'email de réinitialisation');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0A0E1A), Color(0xFF121624), Color(0xFF020205)],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
-                          blurRadius: 15,
-                          offset: const Offset(0, 8),
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Logo + Titre
+                    const SizedBox(height: 16),
+                    Center(
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          gradient: AppColors.primaryGradient,
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Image.asset(
-                        'assets/images/icon.png',
-                        fit: BoxFit.cover,
+                        child: const Icon(
+                          Icons.videocam_rounded,
+                          color: AppColors.textOnPrimary,
+                          size: 36,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  ShaderMask(
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [Color(0xFF00E5FF), Color(0xFF7C5CFF)],
-                    ).createShader(bounds),
-                    child: Text(
-                      'CRUX',
+                    const SizedBox(height: 24),
+                    Text(
+                      'Bienvenue sur CRUX',
+                      textAlign: TextAlign.center,
                       style: GoogleFonts.spaceGrotesk(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 6,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    AppTranslations.t('connecting', lang).toUpperCase(),
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 11,
-                      color: const Color(0xFF8A8FA3),
-                      letterSpacing: 2,
-                      fontWeight: FontWeight.w500,
+                    const SizedBox(height: 6),
+                    Text(
+                      'Connectez-vous pour continuer',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 48),
-                  _buildTextField(
-                    controller: _emailController,
-                    hint: AppTranslations.t('email', lang),
-                    icon: Icons.email_outlined,
-                    errorText: _emailError,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _passwordController,
-                    hint: AppTranslations.t('password', lang),
-                    icon: Icons.lock_outline,
-                    obscure: !_showPassword,
-                    errorText: _passwordError,
-                    suffix: IconButton(
-                      icon: Icon(_showPassword ? Icons.visibility : Icons.visibility_off, color: Colors.white38, size: 20),
-                      onPressed: () => setState(() => _showPassword = !_showPassword),
+
+                    const SizedBox(height: 36),
+
+                    // Email
+                    TextFormField(
+                      controller: _emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autocorrect: false,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 15,
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Adresse email',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Email requis';
+                        if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())) {
+                          return 'Email invalide';
+                        }
+                        return null;
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => _showForgotPasswordDialog(lang),
-                        child: Text(
-                          AppTranslations.t('forgot_password', lang),
-                          style: GoogleFonts.spaceGrotesk(color: Colors.white38, fontSize: 13, fontWeight: FontWeight.w500),
+
+                    const SizedBox(height: 12),
+
+                    // Mot de passe
+                    TextFormField(
+                      controller: _passwordCtrl,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _signIn(),
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 15,
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Mot de passe',
+                        prefixIcon: const Icon(Icons.lock_outline_rounded),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                          onPressed: () =>
+                              setState(() => _obscurePassword = !_obscurePassword),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  _buildPrimaryButton(
-                    onPressed: _isLoading ? null : _handleLogin,
-                    label: AppTranslations.t('login', lang),
-                    loading: _isLoading,
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      const Expanded(child: Divider(color: Colors.white10)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          AppTranslations.t('or_divider', lang).toUpperCase(),
-                          style: GoogleFonts.spaceGrotesk(color: Colors.white10, fontSize: 10, fontWeight: FontWeight.bold),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Mot de passe requis';
+                        if (v.length < 6) return 'Minimum 6 caractères';
+                        return null;
+                      },
+                    ),
+
+                    // Mot de passe oublié
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _resetPassword,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
                         ),
-                      ),
-                      const Expanded(child: Divider(color: Colors.white10)),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  _buildSocialButton(
-                    onPressed: _isGoogleLoading ? null : _handleGoogleLogin,
-                    label: AppTranslations.t('sign_in_google', lang),
-                    icon: Icons.g_mobiledata,
-                    loading: _isGoogleLoading,
-                  ),
-                  const SizedBox(height: 32),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        AppTranslations.t('no_account', lang),
-                        style: GoogleFonts.poppins(color: Colors.white38, fontSize: 14),
-                      ),
-                      const SizedBox(width: 4),
-                      GestureDetector(
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen())),
                         child: Text(
-                          AppTranslations.t('create_account', lang),
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                          'Mot de passe oublié ?',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 13,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _buildLanguageSelector(),
-                ],
+                    ),
+
+                    // Erreur avec shake
+                    if (_error != null)
+                      AnimatedBuilder(
+                        animation: _shakeAnimation,
+                        builder: (_, child) => Transform.translate(
+                          offset: Offset(
+                            4 * (0.5 - _shakeAnimation.value).abs() *
+                                (1 - _shakeAnimation.value) *
+                                8,
+                            0,
+                          ),
+                          child: child,
+                        ),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: AppColors.errorSurface,
+                            borderRadius: BorderRadius.circular(10),
+                            border:
+                                Border.all(color: AppColors.error.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.warning_amber_rounded,
+                                  color: AppColors.error, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _error!,
+                                  style: GoogleFonts.spaceGrotesk(
+                                    fontSize: 13,
+                                    color: AppColors.error,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                    const SizedBox(height: 4),
+
+                    // CTA Connexion
+                    ElevatedButton(
+                      onPressed: _loading ? null : _signIn,
+                      child: _loading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: AppColors.textOnPrimary,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Text('Se connecter'),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Séparateur
+                    Row(
+                      children: [
+                        const Expanded(child: Divider(color: AppColors.divider)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'ou',
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 13,
+                              color: AppColors.textTertiary,
+                            ),
+                          ),
+                        ),
+                        const Expanded(child: Divider(color: AppColors.divider)),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Google Sign-In
+                    OutlinedButton.icon(
+                      onPressed: _loading ? null : _signInWithGoogle,
+                      icon: Image.network(
+                        'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+                        width: 20,
+                        height: 20,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.g_mobiledata_rounded, size: 22),
+                      ),
+                      label: const Text('Continuer avec Google'),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // Créer un compte
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Pas encore de compte ? ',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pushReplacementNamed(
+                              context, '/signup'),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            'Créer un compte',
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
           ),
@@ -414,121 +369,11 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool obscure = false,
-    Widget? suffix,
-    String? errorText,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: errorText != null ? Colors.redAccent.withOpacity(0.5) : Colors.white.withOpacity(0.1)),
-          ),
-          child: TextField(
-            controller: controller,
-            obscureText: obscure,
-            style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: GoogleFonts.poppins(color: Colors.white24, fontSize: 15),
-              prefixIcon: Icon(icon, color: Colors.white38, size: 20),
-              suffixIcon: suffix,
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            ),
-          ),
-        ),
-        if (errorText != null)
-          Padding(
-            padding: const EdgeInsets.only(left: 16, top: 8),
-            child: Text(errorText, style: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 12)),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildPrimaryButton({required VoidCallback? onPressed, required String label, bool loading = false}) {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 0,
-        ),
-        child: loading
-            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-            : Text(label.toUpperCase(), style: GoogleFonts.poppins(fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-      ),
-    );
-  }
-
-  Widget _buildSocialButton({required VoidCallback? onPressed, required String label, required IconData icon, bool loading = false}) {
-    return SizedBox(
-      width: double.infinity,
-      height: 54,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: Colors.white.withOpacity(0.1)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        child: loading
-            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, color: Colors.white, size: 28),
-                  const SizedBox(width: 12),
-                  Text(label, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 14)),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _buildSmallSocialButton({required VoidCallback onPressed, required IconData icon, required Color color}) {
-    return SizedBox(
-      height: 54,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: Colors.white.withOpacity(0.1)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        child: Icon(icon, color: color, size: 24),
-      ),
-    );
-  }
-
-  Widget _buildLanguageSelector() {
-    return Consumer<LocaleProvider>(
-      builder: (context, lp, _) => DropdownButton<String>(
-        value: lp.languageLabel,
-        dropdownColor: const Color(0xFF14141F),
-        underline: const SizedBox(),
-        icon: const Icon(Icons.language, color: Colors.white38, size: 16),
-        items: LocaleProvider.languages.keys.map((String lang) {
-          return DropdownMenuItem<String>(
-            value: lang,
-            child: Text(lang, style: GoogleFonts.poppins(color: Colors.white38, fontSize: 12)),
-          );
-        }).toList(),
-        onChanged: (String? val) {
-          if (val != null) lp.setLanguage(val);
-        },
-      ),
-    );
-  }
+// Exception auth avec messages conviviaux
+class AuthException implements Exception {
+  final String code;
+  final String friendlyMessage;
+  const AuthException(this.code, this.friendlyMessage);
 }
