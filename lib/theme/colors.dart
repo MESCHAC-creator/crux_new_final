@@ -7,7 +7,7 @@ class AppColors {
   static const Color _cyan400 = Color(0xFF00E5FF);
   static const Color _cyan300 = Color(0xFF4DFBFF);
   static const Color _cyan500 = Color(0xFF00B8D4);
-  static const Color _indigo400 = Color(0xFFF4E6BFF);
+  static const Color _indigo400 = Color(0xFF4E6BFF);
   static const Color _indigoAccent = Color(0xFF536DFE);
 
   static const Color _obsidian = Color(0xFF05070D);
