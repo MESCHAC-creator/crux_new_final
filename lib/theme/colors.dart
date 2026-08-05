@@ -1,8 +1,5 @@
-// lib/theme/colors.dart
 import 'package:flutter/material.dart';
 
-/// CRUX Design Tokens — Palette Obsidian & Electric Cyan
-/// Un seul fichier de référence : jamais de couleur hardcodée ailleurs.
 class AppColors {
   AppColors._();
 
@@ -62,6 +59,7 @@ class AppColors {
   static const Color warning = _amber500;
   static const Color warningSurface = Color(0xFF2B2000);
   static const Color info = _cyan400;
+  static const Color whiteBg = Color(0xFFFFFFFF);
   static const Color infoSurface = Color(0xFF002B33);
 
   // ── Sémantiques — Réunion ──────────────────────────────────────────────
