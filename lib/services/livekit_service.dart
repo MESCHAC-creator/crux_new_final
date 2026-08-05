@@ -4,10 +4,8 @@ import 'package:flutter_foundation/flutter_foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import 'auth_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
-/// Gestion des tokens LiveKit — SFU helpers pour conférences 1000+ participants.
-/// Toutes les URLs de candidats viennent de AppConfig, jamais hardcodées ici.
-class LiveKitService {
   LiveKitService._();
   static final LiveKitService instance = LiveKitService._();
 
