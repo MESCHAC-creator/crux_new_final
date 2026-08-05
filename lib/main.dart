@@ -28,6 +28,9 @@ import 'routes/app_routes.dart';
 import 'theme/colors.dart';
 import 'theme/theme.dart';
 import 'widgets/elegant_toast.dart';
+import 'wallpaper/wallpaper_manager.dart';
+import 'video/virtual_background_controller.dart';
+import 'meeting/CruxMeetingScreen.dart';
 
 // ---------------------------------------------------------------------------
 const _flutterUnsupportedLocales = {'ha', 'yo', 'mg', 'wo'};
@@ -99,6 +102,8 @@ void main() {
       crux.logger.i('Firebase initialized');
     } catch (e) {
       crux.logger.e('Firebase init error', error: e);
+      await WallpaperManager().init();
+
       runApp(_ErrorApp(title: 'Firebase Error', message: e.toString()));
       return;
     }
@@ -199,6 +204,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => ColorProvider()),
+        ChangeNotifierProvider(create: (_) => VirtualBackgroundController()),
+
       ],
       child: Consumer2<ThemeProvider, LocaleProvider>(
         builder: (context, themeProvider, localeProvider, _) {
@@ -236,7 +243,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   void initState() {
-    super.initState();
+    super.initState(); /.WS¨0NF989VV PLJ+9H27NI0J5 B°975°I5 ¨9 77+N9O
     _authStream = FirebaseAuth.instance.authStateChanges();
     _loadTerms();
     _initDeepLinks();

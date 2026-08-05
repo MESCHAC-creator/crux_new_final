@@ -9,6 +9,7 @@ import '../screens/privacy_policy_screen.dart';
 import '../screens/terms_screen.dart';
 import '../screens/profile_screen.dart';
 import '../models/user_model.dart';
+import '../wallpaper/wallpaper_picker_screen.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -20,7 +21,8 @@ class AppRoutes {
   static const String privacy = '/privacy';
   static const String terms = '/terms';
   static const String profile = '/profile';
-
+ static const String wallpaper = '/wallpaper';
+ 
   static Route<dynamic> generateRoute(RouteSettings routeSettings) {
     switch (routeSettings.name) {
       case splash:
