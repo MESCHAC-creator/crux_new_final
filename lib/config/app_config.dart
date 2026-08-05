@@ -9,6 +9,11 @@ class AppConfig {
   static const String livekitApiKey = 'APIDnXJytuRnVpH';
   static const String livekitApiSecret = 'ImMJ5epOjxwTeG96CK8yp8qtp28tXBaGLDrjKc5aZC3';
 
+static const List<String> livekitFallbackUrls = [
+  'wss://fallback1.livekit.cloud',
+  'wss://fallback2.livekit.cloud',
+];
+  
   // Token server: generates signed LiveKit JWTs from your API key/secret
   // Endpoint: GET /livekit-token?room=<meetingId>&identity=<userId>&name=<userName>
   static const String livekitTokenServerUrl =
