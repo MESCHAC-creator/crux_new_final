@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/colors.dart';
 import '../l10n/app_translations.dart';
+import '../providers/locale_provider.dart';
 import 'meeting_state.dart';
 import '../wallpaper/glass_surface.dart';
 
@@ -172,7 +174,7 @@ class _MessageBubble extends StatelessWidget {
               color: message.fromMe
                   ? AppColors.primary.withOpacity(0.3)
                   : isPrivate
-                      ? AppColors.accent.withOpacity(0.3)
+                      ? AppColors.secondary.withOpacity(0.3)
                       : AppColors.surface,
               borderRadius: BorderRadius.circular(16),
             ),
