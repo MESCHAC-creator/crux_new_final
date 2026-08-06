@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:provider/provider.dart';
+import '../providers/locale_provider.dart';
 import '../theme/colors.dart';
 import '../l10n/app_translations.dart';
 import '../wallpaper/wallpaper_config.dart';
