@@ -1,27 +1,14 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'virtual_background_mode.dart';
 
-/// Modes de fond virtuel CRUX.
-sealed class VirtualBackgroundMode {
-  const VirtualBackgroundMode();
-}
+/// Contrôleur du fond virtuel CRUX.
+class VirtualBackgroundController extends ChangeNotifier {
+  VirtualBackgroundMode _mode = const VirtualBackgroundNone();
 
-class VirtualBackgroundNone extends VirtualBackgroundMode {
-  const VirtualBackgroundNone();
-}
+  VirtualBackgroundMode get mode => _mode;
 
-sealed class VirtualBackgroundBlur extends VirtualBackgroundMode {
-  const VirtualBackgroundBlur();
-}
-
-class VirtualBackgroundBlurLight extends VirtualBackgroundBlur {
-  const VirtualBackgroundBlurLight();
-}
-
-class VirtualBackgroundBlurStrong extends VirtualBackgroundBlur {
-  const VirtualBackgroundBlurStrong();
-}
-
-class VirtualBackgroundImage extends VirtualBackgroundMode {
-  final File image;
-  const VirtualBackgroundImage(this.image);
+  void setMode(VirtualBackgroundMode mode) {
+    _mode = mode;
+    notifyListeners();
+  }
 }
