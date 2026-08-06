@@ -1,114 +1,338 @@
 import 'dart:convert';
 import 'dart:developer' as dev;
-import 'package:flutter/foundation.dart' show kIsWeb;
+
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+
 import '../config/app_config.dart';
 
-/// Gestion des tokens LiveKit — SFU helpers pour conférences 1000+ participants.
-/// Toutes les URLs de candidats viennent de AppConfig, jamais hardcodées ici.
-class LiveKitService {
-  LiveKitService._();
-  static final LiveKitService instance = LiveKitService._();
 
-  /// Récupère un JWT signé depuis le serveur de tokens CRUX.
-  /// Ajoute automatiquement le Firebase ID token dans l'Authorization header.
+class LiveKitService {
+
+  LiveKitService._();
+
+  static final LiveKitService instance =
+      LiveKitService._();
+
+
+
+  /// Récupération du token JWT LiveKit
   Future<String?> fetchToken({
+
     required String room,
+
     required String identity,
+
     required String name,
+
     bool isHost = false,
+
   }) async {
+
+
     final candidates = _buildCandidates();
 
-    for (final baseUrl in candidates) {
-      try {
-        final token = await _fetchFromCandidate(
+
+
+    for(final baseUrl in candidates){
+
+
+      try{
+
+
+        final token =
+        await _fetchFromServer(
+
           baseUrl: baseUrl,
+
           room: room,
+
           identity: identity,
+
           name: name,
+
           isHost: isHost,
+
         );
-        if (token != null) return token;
-      } catch (e) {
-        dev.log('LiveKitService: candidate $baseUrl failed — $e', name: 'crux');
+
+
+
+        if(token != null){
+
+          return token;
+
+        }
+
+
+
+      }catch(e){
+
+
+        dev.log(
+
+          'LiveKit token error $baseUrl : $e',
+
+          name:'crux'
+
+        );
+
+
       }
+
+
     }
 
-    dev.log('LiveKitService: all candidates exhausted', name: 'crux');
+
+
     return null;
+
   }
 
-  Future<String?> _fetchFromCandidate({
+
+
+
+
+
+  Future<String?> _fetchFromServer({
+
+
     required String baseUrl,
+
     required String room,
+
     required String identity,
+
     required String name,
+
     required bool isHost,
+
+
   }) async {
-    // Obtenir le Firebase ID token pour l'authentification serveur
-    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
-    if (idToken == null) {
-      dev.log('LiveKitService: no Firebase ID token available', name: 'crux');
+
+
+
+    final user =
+    FirebaseAuth.instance.currentUser;
+
+
+
+    if(user == null){
+
+
+      dev.log(
+
+        'Utilisateur Firebase absent',
+
+        name:'crux'
+
+      );
+
+
       return null;
+
     }
 
-    final uri = Uri.parse('$baseUrl/livekit-token').replace(
-      queryParameters: {
-        'room': room,
-        'identity': identity,
-        'name': Uri.encodeComponent(name),
-        'isHost': isHost.toString(),
-      },
+
+
+
+
+    final firebaseToken =
+    await user.getIdToken(true);
+
+
+
+
+
+    final uri =
+    Uri.parse(
+
+      '$baseUrl/livekit-token'
+
+    ).replace(
+
+
+      queryParameters:{
+
+
+        'room':room,
+
+
+        'identity':identity,
+
+
+        'name':name,
+
+
+        'isHost':
+        isHost.toString(),
+
+
+      }
+
+
     );
 
-    final response = await http.get(
+
+
+
+
+
+
+    final response =
+    await http.get(
+
       uri,
-      headers: {
-        'Authorization': 'Bearer $idToken',
-        'Content-Type': 'application/json',
+
+
+      headers:{
+
+
+        'Authorization':
+        'Bearer $firebaseToken',
+
+
+        'Content-Type':
+        'application/json',
+
+
       },
-    ).timeout(const Duration(seconds: 10));
 
-    if (response.statusCode == 200) {
-      final body = json.decode(response.body) as Map<String, dynamic>;
-      final token = body['token'] as String?;
-      if (token != null && token.isNotEmpty) {
-        dev.log('LiveKitService: token obtained from $baseUrl', name: 'crux');
+
+    ).timeout(
+
+      const Duration(seconds:10)
+
+    );
+
+
+
+
+
+
+
+    if(response.statusCode == 200){
+
+
+      final data =
+      jsonDecode(response.body);
+
+
+
+      final token =
+      data['token'];
+
+
+
+      if(token != null &&
+          token.toString().isNotEmpty){
+
+
+
+        dev.log(
+
+          'Token LiveKit reçu',
+
+          name:'crux'
+
+        );
+
+
+
         return token;
+
+
       }
-    } else {
-      dev.log(
-        'LiveKitService: HTTP ${response.statusCode} from $baseUrl — ${response.body}',
-        name: 'crux',
-      );
+
+
     }
+
+
+
+
+
+
+    dev.log(
+
+      'Erreur token ${response.statusCode}: ${response.body}',
+
+      name:'crux'
+
+    );
+
+
+
     return null;
+
+
   }
 
-  /// Construit la liste des URLs candidates dans l'ordre de priorité.
-  /// Toutes les URLs viennent de AppConfig — aucune valeur hardcodée ici.
-  List<String> _buildCandidates() {
-    final candidates = <String>{};
 
-    // 1. URL web actuelle (web uniquement)
-    if (kIsWeb) {
-      try {
-        final origin = Uri.base.origin;
-        if (origin.startsWith('http')) candidates.add(origin);
-      } catch (_) {}
+
+
+
+
+
+  List<String> _buildCandidates(){
+
+
+    final urls=<String>{};
+
+
+
+    if(kIsWeb){
+
+      try{
+
+        final origin =
+        Uri.base.origin;
+
+
+        if(origin.startsWith('http')){
+
+          urls.add(origin);
+
+        }
+
+
+      }catch(_){}
+
     }
 
-    // 2. URL principale depuis la config
-    final primary = AppConfig.livekitTokenServerUrl;
-    if (primary.isNotEmpty) candidates.add(primary);
 
-    // 3. URLs de fallback depuis la config (dev/staging)
-    for (final url in AppConfig.livekitFallbackUrls) {
-      if (url.isNotEmpty) candidates.add(url);
+
+
+
+    urls.add(
+
+      AppConfig.livekitTokenServerUrl
+
+    );
+
+
+
+
+
+    for(final url in AppConfig.livekitFallbackUrls){
+
+
+      if(url.isNotEmpty){
+
+        urls.add(url);
+
+      }
+
+
     }
 
-    return candidates.toList();
+
+
+
+
+    return urls.toList();
+
+
   }
+
+
 }
