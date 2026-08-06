@@ -167,7 +167,7 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
                   hintText: 'Ex. A1B2C3D4E5F6',
                   hintStyle: const TextStyle(color: Colors.white38),
                   filled: true,
-                  fillColor: AppColors.lightBg,
+                  fillColor: AppColors.surfaceVariant,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: const BorderSide(color: AppColors.border),
@@ -199,7 +199,7 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
                     hintStyle: const TextStyle(color: Colors.white38),
                     counterStyle: const TextStyle(color: Colors.white38),
                     filled: true,
-                    fillColor: AppColors.lightBg,
+                    fillColor: AppColors.surfaceVariant,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: const BorderSide(color: AppColors.border),
