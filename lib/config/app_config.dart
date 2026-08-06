@@ -1,77 +1,67 @@
 class AppConfig {
-  static const String firebaseProjectId = 'crux-3c6be';
+  AppConfig._();
 
-  static const String environment = 'production';
+  //==========================================================
+  // ENVIRONNEMENT
+  //==========================================================
 
-  static bool get isProduction => environment == 'production';
+  static const String environment = "production";
 
-  static bool get isDevelopment => environment == 'development';
+  static bool get isProduction => environment == "production";
 
+  static bool get isDevelopment => !isProduction;
 
-  // ============================================================
-  // LIVEKIT CLOUD
-  // URL WebSocket utilisée par l'application Flutter
-  // Le token est obtenu depuis le serveur CRUX Token Server
-  // ============================================================
+  //==========================================================
+  // FIREBASE
+  //==========================================================
 
+  static const String firebaseProjectId = "crux-3c6be";
+
+  //==========================================================
+  // LIVEKIT
+  //==========================================================
+
+  /// Serveur LiveKit Cloud
   static const String livekitUrl =
-      'wss://crux-88fihb12.livekit.cloud';
+      "wss://crux-88fihb12.livekit.cloud";
 
-
-  // ============================================================
-  // LIVEKIT TOKEN SERVER
-  // Génère les JWT LiveKit sécurisés
-  //
-  // Flutter appelle automatiquement :
-  // GET https://crux-new-final.onrender.com/livekit-token
-  //
-  // Les clés LiveKit restent côté serveur uniquement.
-  // ============================================================
-
+  /// Serveur de génération des JWT
   static const String livekitTokenServerUrl =
-      'https://crux-new-final.onrender.com';
+      "https://crux-new-final.onrender.com";
 
+  /// URLs de secours
+  static const List<String> livekitFallbackUrls = [
+    "https://crux-new-final.onrender.com",
+  ];
 
-  // Serveurs de secours du token server uniquement.
-  // Ne jamais mettre ici des URLs wss:// LiveKit.
-  static const List<String> livekitFallbackUrls = [];
+  //==========================================================
+  // LIMITES
+  //==========================================================
 
-
-  // ============================================================
-  // LIMITES DE CONFERENCE
-  // ============================================================
-
-  /// Petites réunions P2P WebRTC directes.
+  /// Réunion P2P
   static const int p2pMaxParticipants = 6;
 
-
-  /// Conférences LiveKit SFU.
+  /// Réunion LiveKit
   static const int livekitMaxParticipants = 5000;
 
-
-  // ============================================================
-  // LIMITES APPLICATION
-  // ============================================================
-
-  /// Durée gratuite des réunions en minutes.
+  /// Durée gratuite
   static const int freeMeetingDurationMinutes = 30;
 
-
-  /// Nombre maximum de vidéos affichées simultanément.
+  /// Nombre de vidéos affichées
   static const int livekitVisibleTileCap = 16;
 
+  //==========================================================
+  // TIMEOUTS
+  //==========================================================
 
-  // ============================================================
-  // OPTIONS PAR DEFAUT DES REUNIONS
-  // ============================================================
+  static const Duration tokenTimeout =
+      Duration(seconds: 15);
 
-  static const bool defaultCameraEnabled = true;
+  static const Duration roomConnectionTimeout =
+      Duration(seconds: 20);
 
-  static const bool defaultMicrophoneEnabled = true;
+  static const Duration reconnectDelay =
+      Duration(seconds: 3);
 
-  static const bool defaultScreenShareEnabled = true;
-
-  static const bool defaultChatEnabled = true;
-
-  static const bool defaultRecordingEnabled = false;
+  static const int maxReconnectAttempts = 5;
 }
