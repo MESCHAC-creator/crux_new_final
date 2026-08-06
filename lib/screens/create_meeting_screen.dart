@@ -171,7 +171,7 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
                   hintText: 'Ex. Point d\'équipe hebdo',
                   hintStyle: const TextStyle(color: Colors.white38),
                   filled: true,
-                  fillColor: AppColors.lightBg,
+                  fillColor: AppColors.surfaceVariant,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: const BorderSide(color: AppColors.border),
@@ -209,7 +209,7 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
                     hintStyle: const TextStyle(color: Colors.white38),
                     counterStyle: const TextStyle(color: Colors.white38),
                     filled: true,
-                    fillColor: AppColors.lightBg,
+                    fillColor: AppColors.surfaceVariant,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: const BorderSide(color: AppColors.border),
