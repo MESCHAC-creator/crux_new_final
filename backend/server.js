@@ -1,5 +1,6 @@
 // backend/server.js
-// v2.0.0 — Ajout : authentification Firebase obligatoire, rate limiting, validation d'identité
+// CRUX LiveKit Token Server v2.1.0
+// Firebase Auth + LiveKit JWT + Rate limiting
 
 require('dotenv').config();
 
@@ -9,200 +10,582 @@ const rateLimit = require('express-rate-limit');
 const admin = require('firebase-admin');
 const { AccessToken } = require('livekit-server-sdk');
 
-// ── Firebase Admin SDK ───────────────────────────────────────────────────
+
+// ============================================================
+// Firebase Admin Initialization
+// ============================================================
+
 if (!admin.apps.length) {
-  // En production : utiliser GOOGLE_APPLICATION_CREDENTIALS ou ADC
-  // En dev local : firebase emulators ou service account JSON
-  admin.initializeApp();
+
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+
+    const serviceAccount = JSON.parse(
+      process.env.FIREBASE_SERVICE_ACCOUNT
+    );
+
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+
+  } else {
+
+    // Pour environnement Google avec ADC
+    admin.initializeApp();
+  }
 }
+
+
+// ============================================================
+// Express
+// ============================================================
 
 const app = express();
 
-// ── CORS ─────────────────────────────────────────────────────────────────
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
+app.use(express.json({
+  limit: '10kb'
+}));
+
+
+// ============================================================
+// CORS
+// ============================================================
+
+const allowedOrigins =
+  (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .filter(Boolean);
+
 
 app.use(
   cors({
+
     origin: (origin, callback) => {
-      // Autoriser les apps mobiles (pas d'origine) + origins whitelistées
-      if (!origin) return callback(null, true);
-      if (
-        !allowedOrigins.length || // développement : tout autoriser si non défini
-        allowedOrigins.some((o) => origin.startsWith(o.replace('/*', '')))
-      ) {
+
+      // Applications mobiles Flutter
+      if (!origin) {
         return callback(null, true);
       }
-      callback(new Error(`CORS: origin ${origin} not allowed`));
+
+
+      // Autoriser si aucune restriction
+      if (!allowedOrigins.length) {
+        return callback(null, true);
+      }
+
+
+      const allowed =
+        allowedOrigins.some(
+          item =>
+            origin.startsWith(
+              item.replace('/*', '')
+            )
+        );
+
+
+      if (allowed) {
+        return callback(null, true);
+      }
+
+
+      return callback(
+        new Error(
+          `CORS blocked: ${origin}`
+        )
+      );
     },
-    methods: ['GET', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type'],
+
+
+    methods:[
+      'GET',
+      'OPTIONS'
+    ],
+
+
+    allowedHeaders:[
+      'Authorization',
+      'Content-Type'
+    ]
   })
 );
 
-app.use(express.json({ limit: '10kb' }));
 
-// ── Configurations ────────────────────────────────────────────────────────
-const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
-const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
-const PORT = process.env.PORT || 3000;
-const TOKEN_TTL_SECONDS = parseInt(process.env.TOKEN_TTL_SECONDS || '86400', 10);
+// ============================================================
+// Configuration
+// ============================================================
 
-if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
-  console.error('❌ LIVEKIT_API_KEY et LIVEKIT_API_SECRET sont requis');
-  process.exit(1);
+const LIVEKIT_API_KEY =
+  process.env.LIVEKIT_API_KEY;
+
+
+const LIVEKIT_API_SECRET =
+  process.env.LIVEKIT_API_SECRET;
+
+
+const PORT =
+  process.env.PORT || 3000;
+
+
+const TOKEN_TTL_SECONDS =
+  Number(
+    process.env.TOKEN_TTL_SECONDS || 86400
+  );
+
+
+
+if(
+ !LIVEKIT_API_KEY ||
+ !LIVEKIT_API_SECRET
+){
+
+ console.error(
+  'LIVEKIT_API_KEY ou LIVEKIT_API_SECRET manquant'
+ );
+
+ process.exit(1);
+
 }
 
-// ── Rate Limiting ─────────────────────────────────────────────────────────
-// Limite globale : 100 req/min par IP
-const globalLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 100,
-  message: { error: 'Trop de requêtes, réessayez dans une minute' },
-  standardHeaders: true,
-  legacyHeaders: false,
+
+
+// ============================================================
+// Rate limiting
+// ============================================================
+
+
+app.use(
+ rateLimit({
+
+  windowMs:60000,
+
+  max:100,
+
+  standardHeaders:true,
+
+  legacyHeaders:false
+
+ })
+);
+
+
+
+const tokenLimiter =
+rateLimit({
+
+ windowMs:60000,
+
+ max:30,
+
+ standardHeaders:true,
+
+ legacyHeaders:false,
+
+
+ keyGenerator:(req)=>{
+
+   return req.user?.uid || req.ip;
+
+ }
+
 });
 
-// Limite spécifique pour les tokens : 30 tokens/min par IP
-const tokenLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 30,
-  message: { error: 'Limite de génération de tokens atteinte' },
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => req.user?.uid || req.ip, // par utilisateur Firebase si auth
-});
 
-app.use(globalLimiter);
 
-// ── Middleware : vérifier le token Firebase ID ────────────────────────────
-const verifyFirebaseToken = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
+// ============================================================
+// Firebase Authentication Middleware
+// ============================================================
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      error: 'Authentification requise',
-      hint: 'Fournissez un Bearer token Firebase dans le header Authorization',
-    });
-  }
 
-  const idToken = authHeader.slice(7); // Retire "Bearer "
+async function verifyFirebaseToken(
+ req,
+ res,
+ next
+){
 
-  try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken, true); // checkRevoked = true
-    req.user = decodedToken;
-    next();
-  } catch (err) {
-    const message =
-      err.code === 'auth/id-token-revoked'
-        ? 'Session révoquée, reconnectez-vous'
-        : err.code === 'auth/id-token-expired'
-        ? 'Session expirée, reconnectez-vous'
-        : 'Token invalide';
+ const header =
+   req.headers.authorization;
 
-    return res.status(401).json({ error: message, code: err.code });
-  }
-};
 
-// ── Health check ──────────────────────────────────────────────────────────
-app.get('/', (req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'CRUX LiveKit Token Server',
-    version: '2.0.0',
-    endpoints: {
-      health: 'GET /',
-      ping: 'GET /ping',
-      token: 'GET /livekit-token (auth required)',
-    },
+ if(
+  !header ||
+  !header.startsWith('Bearer ')
+ ){
+
+  return res.status(401).json({
+
+   error:
+   'Authentification Firebase requise'
+
   });
-});
 
-app.get('/ping', (req, res) => {
-  res.json({ status: 'ok', ts: Date.now() });
-});
+ }
 
-// ── LiveKit token endpoint ────────────────────────────────────────────────
-// Protégé : Firebase auth obligatoire + rate limit
-app.get('/livekit-token', verifyFirebaseToken, tokenLimiter, async (req, res) => {
-  const { room, identity, name, isHost } = req.query;
 
-  // Validation des paramètres requis
-  if (!room || !identity || !name) {
-    return res.status(400).json({
-      error: 'Paramètres manquants',
-      required: ['room', 'identity', 'name'],
-      optional: ['isHost'],
-    });
+
+ const token =
+   header.substring(7);
+
+
+
+ try{
+
+
+  const decoded =
+   await admin
+   .auth()
+   .verifyIdToken(
+     token,
+     true
+   );
+
+
+  req.user = decoded;
+
+
+  next();
+
+
+
+ }catch(error){
+
+
+  console.error(
+   'Firebase auth error:',
+   error.code
+  );
+
+
+  return res.status(401).json({
+
+   error:
+   'Token Firebase invalide'
+
+  });
+
+
+ }
+
+}
+
+
+
+// ============================================================
+// Health
+// ============================================================
+
+
+app.get('/',(req,res)=>{
+
+
+ res.json({
+
+  status:'ok',
+
+  service:
+  'CRUX LiveKit Token Server',
+
+  version:'2.1.0',
+
+
+  endpoints:{
+
+
+   health:
+   'GET /',
+
+
+   ping:
+   'GET /ping',
+
+
+   token:
+   'GET /livekit-token'
+
   }
 
-  // Validation de longueur
-  if (room.length > 100 || identity.length > 100 || name.length > 100) {
-    return res.status(400).json({ error: 'Paramètres trop longs (max 100 caractères)' });
-  }
+ });
 
-  // SÉCURITÉ : l'identité doit correspondre à l'UID Firebase authentifié
-  if (identity !== req.user.uid) {
-    return res.status(403).json({
-      error: 'Identité non autorisée',
-      hint: "L'identité doit correspondre à votre UID Firebase",
-    });
-  }
 
-  const hostGrant = isHost === 'true';
-
-  try {
-    const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
-      identity,
-      name: decodeURIComponent(name),
-      ttl: TOKEN_TTL_SECONDS,
-    });
-
-    at.addGrant({
-      roomJoin: true,
-      room: decodeURIComponent(room),
-      canPublish: true,
-      canSubscribe: true,
-      canPublishData: true,
-      canUpdateOwnMetadata: true,
-      // Droits hôte uniquement si demandé
-      roomAdmin: hostGrant,
-      roomCreate: hostGrant,
-      roomRecord: hostGrant,
-    });
-
-    const token = await at.toJwt();
-
-    console.log(`✅ Token généré : user=${identity} room=${room} host=${hostGrant}`);
-
-    return res.json({
-      token,
-      room: decodeURIComponent(room),
-      identity,
-      isHost: hostGrant,
-      expiresIn: TOKEN_TTL_SECONDS,
-    });
-  } catch (err) {
-    console.error('❌ Token generation error:', err);
-    return res.status(500).json({ error: 'Erreur lors de la génération du token' });
-  }
 });
 
-// ── 404 handler ───────────────────────────────────────────────────────────
-app.use((req, res) => {
-  res.status(404).json({ error: `Route ${req.method} ${req.path} introuvable` });
+
+
+app.get('/ping',(req,res)=>{
+
+ res.json({
+
+  status:'ok',
+
+  timestamp:
+  Date.now()
+
+ });
+
 });
 
-// ── Error handler global ──────────────────────────────────────────────────
-app.use((err, req, res, _next) => {
-  if (err.message?.includes('CORS')) {
-    return res.status(403).json({ error: err.message });
+
+
+
+// ============================================================
+// LiveKit Token Generator
+// ============================================================
+
+
+app.get(
+'/livekit-token',
+verifyFirebaseToken,
+tokenLimiter,
+
+
+async(req,res)=>{
+
+
+ try{
+
+
+ const {
+   room,
+   identity,
+   name,
+   isHost
+ }
+ =
+ req.query;
+
+
+
+ if(
+  !room ||
+  !identity ||
+  !name
+ ){
+
+ return res.status(400).json({
+
+  error:
+  'Paramètres manquants',
+
+  required:[
+   'room',
+   'identity',
+   'name'
+  ]
+
+ });
+
+ }
+
+
+
+ if(
+  room.length>100 ||
+  identity.length>100 ||
+  name.length>100
+ ){
+
+ return res.status(400).json({
+
+  error:
+  'Paramètres trop longs'
+
+ });
+
+ }
+
+
+
+
+ // Sécurité UID Firebase
+
+ if(
+   identity !== req.user.uid
+ ){
+
+ return res.status(403).json({
+
+  error:
+  'Identité non autorisée'
+
+ });
+
+ }
+
+
+
+ const host =
+   isHost === 'true';
+
+
+
+ const accessToken =
+ new AccessToken(
+
+  LIVEKIT_API_KEY,
+
+  LIVEKIT_API_SECRET,
+
+  {
+
+
+   identity:
+
+
+    identity,
+
+
+   name:
+
+
+    name,
+
+
+   ttl:
+
+
+    TOKEN_TTL_SECONDS
+
+
   }
-  console.error('Unhandled error:', err);
-  res.status(500).json({ error: 'Erreur interne du serveur' });
+
+ );
+
+
+
+
+ accessToken.addGrant({
+
+  roomJoin:true,
+
+  room:
+
+
+    room,
+
+
+  canPublish:true,
+
+
+  canSubscribe:true,
+
+
+  canPublishData:true,
+
+
+  canUpdateOwnMetadata:true,
+
+
+  // permissions host
+
+  roomAdmin:
+    host,
+
+
+  roomRecord:
+    host
+
+
+ });
+
+
+
+ const token =
+ await accessToken.toJwt();
+
+
+
+ console.log(
+  `Token généré user=${identity} room=${room} host=${host}`
+ );
+
+
+
+ return res.json({
+
+  token,
+
+
+  room,
+
+
+  identity,
+
+
+  isHost:host,
+
+
+  expiresIn:
+  TOKEN_TTL_SECONDS
+
+
+ });
+
+
+
+ }catch(error){
+
+
+ console.error(
+  'Token error:',
+  error
+ );
+
+
+ return res.status(500).json({
+
+  error:
+  'Erreur génération token'
+
+ });
+
+
+ }
+
+
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 CRUX LiveKit Token Server v2.0 démarré sur le port ${PORT}`);
-  console.log(`   Authentification Firebase : ACTIVÉE`);
-  console.log(`   Rate limiting : 30 tokens/min/utilisateur`);
+
+
+
+// ============================================================
+// 404
+// ============================================================
+
+
+app.use((req,res)=>{
+
+ res.status(404).json({
+
+  error:
+  'Route introuvable'
+
+ });
+
 });
+
+
+
+// ============================================================
+// Start
+// ============================================================
+
+
+app.listen(
+ PORT,
+ ()=>{
+
+ console.log(
+ `🚀 CRUX LiveKit Token Server v2.1.0 port ${PORT}`
+ );
+
+
+ console.log(
+ 'Firebase Auth : ON'
+ );
+
+
+ console.log(
+ 'LiveKit JWT : ON'
+ );
+
+
+}
+);
