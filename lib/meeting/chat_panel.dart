@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/colors.dart';
-import '../l10n/app_translations.dart';
 import '../providers/locale_provider.dart';
 import 'meeting_state.dart';
 import '../wallpaper/glass_surface.dart';
@@ -30,9 +29,6 @@ class _ChatPanelState extends State<ChatPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.read<LocaleProvider>().locale.languageCode;
-    final t = AppTranslations.of(context);
-
     return GlassSurface(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -53,11 +49,10 @@ class _ChatPanelState extends State<ChatPanel> {
             // Sélecteur de destinataire
             ActionChip(
               avatar: const Icon(Icons.person, size: 18),
-              label: Text(_recipient?.name ??
-                  (t.get('everyone', lang) ?? 'À tout le monde')),
+              label: Text(_recipient?.name ?? 'À tout le monde'),
               onPressed: () => _showRecipientPicker(context),
               backgroundColor: AppColors.surface,
-              labelStyle: TextStyle(color: AppColors.textSecondary),
+              labelStyle: const TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 8),
             Row(
@@ -66,8 +61,8 @@ class _ChatPanelState extends State<ChatPanel> {
                   child: TextField(
                     controller: _controller,
                     decoration: InputDecoration(
-                      hintText: t.get('message', lang) ?? 'Message',
-                      hintStyle: TextStyle(color: AppColors.textSecondary),
+                      hintText: 'Message',
+                      hintStyle: const TextStyle(color: AppColors.textSecondary),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
@@ -77,7 +72,7 @@ class _ChatPanelState extends State<ChatPanel> {
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 16),
                     ),
-                    style: TextStyle(color: AppColors.textPrimary),
+                    style: const TextStyle(color: AppColors.textPrimary),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -105,9 +100,6 @@ class _ChatPanelState extends State<ChatPanel> {
   }
 
   void _showRecipientPicker(BuildContext context) {
-    final lang = context.read<LocaleProvider>().locale.languageCode;
-    final t = AppTranslations.of(context);
-
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
@@ -116,8 +108,8 @@ class _ChatPanelState extends State<ChatPanel> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              title: Text(
-                t.get('everyone', lang) ?? 'Tout le monde',
+              title: const Text(
+                'Tout le monde',
                 style: TextStyle(color: AppColors.textPrimary),
               ),
               onTap: () {
@@ -128,10 +120,10 @@ class _ChatPanelState extends State<ChatPanel> {
             ...widget.participants.where((p) => !p.isLocal).map((p) => ListTile(
                   title: Text(
                     p.name,
-                    style: TextStyle(color: AppColors.textPrimary),
+                    style: const TextStyle(color: AppColors.textPrimary),
                   ),
-                  subtitle: Text(
-                    t.get('private_message', lang) ?? 'Message privé',
+                  subtitle: const Text(
+                    'Message privé',
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
                   onTap: () {

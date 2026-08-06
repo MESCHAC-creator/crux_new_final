@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../theme/colors.dart';
-import '../l10n/app_translations.dart';
 import '../providers/locale_provider.dart';
 import 'meeting_state.dart';
 import '../wallpaper/glass_surface.dart';
@@ -23,9 +22,6 @@ class MeetingHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.read<LocaleProvider>().locale.languageCode;
-    final t = AppTranslations.of(context);
-
     return GlassSurface(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -39,18 +35,18 @@ class MeetingHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            _HealthIndicator(health: health, t: t, lang: lang),
+            _HealthIndicator(health: health),
             const Spacer(),
             // Copie du lien en un seul tap
             IconButton(
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: roomUrl));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(t.get('link_copied', lang) ?? 'Lien copié')),
+                  const SnackBar(content: Text('Lien copié')),
                 );
               },
               icon: const Icon(Icons.copy, color: AppColors.textSecondary),
-              tooltip: t.get('copy_link', lang) ?? 'Copier le lien',
+              tooltip: 'Copier le lien',
             ),
           ],
         ),
@@ -69,21 +65,15 @@ class MeetingHeader extends StatelessWidget {
 
 class _HealthIndicator extends StatelessWidget {
   final CallHealth health;
-  final AppTranslations t;
-  final String lang;
 
-  const _HealthIndicator({
-    required this.health,
-    required this.t,
-    required this.lang,
-  });
+  const _HealthIndicator({required this.health});
 
   @override
   Widget build(BuildContext context) {
     final (color, label) = switch (health.level) {
-      CallHealthLevel.good => (AppColors.success, t.get('connection_good', lang) ?? 'Connexion bonne'),
-      CallHealthLevel.fair => (const Color(0xFFF6C445), t.get('connection_fair', lang) ?? 'Connexion moyenne'),
-      CallHealthLevel.poor => (AppColors.error, t.get('connection_poor', lang) ?? 'Connexion faible'),
+      CallHealthLevel.good => (AppColors.success, 'Connexion bonne'),
+      CallHealthLevel.fair => (const Color(0xFFF6C445), 'Connexion moyenne'),
+      CallHealthLevel.poor => (AppColors.error, 'Connexion faible'),
     };
 
     return Chip(
@@ -97,7 +87,7 @@ class _HealthIndicator extends StatelessWidget {
       ),
       label: Text(
         '${health.rttMs} ms',
-        style: TextStyle(
+        style: const TextStyle(
           color: AppColors.textPrimary,
           fontSize: 12,
         ),

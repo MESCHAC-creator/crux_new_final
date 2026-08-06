@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/colors.dart';
-import '../l10n/app_translations.dart';
 import '../providers/locale_provider.dart';
 import '../wallpaper/glass_surface.dart';
 
@@ -54,9 +53,6 @@ class _CallControlsBarState extends State<CallControlsBar> {
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.read<LocaleProvider>().locale.languageCode;
-    final t = AppTranslations.of(context);
-
     return GlassSurface(
       child: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -65,33 +61,29 @@ class _CallControlsBarState extends State<CallControlsBar> {
           children: [
             _ControlButton(
               icon: widget.micEnabled ? Icons.mic : Icons.mic_off,
-              description: widget.micEnabled
-                  ? (t.get('mute', lang) ?? 'Couper le micro')
-                  : (t.get('unmute', lang) ?? 'Activer le micro'),
+              description: widget.micEnabled ? 'Couper le micro' : 'Activer le micro',
               active: !widget.micEnabled,
               onTap: widget.onToggleMic,
             ),
             _ControlButton(
               icon: widget.cameraEnabled ? Icons.videocam : Icons.videocam_off,
-              description: widget.cameraEnabled
-                  ? (t.get('stop_video', lang) ?? 'Couper la caméra')
-                  : (t.get('start_video', lang) ?? 'Activer la caméra'),
+              description: widget.cameraEnabled ? 'Couper la caméra' : 'Activer la caméra',
               active: !widget.cameraEnabled,
               onTap: widget.onToggleCamera,
             ),
             _ControlButton(
               icon: Icons.screen_share,
-              description: t.get('share_screen', lang) ?? 'Partager l\'écran',
+              description: 'Partager l\'écran',
               onTap: widget.onShareScreen,
             ),
             _ControlButton(
               icon: Icons.chat,
-              description: t.get('open_chat', lang) ?? 'Ouvrir la discussion',
+              description: 'Ouvrir la discussion',
               onTap: widget.onOpenChat,
             ),
             _ControlButton(
               icon: Icons.more_horiz,
-              description: t.get('more_options', lang) ?? 'Plus d\'options',
+              description: 'Plus d\'options',
               onTap: () => setState(() => _moreOpen = true),
             ),
             const SizedBox(width: 8),
