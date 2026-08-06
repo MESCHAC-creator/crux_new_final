@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:developer' as dev;
-import 'package:flutter_foundation/flutter_foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
-import 'auth_service.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
+/// Gestion des tokens LiveKit — SFU helpers pour conférences 1000+ participants.
+/// Toutes les URLs de candidats viennent de AppConfig, jamais hardcodées ici.
+class LiveKitService {
   LiveKitService._();
   static final LiveKitService instance = LiveKitService._();
 
@@ -46,7 +48,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
     required bool isHost,
   }) async {
     // Obtenir le Firebase ID token pour l'authentification serveur
-    final idToken = await AuthService.instance.getIdToken();
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
     if (idToken == null) {
       dev.log('LiveKitService: no Firebase ID token available', name: 'crux');
       return null;
@@ -93,7 +95,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
     // 1. URL web actuelle (web uniquement)
     if (kIsWeb) {
       try {
-        // ignore: undefined_function
         final origin = Uri.base.origin;
         if (origin.startsWith('http')) candidates.add(origin);
       } catch (_) {}
