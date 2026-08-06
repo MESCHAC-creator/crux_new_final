@@ -3,7 +3,6 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:provider/provider.dart';
 import '../providers/locale_provider.dart';
 import '../theme/colors.dart';
-import '../l10n/app_translations.dart';
 import '../wallpaper/wallpaper_config.dart';
 import '../wallpaper/app_background.dart';
 import '../video/virtual_background_mode.dart';
@@ -82,8 +81,6 @@ class _CruxMeetingScreenState extends State<CruxMeetingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.read<LocaleProvider>().locale.languageCode;
-    final t = AppTranslations.of(context);
     final bgController = context.watch<VirtualBackgroundController>();
 
     return AppBackground(
@@ -124,38 +121,32 @@ class _CruxMeetingScreenState extends State<CruxMeetingScreen> {
                   secondaryActions: [
                     SecondaryAction(
                       icon: Icons.wallpaper,
-                      label: t.get('wallpaper', lang) ?? 'Fond d\'écran',
-                      description: t.get('wallpaper_desc', lang) ??
-                          'Choisir une image et régler le flou',
+                      label: 'Fond d\'écran',
+                      description: 'Choisir une image et régler le flou',
                       onClick: () => Navigator.pushNamed(context, '/wallpaper'),
                     ),
                     SecondaryAction(
                       icon: Icons.pan_tool,
-                      label: t.get('raise_hand', lang) ?? 'Lever la main',
-                      description: t.get('raise_hand_desc', lang) ??
-                          'Signaler que vous voulez parler',
+                      label: 'Lever la main',
+                      description: 'Signaler que vous voulez parler',
                       onClick: () {},
                     ),
                     SecondaryAction(
                       icon: Icons.closed_caption,
-                      label: t.get('subtitles', lang) ?? 'Sous-titres',
-                      description: t.get('subtitles_desc', lang) ??
-                          'Transcription en direct',
+                      label: 'Sous-titres',
+                      description: 'Transcription en direct',
                       onClick: () {},
                     ),
                     SecondaryAction(
                       icon: Icons.poll,
-                      label: t.get('poll', lang) ?? 'Sondage',
-                      description:
-                          t.get('poll_desc', lang) ?? 'Lancer un vote rapide',
+                      label: 'Sondage',
+                      description: 'Lancer un vote rapide',
                       onClick: () {},
                     ),
                     SecondaryAction(
                       icon: Icons.meeting_room,
-                      label:
-                          t.get('breakout_rooms', lang) ?? 'Salles de groupe',
-                      description: t.get('breakout_rooms_desc', lang) ??
-                          'Répartir les participants',
+                      label: 'Salles de groupe',
+                      description: 'Répartir les participants',
                       onClick: () {},
                     ),
                   ],

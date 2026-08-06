@@ -1,10 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
 import '../theme/colors.dart';
-import '../l10n/app_translations.dart';
-import '../providers/locale_provider.dart';
 import '../wallpaper/glass_surface.dart';
 import 'virtual_background_controller.dart';
 import 'virtual_background_mode.dart';
@@ -25,8 +22,6 @@ class BackgroundPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.read<LocaleProvider>().locale.languageCode;
-    final t = AppTranslations.of(context);
     final mode = controller.mode;
 
     return GlassSurface(
@@ -38,14 +33,14 @@ class BackgroundPanel extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           children: [
             _BgOption(
-              label: t.get('bg_none', lang) ?? 'Aucun',
+              label: 'Aucun',
               icon: Icons.block,
               selected: mode is VirtualBackgroundNone,
               onTap: () => controller.setMode(const VirtualBackgroundNone()),
             ),
             const SizedBox(width: 8),
             _BgOption(
-              label: t.get('bg_blur_light', lang) ?? 'Flou léger',
+              label: 'Flou léger',
               icon: Icons.blur_on,
               selected: mode is VirtualBackgroundBlurLight,
               onTap: () =>
@@ -53,7 +48,7 @@ class BackgroundPanel extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             _BgOption(
-              label: t.get('bg_blur_strong', lang) ?? 'Flou fort',
+              label: 'Flou fort',
               icon: Icons.blur_circular,
               selected: mode is VirtualBackgroundBlurStrong,
               onTap: () =>
@@ -61,7 +56,7 @@ class BackgroundPanel extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             _BgOption(
-              label: t.get('bg_image', lang) ?? 'Image',
+              label: 'Image',
               icon: Icons.image,
               selected: mode is VirtualBackgroundImage,
               onTap: () => _pickImage(context),

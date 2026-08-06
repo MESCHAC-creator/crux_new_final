@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../theme/colors.dart';
-import '../l10n/app_translations.dart';
 import 'wallpaper_config.dart';
 import 'wallpaper_manager.dart';
 import 'app_background.dart';
 import 'glass_surface.dart';
-import '../providers/locale_provider.dart';
 
 /// Écran de sélection du fond d'écran CRUX.
 /// L'aperçu EST le fond réel : ce que vous voyez est ce que vous obtenez.
@@ -38,15 +36,12 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.read<LocaleProvider>().locale.languageCode;
-    final t = AppTranslations.of(context);
-
     return AppBackground(
       config: _draft,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: Text(t.get('wallpaper_title', lang) ?? 'Fond d\'écran'),
+          title: const Text('Fond d\'écran'),
           backgroundColor: Colors.transparent,
           elevation: 0,
         ),
@@ -62,7 +57,7 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _LabeledSlider(
-                        label: t.get('blur', lang) ?? 'Floutage',
+                        label: 'Floutage',
                         value: _draft.blurRadius,
                         max: WallpaperConfig.maxBlur,
                         display: '${_draft.blurRadius.round()} dp',
@@ -71,7 +66,7 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                             () => _draft = _draft.copyWith(blurRadius: v)),
                       ),
                       _LabeledSlider(
-                        label: t.get('scrim', lang) ?? 'Assombrissement',
+                        label: 'Assombrissement',
                         value: _draft.scrim,
                         max: WallpaperConfig.maxScrim,
                         display:
@@ -87,8 +82,7 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  t.get('progressive_blur', lang) ??
-                                      'Flou progressif',
+                                  'Flou progressif',
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodyLarge
@@ -97,8 +91,7 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                                       ),
                                 ),
                                 Text(
-                                  t.get('progressive_blur_desc', lang) ??
-                                      'Flou en haut, net en bas — améliore la lisibilité',
+                                  'Flou en haut, net en bas — améliore la lisibilité',
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodyMedium
@@ -129,8 +122,7 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _pickImage,
                       icon: const Icon(Icons.image),
-                      label: Text(
-                          t.get('choose_photo', lang) ?? 'Choisir une photo'),
+                      label: const Text('Choisir une photo'),
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(0, 48),
                       ),
@@ -161,7 +153,7 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),
                 ),
-                child: Text(t.get('apply', lang) ?? 'Appliquer'),
+                child: const Text('Appliquer'),
               ),
               const SizedBox(height: 16),
             ],

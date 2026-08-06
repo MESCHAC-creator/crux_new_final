@@ -6,6 +6,44 @@ import 'colors.dart';
 class AppTheme {
   AppTheme._();
 
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: Colors.white,
+      colorScheme: const ColorScheme.light(
+        primary: AppColors.primary,
+        onPrimary: Colors.white,
+        surface: Colors.white,
+        onSurface: Colors.black87,
+        error: AppColors.error,
+        onError: Colors.white,
+      ),
+      textTheme: TextTheme(
+        displayLarge: GoogleFonts.spaceGrotesk(
+          fontSize: 57, fontWeight: FontWeight.w700, color: Colors.black87,
+        ),
+        headlineSmall: GoogleFonts.spaceGrotesk(
+          fontSize: 24, fontWeight: FontWeight.w600, color: Colors.black87,
+        ),
+        bodyLarge: GoogleFonts.spaceGrotesk(
+          fontSize: 16, fontWeight: FontWeight.w400, color: Colors.black87,
+        ),
+        bodyMedium: GoogleFonts.spaceGrotesk(
+          fontSize: 14, fontWeight: FontWeight.w400, color: Colors.black54,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,

@@ -426,7 +426,7 @@ class _AccueilTab extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) =>
-                              const CreateMeetingScreen(isScheduled: true),
+                              const CreateMeetingScreen(),
                         ),
                       ),
                     ),
