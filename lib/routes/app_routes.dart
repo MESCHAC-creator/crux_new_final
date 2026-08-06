@@ -67,6 +67,9 @@ class AppRoutes {
       case profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
 
+      case wallpaper:
+        return MaterialPageRoute(builder: (_) => const WallpaperPickerScreen());
+
       default:
         return MaterialPageRoute(builder: (_) => const SplashScreen());
     }
