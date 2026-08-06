@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/colors.dart';
 import '../l10n/app_translations.dart';
+import '../providers/locale_provider.dart';
 import '../wallpaper/glass_surface.dart';
 
 /// Action secondaire pour la bottom sheet.
