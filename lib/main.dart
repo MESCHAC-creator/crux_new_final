@@ -32,7 +32,6 @@ import 'wallpaper/wallpaper_manager.dart';
 import 'video/virtual_background_controller.dart';
 import 'meeting/CruxMeetingScreen.dart';
 
-// ---------------------------------------------------------------------------
 const _flutterUnsupportedLocales = {'ha', 'yo', 'mg', 'wo'};
 
 Locale _materialFallback(Locale locale) =>
@@ -78,10 +77,7 @@ const List<LocalizationsDelegate<dynamic>> _localizationsDelegates = [
   GlobalWidgetsLocalizations.delegate,
 ];
 
-// ---------------------------------------------------------------------------
-
 void main() {
-  // Capture all Flutter framework errors
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     crux.logger.e('Flutter Framework Error', error: details.exception, stackTrace: details.stack);
@@ -90,7 +86,6 @@ void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    // Initialize Firebase first
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
@@ -108,7 +103,6 @@ void main() {
       return;
     }
 
-    // Attempt services initialization without blocking startup if they fail
     try {
       NotificationService().initialize().catchError((e) => crux.logger.e('Notification init failed', error: e));
     } catch (e) {
@@ -205,7 +199,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => ColorProvider()),
         ChangeNotifierProvider(create: (_) => VirtualBackgroundController()),
-
       ],
       child: Consumer2<ThemeProvider, LocaleProvider>(
         builder: (context, themeProvider, localeProvider, _) {
@@ -243,7 +236,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   void initState() {
-    super.initState(); /.WS¨0NF989VV PLJ+9H27NI0J5 B°975°I5 ¨9 77+N9O
+    super.initState();
     _authStream = FirebaseAuth.instance.authStateChanges();
     _loadTerms();
     _initDeepLinks();
@@ -266,6 +259,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   void _handleDeepLink(Uri uri) {
+    if (!mounted) return;
+
     String? meetingId;
     if (uri.scheme == 'crux' && uri.host == 'join') {
       meetingId = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
@@ -278,10 +273,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (meetingId == null || meetingId.isEmpty) return;
     final mid = meetingId.trim().toUpperCase();
 
-    if (!mounted) {
-      _pendingMeetingId = mid;
-      return;
-    }
+    _pendingMeetingId = mid;
+
+    if (!mounted) return;
 
     final current = FirebaseAuth.instance.currentUser;
     if (current != null && !current.isAnonymous) {
@@ -333,9 +327,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Future<void> _loadTerms() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (mounted) setState(() => _termsAccepted = prefs.getBool('crux_terms_accepted') ?? false);
+      if (!mounted) return;
+      setState(() => _termsAccepted = prefs.getBool('crux_terms_accepted') ?? false);
     } catch (e) {
-      if (mounted) setState(() => _termsAccepted = false);
+      if (!mounted) return;
+      setState(() => _termsAccepted = false);
     }
   }
 

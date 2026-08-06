@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/colors.dart';
 import '../services/auth_service.dart';
 import '../utils/logger.dart' as crux;
@@ -55,13 +57,13 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() { _loading = true; _error = null; });
 
     try {
-      await AuthService.instance.signInWithEmailAndPassword(
+      await AuthService().signIn(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
       );
-      // Navigation gérée par AuthWrapper dans main.dart
-    } on AuthException catch (e) {
-      if (mounted) _shakeError(e.friendlyMessage);
+      // Navigation managed by AuthWrapper in main.dart
+    } on FirebaseAuthException catch (e) {
+      if (mounted) _shakeError(_friendlyAuthError(e.code));
     } catch (e) {
       crux.logger.e('Login error: $e');
       if (mounted) _shakeError('Erreur de connexion. Vérifiez votre connexion internet.');
@@ -73,9 +75,9 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _signInWithGoogle() async {
     setState(() { _loading = true; _error = null; });
     try {
-      await AuthService.instance.signInWithGoogle();
-    } on AuthException catch (e) {
-      if (mounted) _shakeError(e.friendlyMessage);
+      await AuthService().signInWithGoogle();
+    } on FirebaseAuthException catch (e) {
+      if (mounted) _shakeError(_friendlyAuthError(e.code));
     } catch (e) {
       crux.logger.e('Google sign-in error: $e');
       if (mounted) _shakeError('Connexion Google annulée ou échouée');
@@ -91,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
     try {
-      await AuthService.instance.sendPasswordResetEmail(email);
+      await AuthService().resetPassword(email);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -102,6 +104,21 @@ class _LoginScreenState extends State<LoginScreen>
       }
     } catch (_) {
       if (mounted) _shakeError('Impossible d\'envoyer l\'email de réinitialisation');
+    }
+  }
+
+  String _friendlyAuthError(String code) {
+    switch (code) {
+      case 'user-not-found':
+        return 'Utilisateur non trouvé';
+      case 'wrong-password':
+        return 'Mot de passe incorrect';
+      case 'user-disabled':
+        return 'Compte désactivé';
+      case 'too-many-requests':
+        return 'Trop de tentatives. Réessayez plus tard';
+      default:
+        return 'Erreur d\'authentification';
     }
   }
 
@@ -120,7 +137,6 @@ class _LoginScreenState extends State<LoginScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Logo + Titre
                     const SizedBox(height: 16),
                     Center(
                       child: Container(
@@ -156,10 +172,7 @@ class _LoginScreenState extends State<LoginScreen>
                         color: AppColors.textSecondary,
                       ),
                     ),
-
                     const SizedBox(height: 36),
-
-                    // Email
                     TextFormField(
                       controller: _emailCtrl,
                       keyboardType: TextInputType.emailAddress,
@@ -181,10 +194,7 @@ class _LoginScreenState extends State<LoginScreen>
                         return null;
                       },
                     ),
-
                     const SizedBox(height: 12),
-
-                    // Mot de passe
                     TextFormField(
                       controller: _passwordCtrl,
                       obscureText: _obscurePassword,
@@ -213,8 +223,6 @@ class _LoginScreenState extends State<LoginScreen>
                         return null;
                       },
                     ),
-
-                    // Mot de passe oublié
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
@@ -231,8 +239,6 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       ),
                     ),
-
-                    // Erreur avec shake
                     if (_error != null)
                       AnimatedBuilder(
                         animation: _shakeAnimation,
@@ -273,10 +279,7 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                         ),
                       ),
-
                     const SizedBox(height: 4),
-
-                    // CTA Connexion
                     ElevatedButton(
                       onPressed: _loading ? null : _signIn,
                       child: _loading
@@ -290,10 +293,7 @@ class _LoginScreenState extends State<LoginScreen>
                             )
                           : const Text('Se connecter'),
                     ),
-
                     const SizedBox(height: 16),
-
-                    // Séparateur
                     Row(
                       children: [
                         const Expanded(child: Divider(color: AppColors.divider)),
@@ -310,10 +310,7 @@ class _LoginScreenState extends State<LoginScreen>
                         const Expanded(child: Divider(color: AppColors.divider)),
                       ],
                     ),
-
                     const SizedBox(height: 16),
-
-                    // Google Sign-In
                     OutlinedButton.icon(
                       onPressed: _loading ? null : _signInWithGoogle,
                       icon: Image.network(
@@ -325,10 +322,7 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                       label: const Text('Continuer avec Google'),
                     ),
-
                     const SizedBox(height: 32),
-
-                    // Créer un compte
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -358,7 +352,6 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 16),
                   ],
                 ),
@@ -369,11 +362,4 @@ class _LoginScreenState extends State<LoginScreen>
       ),
     );
   }
-}
-
-// Exception auth avec messages conviviaux
-class AuthException implements Exception {
-  final String code;
-  final String friendlyMessage;
-  const AuthException(this.code, this.friendlyMessage);
 }
