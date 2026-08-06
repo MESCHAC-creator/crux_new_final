@@ -15,4 +15,9 @@
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+
+    <!-- Thème au niveau application, utilisé par toute future Activity native
+         (Compose) qui ne définit pas son propre thème. MainActivity garde son
+         propre android:theme="@style/LaunchTheme" et n'est donc pas affectée. -->
+    <style name="Theme.Crux" parent="@style/Theme.Material3.DayNight.NoActionBar" />
 </resources>
