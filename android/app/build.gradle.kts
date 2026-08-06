@@ -4,6 +4,7 @@ import java.io.FileInputStream
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
 }
@@ -20,6 +21,10 @@ android {
     namespace = "com.schac_crux.app"
     compileSdk = 36
     ndkVersion = "27.0.12077973"
+
+    buildFeatures {
+        compose = true
+    }
 
     signingConfigs {
         create("release") {
@@ -106,4 +111,29 @@ dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
+
+    // Compose — pour le fond vidéo virtuel (segmentation MLKit) et futures vues natives
+    implementation(platform("androidx.compose:compose-bom:2024.10.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+
+    // Persistance des préférences de fond d'écran
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Chargement d'images
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Segmentation du fond vidéo
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
+
+    // LiveKit natif : normalement déjà tiré transitivement par le plugin Flutter
+    // `livekit_client`. Ligne explicite conservée à la demande, mais à surveiller —
+    // en cas d'erreur "duplicate class" au build, retirer cette ligne et laisser
+    // le plugin Flutter fournir la version native.
+    implementation("io.livekit:livekit-android:2.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }
