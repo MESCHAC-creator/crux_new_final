@@ -1,33 +1,77 @@
 class AppConfig {
   static const String firebaseProjectId = 'crux-3c6be';
+
   static const String environment = 'production';
+
   static bool get isProduction => environment == 'production';
+
   static bool get isDevelopment => environment == 'development';
 
-  // LiveKit server URL (WebSocket) — livekit.cloud hosted
-  static const String livekitUrl = 'wss://crux-88fihb12.livekit.cloud';
-  static const String livekitApiKey = 'APIDnXJytuRnVpH';
-  static const String livekitApiSecret = 'ImMJ5epOjxwTeG96CK8yp8qtp28tXBaGLDrjKc5aZC3';
 
-static const List<String> livekitFallbackUrls = [
-  'wss://fallback1.livekit.cloud',
-  'wss://fallback2.livekit.cloud',
-];
-  
-  // Token server: generates signed LiveKit JWTs from your API key/secret
-  // Endpoint: GET /livekit-token?room=<meetingId>&identity=<userId>&name=<userName>
+  // ============================================================
+  // LIVEKIT CLOUD
+  // URL WebSocket utilisée par l'application Flutter
+  // Le token est obtenu depuis le serveur CRUX Token Server
+  // ============================================================
+
+  static const String livekitUrl =
+      'wss://crux-88fihb12.livekit.cloud';
+
+
+  // ============================================================
+  // LIVEKIT TOKEN SERVER
+  // Génère les JWT LiveKit sécurisés
+  //
+  // Flutter appelle automatiquement :
+  // GET https://crux-new-final.onrender.com/livekit-token
+  //
+  // Les clés LiveKit restent côté serveur uniquement.
+  // ============================================================
+
   static const String livekitTokenServerUrl =
       'https://crux-new-final.onrender.com';
 
-  /// P2P mesh limit (WebRTC direct — small meetings).
+
+  // Serveurs de secours du token server uniquement.
+  // Ne jamais mettre ici des URLs wss:// LiveKit.
+  static const List<String> livekitFallbackUrls = [];
+
+
+  // ============================================================
+  // LIMITES DE CONFERENCE
+  // ============================================================
+
+  /// Petites réunions P2P WebRTC directes.
   static const int p2pMaxParticipants = 6;
 
-  /// SFU limit (Zoom/Meet-style large webinars).
+
+  /// Conférences LiveKit SFU.
   static const int livekitMaxParticipants = 5000;
 
-  /// Limite de durée pour les appels gratuits (en minutes)
+
+  // ============================================================
+  // LIMITES APPLICATION
+  // ============================================================
+
+  /// Durée gratuite des réunions en minutes.
   static const int freeMeetingDurationMinutes = 30;
 
-  /// Max video tiles rendered on screen at once
+
+  /// Nombre maximum de vidéos affichées simultanément.
   static const int livekitVisibleTileCap = 16;
+
+
+  // ============================================================
+  // OPTIONS PAR DEFAUT DES REUNIONS
+  // ============================================================
+
+  static const bool defaultCameraEnabled = true;
+
+  static const bool defaultMicrophoneEnabled = true;
+
+  static const bool defaultScreenShareEnabled = true;
+
+  static const bool defaultChatEnabled = true;
+
+  static const bool defaultRecordingEnabled = false;
 }
