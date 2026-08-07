@@ -1,21 +1,4 @@
-// lib/utils/meeting_notification_manager.dart
-//
-// CORRECTIF : les rappels de réunion étaient stockés en base
-// (notifyAtOneHour / notifyAtFifteenMin / notifyAtFiveMin / notifyAtStart)
-// mais **jamais programmés** côté appareil, et `tz.initializeTimeZones()`
-// n'était appelé nulle part → `zonedSchedule` levait
-// `LateInitializationError: local` au premier appel.
-//
-// Ce manager :
-//   - initialise la base de fuseaux + le fuseau local une seule fois ;
-//   - programme les 4 rappels d'une réunion avec des IDs déterministes
-//     (dérivés du meetingId) pour pouvoir les annuler/reprogrammer ;
-//   - ignore silencieusement les échéances déjà passées ;
-//   - retombe sur un scheduling inexact si l'alarme exacte est refusée
-//     (Android 12+ / SCHEDULE_EXACT_ALARM).
-
 import 'dart:io' show Platform;
-
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
@@ -68,8 +51,8 @@ class MeetingNotificationManager {
     try {
       tzdata.initializeTimeZones();
       try {
-        final localName = await FlutterTimezone.getLocalTimezone();
-        tz.setLocalLocation(tz.getLocation(localName));
+        final tzInfo = await FlutterTimezone.getLocalTimezone();
+        tz.setLocalLocation(tz.getLocation(tzInfo.identifier));
       } catch (e) {
         // Fuseau système illisible : on reste sur UTC plutôt que de crasher.
         crux.logger.w('Fuseau local introuvable ($e) → UTC');
