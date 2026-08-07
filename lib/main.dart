@@ -29,6 +29,9 @@ import 'theme/colors.dart';
 import 'theme/theme.dart';
 import 'widgets/elegant_toast.dart';
 import 'wallpaper/wallpaper_manager.dart';
+import 'wallpaper/app_background.dart';
+import 'providers/wallpaper_provider.dart';
+import 'utils/meeting_notification_manager.dart';
 import 'video/virtual_background_controller.dart';
 import 'meeting/CruxMeetingScreen.dart';
 
@@ -86,6 +89,15 @@ void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
+    // CORRECTIF : le fond d'écran doit être initialisé quoi qu'il arrive,
+    // pas seulement dans la branche d'erreur Firebase (sinon
+    // LateInitializationError sur `_prefs` dès l'ouverture du sélecteur).
+    try {
+      await WallpaperManager().init();
+    } catch (e) {
+      crux.logger.e('WallpaperManager init error', error: e);
+    }
+
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
@@ -97,14 +109,16 @@ void main() {
       crux.logger.i('Firebase initialized');
     } catch (e) {
       crux.logger.e('Firebase init error', error: e);
-      await WallpaperManager().init();
-
       runApp(_ErrorApp(title: 'Firebase Error', message: e.toString()));
       return;
     }
 
     try {
       NotificationService().initialize().catchError((e) => crux.logger.e('Notification init failed', error: e));
+      // CORRECTIF : sans cet appel, aucun rappel de réunion n'était programmé.
+      MeetingNotificationManager.instance
+          .initialize()
+          .catchError((e) => crux.logger.e('Meeting reminders init failed', error: e));
     } catch (e) {
       crux.logger.e('Notification Service crash', error: e);
     }
@@ -199,9 +213,10 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => ColorProvider()),
         ChangeNotifierProvider(create: (_) => VirtualBackgroundController()),
+        ChangeNotifierProvider(create: (_) => WallpaperProvider()),
       ],
-      child: Consumer2<ThemeProvider, LocaleProvider>(
-        builder: (context, themeProvider, localeProvider, _) {
+      child: Consumer3<ThemeProvider, LocaleProvider, WallpaperProvider>(
+        builder: (context, themeProvider, localeProvider, wallpaper, _) {
           return MaterialApp(
             navigatorKey: MyApp._navigatorKey,
             title: 'CRUX',
@@ -213,6 +228,11 @@ class MyApp extends StatelessWidget {
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
             onGenerateRoute: AppRoutes.generateRoute,
+            // Le fond choisi par l'utilisateur habille TOUTE l'application.
+            builder: (context, child) => AppBackground(
+              config: wallpaper.config,
+              child: child ?? const SizedBox.shrink(),
+            ),
             home: const AuthWrapper(),
           );
         },

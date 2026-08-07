@@ -51,8 +51,12 @@ class MeetingNotificationManager {
     try {
       tzdata.initializeTimeZones();
       try {
-        final tzInfo = await FlutterTimezone.getLocalTimezone();
-        tz.setLocalLocation(tz.getLocation(tzInfo.identifier));
+        // flutter_timezone renvoie un String (<=3.x) ou un TimezoneInfo (>=4.x).
+        // On accepte les deux pour ne dépendre d'aucune version précise.
+        final dynamic tzInfo = await FlutterTimezone.getLocalTimezone();
+        final String tzName =
+            tzInfo is String ? tzInfo : (tzInfo.identifier as String);
+        tz.setLocalLocation(tz.getLocation(tzName));
       } catch (e) {
         // Fuseau système illisible : on reste sur UTC plutôt que de crasher.
         crux.logger.w('Fuseau local introuvable ($e) → UTC');

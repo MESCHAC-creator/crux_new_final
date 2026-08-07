@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/wallpaper_provider.dart';
 import '../theme/colors.dart';
-import 'wallpaper_config.dart';
-import 'wallpaper_manager.dart';
-import 'app_background.dart';
 import 'glass_surface.dart';
+import 'wallpaper_config.dart';
 
 /// Écran de sélection du fond d'écran CRUX.
 /// L'aperçu EST le fond réel : ce que vous voyez est ce que vous obtenez.
+///
+/// CORRECTIFS :
+///   * l'aperçu passe par WallpaperProvider → toute l'app se met à jour en
+///     direct (avant, l'accueil gardait l'ancien fond) ;
+///   * « Appliquer » est toujours actif (on peut aussi enregistrer le retour
+///     au fond CRUX par défaut) ;
+///   * la configuration d'origine est restaurée si l'on quitte sans appliquer ;
+///   * gestion d'erreur sur l'import (permission refusée, fichier illisible).
 class WallpaperPickerScreen extends StatefulWidget {
   const WallpaperPickerScreen({super.key});
 
@@ -16,63 +25,102 @@ class WallpaperPickerScreen extends StatefulWidget {
 }
 
 class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
-  late WallpaperConfig _draft;
   final _picker = ImagePicker();
+
+  late final WallpaperProvider _provider;
+  late final WallpaperConfig _initial;
+  bool _applied = false;
+  bool _busy = false;
 
   @override
   void initState() {
     super.initState();
-    _draft = WallpaperManager().config;
+    _provider = context.read<WallpaperProvider>();
+    _initial = _provider.config;
+  }
+
+  @override
+  void dispose() {
+    // Quitter sans appliquer ne doit rien changer.
+    if (!_applied) _provider.preview(_initial);
+    super.dispose();
   }
 
   Future<void> _pickImage() async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      final path = await WallpaperManager().importImage(picked.path);
-      setState(() => _draft = _draft.copyWith(imagePath: path));
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 2400,
+        imageQuality: 92,
+      );
+      if (picked == null) return;
+      await _provider.importAndApply(picked.path);
+      _applied = true;
+    } catch (e) {
+      if (mounted) _snack('Import impossible : $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _snack(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message,
+              style: const TextStyle(color: AppColors.textPrimary)),
+          backgroundColor: AppColors.surfaceElevated,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   @override
   Widget build(BuildContext context) {
-    return AppBackground(
-      config: _draft,
-      child: Scaffold(
+    // Rebuild à chaque changement d'aperçu.
+    final draft = context.watch<WallpaperProvider>().config;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: const Text('Fond d\'écran'),
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: const Text('Fond d\'écran'),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(16.0),
+        elevation: 0,
+        foregroundColor: AppColors.textPrimary,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               GlassSurface(
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _LabeledSlider(
                         label: 'Floutage',
-                        value: _draft.blurRadius,
+                        value: draft.blurRadius,
                         max: WallpaperConfig.maxBlur,
-                        display: '${_draft.blurRadius.round()} dp',
-                        enabled: _draft.hasImage,
-                        onChanged: (v) => setState(
-                            () => _draft = _draft.copyWith(blurRadius: v)),
+                        display: '${draft.blurRadius.round()} dp',
+                        enabled: draft.hasImage,
+                        onChanged: (v) =>
+                            _provider.preview(draft.copyWith(blurRadius: v)),
                       ),
                       _LabeledSlider(
                         label: 'Assombrissement',
-                        value: _draft.scrim,
+                        value: draft.scrim,
                         max: WallpaperConfig.maxScrim,
                         display:
-                            '${(_draft.scrim / WallpaperConfig.maxScrim * 100).round()} %',
-                        enabled: _draft.hasImage,
+                            '${(draft.scrim / WallpaperConfig.maxScrim * 100).round()} %',
+                        enabled: draft.hasImage,
                         onChanged: (v) =>
-                            setState(() => _draft = _draft.copyWith(scrim: v)),
+                            _provider.preview(draft.copyWith(scrim: v)),
                       ),
                       Row(
                         children: [
@@ -85,9 +133,7 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodyLarge
-                                      ?.copyWith(
-                                        color: AppColors.textPrimary,
-                                      ),
+                                      ?.copyWith(color: AppColors.textPrimary),
                                 ),
                                 Text(
                                   'Flou en haut, net en bas — améliore la lisibilité',
@@ -95,17 +141,16 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                                       .textTheme
                                       .bodyMedium
                                       ?.copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
+                                          color: AppColors.textSecondary),
                                 ),
                               ],
                             ),
                           ),
                           Switch(
-                            value: _draft.progressiveBlur,
-                            onChanged: _draft.hasImage
-                                ? (v) => setState(() => _draft =
-                                    _draft.copyWith(progressiveBlur: v))
+                            value: draft.progressiveBlur,
+                            onChanged: draft.hasImage
+                                ? (v) => _provider
+                                    .preview(draft.copyWith(progressiveBlur: v))
                                 : null,
                           ),
                         ],
@@ -119,36 +164,43 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: _pickImage,
-                      icon: const Icon(Icons.image),
-                      label: const Text('Choisir une photo'),
+                      onPressed: _busy ? null : _pickImage,
+                      icon: _busy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.image_outlined),
+                      label: Text(draft.hasImage
+                          ? 'Changer la photo'
+                          : 'Choisir une photo'),
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(0, 48),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      setState(() => _draft = WallpaperConfig.defaultConfig);
-                      WallpaperManager().reset();
+                  OutlinedButton(
+                    onPressed: () async {
+                      await _provider.reset();
+                      _applied = true;
+                      if (mounted) _snack('Fond CRUX par défaut restauré.');
                     },
-                    icon: const Icon(Icons.restore),
-                    label: const Text(''),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(48, 48),
                     ),
+                    child: const Icon(Icons.restore),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               ElevatedButton(
-                onPressed: _draft.hasImage
-                    ? () async {
-                        await WallpaperManager().save(_draft);
-                        if (mounted) Navigator.pop(context);
-                      }
-                    : null,
+                onPressed: () async {
+                  await _provider.apply(_provider.config);
+                  _applied = true;
+                  if (mounted) Navigator.pop(context);
+                },
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),
                 ),
@@ -190,20 +242,22 @@ class _LabeledSlider extends StatelessWidget {
           children: [
             Text(
               label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
+              style: Theme.of(context)
+                  .textTheme
+                  .labelLarge
+                  ?.copyWith(color: AppColors.textPrimary),
             ),
             Text(
               display,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+              style: Theme.of(context)
+                  .textTheme
+                  .labelLarge
+                  ?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ),
         Slider(
-          value: value,
+          value: value.clamp(0.0, max),
           max: max,
           onChanged: enabled ? onChanged : null,
         ),
