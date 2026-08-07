@@ -1,261 +1,233 @@
-import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:logger/logger.dart';
-import '../models/scheduled_meeting_model.dart';
-import '../services/meeting_service.dart';
-import '../services/notification_service.dart';
+// lib/utils/meeting_notification_manager.dart
+//
+// CORRECTIF : les rappels de réunion étaient stockés en base
+// (notifyAtOneHour / notifyAtFifteenMin / notifyAtFiveMin / notifyAtStart)
+// mais **jamais programmés** côté appareil, et `tz.initializeTimeZones()`
+// n'était appelé nulle part → `zonedSchedule` levait
+// `LateInitializationError: local` au premier appel.
+//
+// Ce manager :
+//   - initialise la base de fuseaux + le fuseau local une seule fois ;
+//   - programme les 4 rappels d'une réunion avec des IDs déterministes
+//     (dérivés du meetingId) pour pouvoir les annuler/reprogrammer ;
+//   - ignore silencieusement les échéances déjà passées ;
+//   - retombe sur un scheduling inexact si l'alarme exacte est refusée
+//     (Android 12+ / SCHEDULE_EXACT_ALARM).
+
+import 'dart:io' show Platform;
+
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest_all.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
+
 import 'logger.dart' as crux;
 
-/// **MeetingNotificationManager** — Gère les transitions de statuts et notifications automatiques.
-/// Implémente la Phase 6-7 de la roadmap avec notifications intelligentes et transitions auto.
+/// Décalages de rappel supportés, dans l'ordre d'affichage.
+enum MeetingReminder { oneHour, fifteenMin, fiveMin, atStart }
+
+extension MeetingReminderX on MeetingReminder {
+  Duration get lead => switch (this) {
+        MeetingReminder.oneHour => const Duration(hours: 1),
+        MeetingReminder.fifteenMin => const Duration(minutes: 15),
+        MeetingReminder.fiveMin => const Duration(minutes: 5),
+        MeetingReminder.atStart => Duration.zero,
+      };
+
+  String get label => switch (this) {
+        MeetingReminder.oneHour => 'dans 1 heure',
+        MeetingReminder.fifteenMin => 'dans 15 minutes',
+        MeetingReminder.fiveMin => 'dans 5 minutes',
+        MeetingReminder.atStart => 'commence maintenant',
+      };
+
+  /// Offset ajouté à l'ID de base (4 slots réservés par réunion).
+  int get slot => index;
+}
+
 class MeetingNotificationManager {
-  static final MeetingNotificationManager _instance =
-      MeetingNotificationManager._internal();
+  MeetingNotificationManager._();
+  static final MeetingNotificationManager instance =
+      MeetingNotificationManager._();
+  factory MeetingNotificationManager() => instance;
 
-  factory MeetingNotificationManager() => _instance;
-  MeetingNotificationManager._internal();
+  final FlutterLocalNotificationsPlugin _ln = FlutterLocalNotificationsPlugin();
 
-  final _firestore = FirebaseFirestore.instance;
-  final _meetingService = MeetingService();
-  final _notificationService = NotificationService();
-  final _log = Logger();
+  static const String channelId = 'crux_meeting_reminders';
+  static const String channelName = 'Rappels de réunion';
+  static const String channelDescription =
+      'Notifications avant le début de vos réunions CRUX';
 
-  /// Map de timers pour chaque réunion (meetingId -> Timer).
-  /// Permet de gérer les notifications et transitions.
-  final Map<String, Timer> _meetingTimers = {};
+  bool _ready = false;
+  bool _exactAlarmAllowed = true;
 
-  /// Démarre la surveillance des transitions de statut pour une réunion planifiée.
-  /// Appelle automatiquement les notifications et met à jour les statuts.
-  void startMonitoring(String meetingId) {
-    if (_meetingTimers.containsKey(meetingId)) {
-      crux.logger.w('Meeting $meetingId déjà en surveillance');
-      return;
-    }
-
-    _log.i('🔄 Démarrage surveillance réunion: $meetingId');
-
-    // Vérifier la réunion toutes les 30 secondes
-    final timer = Timer.periodic(const Duration(seconds: 30), (_) async {
-      await _checkAndNotify(meetingId);
-    });
-
-    _meetingTimers[meetingId] = timer;
-  }
-
-  /// Arrête la surveillance d'une réunion.
-  void stopMonitoring(String meetingId) {
-    _meetingTimers[meetingId]?.cancel();
-    _meetingTimers.remove(meetingId);
-    crux.logger.i('⏹️ Surveillance arrêtée: $meetingId');
-  }
-
-  /// Arrête toutes les surveillances.
-  void stopAllMonitoring() {
-    for (final timer in _meetingTimers.values) {
-      timer.cancel();
-    }
-    _meetingTimers.clear();
-    crux.logger.i('🛑 Toutes les surveillances arrêtées');
-  }
-
-  /// Vérifie le statut d'une réunion et envoie les notifications appropriées.
-  Future<void> _checkAndNotify(String meetingId) async {
+  /// À appeler une fois au démarrage, **avant** toute planification.
+  /// (dans `main()`, juste après `NotificationService().initialize()`)
+  Future<void> initialize() async {
+    if (_ready) return;
     try {
-      final meeting = await _meetingService.getScheduledMeeting(meetingId);
-      if (meeting == null) {
-        crux.logger.w('Réunion introuvable: $meetingId');
-        stopMonitoring(meetingId);
-        return;
+      tzdata.initializeTimeZones();
+      try {
+        final localName = await FlutterTimezone.getLocalTimezone();
+        tz.setLocalLocation(tz.getLocation(localName));
+      } catch (e) {
+        // Fuseau système illisible : on reste sur UTC plutôt que de crasher.
+        crux.logger.w('Fuseau local introuvable ($e) → UTC');
+        tz.setLocalLocation(tz.UTC);
       }
 
-      final now = DateTime.now();
-
-      // ── Vérifier les transitions de statut ────────────────────────────
-      if (meeting.status == ScheduledMeetingStatus.scheduled) {
-        // Transition : scheduled → live
-        if (now.isAfter(meeting.scheduledStart) &&
-            now.isBefore(meeting.scheduledEnd)) {
-          await _transitionToLive(meeting);
-          return;
-        }
-
-        // Transition : scheduled → ended (si le temps de fin est passé)
-        if (now.isAfter(meeting.scheduledEnd)) {
-          await _transitionToEnded(meeting);
-          return;
-        }
-
-        // ── Notifications avant le démarrage ─────────────────────────────
-        final timeUntilStart = meeting.scheduledStart.difference(now).inMinutes;
-
-        // Notification 1 heure avant
-        if (meeting.notifyAtOneHour && timeUntilStart == 60) {
-          await _sendNotification(meeting, 'start', minutesBefore: 60);
-        }
-
-        // Notification 15 minutes avant
-        if (meeting.notifyAtFifteenMin && timeUntilStart == 15) {
-          await _sendNotification(meeting, 'start', minutesBefore: 15);
-        }
-
-        // Notification 5 minutes avant
-        if (meeting.notifyAtFiveMin && timeUntilStart == 5) {
-          await _sendNotification(meeting, 'start', minutesBefore: 5);
-        }
-      } else if (meeting.status == ScheduledMeetingStatus.live) {
-        // Vérifier si la réunion doit se terminer
-        if (now.isAfter(meeting.scheduledEnd)) {
-          await _transitionToEnded(meeting);
-        }
-      }
-    } catch (e) {
-      _log.e('Erreur dans _checkAndNotify: $e');
-    }
-  }
-
-  /// Transition : scheduled → live
-  Future<void> _transitionToLive(ScheduledMeetingModel meeting) async {
-    try {
-      await _meetingService.updateScheduledMeetingStatus(
-        meeting.id,
-        ScheduledMeetingStatus.live,
+      const androidInit =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosInit = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
+      await _ln.initialize(
+        const InitializationSettings(android: androidInit, iOS: iosInit),
       );
 
-      if (meeting.notifyAtStart) {
-        await _sendNotification(meeting, 'live', minutesBefore: 0);
-      }
-
-      _log.i('✅ Réunion ${meeting.id} passée en LIVE');
-
-      // Note: Future → Ajouter une logique pour rejoindre automatiquement l'hôte
-    } catch (e) {
-      _log.e('Erreur transition live: $e');
-    }
-  }
-
-  /// Transition : live → ended ou scheduled → ended
-  Future<void> _transitionToEnded(ScheduledMeetingModel meeting) async {
-    try {
-      await _meetingService.updateScheduledMeetingStatus(
-        meeting.id,
-        ScheduledMeetingStatus.ended,
-      );
-
-      _log.i('✅ Réunion ${meeting.id} TERMINÉE');
-
-      // Arrêter la surveillance
-      stopMonitoring(meeting.id);
-
-      // Future: Sauvegarder l'historique, archiver les enregistrements, etc.
-    } catch (e) {
-      _log.e('Erreur transition ended: $e');
-    }
-  }
-
-  /// Envoie une notification intelligente (locale ou distant).
-  Future<void> _sendNotification(
-    ScheduledMeetingModel meeting,
-    String type, {
-    required int minutesBefore,
-  }) async {
-    try {
-      late String title;
-      late String body;
-
-      if (type == 'start') {
-        title = 'Rappel réunion';
-        if (minutesBefore == 0) {
-          body = '${meeting.title} commence maintenant! 🚀';
-        } else {
-          body =
-              '${meeting.title} dans $minutesBefore minutes. Prépare-toi! ⏰';
-        }
-      } else if (type == 'live') {
-        title = 'Réunion en direct';
-        body = '${meeting.title} a démarré. Rejoins-la maintenant! 📞';
-      } else {
-        title = 'Réunion terminée';
-        body = '${meeting.title} est terminée. À bientôt! 👋';
-      }
-
-      // Envoyer notification locale
-      await _notificationService.notifyDailyReminder(
-        userToken: meeting.organizerId,
-        message: '$title: $body',
-      );
-
-      _log.i('📬 Notification envoyée: $title');
-    } catch (e) {
-      _log.e('Erreur notification: $e');
-    }
-  }
-
-  /// Lance le monitoring pour toutes les réunions planifiées d'un utilisateur.
-  Future<void> startMonitoringForUser(String userId) async {
-    try {
-      final meetings = _firestore
-          .collection('scheduled_meetings')
-          .where('participants', arrayContains: userId)
-          .where('status', isEqualTo: 'scheduled')
-          .snapshots();
-
-      await for (final snap in meetings) {
-        for (final doc in snap.docs) {
-          final meeting = ScheduledMeetingModel.fromJson(
-            doc.data() as Map<String, dynamic>,
-          );
-
-          // Si la réunion est dans le futur, la surveiller
-          if (DateTime.now().isBefore(meeting.scheduledEnd)) {
-            startMonitoring(meeting.id);
-          } else {
-            // Sinon, passer directement à "ended"
-            await _meetingService.updateScheduledMeetingStatus(
-              meeting.id,
-              ScheduledMeetingStatus.ended,
-            );
-          }
-        }
-      }
-
-      crux.logger.i('✅ Monitoring démarré pour l\'utilisateur $userId');
-    } catch (e) {
-      _log.e('Erreur startMonitoringForUser: $e');
-    }
-  }
-
-  /// Marque les réunions expirées (passées, jamais commencées) comme ended.
-  /// À appeler au démarrage de l'app pour nettoyer l'état.
-  Future<void> cleanupExpiredMeetings(String userId) async {
-    try {
-      final now = DateTime.now();
-      final snap = await _firestore
-          .collection('scheduled_meetings')
-          .where('participants', arrayContains: userId)
-          .where('status', isEqualTo: 'scheduled')
-          .get();
-
-      int updated = 0;
-      for (final doc in snap.docs) {
-        final meeting = ScheduledMeetingModel.fromJson(
-          doc.data() as Map<String, dynamic>,
+      if (Platform.isAndroid) {
+        final android = _ln.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+        await android?.createNotificationChannel(
+          const AndroidNotificationChannel(
+            channelId,
+            channelName,
+            description: channelDescription,
+            importance: Importance.high,
+          ),
         );
-
-        // Si la réunion est passée sa date de fin
-        if (now.isAfter(meeting.scheduledEnd)) {
-          await _meetingService.updateScheduledMeetingStatus(
-            meeting.id,
-            ScheduledMeetingStatus.ended,
+        await android?.requestNotificationsPermission();
+        _exactAlarmAllowed =
+            await android?.canScheduleExactNotifications() ?? true;
+        if (!_exactAlarmAllowed) {
+          crux.logger.w(
+            'Alarmes exactes refusées → rappels programmés en mode inexact',
           );
-          updated++;
         }
       }
 
-      if (updated > 0) {
-        crux.logger.i('🧹 $updated réunions expirées marquées comme ended');
-      }
-    } catch (e) {
-      _log.e('Erreur cleanupExpiredMeetings: $e');
+      _ready = true;
+      crux.logger.i('✅ MeetingNotificationManager prêt (${tz.local.name})');
+    } catch (e, st) {
+      crux.logger.e('MeetingNotificationManager.initialize',
+          error: e, stackTrace: st);
     }
+  }
+
+  /// ID stable dérivé du meetingId : permet d'annuler les rappels d'une
+  /// réunion sans stocker les IDs générés.
+  int _baseId(String meetingId) {
+    final hash = meetingId.hashCode.abs() % 100000;
+    return 200000 + hash * 4;
+  }
+
+  NotificationDetails get _details => const NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          channelName,
+          channelDescription: channelDescription,
+          importance: Importance.high,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.event,
+        ),
+        iOS: DarwinNotificationDetails(),
+      );
+
+  /// Programme les rappels demandés pour une réunion.
+  ///
+  /// Retourne le nombre de rappels effectivement programmés (les échéances
+  /// déjà passées sont ignorées, ce qui est le cas normal quand on planifie
+  /// une réunion dans 10 minutes).
+  Future<int> scheduleForMeeting({
+    required String meetingId,
+    required String title,
+    required DateTime startTime,
+    bool oneHour = true,
+    bool fifteenMin = true,
+    bool fiveMin = true,
+    bool atStart = true,
+  }) async {
+    await initialize();
+    if (!_ready) return 0;
+
+    await cancelForMeeting(meetingId);
+
+    final wanted = <MeetingReminder>[
+      if (oneHour) MeetingReminder.oneHour,
+      if (fifteenMin) MeetingReminder.fifteenMin,
+      if (fiveMin) MeetingReminder.fiveMin,
+      if (atStart) MeetingReminder.atStart,
+    ];
+
+    final base = _baseId(meetingId);
+    final now = DateTime.now();
+    var scheduled = 0;
+
+    for (final reminder in wanted) {
+      final when = startTime.subtract(reminder.lead);
+      if (!when.isAfter(now.add(const Duration(seconds: 5)))) continue;
+
+      try {
+        await _ln.zonedSchedule(
+          base + reminder.slot,
+          title.isEmpty ? 'Réunion CRUX' : title,
+          'Votre réunion ${reminder.label}.',
+          tz.TZDateTime.from(when, tz.local),
+          _details,
+          androidScheduleMode: _exactAlarmAllowed
+              ? AndroidScheduleMode.exactAllowWhileIdle
+              : AndroidScheduleMode.inexactAllowWhileIdle,
+          payload: 'meeting:$meetingId',
+          matchDateTimeComponents: null,
+        );
+        scheduled++;
+      } catch (e) {
+        crux.logger.e('zonedSchedule($meetingId/${reminder.name}) → $e');
+      }
+    }
+
+    crux.logger.i('🔔 $scheduled rappel(s) programmé(s) pour $meetingId');
+    return scheduled;
+  }
+
+  /// Annule les 4 slots de rappel d'une réunion (édition ou annulation).
+  Future<void> cancelForMeeting(String meetingId) async {
+    await initialize();
+    final base = _baseId(meetingId);
+    for (var i = 0; i < 4; i++) {
+      try {
+        await _ln.cancel(base + i);
+      } catch (_) {
+        // Un ID inexistant n'est pas une erreur.
+      }
+    }
+  }
+
+  /// Reprogramme après modification de l'horaire.
+  Future<int> rescheduleForMeeting({
+    required String meetingId,
+    required String title,
+    required DateTime startTime,
+    bool oneHour = true,
+    bool fifteenMin = true,
+    bool fiveMin = true,
+    bool atStart = true,
+  }) =>
+      scheduleForMeeting(
+        meetingId: meetingId,
+        title: title,
+        startTime: startTime,
+        oneHour: oneHour,
+        fifteenMin: fifteenMin,
+        fiveMin: fiveMin,
+        atStart: atStart,
+      );
+
+  /// Utile pour un écran de debug.
+  Future<List<PendingNotificationRequest>> pending() async {
+    await initialize();
+    return _ln.pendingNotificationRequests();
   }
 }

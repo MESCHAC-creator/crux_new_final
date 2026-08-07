@@ -1,704 +1,732 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
-import '../models/scheduled_meeting_model.dart';
-import '../theme/colors.dart';
-import '../services/meeting_service.dart';
-import '../utils/logger.dart' as crux;
-import '../widgets/custom_button.dart';
-import '../widgets/elegant_toast.dart';
+// lib/screens/schedule_meeting_screen.dart
+//
+// Écran de planification réécrit (style « Obsidian Mono »).
+//
+// CORRECTIFS apportés par rapport à la version d'origine :
+//   1. Écrit via [ScheduleService] → collection `meetings` (celle que
+//      l'accueil lit) + miroir `scheduled_meetings`, dates en Timestamp.
+//   2. Sélecteur de DURÉE (absent avant : `scheduledEnd` valait toujours
+//      start + 1h en dur).
+//   3. Interdit un horaire dans le passé, avec message clair (avant : on
+//      pouvait planifier hier, la réunion n'apparaissait jamais).
+//   4. Anti double-tap (`_submitting` + verrou statique du service) : plus de
+//      réunions dupliquées.
+//   5. Programme réellement les rappels locaux et l'affiche dans le résumé.
+//   6. Toute erreur est remontée à l'utilisateur (avant : `catch (e) {}` muet).
 
-/// **ScheduleMeetingScreen** — Écran professionnel de planification de réunions.
-/// Inspire par Zoom, Google Meet et Teams. Complète la roadmap Phase 2-3.
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../models/meeting_model.dart';
+import '../services/schedule_service.dart';
+import '../theme/colors.dart';
+import '../utils/logger.dart' as crux;
+
 class ScheduleMeetingScreen extends StatefulWidget {
-  const ScheduleMeetingScreen({super.key});
+  const ScheduleMeetingScreen({super.key, this.initialStart});
+
+  /// Créneau pré-rempli (depuis un calendrier ou un raccourci).
+  final DateTime? initialStart;
 
   @override
   State<ScheduleMeetingScreen> createState() => _ScheduleMeetingScreenState();
 }
 
 class _ScheduleMeetingScreenState extends State<ScheduleMeetingScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
-  final _descriptionCtrl = TextEditingController();
-  final _passcodeCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _service = ScheduleService();
 
-  DateTime? _selectedDate;
-  TimeOfDay? _selectedTime;
-  String _timezone = 'UTC';
-  String _meetingType = 'standard'; // standard, largeConference
+  late DateTime _start;
+  Duration _duration = const Duration(minutes: 45);
 
+  bool _usePasscode = false;
   bool _waitingRoom = false;
-  bool _allowBeforeHost = false;
-  bool _disableGuests = false;
-  bool _cameraEnabled = true;
-  bool _micEnabled = true;
-  bool _screenShareEnabled = true;
-  bool _chatEnabled = true;
-  bool _recordAutomatically = false;
+  bool _largeConference = false;
+  bool _remind1h = true;
+  bool _remind15 = true;
+  bool _remind5 = false;
+  bool _remindStart = true;
+  bool _submitting = false;
 
-  bool _notifyOneHour = true;
-  bool _notifyFifteenMin = true;
-  bool _notifyFiveMin = true;
-  bool _notifyAtStart = true;
+  static const _durations = <Duration>[
+    Duration(minutes: 15),
+    Duration(minutes: 30),
+    Duration(minutes: 45),
+    Duration(hours: 1),
+    Duration(hours: 2),
+    Duration(hours: 4),
+  ];
 
-  bool _loading = false;
-  String? _error;
+  @override
+  void initState() {
+    super.initState();
+    final base = widget.initialStart ??
+        DateTime.now().add(const Duration(minutes: 30));
+    // Arrondi au quart d'heure supérieur.
+    final rounded = DateTime(
+      base.year,
+      base.month,
+      base.day,
+      base.hour,
+      (base.minute / 15).ceil() * 15,
+    );
+    _start = rounded;
+  }
 
   @override
   void dispose() {
     _titleCtrl.dispose();
-    _descriptionCtrl.dispose();
-    _passcodeCtrl.dispose();
+    _descCtrl.dispose();
+    _passCtrl.dispose();
     super.dispose();
   }
 
-  String _displayName() {
-    final fb = FirebaseAuth.instance.currentUser;
-    if (fb?.displayName?.trim().isNotEmpty == true) return fb!.displayName!;
-    if (fb?.email?.isNotEmpty == true && fb!.email!.contains('@')) {
-      return fb.email!.split('@')[0];
-    }
-    return 'Utilisateur';
-  }
-
-  String _userEmail() {
-    return FirebaseAuth.instance.currentUser?.email ?? 'unknown@crux.app';
-  }
+  // ------------------------------------------------------------------ pickers
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate ?? now.add(const Duration(days: 1)),
-      firstDate: now,
+      initialDate: _start.isBefore(now) ? now : _start,
+      firstDate: DateTime(now.year, now.month, now.day),
       lastDate: now.add(const Duration(days: 365)),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AppColors.primary,
-              surface: AppColors.surface,
-              onSurface: AppColors.textPrimary,
-            ),
-            dialogBackgroundColor: AppColors.surface,
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: AppColors.primary,
+            onPrimary: AppColors.textOnPrimary,
+            surface: AppColors.surface,
+            onSurface: AppColors.textPrimary,
           ),
-          child: child!,
-        );
-      },
+        ),
+        child: child!,
+      ),
     );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-    }
+    if (picked == null) return;
+    setState(() {
+      _start = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        _start.hour,
+        _start.minute,
+      );
+    });
   }
 
   Future<void> _pickTime() async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: _selectedTime ?? TimeOfDay.now(),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AppColors.primary,
-              surface: AppColors.surface,
-            ),
-            dialogBackgroundColor: AppColors.surface,
+      initialTime: TimeOfDay.fromDateTime(_start),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: AppColors.primary,
+            onPrimary: AppColors.textOnPrimary,
+            surface: AppColors.surface,
+            onSurface: AppColors.textPrimary,
           ),
+        ),
+        child: MediaQuery(
+          data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
           child: child!,
-        );
-      },
+        ),
+      ),
     );
-    if (picked != null) {
-      setState(() => _selectedTime = picked);
-    }
+    if (picked == null) return;
+    setState(() {
+      _start = DateTime(
+        _start.year,
+        _start.month,
+        _start.day,
+        picked.hour,
+        picked.minute,
+      );
+    });
   }
 
-  Future<void> _scheduleMeeting() async {
-    final title = _titleCtrl.text.trim();
-    if (title.isEmpty) {
-      setState(() => _error = 'Donne un titre à ta réunion');
-      return;
-    }
+  // ------------------------------------------------------------------- submit
 
-    if (_selectedDate == null) {
-      setState(() => _error = 'Sélectionne une date');
-      return;
-    }
+  Future<void> _submit() async {
+    if (_submitting || ScheduleService.isBusy) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    if (_selectedTime == null) {
-      setState(() => _error = 'Sélectionne une heure');
-      return;
-    }
-
-    final passcode = _passcodeCtrl.text.trim();
-    if (passcode.isNotEmpty && (passcode.length < 4 || passcode.length > 6)) {
-      setState(() => _error = 'Le code d\'accès doit faire 4 à 6 chiffres');
-      return;
-    }
-    if (passcode.isNotEmpty && !RegExp(r'^\d+$').hasMatch(passcode)) {
-      setState(() => _error = 'Le code d\'accès ne doit contenir que des chiffres');
-      return;
-    }
-
-    // Construire l'heure de début
-    final startTime = DateTime(
-      _selectedDate!.year,
-      _selectedDate!.month,
-      _selectedDate!.day,
-      _selectedTime!.hour,
-      _selectedTime!.minute,
-    );
-
-    final endTime = startTime.add(const Duration(hours: 1));
-
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    FocusScope.of(context).unfocus();
+    setState(() => _submitting = true);
 
     try {
-      final service = MeetingService();
-      final meeting = await service.scheduleProMeeting(
-        title: title,
-        description: _descriptionCtrl.text.trim(),
-        organizerName: _displayName(),
-        organizerEmail: _userEmail(),
-        startTime: startTime,
-        endTime: endTime,
-        timezone: _timezone,
-        passcode: passcode.isNotEmpty ? passcode : null,
+      final result = await _service.scheduleMeeting(
+        title: _titleCtrl.text,
+        description: _descCtrl.text,
+        startTime: _start,
+        duration: _duration,
+        passcode: _usePasscode ? _passCtrl.text.trim() : null,
         waitingRoomEnabled: _waitingRoom,
-        allowBeforeHost: _allowBeforeHost,
-        disableGuests: _disableGuests,
-        cameraEnabled: _cameraEnabled,
-        microphoneEnabled: _micEnabled,
-        screenShareEnabled: _screenShareEnabled,
-        chatEnabled: _chatEnabled,
-        recordAutomatically: _recordAutomatically,
-        notifyAtOneHour: _notifyOneHour,
-        notifyAtFifteenMin: _notifyFifteenMin,
-        notifyAtFiveMin: _notifyFiveMin,
-        notifyAtStart: _notifyAtStart,
-        meetingType: _meetingType == 'largeConference'
-            ? MeetingType.largeConference
-            : MeetingType.standard,
-        isLargeConference: _meetingType == 'largeConference',
+        isLargeConference: _largeConference,
+        notifyAtOneHour: _remind1h,
+        notifyAtFifteenMin: _remind15,
+        notifyAtFiveMin: _remind5,
+        notifyAtStart: _remindStart,
       );
-
       if (!mounted) return;
-
-      ElegantToast.show(
-        context,
-        title: 'Réunion planifiée',
-        message: 'Réunion créée le ${DateFormat('dd/MM/yyyy HH:mm').format(startTime)}',
-        type: ElegantToastType.success,
-      );
-
-      Navigator.pop(context, meeting);
-    } catch (e) {
-      crux.logger.e('ScheduleMeetingScreen._scheduleMeeting error', error: e);
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = 'Erreur lors de la planification. Réessaie.';
-        });
-      }
+      await _showSuccessSheet(result);
+      if (mounted) Navigator.of(context).pop(result.meeting);
+    } on ScheduleException catch (e) {
+      if (!mounted) return;
+      _snack(e.message, isError: true);
+    } catch (e, st) {
+      crux.logger.e('ScheduleMeetingScreen._submit', error: e, stackTrace: st);
+      if (!mounted) return;
+      _snack('Impossible de planifier la réunion.', isError: true);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final dateStr = _selectedDate != null
-        ? DateFormat('dd MMM yyyy', 'fr_FR').format(_selectedDate!)
-        : 'Sélectionner une date';
-
-    final timeStr = _selectedTime != null
-        ? _selectedTime!.format(context)
-        : 'Sélectionner l\'heure';
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Planifier une réunion',
-          style: GoogleFonts.spaceGrotesk(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
+  void _snack(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: const TextStyle(color: AppColors.textPrimary),
+          ),
+          backgroundColor:
+              isError ? AppColors.errorSurface : AppColors.surfaceElevated,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(
+              color: isError ? AppColors.error : AppColors.border,
+            ),
           ),
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Icône d'en-tête ──────────────────────────────────────────
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Icon(
-                  Icons.calendar_today_rounded,
-                  color: Colors.white,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // ── SECTION 1 : INFORMATIONS DE BASE ─────────────────────────
-              _buildSectionTitle('Informations de base'),
-              const SizedBox(height: 12),
-
-              _buildTextfield(
-                controller: _titleCtrl,
-                label: 'Titre de la réunion',
-                hint: 'Ex. Sprint Planning Équipe Tech',
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextfield(
-                controller: _descriptionCtrl,
-                label: 'Description (optionnel)',
-                hint: 'Décris le sujet de la réunion',
-                maxLines: 3,
-              ),
-              const SizedBox(height: 20),
-
-              // ── SECTION 2 : DATE & HEURE ────────────────────────────────
-              _buildSectionTitle('Date et heure'),
-              const SizedBox(height: 12),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTapField(
-                      icon: Icons.calendar_today_rounded,
-                      label: dateStr,
-                      onTap: _pickDate,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildTapField(
-                      icon: Icons.access_time_rounded,
-                      label: timeStr,
-                      onTap: _pickTime,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              _buildDropdown(
-                label: 'Fuseau horaire',
-                value: _timezone,
-                items: [
-                  'UTC',
-                  'Europe/Paris',
-                  'Europe/London',
-                  'America/New_York',
-                  'America/Los_Angeles',
-                  'Asia/Tokyo',
-                  'Australia/Sydney',
-                ],
-                onChanged: (v) => setState(() => _timezone = v),
-              ),
-              const SizedBox(height: 20),
-
-              // ── SECTION 3 : SÉCURITÉ ────────────────────────────────────
-              _buildSectionTitle('Sécurité'),
-              const SizedBox(height: 12),
-
-              _buildToggleTile(
-                icon: Icons.lock_rounded,
-                title: 'Salle d\'attente',
-                subtitle: 'Approuver les participants avant l\'entrée',
-                value: _waitingRoom,
-                onChanged: (v) => setState(() => _waitingRoom = v),
-              ),
-              const SizedBox(height: 10),
-
-              _buildToggleTile(
-                icon: Icons.person_add_disabled_rounded,
-                title: 'Autoriser avant l\'hôte',
-                subtitle: 'Les participants peuvent rejoindre avant vous',
-                value: _allowBeforeHost,
-                onChanged: (v) => setState(() => _allowBeforeHost = v),
-              ),
-              const SizedBox(height: 10),
-
-              _buildToggleTile(
-                icon: Icons.people_outline_rounded,
-                title: 'Désactiver les invités',
-                subtitle: 'Seulement les utilisateurs authentifiés peuvent accéder',
-                value: _disableGuests,
-                onChanged: (v) => setState(() => _disableGuests = v),
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextfield(
-                controller: _passcodeCtrl,
-                label: 'Code d\'accès (optionnel)',
-                hint: '4-6 chiffres',
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 20),
-
-              // ── SECTION 4 : AUDIO / VIDÉO ────────────────────────────────
-              _buildSectionTitle('Paramètres audio/vidéo'),
-              const SizedBox(height: 12),
-
-              _buildToggleTile(
-                icon: Icons.videocam_rounded,
-                title: 'Caméra activée',
-                value: _cameraEnabled,
-                onChanged: (v) => setState(() => _cameraEnabled = v),
-              ),
-              const SizedBox(height: 10),
-
-              _buildToggleTile(
-                icon: Icons.mic_rounded,
-                title: 'Micro activé',
-                value: _micEnabled,
-                onChanged: (v) => setState(() => _micEnabled = v),
-              ),
-              const SizedBox(height: 10),
-
-              _buildToggleTile(
-                icon: Icons.screen_share_rounded,
-                title: 'Partage d\'écran autorisé',
-                value: _screenShareEnabled,
-                onChanged: (v) => setState(() => _screenShareEnabled = v),
-              ),
-              const SizedBox(height: 10),
-
-              _buildToggleTile(
-                icon: Icons.chat_bubble_outline_rounded,
-                title: 'Chat activé',
-                value: _chatEnabled,
-                onChanged: (v) => setState(() => _chatEnabled = v),
-              ),
-              const SizedBox(height: 20),
-
-              // ── SECTION 5 : NOTIFICATIONS ────────────────────────────────
-              _buildSectionTitle('Notifications'),
-              const SizedBox(height: 12),
-
-              _buildToggleTile(
-                icon: Icons.notifications_active_rounded,
-                title: 'Notification 1 heure avant',
-                value: _notifyOneHour,
-                onChanged: (v) => setState(() => _notifyOneHour = v),
-              ),
-              const SizedBox(height: 10),
-
-              _buildToggleTile(
-                icon: Icons.notifications_active_rounded,
-                title: 'Notification 15 min avant',
-                value: _notifyFifteenMin,
-                onChanged: (v) => setState(() => _notifyFifteenMin = v),
-              ),
-              const SizedBox(height: 10),
-
-              _buildToggleTile(
-                icon: Icons.notifications_active_rounded,
-                title: 'Notification 5 min avant',
-                value: _notifyFiveMin,
-                onChanged: (v) => setState(() => _notifyFiveMin = v),
-              ),
-              const SizedBox(height: 10),
-
-              _buildToggleTile(
-                icon: Icons.notifications_active_rounded,
-                title: 'Notification au démarrage',
-                value: _notifyAtStart,
-                onChanged: (v) => setState(() => _notifyAtStart = v),
-              ),
-              const SizedBox(height: 20),
-
-              // ── SECTION 6 : ENREGISTREMENT ────────────────────────────────
-              _buildSectionTitle('Enregistrement'),
-              const SizedBox(height: 12),
-
-              _buildToggleTile(
-                icon: Icons.record_voice_over_rounded,
-                title: 'Enregistrement automatique',
-                subtitle: 'Enregistrer la réunion dans le cloud',
-                value: _recordAutomatically,
-                onChanged: (v) => setState(() => _recordAutomatically = v),
-              ),
-              const SizedBox(height: 20),
-
-              // ── MESSAGE D'ERREUR ─────────────────────────────────────────
-              if (_error != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.error.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_rounded, color: AppColors.error, size: 18),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: GoogleFonts.spaceGrotesk(
-                            color: AppColors.error,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: 28),
-
-              // ── BOUTONS ──────────────────────────────────────────────────
-              Row(
-                children: [
-                  Expanded(
-                    child: CustomButton(
-                      label: 'Annuler',
-                      backgroundColor: AppColors.surfaceVariant,
-                      textColor: AppColors.textPrimary,
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: CustomButton(
-                      label: _loading ? 'Planification…' : 'Planifier',
-                      isLoading: _loading,
-                      onPressed: _loading ? () {} : _scheduleMeeting,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-            ],
-          ),
-        ),
-      ),
-    );
+      );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.spaceGrotesk(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
+  Future<void> _showSuccessSheet(ScheduleResult result) {
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-    );
-  }
-
-  Widget _buildTextfield({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    int maxLines = 1,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.spaceGrotesk(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          maxLines: maxLines,
-          keyboardType: keyboardType,
-          style: GoogleFonts.spaceGrotesk(color: AppColors.textPrimary, fontSize: 14),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: GoogleFonts.spaceGrotesk(
-              color: AppColors.textTertiary,
-              fontSize: 14,
-            ),
-            filled: true,
-            fillColor: AppColors.surfaceVariant,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTapField({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Icon(icon, size: 18, color: AppColors.primary),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                style: GoogleFonts.spaceGrotesk(
-                  fontSize: 14,
-                  color: AppColors.textPrimary,
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textTertiary),
+            const SizedBox(height: 24),
+            const Icon(Icons.event_available_rounded,
+                color: AppColors.primary, size: 36),
+            const SizedBox(height: 14),
+            Text(
+              'Réunion planifiée',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${_formatFullDate(result.meeting.startTime)} · '
+              '${_formatDuration(result.meeting.duration)}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      result.shareLink,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Copier le lien',
+                    icon: const Icon(Icons.copy_rounded,
+                        color: AppColors.primary, size: 20),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: result.shareLink));
+                      _snack('Lien copié');
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              result.remindersScheduled > 0
+                  ? '${result.remindersScheduled} rappel(s) programmé(s) sur cet appareil.'
+                  : 'Aucun rappel programmé (échéance trop proche).',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: AppColors.textTertiary, fontSize: 12),
+            ),
+            const SizedBox(height: 22),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textOnPrimary,
+                minimumSize: const Size.fromHeight(52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Terminé',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDropdown({
-    required String label,
-    required String value,
-    required List<String> items,
-    required ValueChanged<String> onChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.spaceGrotesk(
-            fontSize: 13,
+  // --------------------------------------------------------------------- ui
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'Planifier une réunion',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+            letterSpacing: -0.3,
           ),
         ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceVariant,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: DropdownButton<String>(
-            value: value,
-            isExpanded: true,
-            underline: const SizedBox(),
-            dropdownColor: AppColors.surface,
-            style: GoogleFonts.spaceGrotesk(
-              color: AppColors.textPrimary,
-              fontSize: 14,
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppColors.heroGradient),
+        child: SafeArea(
+          top: false,
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+              children: [
+                _field(
+                  controller: _titleCtrl,
+                  label: 'Titre',
+                  hint: 'Point hebdo équipe produit',
+                  maxLength: 120,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Le titre est obligatoire'
+                      : null,
+                ),
+                const SizedBox(height: 16),
+                _field(
+                  controller: _descCtrl,
+                  label: 'Description (optionnel)',
+                  hint: 'Ordre du jour, liens utiles…',
+                  maxLines: 3,
+                  maxLength: 500,
+                ),
+                const SizedBox(height: 24),
+                _sectionTitle('Quand'),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _pickerTile(
+                        icon: Icons.calendar_today_rounded,
+                        label: 'Date',
+                        value: _formatDate(_start),
+                        onTap: _pickDate,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _pickerTile(
+                        icon: Icons.schedule_rounded,
+                        label: 'Heure',
+                        value: _formatTime(_start),
+                        onTap: _pickTime,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_start.isBefore(DateTime.now()))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.error_outline_rounded,
+                            color: AppColors.warning, size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Cet horaire est déjà passé.',
+                            style: TextStyle(
+                                color: AppColors.warning, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 20),
+                _sectionTitle('Durée'),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: _durations
+                      .map((d) => _chip(
+                            label: _formatDuration(d),
+                            selected: d == _duration,
+                            onTap: () => setState(() => _duration = d),
+                          ))
+                      .toList(),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Fin prévue à ${_formatTime(_start.add(_duration))}',
+                  style: const TextStyle(
+                      color: AppColors.textTertiary, fontSize: 12),
+                ),
+                const SizedBox(height: 26),
+                _sectionTitle('Rappels'),
+                const SizedBox(height: 6),
+                _switchTile(
+                  '1 heure avant',
+                  _remind1h,
+                  (v) => setState(() => _remind1h = v),
+                ),
+                _switchTile(
+                  '15 minutes avant',
+                  _remind15,
+                  (v) => setState(() => _remind15 = v),
+                ),
+                _switchTile(
+                  '5 minutes avant',
+                  _remind5,
+                  (v) => setState(() => _remind5 = v),
+                ),
+                _switchTile(
+                  'Au démarrage',
+                  _remindStart,
+                  (v) => setState(() => _remindStart = v),
+                ),
+                const SizedBox(height: 26),
+                _sectionTitle('Sécurité & format'),
+                const SizedBox(height: 6),
+                _switchTile(
+                  'Code d\'accès',
+                  _usePasscode,
+                  (v) => setState(() => _usePasscode = v),
+                  subtitle: '4 à 6 chiffres demandés à l\'entrée',
+                ),
+                if (_usePasscode)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 4),
+                    child: _field(
+                      controller: _passCtrl,
+                      label: 'Code',
+                      hint: '1234',
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (v) {
+                        if (!_usePasscode) return null;
+                        final value = v?.trim() ?? '';
+                        if (!RegExp(r'^\d{4,6}$').hasMatch(value)) {
+                          return 'Entre 4 et 6 chiffres';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                _switchTile(
+                  'Salle d\'attente',
+                  _waitingRoom,
+                  (v) => setState(() => _waitingRoom = v),
+                  subtitle: 'L\'hôte admet chaque participant',
+                ),
+                _switchTile(
+                  'Grande conférence',
+                  _largeConference,
+                  (v) => setState(() => _largeConference = v),
+                  subtitle: 'Au-delà de 6 participants (mode SFU)',
+                ),
+              ],
             ),
-            items: items
-                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                .toList(),
-            onChanged: (v) => v != null ? onChanged(v) : null,
           ),
         ),
-      ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.textOnPrimary,
+              disabledBackgroundColor: AppColors.surfaceElevated,
+              minimumSize: const Size.fromHeight(56),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            // Bouton désactivé pendant l'envoi → protège du double tap.
+            onPressed: _submitting ? null : _submit,
+            child: _submitting
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      color: AppColors.textSecondary,
+                    ),
+                  )
+                : const Text(
+                    'Planifier la réunion',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildToggleTile({
-    required IconData icon,
-    required String title,
-    String? subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
+  Widget _sectionTitle(String text) => Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.textTertiary,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.4,
+        ),
+      );
+
+  Widget _field({
+    required TextEditingController controller,
+    required String label,
+    String? hint,
+    int maxLines = 1,
+    int? maxLength,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
   }) {
-    return GestureDetector(
-      onTap: () => onChanged(!value),
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      maxLength: maxLength,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      validator: validator,
+      style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+      cursorColor: AppColors.primary,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        counterText: '',
+        labelStyle:
+            const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        hintStyle:
+            const TextStyle(color: AppColors.textDisabled, fontSize: 14),
+        filled: true,
+        fillColor: AppColors.surfaceVariant,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.borderFocused),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.error),
+        ),
+      ),
+    );
+  }
+
+  Widget _pickerTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           color: AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
         ),
         child: Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: value ? AppColors.primary.withOpacity(0.15) : AppColors.surface,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, size: 18, color: value ? AppColors.primary : AppColors.textTertiary),
-            ),
+            Icon(icon, size: 18, color: AppColors.textSecondary),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
-                    style: GoogleFonts.spaceGrotesk(
+                    label,
+                    style: const TextStyle(
+                        color: AppColors.textTertiary, fontSize: 11),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
                     ),
                   ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.spaceGrotesk(
-                        fontSize: 12,
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                  ],
                 ],
               ),
-            ),
-            Switch(
-              value: value,
-              onChanged: onChanged,
-              activeColor: AppColors.primary,
-              inactiveTrackColor: AppColors.border,
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _chip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.surfaceVariant,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? AppColors.textOnPrimary : AppColors.textSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _switchTile(
+    String title,
+    bool value,
+    ValueChanged<bool> onChanged, {
+    String? subtitle,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: SwitchListTile.adaptive(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        value: value,
+        onChanged: onChanged,
+        activeThumbColor: AppColors.textOnPrimary,
+        activeTrackColor: AppColors.primary,
+        inactiveTrackColor: AppColors.surfaceVariant,
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        subtitle: subtitle == null
+            ? null
+            : Text(
+                subtitle,
+                style: const TextStyle(
+                    color: AppColors.textTertiary, fontSize: 12),
+              ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------- formats
+
+  static const _months = [
+    'jan.', 'fév.', 'mars', 'avr.', 'mai', 'juin',
+    'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.',
+  ];
+  static const _days = [
+    'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.',
+  ];
+
+  String _formatDate(DateTime d) =>
+      '${_days[d.weekday - 1]} ${d.day} ${_months[d.month - 1]}';
+
+  String _formatTime(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+  String _formatFullDate(DateTime d) => '${_formatDate(d)} à ${_formatTime(d)}';
+
+  String _formatDuration(Duration d) {
+    if (d.inMinutes < 60) return '${d.inMinutes} min';
+    final h = d.inMinutes ~/ 60;
+    final m = d.inMinutes % 60;
+    return m == 0 ? '${h} h' : '${h} h ${m}';
   }
 }

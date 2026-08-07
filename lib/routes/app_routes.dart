@@ -3,6 +3,7 @@ import '../screens/splash_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/meeting_screen.dart';
+import '../screens/schedule_meeting_screen.dart';
 import '../screens/setting_screen.dart';
 import '../screens/signup_screen.dart';
 import '../screens/privacy_policy_screen.dart';
@@ -17,12 +18,17 @@ class AppRoutes {
   static const String signup = '/signup';
   static const String home = '/home';
   static const String meeting = '/meeting';
+
+  /// CORRECTIF : la route de planification n'existait pas, donc le bouton
+  /// « Planifier » de l'accueil retombait sur la réunion instantanée.
+  static const String schedule = '/schedule';
+
   static const String settings = '/settings';
   static const String privacy = '/privacy';
   static const String terms = '/terms';
   static const String profile = '/profile';
- static const String wallpaper = '/wallpaper';
- 
+  static const String wallpaper = '/wallpaper';
+
   static Route<dynamic> generateRoute(RouteSettings routeSettings) {
     switch (routeSettings.name) {
       case splash:
@@ -52,6 +58,16 @@ class AppRoutes {
             userName: args?['userName'] ?? 'Utilisateur',
             userEmail: args?['userEmail'],
             isHost: args?['isHost'] ?? false,
+          ),
+        );
+
+      case schedule:
+        // `arguments` accepte un DateTime (créneau pré-sélectionné depuis un
+        // calendrier) ou null.
+        final initial = routeSettings.arguments;
+        return MaterialPageRoute(
+          builder: (_) => ScheduleMeetingScreen(
+            initialStart: initial is DateTime ? initial : null,
           ),
         );
 
