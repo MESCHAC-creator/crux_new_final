@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
 import '../theme/colors.dart';
 import 'wallpaper_config.dart';
 import 'wallpaper_manager.dart';
