@@ -53,6 +53,9 @@ class AppConfig {
         ...livekitFallbackUrls,
       ];
 
+  /// Timeout de la requête HTTP vers le serveur de tokens.
+  static const Duration tokenTimeout = Duration(seconds: 15);
+
   // ── LiveKit SFU (WSS) ──────────────────────────────────────────────────
   static const String livekitWssUrl = String.fromEnvironment(
     'LIVEKIT_WSS_URL',
