@@ -247,7 +247,7 @@ class AppTheme {
       ),
 
       // ── Cards ────────────────────────────────────────────────────────
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.surfaceVariant,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -312,7 +312,7 @@ class AppTheme {
       ),
 
       // ── Dialog ───────────────────────────────────────────────────────
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: AppColors.surfaceVariant,
         elevation: 24,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -392,7 +392,7 @@ class AppTheme {
       ),
 
       // ── Tab bar ───────────────────────────────────────────────────────
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: TabBarThemeData(
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textSecondary,
         indicator: const UnderlineTabIndicator(
