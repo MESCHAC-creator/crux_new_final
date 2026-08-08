@@ -2,15 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../models/meeting_model.dart';
 import '../models/user_model.dart';
+import '../providers/wallpaper_provider.dart';
 import '../routes/app_routes.dart';
 import '../services/schedule_service.dart';
 import '../theme/colors.dart';
 import '../wallpaper/app_background.dart';
-import '../wallpaper/wallpaper_config.dart';
-import '../wallpaper/wallpaper_manager.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.user});
@@ -24,7 +24,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _schedule = ScheduleService();
   final _codeCtrl = TextEditingController();
-  WallpaperConfig _wallpaper = WallpaperConfig.defaultConfig;
 
   String get _uid =>
       widget.user.uid.isNotEmpty
@@ -37,7 +36,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _wallpaper = WallpaperManager().config;
     // Les notifications locales sont perdues après un redémarrage système :
     // on les reprogramme à l'ouverture de l'accueil.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -45,9 +43,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _openWallpaperPicker() async {
-    await Navigator.of(context).pushNamed(AppRoutes.wallpaper);
-    if (mounted) setState(() => _wallpaper = WallpaperManager().config);
+  void _openWallpaperPicker() {
+    Navigator.of(context).pushNamed(AppRoutes.wallpaper);
+    // Pas de rafraîchissement manuel nécessaire : WallpaperProvider est un
+    // ChangeNotifier écouté via context.watch dans build(), toute l'app se
+    // met donc à jour en direct pendant et après la sélection.
   }
 
   @override
@@ -131,6 +131,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final wallpaper = context.watch<WallpaperProvider>().config;
+
     final content = SafeArea(
       child: RefreshIndicator(
         color: AppColors.primary,
@@ -157,8 +159,8 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: AppColors.background,
       // Fond personnalisé si l'utilisateur en a importé un, sinon le
       // dégradé Obsidian par défaut est conservé à l'identique.
-      body: _wallpaper.hasImage
-          ? AppBackground(config: _wallpaper, child: content)
+      body: wallpaper.hasImage
+          ? AppBackground(config: wallpaper, child: content)
           : Container(
               decoration: const BoxDecoration(gradient: AppColors.heroGradient),
               child: content,
@@ -204,7 +206,9 @@ class _HomeScreenState extends State<HomeScreen> {
           tooltip: 'Fond d\'écran',
           onPressed: _openWallpaperPicker,
           icon: Icon(
-            _wallpaper.hasImage ? Icons.wallpaper_rounded : Icons.wallpaper_outlined,
+            context.watch<WallpaperProvider>().config.hasImage
+                ? Icons.wallpaper_rounded
+                : Icons.wallpaper_outlined,
             color: AppColors.textSecondary,
           ),
         ),
