@@ -1,14 +1,3 @@
-// lib/config/app_config.dart
-// Configuration centralisée de Crux.
-// Toutes les URLs sensibles / dépendantes de l'environnement passent par
-// --dart-define, avec un défaut sûr. Aucune URL de dev n'est embarquée en
-// release.
-//
-// Exemple de build :
-//   flutter build apk --release \
-//     --dart-define=LIVEKIT_TOKEN_SERVER_URL=https://crux-token-server-xxxx-ew.a.run.app \
-//     --dart-define=LIVEKIT_WSS_URL=wss://crux-xxxx.livekit.cloud \
-//     --dart-define=APP_BASE_URL=https://crux-3c6be.web.app
 import 'package:flutter/foundation.dart';
 
 class AppConfig {
@@ -84,6 +73,11 @@ class AppConfig {
   static const int maxParticipantsStandard = 50;
   static const int maxParticipantsLarge = 1000;
   static const int tokenTtlSeconds = 86400;
+
+  /// Durée maximale d'un appel en formule gratuite (non-PRO), en minutes.
+  /// Cohérent avec l'argument marketing de ProScreen : "Fini la limite de
+  /// 40 minutes en gratuit".
+  static const int freeMeetingDurationMinutes = 40;
 
   /// Une réunion au-delà de [maxParticipantsStandard] passe en mode
   /// "large conference" (LargeConferenceScreen).
