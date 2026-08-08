@@ -175,8 +175,8 @@ class _ProfileScreenState extends State<ProfileScreen>
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             color: isDark
-                ? Colors.black.withOpacity(0.85)
-                : Colors.white.withOpacity(0.95),
+                ? Colors.black.withValues(alpha: 0.85)
+                : Colors.white.withValues(alpha: 0.95),
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 48),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -185,7 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.4),
+                    color: Colors.grey.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -616,7 +616,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.15),
+                color: Colors.red.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -730,7 +730,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     Widget photo;
     if (_isUpdatingPhoto) {
       photo = Container(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white.withValues(alpha: 0.2),
         child: const Center(
           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
         ),
@@ -766,7 +766,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 3),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 16),
+                BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 16),
               ],
             ),
             child: ClipOval(child: photo),
@@ -787,7 +787,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 6,
                   ),
                 ],
@@ -847,7 +847,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
+                            color: Colors.white.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(
@@ -883,7 +883,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           Text(
                             user?.email ?? '',
                             style: GoogleFonts.poppins(
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha: 0.8),
                               fontSize: 12,
                             ),
                           ),
@@ -1070,7 +1070,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           isDark: isDark,
                           trailing: Icon(
                             Icons.chevron_right,
-                            color: Colors.red.withOpacity(0.5),
+                            color: Colors.red.withValues(alpha: 0.5),
                             size: 20,
                           ),
                           onTap: () => _confirmDeleteAccount(lang, isDark, cp),
@@ -1169,13 +1169,13 @@ class _GlassCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: isDark
-              ? Colors.white.withOpacity(0.07)
-              : Colors.white.withOpacity(0.75),
+              ? Colors.white.withValues(alpha: 0.07)
+              : Colors.white.withValues(alpha: 0.75),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isDark
-                ? Colors.white.withOpacity(0.1)
-                : Colors.white.withOpacity(0.6),
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.white.withValues(alpha: 0.6),
           ),
         ),
         child: child,
@@ -1217,7 +1217,7 @@ class _ProfileTile extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.15),
+              color: iconColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: iconColor, size: 20),
@@ -1315,7 +1315,7 @@ class _Badge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     decoration: BoxDecoration(
-      color: color.withOpacity(0.15),
+      color: color.withValues(alpha: 0.15),
       borderRadius: BorderRadius.circular(20),
     ),
     child: Text(
@@ -1349,7 +1349,7 @@ class _BottomSheetTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(

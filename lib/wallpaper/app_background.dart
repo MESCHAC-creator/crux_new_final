@@ -35,9 +35,9 @@ class AppBackground extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(config.scrim * 1.1),
-                    Colors.black.withOpacity(config.scrim * 0.6),
-                    Colors.black.withOpacity(config.scrim * 1.2),
+                    Colors.black.withValues(alpha: config.scrim * 1.1),
+                    Colors.black.withValues(alpha: config.scrim * 0.6),
+                    Colors.black.withValues(alpha: config.scrim * 1.2),
                   ],
                 ),
               ),

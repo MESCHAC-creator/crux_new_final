@@ -1,11 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
@@ -68,7 +66,6 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   String? _error;
   String? _organizerId;
 
-  String? _activeSpeakerId;
   String _currentTranscription = "";
 
   // Monétisation
@@ -142,15 +139,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   void _copyInviteLink() {
     Clipboard.setData(ClipboardData(text: _joinUrl));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Lien de réunion copié.")),
-    );
-  }
-
-  void _shareInvite() {
-    Share.share(
-      "Rejoins ma réunion CRUX : ${widget.meetingName}\nID : ${widget.meetingId}\nLien : $_joinUrl",
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Lien de réunion copié.")),
+      );
+    }
   }
 
   void _showPaywall() {
@@ -206,8 +199,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       bool available = await _speech.initialize();
       if (available) {
         _speech.listen(onResult: (val) {
-          if (mounted)
-            setState(() => _currentTranscription = val.recognizedWords);
+    if (mounted) {
+      setState(() => _currentTranscription = val.recognizedWords);
+    }
         });
       }
     } catch (e) {
@@ -227,7 +221,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       return;
     }
 
-    if (mounted) setState(() => _liveCaptions = true);
+    if (mounted) {
+      setState(() => _liveCaptions = true);
+    }
     await _initSTT();
   }
 
@@ -383,7 +379,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       if (change.type == DocumentChangeType.added) {
         final data = change.doc.data() as Map<String, dynamic>;
         final senderId = data['senderId'] as String?;
-        if (senderId == widget.userId) continue;
+        if (senderId == widget.userId) {
+          continue;
+        }
 
         final type = data['type'] as String?;
 
@@ -471,17 +469,17 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       ),
     );
 
-    if (confirmMute == true) {
-      _sendSignal({
-        'type': 'mute_all',
-        'senderId': widget.userId,
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Demande de coupure micro envoyée.")),
-        );
+      if (confirmMute == true) {
+        _sendSignal({
+          'type': 'mute_all',
+          'senderId': widget.userId,
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Demande de coupure micro envoyée.")),
+          );
+        }
       }
-    }
   }
 
   Future<void> _toggleRaiseHand() async {
@@ -492,7 +490,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         .collection('presence')
         .doc(widget.userId)
         .set({'handRaised': _handRaised}, SetOptions(merge: true));
-    if (_handRaised) _announce("Vous avez levé la main.");
+    if (_handRaised) {
+      _announce("Vous avez levé la main.");
+    }
   }
 
   Future<void> _switchCamera() async {
@@ -597,7 +597,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                 final joinUrl =
                     'https://crux-3c6be.web.app/join/${widget.meetingId}';
                 Share.share(
-                    "Rejoins ma réunion CRUX : ${widget.meetingName}\\nID : ${widget.meetingId}\\nLien : $joinUrl");
+                    "Rejoins ma réunion CRUX : ${widget.meetingName}\nID : ${widget.meetingId}\nLien : $joinUrl");
               },
             ),
           ],
@@ -729,7 +729,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         ],
       ),
     );
-    if (leave == true) _leave();
+    if (leave == true) {
+      _leave();
+    }
   }
 
   Future<void> _leave() async {
@@ -743,7 +745,9 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     await MeetingService().removePresence(widget.meetingId, widget.userId);
     _signalSubscription?.cancel();
     _peerConnection?.close();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     Navigator.pop(context);
   }
 
@@ -837,7 +841,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05), width: 2),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05), width: 2),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
@@ -874,7 +878,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05), width: 2),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05), width: 2),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
@@ -1010,10 +1014,10 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.2),
+                      color: AppColors.error.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                       border:
-                          Border.all(color: AppColors.error.withOpacity(0.5))),
+                          Border.all(color: AppColors.error.withValues(alpha: 0.5))),
                   child: const Text("Quitter",
                       style: TextStyle(
                           color: AppColors.error,
@@ -1067,7 +1071,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       child: Column(children: [
         if (_privateRecipientId != null)
           Container(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               child: ListTile(
                   title: Text("Mode privé actif",
                       style: GoogleFonts.poppins(
@@ -1120,7 +1124,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   decoration: InputDecoration(
                       hintText: "Écrire...",
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
+                      fillColor: Colors.white.withValues(alpha: 0.05),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
                           borderSide: BorderSide.none)))),
@@ -1288,7 +1292,7 @@ class _BasePanel extends StatelessWidget {
           child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
-                  color: Colors.black.withOpacity(0.9),
+                  color: Colors.black.withValues(alpha: 0.9),
                   child: Column(children: [
                     AppBar(
                         backgroundColor: Colors.transparent,

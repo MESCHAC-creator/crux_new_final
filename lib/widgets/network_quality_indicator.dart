@@ -92,7 +92,7 @@ class NetworkQualityBars extends StatelessWidget {
               height: 6.0 + i * 4.0,
               margin: const EdgeInsets.only(right: 2),
               decoration: BoxDecoration(
-                color: isActive ? color : color.withOpacity(0.2),
+                color: isActive ? color : color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(2),
               ),
             );
@@ -147,7 +147,7 @@ class _NetworkDetailsSheet extends StatelessWidget {
                   color: stats.color,
                   shape: BoxShape.circle,
                   boxShadow: [
-                    BoxShadow(color: stats.color.withOpacity(0.4), blurRadius: 6),
+                    BoxShadow(color: stats.color.withValues(alpha: 0.4), blurRadius: 6),
                   ],
                 ),
               ),
@@ -198,7 +198,7 @@ class _NetworkDetailsSheet extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.warningSurface,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -332,7 +332,7 @@ class _NetworkQualityDotState extends State<NetworkQualityDot>
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 6, spreadRadius: 1)],
+            boxShadow: [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 6, spreadRadius: 1)],
           ),
         ),
       ),

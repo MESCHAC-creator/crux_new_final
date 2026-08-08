@@ -23,7 +23,7 @@ class ReactionEmojis extends StatelessWidget {
       decoration: BoxDecoration(
         color: PremiumColors.darkBackground,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: PremiumColors.borderGray.withOpacity(0.2)),
+        border: Border.all(color: PremiumColors.borderGray.withValues(alpha: 0.2)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -39,7 +39,7 @@ class ReactionEmojis extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: PremiumColors.surfaceGray.withOpacity(0.3),
+                    color: PremiumColors.surfaceGray.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Column(

@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../models/meeting_model.dart';
 import '../models/user_model.dart';
-import '../providers/wallpaper_provider.dart';
+import '../wallpaper/wallpaper_provider.dart';
 import '../routes/app_routes.dart';
 import '../services/schedule_service.dart';
 import '../theme/colors.dart';

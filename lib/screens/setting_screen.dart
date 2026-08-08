@@ -87,20 +87,27 @@ class _SettingsScreenState extends State<SettingsScreen>
               : null;
           final isValid =
               isPro && expiry != null && expiry.isAfter(DateTime.now());
-          if (mounted)
+          if (mounted) {
             setState(() {
               _isPro = isValid;
               _proExpiry = isValid ? expiry : null;
               _loadingPro = false;
             });
+          }
         } else {
-          if (mounted) setState(() => _loadingPro = false);
+          if (mounted) {
+            setState(() => _loadingPro = false);
+          }
         }
       } catch (_) {
-        if (mounted) setState(() => _loadingPro = false);
+        if (mounted) {
+          setState(() => _loadingPro = false);
+        }
       }
     } else {
-      if (mounted) setState(() => _loadingPro = false);
+      if (mounted) {
+        setState(() => _loadingPro = false);
+      }
     }
   }
 
@@ -395,7 +402,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                         boxShadow: [
                                           BoxShadow(
                                             color: colorProvider.primary
-                                                .withOpacity(0.4),
+                                                .withValues(alpha: 0.4),
                                             blurRadius: 12,
                                           ),
                                         ],
@@ -474,8 +481,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                                                 : null,
                                             boxShadow: [
                                               BoxShadow(
-                                                color: opt.start.withOpacity(
-                                                  selected ? 0.6 : 0.25,
+                                                color: opt.start.withValues(
+                                                  alpha: selected ? 0.6 : 0.25,
                                                 ),
                                                 blurRadius: selected ? 16 : 6,
                                                 spreadRadius: selected ? 2 : 0,
@@ -515,8 +522,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                                         ),
                                         decoration: BoxDecoration(
                                           color: selected
-                                              ? colorProvider.primary.withOpacity(
-                                                  0.15,
+                                              ? colorProvider.primary.withValues(
+                                                  alpha: 0.15,
                                                 )
                                               : Colors.transparent,
                                           borderRadius: BorderRadius.circular(20),
@@ -775,9 +782,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                                             ),
                                             decoration: BoxDecoration(
                                               color: isDark
-                                                  ? Colors.white.withOpacity(0.07)
-                                                  : Colors.black.withOpacity(
-                                                      0.04,
+                                                  ? Colors.white.withValues(alpha: 0.07)
+                                                  : Colors.black.withValues(
+                                                      alpha: 0.04,
                                                     ),
                                               borderRadius: BorderRadius.circular(
                                                 10,
@@ -839,9 +846,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                                             ),
                                             decoration: BoxDecoration(
                                               color: isDark
-                                                  ? Colors.white.withOpacity(0.07)
-                                                  : Colors.black.withOpacity(
-                                                      0.04,
+                                                  ? Colors.white.withValues(alpha: 0.07)
+                                                  : Colors.black.withValues(
+                                                      alpha: 0.04,
                                                     ),
                                               borderRadius: BorderRadius.circular(
                                                 10,
@@ -951,7 +958,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                       (_isPro
                                               ? const Color(0xFF43A047)
                                               : const Color(0xFFFFD700))
-                                          .withOpacity(0.4),
+                                          .withValues(alpha: 0.4),
                                   blurRadius: 20,
                                   offset: const Offset(0, 8),
                                 ),
@@ -962,7 +969,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
@@ -1017,7 +1024,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                                           .languageCode,
                                                     )),
                                         style: GoogleFonts.poppins(
-                                          color: Colors.white.withOpacity(0.85),
+                                          color: Colors.white.withValues(alpha: 0.85),
                                           fontSize: 12,
                                         ),
                                       ),
@@ -1209,8 +1216,8 @@ class _SettingsScreenState extends State<SettingsScreen>
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
               color: isDark
-                  ? Colors.black.withOpacity(0.8)
-                  : Colors.white.withOpacity(0.92),
+                  ? Colors.black.withValues(alpha: 0.8)
+                  : Colors.white.withValues(alpha: 0.92),
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1221,7 +1228,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                       width: 36,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.4),
+                        color: Colors.grey.withValues(alpha: 0.4),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -1243,14 +1250,16 @@ class _SettingsScreenState extends State<SettingsScreen>
                         setState(() => _videoQuality = q);
                         final p = await SharedPreferences.getInstance();
                         await p.setString('crux_video_quality', q);
-                        if (mounted) Navigator.pop(context);
+                        if (mounted) {
+                          Navigator.pop(context);
+                        }
                       },
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 10),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: _videoQuality == q
-                              ? cp.primary.withOpacity(0.15)
+                              ? cp.primary.withValues(alpha: 0.15)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
@@ -1318,8 +1327,8 @@ class _SettingsScreenState extends State<SettingsScreen>
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
               color: isDark
-                  ? Colors.black.withOpacity(0.88)
-                  : Colors.white.withOpacity(0.95),
+                  ? Colors.black.withValues(alpha: 0.88)
+                  : Colors.white.withValues(alpha: 0.95),
               // Fixed header + scrollable list, capped at 80% screen height
               constraints: BoxConstraints(maxHeight: screenH * 0.80),
               child: Column(
@@ -1337,7 +1346,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             width: 36,
                             height: 4,
                             decoration: BoxDecoration(
-                              color: Colors.grey.withOpacity(0.4),
+                              color: Colors.grey.withValues(alpha: 0.4),
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),
@@ -1399,10 +1408,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                             ),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? cp.primary.withOpacity(0.15)
+                                  ? cp.primary.withValues(alpha: 0.15)
                                   : (isDark
-                                        ? Colors.white.withOpacity(0.04)
-                                        : Colors.black.withOpacity(0.03)),
+                                        ? Colors.white.withValues(alpha: 0.04)
+                                        : Colors.black.withValues(alpha: 0.03)),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
                                 color: isSelected
@@ -1468,20 +1477,20 @@ class _GlassCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: isDark
-                ? Colors.white.withOpacity(0.06)
-                : Colors.white.withOpacity(0.75),
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.white.withValues(alpha: 0.75),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isDark
-                  ? Colors.white.withOpacity(0.1)
-                  : Colors.white.withOpacity(0.8),
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.white.withValues(alpha: 0.8),
               width: 1,
             ),
             boxShadow: isDark
                 ? []
                 : [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
+                      color: Colors.black.withValues(alpha: 0.06),
                       blurRadius: 20,
                       offset: const Offset(0, 4),
                     ),
@@ -1531,7 +1540,7 @@ class _GlassTile extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.15),
+                color: iconColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: iconColor, size: 20),
@@ -1576,8 +1585,8 @@ class _GlassDivider extends StatelessWidget {
     height: 1,
     indent: 68,
     color: isDark
-        ? Colors.white.withOpacity(0.06)
-        : Colors.black.withOpacity(0.06),
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.06),
   );
 }
 
@@ -1612,7 +1621,7 @@ class _GlassButton extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
+            color: Colors.white.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: child,

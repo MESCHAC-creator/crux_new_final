@@ -1,17 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' show ImageFilter;
-
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import 'package:google_fonts/google_fonts.dart';
-import 'package:permission_handler/permission_handler.dart';
-
-import 'package:livekit_client/livekit_client.dart'
-    hide Logger, logger, Navigator;
-
+import 'package:livekit_client/livekit_client.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -19,16 +12,12 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import 'package:webrtc_interface/webrtc_interface.dart' hide Navigator;
-
+import 'package:webrtc_interface/webrtc_interface.dart';
 import '../utils/logger.dart' as crux;
 import '../config/app_config.dart';
 import '../services/livekit_service.dart';
 import '../services/meeting_service.dart';
 import '../services/error_handler_service.dart';
-import '../models/meeting_model.dart';
-import '../services/note_service.dart';
 import '../theme/colors.dart';
 import '../providers/locale_provider.dart';
 import '../services/pro_service.dart';
@@ -108,9 +97,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // --- Transcription ---
   String _currentTranscription = "";
 
-  // --- Chat & Notes ---
-  String? _privateRecipientId;
-  String? _privateRecipientName;
   late final TextEditingController _noteController;
   late final TextEditingController _chatController;
 
@@ -446,7 +432,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     }
 
     _reconnectAttempts++;
-    crux.logger.i('🔄 Reconnection attempt ${_reconnectAttempts}/${AppConfig.maxReconnectAttempts}');
+    crux.logger.i('🔄 Reconnection attempt $_reconnectAttempts/${AppConfig.maxReconnectAttempts}');
 
     await Future.delayed(AppConfig.reconnectDelay);
 
@@ -475,112 +461,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   Future<void> _toggleCam() async {
     setState(() => _camOn = !_camOn);
     await _room?.localParticipant?.setCameraEnabled(_camOn);
-  }
-
-  Future<void> _toggleScreenShare() async {
-    setState(() => _screenShareOn = !_screenShareOn);
-    await _room?.localParticipant?.setScreenShareEnabled(_screenShareOn);
-  }
-
-  Future<void> _toggleRaiseHand() async {
-    setState(() => _handRaised = !_handRaised);
-    await _db
-        .collection('meetings')
-        .doc(widget.meetingId)
-        .collection('presence')
-        .doc(widget.userId)
-        .set({'handRaised': _handRaised}, SetOptions(merge: true));
-    if (_handRaised) _announce('You raised your hand.');
-  }
-
-  Future<void> _toggleLiveCaptions() async {
-    if (_liveCaptions) {
-      await _speech.stop();
-      if (mounted) {
-        setState(() {
-          _liveCaptions = false;
-          _currentTranscription = '';
-        });
-      }
-      return;
-    }
-
-    if (mounted) setState(() => _liveCaptions = true);
-    try {
-      bool available = await _speech.initialize();
-      if (available) {
-        _speech.listen(onResult: (val) {
-          if (mounted) setState(() => _currentTranscription = val.recognizedWords);
-        });
-      }
-    } catch (e) {
-      crux.logger.w('Speech recognition error', error: e);
-    }
-  }
-
-  Future<void> _muteAllOthers() async {
-    final confirmMute = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('Mute everyone?', style: TextStyle(color: Colors.white)),
-        content: const Text('Mute all other participants?',
-            style: TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Mute'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmMute == true && _room != null) {
-      try {
-        final data = utf8.encode(jsonEncode({'type': 'mute_all'}));
-        await _room!.localParticipant?.publishData(data, reliable: true);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Mute request sent.')),
-          );
-        }
-      } catch (e) {
-        crux.logger.e('Error muting all', error: e);
-      }
-    }
-  }
-
-  Future<void> _switchCamera() async {
-    final localParticipant = _room?.localParticipant;
-    if (localParticipant == null) return;
-
-    LocalVideoTrack? videoTrack;
-    for (final pub in localParticipant.videoTrackPublications) {
-      final track = pub.track;
-      if (pub.source == TrackSource.camera && track is LocalVideoTrack) {
-        videoTrack = track;
-        break;
-      }
-    }
-    if (videoTrack == null) return;
-
-    final currentOptions = videoTrack.currentOptions;
-    final currentPosition = currentOptions is CameraCaptureOptions
-        ? currentOptions.cameraPosition
-        : null;
-    final nextPosition = currentPosition == CameraPosition.front
-        ? CameraPosition.back
-        : CameraPosition.front;
-
-    try {
-      await videoTrack.restartTrack(
-        CameraCaptureOptions(cameraPosition: nextPosition),
-      );
-    } catch (e) {
-      crux.logger.e('Camera switch error', error: e);
-    }
   }
 
   Future<void> _announce(String text) async {
@@ -664,30 +544,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         const SnackBar(content: Text('Meeting link copied.')),
       );
     }
-  }
-
-  void _shareInvite() {
-    Share.share(
-      'Join my CRUX call: ${widget.meetingName}\nID: ${widget.meetingId}\nLink: $_joinUrl',
-    );
-  }
-
-  void _initPresenceListener() {
-    _presenceSubscription = _db
-        .collection('meetings')
-        .doc(widget.meetingId)
-        .collection('presence')
-        .snapshots()
-        .listen((snap) {
-      if (mounted) {
-        setState(() {
-          _raisedHands = snap.docs
-              .where((doc) => (doc.data()['handRaised'] ?? false) == true)
-              .map((doc) => doc.id)
-              .toList();
-        });
-      }
-    });
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -885,11 +741,11 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isSpeaking ? AppColors.primary : Colors.white.withOpacity(0.05),
+          color: isSpeaking ? AppColors.primary : Colors.white.withValues(alpha: 0.05),
           width: 2,
         ),
         boxShadow: isSpeaking
-            ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 15)]
+            ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 15)]
             : [],
       ),
       child: ClipRRect(
@@ -921,7 +777,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
               left: 12,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: Colors.red.withOpacity(0.8), borderRadius: BorderRadius.circular(6)),
+                decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.8), borderRadius: BorderRadius.circular(6)),
                 child: const Row(
                   children: [
                     Icon(Icons.screen_share, color: Colors.white, size: 12),
@@ -940,7 +796,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     return Container(
       width: large ? 60 : 32,
       height: large ? 60 : 32,
-      decoration: BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
+      decoration: const BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
       child: Center(
         child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: large ? 24 : 14)),
@@ -1017,8 +873,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
               onTap: _confirmLeave,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(color: AppColors.error.withOpacity(0.2), borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.error.withOpacity(0.5))),
+                decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.error.withValues(alpha: 0.5))),
                 child: const Text('Leave', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 12)),
               ),
             ),

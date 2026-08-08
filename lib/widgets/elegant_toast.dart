@@ -211,21 +211,21 @@ class _ElegantToastState extends State<ElegantToast> with SingleTickerProviderSt
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: const Color(0xFF121624).withOpacity(0.92), // Glass surface
+            color: const Color(0xFF121624).withValues(alpha: 0.92), // Glass surface
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: typeColor.withOpacity(0.25),
+              color: typeColor.withValues(alpha: 0.25),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: typeColor.withOpacity(0.08),
+                color: typeColor.withValues(alpha: 0.08),
                 blurRadius: 16,
                 offset: const Offset(0, 8),
                 spreadRadius: 2,
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.35),
+                color: Colors.black.withValues(alpha: 0.35),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               ),
@@ -245,7 +245,7 @@ class _ElegantToastState extends State<ElegantToast> with SingleTickerProviderSt
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: typeColor.withOpacity(0.12),
+                          color: typeColor.withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -287,7 +287,7 @@ class _ElegantToastState extends State<ElegantToast> with SingleTickerProviderSt
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.03),
+                            color: Colors.white.withValues(alpha: 0.03),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
@@ -354,7 +354,7 @@ class _ToastProgressBarState extends State<_ToastProgressBar> with SingleTickerP
         return Container(
           width: double.infinity,
           height: 3,
-          color: Colors.white.withOpacity(0.04),
+          color: Colors.white.withValues(alpha: 0.04),
           alignment: Alignment.centerLeft,
           child: FractionallySizedBox(
             widthFactor: 1.0 - _controller.value, // Shrinks as time runs out
@@ -368,7 +368,7 @@ class _ToastProgressBarState extends State<_ToastProgressBar> with SingleTickerP
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: widget.color.withOpacity(0.5),
+                    color: widget.color.withValues(alpha: 0.5),
                     blurRadius: 4,
                     spreadRadius: 0.5,
                   ),

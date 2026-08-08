@@ -30,10 +30,9 @@ import 'theme/theme.dart';
 import 'widgets/elegant_toast.dart';
 import 'wallpaper/wallpaper_manager.dart';
 import 'wallpaper/app_background.dart';
-import 'providers/wallpaper_provider.dart';
+import 'wallpaper/wallpaper_provider.dart';
 import 'utils/meeting_notification_manager.dart';
 import 'video/virtual_background_controller.dart';
-import 'meeting/CruxMeetingScreen.dart';
 
 const _flutterUnsupportedLocales = {'ha', 'yo', 'mg', 'wo'};
 

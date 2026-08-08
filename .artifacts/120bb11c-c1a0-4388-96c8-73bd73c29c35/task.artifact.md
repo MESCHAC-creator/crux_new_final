@@ -1,0 +1,16 @@
+- [x] Fix critical errors (Imports & Types)
+    - [x] Rename `lib/meeting/CruxMeetingScreen.dart` to `lib/meeting/crux_meeting_screen.dart`
+    - [x] Update `main.dart` imports and types
+    - [x] Update `home_screen.dart` imports and types
+    - [x] Update `wallpaper_picker_screen.dart` imports and types
+- [/] Modernize code (Deprecated Members)
+    - [/] Replace `withOpacity` with `withValues(alpha: ...)`
+    - [ ] Replace `activeColor` with `activeThumbColor` in `create_meeting_screen.dart`
+    - [ ] Replace `Share.share` with `SharePlus.instance.share`
+- [ ] Cleanup and Linting
+    - [ ] Remove unused imports across the project
+    - [ ] Remove unused fields and local variables
+    - [ ] Fix string interpolation and documentation formatting
+    - [ ] Add `const` and `final` where suggested
+- [ ] Verification
+    - [ ] Run `flutter analyze` to confirm 0 issues

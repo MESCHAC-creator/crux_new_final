@@ -90,7 +90,7 @@ class ErrorHandlerService {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.info.withOpacity(0.12),
+                color: AppColors.info.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(

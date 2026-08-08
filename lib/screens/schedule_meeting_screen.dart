@@ -17,7 +17,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../models/meeting_model.dart';
 import '../services/schedule_service.dart';
 import '../theme/colors.dart';
 import '../utils/logger.dart' as crux;
@@ -727,6 +726,6 @@ class _ScheduleMeetingScreenState extends State<ScheduleMeetingScreen> {
     if (d.inMinutes < 60) return '${d.inMinutes} min';
     final h = d.inMinutes ~/ 60;
     final m = d.inMinutes % 60;
-    return m == 0 ? '${h} h' : '${h} h ${m}';
+    return m == 0 ? '$h h' : '$h h $m';
   }
 }

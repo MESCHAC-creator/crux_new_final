@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
-import '../providers/wallpaper_provider.dart';
+import 'wallpaper_provider.dart';
 import '../theme/colors.dart';
 import 'glass_surface.dart';
 import 'wallpaper_config.dart';

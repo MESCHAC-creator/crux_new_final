@@ -189,7 +189,7 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
               const SizedBox(height: 20),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 value: _showPasscode,
                 onChanged: (v) => setState(() => _showPasscode = v),
                 title: Text(

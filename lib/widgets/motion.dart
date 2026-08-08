@@ -165,7 +165,7 @@ class _PulseDotState extends State<PulseDot>
           width: widget.size + t * 2,
           height: widget.size + t * 2,
           decoration: BoxDecoration(
-            color: widget.color.withOpacity(0.55 + t * 0.45),
+            color: widget.color.withValues(alpha: 0.55 + t * 0.45),
             shape: BoxShape.circle,
           ),
         );

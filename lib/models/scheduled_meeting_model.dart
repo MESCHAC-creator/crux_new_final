@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 /// Énumération des types de réunion.
 enum MeetingType { standard, largeConference, webinar }
 

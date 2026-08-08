@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:livekit_client/livekit_client.dart';
 import 'package:provider/provider.dart';
-import '../providers/locale_provider.dart';
-import '../theme/colors.dart';
 import '../wallpaper/wallpaper_config.dart';
 import '../wallpaper/app_background.dart';
-import '../video/virtual_background_mode.dart';
 import '../video/virtual_background_controller.dart';
 import '../video/background_panel.dart';
 import 'meeting_state.dart';
@@ -41,13 +37,12 @@ class CruxMeetingScreen extends StatefulWidget {
 }
 
 class _CruxMeetingScreenState extends State<CruxMeetingScreen> {
-  Room? _room;
   final List<ChatMessage> _messages = [];
-  int _elapsedSeconds = 0;
+  final int _elapsedSeconds = 0;
   bool _micOn = true;
   bool _camOn = true;
   bool _showChat = false;
-  List<ParticipantUi> _participants = [];
+  final List<ParticipantUi> _participants = [];
   ParticipantUi? _screenShare;
   final CallHealth _health = const CallHealth();
 

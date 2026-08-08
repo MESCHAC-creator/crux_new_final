@@ -374,6 +374,12 @@
       "languageVersion": "3.10"
     },
     {
+      "name": "flutter_timezone",
+      "rootUri": "file:///C:/Users/HP/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_timezone-4.1.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
       "name": "flutter_tts",
       "rootUri": "file:///C:/Users/HP/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_tts-4.2.5",
       "packageUri": "lib/",

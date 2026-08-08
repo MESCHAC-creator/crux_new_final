@@ -21,10 +21,10 @@ class GlassSurface extends StatelessWidget {
       borderRadius: BorderRadius.circular(borderRadius),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface.withOpacity(opacity),
+          color: AppColors.surface.withValues(alpha: opacity),
           borderRadius: BorderRadius.circular(borderRadius),
           border: Border.all(
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
             width: 1,
           ),
         ),

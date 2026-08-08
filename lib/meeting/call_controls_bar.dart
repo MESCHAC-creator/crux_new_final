@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../theme/colors.dart';
-import '../providers/locale_provider.dart';
 import '../wallpaper/glass_surface.dart';
 
 /// Action secondaire pour la bottom sheet.
@@ -49,8 +47,6 @@ class CallControlsBar extends StatefulWidget {
 }
 
 class _CallControlsBarState extends State<CallControlsBar> {
-  bool _moreOpen = false;
-
   @override
   Widget build(BuildContext context) {
     return GlassSurface(
@@ -84,7 +80,7 @@ class _CallControlsBarState extends State<CallControlsBar> {
             _ControlButton(
               icon: Icons.more_horiz,
               description: 'Plus d\'options',
-              onTap: () => setState(() => _moreOpen = true),
+              onTap: () {},
             ),
             const SizedBox(width: 8),
             // Quitter : seul bouton rouge rempli, impossible à confondre
@@ -127,7 +123,7 @@ class _ControlButton extends StatelessWidget {
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
           backgroundColor:
-              active ? AppColors.error : AppColors.surface.withOpacity(0.8),
+              active ? AppColors.error : AppColors.surface.withValues(alpha: 0.8),
           foregroundColor: active ? Colors.white : AppColors.textSecondary,
           minimumSize: const Size(48, 48),
           shape: const CircleBorder(),

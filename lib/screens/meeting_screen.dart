@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
-import '../models/meeting_model.dart';
-import '../providers/locale_provider.dart';
-import '../l10n/app_translations.dart';
 import '../widgets/elegant_toast.dart';
 import 'large_conference_screen.dart';
 
@@ -59,11 +55,6 @@ class _MeetingScreenState extends State<MeetingScreen> {
     );
   }
 
-  void _shareMeeting() {
-    final joinUrl = 'https://crux-3c6be.web.app/join/${widget.meetingId}';
-    Share.share("Rejoins ma réunion CRUX : ${widget.meetingName}\nID : ${widget.meetingId}\nLien : $joinUrl");
-  }
-
   void _joinCall() {
     Navigator.push(
       context,
@@ -87,7 +78,6 @@ class _MeetingScreenState extends State<MeetingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF1A1A2E), Color(0xFF16213E)])),
@@ -129,7 +119,7 @@ class _InfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white12)),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white12)),
       child: Column(children: [
         const Icon(Icons.security, color: Colors.green, size: 40),
         const SizedBox(height: 16),

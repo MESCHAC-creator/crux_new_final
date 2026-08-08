@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../theme/colors.dart';
-import '../providers/locale_provider.dart';
 import 'meeting_state.dart';
 import '../wallpaper/glass_surface.dart';
 
@@ -164,9 +162,9 @@ class _MessageBubble extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: message.fromMe
-                  ? AppColors.primary.withOpacity(0.3)
+                  ? AppColors.primary.withValues(alpha: 0.3)
                   : isPrivate
-                      ? AppColors.secondary.withOpacity(0.3)
+                      ? AppColors.secondary.withValues(alpha: 0.3)
                       : AppColors.surface,
               borderRadius: BorderRadius.circular(16),
             ),

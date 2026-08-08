@@ -21,6 +21,7 @@
         "flutter_local_notifications",
         "flutter_localizations",
         "flutter_secure_storage",
+        "flutter_timezone",
         "flutter_tts",
         "flutter_webrtc",
         "google_fonts",
@@ -200,6 +201,14 @@
         "permission_handler_html",
         "permission_handler_platform_interface",
         "permission_handler_windows"
+      ]
+    },
+    {
+      "name": "flutter_timezone",
+      "version": "4.1.1",
+      "dependencies": [
+        "flutter",
+        "flutter_web_plugins"
       ]
     },
     {

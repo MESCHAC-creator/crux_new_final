@@ -53,14 +53,14 @@ class _CustomButtonState extends State<CustomButton> {
               const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           decoration: BoxDecoration(
             color: widget.isLoading
-                ? bgColor.withOpacity(0.6)
+                ? bgColor.withValues(alpha: 0.6)
                 : _isPressed
-                ? bgColor.withOpacity(0.8)
+                ? bgColor.withValues(alpha: 0.8)
                 : bgColor,
             borderRadius: BorderRadius.circular(borderRadius),
             boxShadow: [
               BoxShadow(
-                color: bgColor.withOpacity(_isPressed ? 0.2 : 0.3),
+                color: bgColor.withValues(alpha: _isPressed ? 0.2 : 0.3),
                 blurRadius: _isPressed ? 8 : 12,
                 offset: Offset(0, _isPressed ? 2 : 4),
               ),

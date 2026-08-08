@@ -54,7 +54,7 @@ class _MeetingChatState extends State<MeetingChat> {
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
-                  color: PremiumColors.borderGray.withOpacity(0.2),
+                  color: PremiumColors.borderGray.withValues(alpha: 0.2),
                 ),
               ),
             ),
@@ -120,7 +120,7 @@ class _MeetingChatState extends State<MeetingChat> {
             decoration: BoxDecoration(
               border: Border(
                 top: BorderSide(
-                  color: PremiumColors.borderGray.withOpacity(0.2),
+                  color: PremiumColors.borderGray.withValues(alpha: 0.2),
                 ),
               ),
             ),
@@ -188,7 +188,7 @@ class _ChatMessageWidget extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: PremiumColors.textSecondary.withOpacity(0.2),
+              color: PremiumColors.textSecondary.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
@@ -219,7 +219,7 @@ class _ChatMessageWidget extends StatelessWidget {
           decoration: BoxDecoration(
             color: isMine
                 ? PremiumColors.flamePrimary
-                : PremiumColors.textSecondary.withOpacity(0.2),
+                : PremiumColors.textSecondary.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
@@ -254,8 +254,8 @@ class _ChatMessageWidget extends StatelessWidget {
                   timeStr,
                   style: GoogleFonts.poppins(
                     color: isMine
-                        ? PremiumColors.snowWhite.withOpacity(0.5)
-                        : PremiumColors.textTertiary.withOpacity(0.7),
+                        ? PremiumColors.snowWhite.withValues(alpha: 0.5)
+                        : PremiumColors.textTertiary.withValues(alpha: 0.7),
                     fontSize: 9,
                   ),
                 ),

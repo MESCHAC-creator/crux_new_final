@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import '../theme/colors.dart';
-import '../providers/locale_provider.dart';
 import 'meeting_state.dart';
 import '../wallpaper/glass_surface.dart';
 
@@ -58,7 +56,7 @@ class MeetingHeader extends StatelessWidget {
     final h = seconds ~/ 3600;
     final m = (seconds % 3600) ~/ 60;
     final s = seconds % 60;
-    if (h > 0) return '${h}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    if (h > 0) return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 }
@@ -92,7 +90,7 @@ class _HealthIndicator extends StatelessWidget {
           fontSize: 12,
         ),
       ),
-      backgroundColor: AppColors.surface.withOpacity(0.8),
+      backgroundColor: AppColors.surface.withValues(alpha: 0.8),
       side: BorderSide.none,
     );
   }
