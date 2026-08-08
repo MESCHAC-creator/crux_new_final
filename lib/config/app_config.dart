@@ -79,6 +79,20 @@ class AppConfig {
   /// 40 minutes en gratuit".
   static const int freeMeetingDurationMinutes = 40;
 
+  /// Timeout de connexion à la salle LiveKit (après obtention du token).
+  static const Duration roomConnectionTimeout = Duration(seconds: 20);
+
+  /// Nombre de tentatives de reconnexion après perte de connexion.
+  static const int maxReconnectAttempts = 5;
+
+  /// Délai d'attente entre deux tentatives de reconnexion.
+  static const Duration reconnectDelay = Duration(seconds: 3);
+
+  /// Nombre maximal de tuiles vidéo réellement rendues à l'écran dans une
+  /// grande conférence (au-delà, les participants restent connectés mais
+  /// sans rendu vidéo, pour préserver les performances sur mobile).
+  static const int livekitVisibleTileCap = 50;
+
   /// Une réunion au-delà de [maxParticipantsStandard] passe en mode
   /// "large conference" (LargeConferenceScreen).
   static bool isLargeMeeting(int? maxParticipants) =>
