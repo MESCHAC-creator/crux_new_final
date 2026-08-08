@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 
 import '../wallpaper/wallpaper_config.dart';
 import '../wallpaper/wallpaper_manager.dart';
