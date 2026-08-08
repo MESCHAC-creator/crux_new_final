@@ -282,7 +282,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       }
 
       // Étape 4: Connecter à LiveKit
-      await _room!.connect(AppConfig.livekitUrl, token).timeout(
+      await _room!.connect(AppConfig.livekitWssUrl, token).timeout(
         AppConfig.roomConnectionTimeout,
         onTimeout: () {
           throw Exception('Room connection timeout');
