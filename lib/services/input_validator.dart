@@ -7,8 +7,9 @@ class InputValidator {
     if (value.isEmpty) return AppTranslations.t('val_name_required', lang);
     if (value.length < 2) return AppTranslations.t('val_min_2', lang);
     if (value.length > 60) return AppTranslations.t('val_max_60', lang);
-    if (_containsMaliciousPatterns(value))
+    if (_containsMaliciousPatterns(value)) {
       return AppTranslations.t('val_invalid_chars', lang);
+    }
     return null;
   }
 
@@ -29,8 +30,9 @@ class InputValidator {
     value = value.trim();
     if (value.isEmpty) return AppTranslations.t('val_name_required', lang);
     if (value.length > 50) return AppTranslations.t('val_max_50', lang);
-    if (_containsMaliciousPatterns(value))
+    if (_containsMaliciousPatterns(value)) {
       return AppTranslations.t('val_invalid_chars', lang);
+    }
     return null;
   }
 

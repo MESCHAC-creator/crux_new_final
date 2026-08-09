@@ -102,11 +102,11 @@ class AppConfig {
   static const String deepLinkScheme = 'crux';
   static const String deepLinkHost = 'join';
 
-  /// Lien natif : crux://join/<id>
+  /// Lien natif : crux://join/`<id>`
   static String deepLink(String meetingId) =>
       '$deepLinkScheme://$deepLinkHost/$meetingId';
 
-  /// Lien web universel, partageable partout : https://.../join/<id>
+  /// Lien web universel, partageable partout : https://.../join/`id`
   static String webJoinLink(String meetingId) => '$appBaseUrl/join/$meetingId';
 
   /// Lien à copier / partager par défaut (web = ouvrable par tout le monde).

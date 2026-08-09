@@ -199,7 +199,8 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                 onPressed: () async {
                   await _provider.apply(_provider.config);
                   _applied = true;
-                  if (mounted) Navigator.pop(context);
+                  if (!context.mounted) return;
+                  Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),

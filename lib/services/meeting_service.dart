@@ -253,8 +253,6 @@ class MeetingService {
     String? passcode,
   }) async {
     try {
-      final userId = _getCurrentUserId();
-      final finalOrganizerID = organizerId ?? userId;
       final current = FirebaseAuth.instance.currentUser;
 
       final meeting = await scheduleProMeeting(

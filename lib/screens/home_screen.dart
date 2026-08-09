@@ -262,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 46,
                 height: 46,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: AppColors.logoHalo,
                   shape: BoxShape.circle,
                 ),

@@ -235,10 +235,10 @@ class _ScheduleMeetingScreenState extends State<ScheduleMeetingScreen> {
             const Icon(Icons.event_available_rounded,
                 color: AppColors.primary, size: 36),
             const SizedBox(height: 14),
-            Text(
+            const Text(
               'Réunion planifiée',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
@@ -385,10 +385,10 @@ class _ScheduleMeetingScreenState extends State<ScheduleMeetingScreen> {
                   ],
                 ),
                 if (_start.isBefore(DateTime.now()))
-                  Padding(
-                    padding: const EdgeInsets.only(top: 10),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 10),
                     child: Row(
-                      children: const [
+                      children: [
                         Icon(Icons.error_outline_rounded,
                             color: AppColors.warning, size: 16),
                         SizedBox(width: 8),

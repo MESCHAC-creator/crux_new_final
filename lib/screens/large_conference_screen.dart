@@ -7,12 +7,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:webrtc_interface/webrtc_interface.dart';
+import 'package:webrtc_interface/webrtc_interface.dart' hide Navigator;
 import '../utils/logger.dart' as crux;
 import '../config/app_config.dart';
 import '../services/livekit_service.dart';
@@ -71,7 +70,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _micOn = true;
   bool _camOn = true;
-  bool _screenShareOn = false;
 
   // --- Participants ---
   List<RemoteParticipant> _remoteParticipants = [];
@@ -85,9 +83,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   bool _showParticipants = false;
   bool _showNotes = false;
   bool _voiceAssistant = false;
-  bool _liveCaptions = false;
-  bool _handRaised = false;
-  List<String> _raisedHands = [];
+  final List<String> _raisedHands = [];
 
   // --- Meeting Duration & Pro ---
   Timer? _callTimer;
@@ -95,7 +91,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   bool _isPro = false;
 
   // --- Transcription ---
-  String _currentTranscription = "";
+  final String _currentTranscription = "";
 
   late final TextEditingController _noteController;
   late final TextEditingController _chatController;
@@ -724,14 +720,12 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     bool isScreenShare = false;
     bool hasVideo = false;
 
-    if (p.videoTrackPublications != null) {
-      for (final pub in p.videoTrackPublications) {
-        if (pub.track != null && pub.track is VideoTrack && pub.muted == false) {
-          videoTrack = pub.track as VideoTrack;
-          isScreenShare = pub.source == TrackSource.screenShareVideo;
-          hasVideo = true;
-          break;
-        }
+    for (final pub in p.videoTrackPublications) {
+      if (pub.track != null && pub.track is VideoTrack && pub.muted == false) {
+        videoTrack = pub.track as VideoTrack;
+        isScreenShare = pub.source == TrackSource.screenShareVideo;
+        hasVideo = true;
+        break;
       }
     }
 
@@ -752,12 +746,12 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         borderRadius: BorderRadius.circular(24),
         child: Stack(children: [
           Positioned.fill(
-            child: hasVideo && videoTrack != null
-                ? VideoTrackRenderer(videoTrack,
+            child: hasVideo
+                ? VideoTrackRenderer(videoTrack!,
                     fit: isScreenShare
                         ? RTCVideoViewObjectFit.RTCVideoViewObjectFitContain
                         : RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
-                : Center(child: _buildAvatar(p.name ?? p.identity, large: true)),
+                : Center(child: _buildAvatar(p.name, large: true)),
           ),
           Positioned(
             bottom: 12,
@@ -765,7 +759,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(8)),
-              child: Text((p.name != null && p.name!.isNotEmpty) ? p.name! : 'Guest',
+              child: Text(p.name.isNotEmpty ? p.name : 'Guest',
                   style: GoogleFonts.poppins(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
             ),
           ),

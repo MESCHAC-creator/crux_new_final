@@ -91,11 +91,11 @@ class _ProgressiveBlurBackground extends StatelessWidget {
         ),
         // Couche floue dessus, masquée en dégradé : flou en haut, net en bas
         ShaderMask(
-          shaderCallback: (bounds) => LinearGradient(
+          shaderCallback: (bounds) => const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [Colors.black, Colors.black, Colors.transparent],
-            stops: const [0.0, 0.45, 1.0],
+            stops: [0.0, 0.45, 1.0],
           ).createShader(bounds),
           blendMode: BlendMode.dstIn,
           child: ImageFiltered(

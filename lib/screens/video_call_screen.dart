@@ -16,11 +16,10 @@ import '../utils/logger.dart' as crux;
 import '../config/app_config.dart';
 import '../services/meeting_service.dart';
 import '../services/error_handler_service.dart';
-import '../models/meeting_model.dart';
 import '../services/note_service.dart';
 import '../theme/colors.dart';
-import '../providers/locale_provider.dart';
 import '../services/pro_service.dart';
+import '../providers/locale_provider.dart';
 
 /// Écran d'appel vidéo P2P standard (jusqu'à 25 participants)
 /// Utilise flutter_webrtc pour les appels directs
@@ -56,7 +55,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
   final List<MediaStream> _remoteStreams = [];
-  RTCVideoRenderer _localRenderer = RTCVideoRenderer();
+  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
   final Map<String, RTCVideoRenderer> _remoteRenderers = {};
 
   bool _micOn = true;
@@ -292,6 +291,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       setState(() => _loading = false);
     } catch (e, st) {
       crux.logger.e('WebRTC initialization failed', error: e, stackTrace: st);
+      if (!mounted) return;
       final lang = context.read<LocaleProvider>().locale.languageCode;
       setState(() {
         _loading = false;
@@ -511,6 +511,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   void _showMoreOptions() {
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -594,10 +595,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
                   style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
-                final joinUrl =
-                    'https://crux-3c6be.web.app/join/${widget.meetingId}';
-                Share.share(
-                    "Rejoins ma réunion CRUX : ${widget.meetingName}\nID : ${widget.meetingId}\nLien : $joinUrl");
+                final text = "Rejoins ma réunion CRUX : ${widget.meetingName}\nID : ${widget.meetingId}\nLien : $_joinUrl";
+                unawaited(SharePlus.instance.share(ShareParams(text: text)));
               },
             ),
           ],
@@ -607,6 +606,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   }
 
   void _showHealthDashboard() {
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -664,6 +664,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       );
 
   void _showMeetingInfo() {
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -711,6 +712,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       );
 
   Future<void> _confirmLeave() async {
+    if (!mounted) return;
     final leave = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -730,6 +732,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       ),
     );
     if (leave == true) {
+      if (!mounted) return;
       _leave();
     }
   }
@@ -910,7 +913,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     return Container(
       width: large ? 60 : 32,
       height: large ? 60 : 32,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
           gradient: AppColors.primaryGradient, shape: BoxShape.circle),
       child: Center(
           child: Text(name.isNotEmpty ? name[0].toUpperCase() : "?",

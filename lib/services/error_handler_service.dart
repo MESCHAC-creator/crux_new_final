@@ -26,7 +26,7 @@ class ErrorHandlerService {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.error.withOpacity(0.12),
+                color: AppColors.error.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -386,8 +386,9 @@ class ErrorHandlerService {
       case 'quota-exceeded':
         return AppTranslations.t('auth_limit', lang);
       default:
-        if (code.contains('network'))
+        if (code.contains('network')) {
           return AppTranslations.t('auth_network_issue', lang);
+        }
         return AppTranslations.t('auth_unknown', lang);
     }
   }
@@ -401,30 +402,42 @@ class ErrorHandlerService {
         msg.contains('incorrect')) {
       return AppTranslations.t('auth_wrong_pwd', lang);
     }
-    if (msg.contains('user-not-found'))
+    if (msg.contains('user-not-found')) {
       return AppTranslations.t('auth_no_account', lang);
-    if (msg.contains('email-already-in-use'))
+    }
+    if (msg.contains('email-already-in-use')) {
       return AppTranslations.t('auth_email_used', lang);
-    if (msg.contains('weak-password'))
+    }
+    if (msg.contains('weak-password')) {
       return AppTranslations.t('auth_weak_pwd', lang);
-    if (msg.contains('invalid-email'))
+    }
+    if (msg.contains('invalid-email')) {
       return AppTranslations.t('auth_invalid_email_fmt', lang);
-    if (msg.contains('too-many-requests'))
+    }
+    if (msg.contains('too-many-requests')) {
       return AppTranslations.t('auth_too_many', lang);
-    if (msg.contains('network') || msg.contains('Network'))
+    }
+    if (msg.contains('network') || msg.contains('Network')) {
       return AppTranslations.t('auth_no_network', lang);
-    if (msg.contains('user-disabled'))
+    }
+    if (msg.contains('user-disabled')) {
       return AppTranslations.t('auth_disabled', lang);
-    if (msg.contains('requires-recent-login'))
+    }
+    if (msg.contains('requires-recent-login')) {
       return AppTranslations.t('auth_session_expired', lang);
-    if (msg.contains('account-exists-with-different-credential'))
+    }
+    if (msg.contains('account-exists-with-different-credential')) {
       return AppTranslations.t('auth_other_method', lang);
-    if (msg.contains('permission-denied'))
+    }
+    if (msg.contains('permission-denied')) {
       return AppTranslations.t('auth_unknown', lang);
-    if (msg.contains('cancelled') || msg.contains('canceled'))
+    }
+    if (msg.contains('cancelled') || msg.contains('canceled')) {
       return AppTranslations.t('auth_cancelled', lang);
-    if (msg.length < 120 && !msg.contains('[') && !msg.contains('{'))
+    }
+    if (msg.length < 120 && !msg.contains('[') && !msg.contains('{')) {
       return msg;
+    }
     return AppTranslations.t('auth_unknown', lang);
   }
 

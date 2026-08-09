@@ -40,7 +40,8 @@
         "speech_to_text",
         "timezone",
         "url_launcher",
-        "uuid"
+        "uuid",
+        "webrtc_interface"
       ],
       "devDependencies": [
         "flutter_launcher_icons",
@@ -253,6 +254,11 @@
         "uuid",
         "web"
       ]
+    },
+    {
+      "name": "webrtc_interface",
+      "version": "1.5.1",
+      "dependencies": []
     },
     {
       "name": "flutter_webrtc",
@@ -888,11 +894,6 @@
         "collection",
         "meta"
       ]
-    },
-    {
-      "name": "webrtc_interface",
-      "version": "1.5.1",
-      "dependencies": []
     },
     {
       "name": "nested",

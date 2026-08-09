@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
-import '../models/meeting_model.dart';
 import '../services/meeting_service.dart';
 
 class MeetingProvider extends ChangeNotifier {
