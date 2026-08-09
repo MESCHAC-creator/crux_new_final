@@ -11,7 +11,7 @@ import '../config/app_config.dart';
 /// PRINCIPES:
 /// - Une seule méthode publique: fetchToken()
 /// - Récupère automatiquement le Firebase ID Token
-/// - Envoie Authorization: Bearer `FirebaseToken`
+/// - Envoie Authorization: Bearer `<FirebaseToken>`
 /// - Timeout strict: 15 secondes
 /// - Logs détaillés pour debugging
 /// - Gestion des exceptions cohérente

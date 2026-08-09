@@ -11,7 +11,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:webrtc_interface/webrtc_interface.dart' hide Navigator;
+import 'package:webrtc_interface/webrtc_interface.dart' as rtc hide Navigator;
 import '../utils/logger.dart' as crux;
 import '../config/app_config.dart';
 import '../services/livekit_service.dart';
@@ -721,7 +721,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     bool hasVideo = false;
 
     for (final pub in p.videoTrackPublications) {
-      if (pub.track != null && pub.track is VideoTrack && pub.muted == false) {
+      if (pub.track is VideoTrack && pub.muted == false) {
         videoTrack = pub.track as VideoTrack;
         isScreenShare = pub.source == TrackSource.screenShareVideo;
         hasVideo = true;
@@ -749,8 +749,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
             child: hasVideo
                 ? VideoTrackRenderer(videoTrack!,
                     fit: isScreenShare
-                        ? RTCVideoViewObjectFit.RTCVideoViewObjectFitContain
-                        : RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                        ? rtc.RTCVideoViewObjectFit.RTCVideoViewObjectFitContain
+                        : rtc.RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
                 : Center(child: _buildAvatar(p.name, large: true)),
           ),
           Positioned(

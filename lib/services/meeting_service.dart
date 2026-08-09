@@ -248,7 +248,6 @@ class MeetingService {
     required String title,
     required String description,
     required String organizerName,
-    String? organizerId,
     required DateTime startTime,
     String? passcode,
   }) async {

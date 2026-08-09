@@ -15,7 +15,9 @@ class ErrorHandlerService {
   // ── Dialogs ────────────────────────────────────────────────────────────────
 
   void showErrorDialog(BuildContext context, String title, String message) {
-    if (!context.mounted) return;
+    if (!context.mounted) {
+      return;
+    }
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -79,7 +81,9 @@ class ErrorHandlerService {
   }
 
   void showInfoDialog(BuildContext context, String title, String message) {
-    if (!context.mounted) return;
+    if (!context.mounted) {
+      return;
+    }
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -145,7 +149,9 @@ class ErrorHandlerService {
   // ── Snackbars ──────────────────────────────────────────────────────────────
 
   void showError(BuildContext context, String message) {
-    if (!context.mounted) return;
+    if (!context.mounted) {
+      return;
+    }
     ElegantToast.show(
       context,
       title: 'Erreur',
@@ -156,7 +162,9 @@ class ErrorHandlerService {
   }
 
   void showSuccessSnackBar(BuildContext context, String message) {
-    if (!context.mounted) return;
+    if (!context.mounted) {
+      return;
+    }
     ElegantToast.show(
       context,
       title: 'Succès',
@@ -167,7 +175,9 @@ class ErrorHandlerService {
   }
 
   void showWarningSnackBar(BuildContext context, String message) {
-    if (!context.mounted) return;
+    if (!context.mounted) {
+      return;
+    }
     ElegantToast.show(
       context,
       title: 'Attention',
@@ -178,7 +188,9 @@ class ErrorHandlerService {
   }
 
   void showInfoSnackBar(BuildContext context, String message) {
-    if (!context.mounted) return;
+    if (!context.mounted) {
+      return;
+    }
     ElegantToast.show(
       context,
       title: 'Information',

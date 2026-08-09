@@ -291,12 +291,13 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       setState(() => _loading = false);
     } catch (e, st) {
       crux.logger.e('WebRTC initialization failed', error: e, stackTrace: st);
-      if (!mounted) return;
-      final lang = context.read<LocaleProvider>().locale.languageCode;
-      setState(() {
-        _loading = false;
-        _error = _errorHandler.getMeetingErrorMessageL(e.toString(), lang);
-      });
+      if (mounted) {
+        final lang = context.read<LocaleProvider>().locale.languageCode;
+        setState(() {
+          _loading = false;
+          _error = _errorHandler.getMeetingErrorMessageL(e.toString(), lang);
+        });
+      }
     }
   }
 

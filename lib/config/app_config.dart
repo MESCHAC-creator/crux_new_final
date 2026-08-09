@@ -106,7 +106,7 @@ class AppConfig {
   static String deepLink(String meetingId) =>
       '$deepLinkScheme://$deepLinkHost/$meetingId';
 
-  /// Lien web universel, partageable partout : https://.../join/`id`
+  /// Lien web universel, partageable partout : https://.../join/`<id>`
   static String webJoinLink(String meetingId) => '$appBaseUrl/join/$meetingId';
 
   /// Lien à copier / partager par défaut (web = ouvrable par tout le monde).
