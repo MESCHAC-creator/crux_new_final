@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Inscription — CRUX</title>
+  <link rel="icon" type="image/png" href="/favicon.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/crux.css"/>
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav-logo" style="text-decoration:none;color:inherit">
+    <div class="mark">📹</div>CRUX
+  </a>
+  <div class="nav-actions">
+    <a href="/login" class="btn btn-outline btn-sm" style="text-decoration:none">Connexion</a>
+  </div>
+</nav>
+
+<div class="page-center">
+  <div class="card">
+    <div class="logo-mark">📹</div>
+    <div class="logo-text">CRUX</div>
+    <div class="logo-sub">Créer un compte gratuit</div>
+
+    <div id="errMsg" class="err-msg"></div>
+
+    <div class="field">
+      <label>Nom complet</label>
+      <input type="text" id="name" placeholder="Votre nom" autocomplete="name"/>
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="email" placeholder="votre@email.com" autocomplete="email"/>
+    </div>
+    <div class="field">
+      <label>Mot de passe</label>
+      <input type="password" id="password" placeholder="8 caractères minimum" autocomplete="new-password"/>
+    </div>
+    <div class="field">
+      <label>Confirmer le mot de passe</label>
+      <input type="password" id="confirm" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')signup()"/>
+    </div>
+
+    <button class="btn btn-primary" id="signupBtn" onclick="signup()">Créer mon compte</button>
+
+    <div class="divider">ou</div>
+
+    <button class="btn-google" id="googleBtn" onclick="signupGoogle()">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continuer avec Google
+    </button>
+
+    <div style="text-align:center;margin-top:20px;font-size:13px;color:rgba(255,255,255,0.45)">
+      Déjà un compte ? <a href="/login">Se connecter</a>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script type="module">
+  import { initializeApp }         from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getAuth, createUserWithEmailAndPassword, updateProfile,
+           GoogleAuthProvider, signInWithPopup, onAuthStateChanged }
+                                   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+  import { getFirestore, doc, setDoc, serverTimestamp }
+                                   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import { FIREBASE_CONFIG, toast } from '../js/firebase.js';
+
+  const app  = initializeApp(FIREBASE_CONFIG);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  onAuthStateChanged(auth, user => {
+    if (user && !user.isAnonymous) window.location.href = '../app/';
+  });
+
+  function showErr(msg) {
+    const el = document.getElementById('errMsg');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+  function setLoading(id, loading, label) {
+    const btn = document.getElementById(id);
+    btn.disabled = loading;
+    btn.innerHTML = loading ? `<span class="spinner"></span>${label}` : label;
+  }
+
+  async function saveUserToFirestore(user, name) {
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        name: name || user.displayName || 'Utilisateur',
+        email: user.email,
+        photoBase64: '',
+        isPro: false,
+        isOnline: true,
+        createdAt: serverTimestamp(),
+      }, { merge: true });
+    } catch (e) { console.warn('Firestore write failed:', e); }
+  }
+
+  window.signup = async function() {
+    const name  = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const pass  = document.getElementById('password').value;
+    const conf  = document.getElementById('confirm').value;
+    if (!name || !email || !pass) { showErr('Remplissez tous les champs.'); return; }
+    if (pass.length < 8)          { showErr('Mot de passe trop court (8 min).'); return; }
+    if (pass !== conf)            { showErr('Les mots de passe ne correspondent pas.'); return; }
+    setLoading('signupBtn', true, 'Création...');
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      await updateProfile(cred.user, { displayName: name });
+      await saveUserToFirestore(cred.user, name);
+      // onAuthStateChanged redirects to /app
+    } catch (e) {
+      const msgs = {
+        'auth/email-already-in-use': 'Cet email est déjà utilisé.',
+        'auth/invalid-email': 'Email invalide.',
+        'auth/weak-password': 'Mot de passe trop faible.',
+      };
+      showErr(msgs[e.code] || 'Erreur d\'inscription.');
+      setLoading('signupBtn', false, 'Créer mon compte');
+    }
+  };
+
+  window.signupGoogle = async function() {
+    setLoading('googleBtn', true, 'Connexion...');
+    try {
+      const provider = new GoogleAuthProvider();
+      const cred = await signInWithPopup(auth, provider);
+      await saveUserToFirestore(cred.user, cred.user.displayName);
+    } catch (e) {
+      if (e.code !== 'auth/popup-closed-by-user') showErr('Erreur Google Sign-In.');
+      document.getElementById('googleBtn').disabled = false;
+      document.getElementById('googleBtn').innerHTML = '🔵 Continuer avec Google';
+    }
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+/* CRUX Web — shared styles */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#E74C3C;--primary-dark:#c0392b;
+  --bg:#0A0A14;--surface:#12121E;--surface2:#1a1a2e;
+  --border:rgba(255,255,255,0.1);--text:rgba(255,255,255,0.9);
+  --text2:rgba(255,255,255,0.55);--text3:rgba(255,255,255,0.3);
+  --green:#2ecc71;--orange:#e67e22;
+}
+body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:var(--primary);text-decoration:none}a:hover{text-decoration:underline}
+
+/* Layout */
+.page-center{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.card{background:var(--surface);border-radius:20px;padding:36px 32px;width:100%;max-width:440px;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+
+/* Logo */
+.logo-mark{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#B71C1C,#6A1B9A);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 16px;flex-shrink:0}
+.logo-text{font-size:22px;font-weight:700;text-align:center;margin-bottom:4px}
+.logo-sub{font-size:13px;color:var(--text2);text-align:center;margin-bottom:28px}
+
+/* Form */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13px;color:var(--text2);margin-bottom:7px;font-weight:500}
+.field input{width:100%;background:rgba(255,255,255,0.06);border:1.5px solid var(--border);border-radius:12px;padding:13px 16px;font-family:'Poppins',sans-serif;font-size:15px;color:var(--text);outline:none;transition:border-color .2s}
+.field input:focus{border-color:var(--primary)}
+.field input::placeholder{color:var(--text3)}
+.field input.err{border-color:var(--primary)}
+
+/* Buttons */
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s;text-align:center}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover:not(:disabled){opacity:.88}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text2)}
+.btn-outline:hover{border-color:rgba(255,255,255,.3);color:var(--text)}
+.btn-ghost{background:transparent;color:var(--primary);border:none;padding:8px 0;font-size:14px;cursor:pointer}
+.btn-sm{padding:9px 18px;font-size:13px;border-radius:9px;display:inline-block;width:auto}
+.btn-danger{background:var(--primary-dark);color:#fff}
+
+/* Divider */
+.divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--text3);font-size:13px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* Messages */
+.err-msg{color:var(--primary);font-size:13px;margin-top:-8px;margin-bottom:12px;display:none}
+.info-msg{color:var(--green);font-size:13px;margin-bottom:12px;display:none}
+
+/* Spinner */
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Navbar */
+.nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.nav-logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
+.nav-logo .mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#B71C1C,#6A1B9A);display:flex;align-items:center;justify-content:center;font-size:14px}
+.nav-actions{display:flex;align-items:center;gap:10px}
+
+/* Avatar */
+.avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#B71C1C,#6A1B9A);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff;cursor:pointer;flex-shrink:0}
+
+/* Meeting card */
+.meeting-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;transition:border-color .2s;cursor:pointer}
+.meeting-card:hover{border-color:rgba(255,255,255,.25)}
+.meeting-card .title{font-weight:600;font-size:15px;margin-bottom:4px}
+.meeting-card .meta{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:8px}
+.meeting-card .status{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.status-ongoing{background:rgba(46,204,113,.15);color:#2ecc71;border:1px solid rgba(46,204,113,.3)}
+.status-scheduled{background:rgba(52,152,219,.15);color:#3498db;border:1px solid rgba(52,152,219,.3)}
+.status-ended{background:rgba(255,255,255,.06);color:var(--text3);border:1px solid var(--border)}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px}
+.modal{background:var(--surface);border-radius:20px;padding:32px;width:100%;max-width:420px;box-shadow:0 16px 60px rgba(0,0,0,.6)}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:20px}
+
+/* Tags / badges */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-green{background:rgba(46,204,113,.15);color:#2ecc71;border:1px solid rgba(46,204,113,.25)}
+.badge-blue{background:rgba(52,152,219,.15);color:#3498db;border:1px solid rgba(52,152,219,.25)}
+.badge-red{background:rgba(231,76,60,.15);color:#e74c3c;border:1px solid rgba(231,76,60,.25)}
+
+/* Empty state */
+.empty{text-align:center;padding:48px 0;color:var(--text3)}
+.empty .icon{font-size:48px;margin-bottom:12px}
+.empty p{font-size:14px;margin-bottom:20px}
+
+/* Grid */
+.grid{display:grid;gap:12px}
+
+/* Toast */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 20px;font-size:14px;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Custom Elegant Google Button */
+.btn-google {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 12px;
+  padding: 13px 20px;
+  width: 100%;
+  font-family: 'Poppins', sans-serif;
+  font-size: 15px;
+}
+.btn-google:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
+}
+.btn-google:active {
+  transform: translateY(1px);
+}
+.btn-google svg {
+  flex-shrink: 0;
+}
