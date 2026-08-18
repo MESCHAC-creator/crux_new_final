@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Mon espace — CRUX</title>
+  <link rel="icon" type="image/png" href="/favicon.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/crux.css"/>
+  <style>
+    .app-layout{display:flex;min-height:100vh;flex-direction:column}
+    .app-body{flex:1;max-width:860px;margin:0 auto;width:100%;padding:32px 24px}
+    .section-title{font-size:13px;font-weight:600;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;margin-top:28px}
+    .quick-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:4px}
+    .action-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);border-radius:16px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s,transform .15s}
+    .action-card:hover{border-color:rgba(231,76,60,0.5);transform:translateY(-2px)}
+    .action-card .icon{font-size:32px;margin-bottom:10px}
+    .action-card h3{font-size:14px;font-weight:600;margin-bottom:4px}
+    .action-card p{font-size:11px;color:rgba(255,255,255,0.4)}
+    .meeting-list{display:flex;flex-direction:column;gap:10px}
+    .empty{text-align:center;padding:40px 0;color:rgba(255,255,255,0.3)}
+    .empty .icon{font-size:44px;margin-bottom:12px}
+    /* Modal */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:center;justify-content:center;padding:24px}
+    .modal-bg.open{display:flex}
+    .modal{background:#12121E;border-radius:20px;padding:32px;width:100%;max-width:420px;border:1px solid rgba(255,255,255,0.08)}
+    .modal-title{font-size:18px;font-weight:700;margin-bottom:20px}
+    .modal-actions{display:flex;gap:10px;margin-top:20px}
+    .modal-actions .btn{flex:1}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav-logo" style="text-decoration:none;color:inherit">
+    <div class="mark">📹</div>CRUX
+  </a>
+  <div class="nav-actions">
+    <div id="userInfo" style="display:flex;align-items:center;gap:10px"></div>
+  </div>
+</nav>
+
+<div class="app-body">
+  <div class="section-title">Actions rapides</div>
+  <div class="quick-actions">
+    <div class="action-card" onclick="openCreateModal()">
+      <div class="icon">➕</div>
+      <h3>Nouvelle réunion</h3>
+      <p>Démarrer maintenant</p>
+    </div>
+    <div class="action-card" onclick="openJoinModal()">
+      <div class="icon">🔗</div>
+      <h3>Rejoindre</h3>
+      <p>Via code ou lien</p>
+    </div>
+    <div class="action-card" onclick="openScheduleModal()">
+      <div class="icon">📅</div>
+      <h3>Planifier</h3>
+      <p>Réunion future</p>
+    </div>
+  </div>
+
+  <div class="section-title">Mes réunions</div>
+  <div class="meeting-list" id="meetingList">
+    <div class="empty"><div class="icon">📭</div><p>Chargement...</p></div>
+  </div>
+</div>
+
+<!-- Create meeting modal -->
+<div class="modal-bg" id="createModal">
+  <div class="modal">
+    <div class="modal-title">Nouvelle réunion</div>
+    <div class="field">
+      <label>Titre de la réunion</label>
+      <input type="text" id="newTitle" placeholder="Ex: Réunion d'équipe" maxlength="60"/>
+    </div>
+    <div class="field">
+      <label>Description (optionnel)</label>
+      <input type="text" id="newDesc" placeholder="Ordre du jour..." maxlength="120"/>
+    </div>
+    <div class="field">
+      <label>Code d'accès (optionnel)</label>
+      <input type="text" id="newPasscode" placeholder="4-6 chiffres" maxlength="6" oninput="this.value=this.value.replace(/\D/g,'')"/>
+    </div>
+    <div class="field" style="display:flex;align-items:center;gap:10px;margin:16px 0">
+      <input type="checkbox" id="newWaitingRoom" style="width:18px;height:18px;accent-color:#E74C3C;cursor:pointer"/>
+      <label for="newWaitingRoom" style="margin-bottom:0;cursor:pointer;font-weight:500;font-size:13px;color:rgba(255,255,255,0.85)">Activer la Salle d'attente (Verrouiller la session)</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('createModal')">Annuler</button>
+      <button class="btn btn-primary" id="createBtn" onclick="createMeeting()">Démarrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Join meeting modal -->
+<div class="modal-bg" id="joinModal">
+  <div class="modal">
+    <div class="modal-title">Rejoindre une réunion</div>
+    <div class="field">
+      <label>Code de réunion ou lien</label>
+      <input type="text" id="joinCode" placeholder="Ex: ABC123456789" maxlength="60"
+             oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')joinMeeting()"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('joinModal')">Annuler</button>
+      <button class="btn btn-primary" onclick="joinMeeting()">Rejoindre</button>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule meeting modal -->
+<div class="modal-bg" id="scheduleModal">
+  <div class="modal">
+    <div class="modal-title">Planifier une réunion</div>
+    <div class="field">
+      <label>Titre</label>
+      <input type="text" id="schedTitle" placeholder="Titre de la réunion" maxlength="60"/>
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <input type="text" id="schedDesc" placeholder="Ordre du jour" maxlength="120"/>
+    </div>
+    <div class="field">
+      <label>Date et heure</label>
+      <input type="datetime-local" id="schedTime" style="color-scheme:dark"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('scheduleModal')">Annuler</button>
+      <button class="btn btn-primary" id="schedBtn" onclick="scheduleMeeting()">Planifier</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script type="module">
+  import { initializeApp }   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getAuth, onAuthStateChanged, signOut }
+                             from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+  import { getFirestore, collection, doc, query, where, orderBy, onSnapshot,
+           setDoc, serverTimestamp, Timestamp }
+                             from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import { FIREBASE_CONFIG, generateMeetingId, toast, formatDate, esc, requireAuth }
+                             from '/js/firebase.js';
+
+  const app  = initializeApp(FIREBASE_CONFIG);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+  let currentUser = null;
+  let unsubMeetings = null;
+
+  requireAuth(auth, async user => {
+    currentUser = user;
+    renderUserInfo(user);
+    loadMeetings(user);
+  });
+
+  function renderUserInfo(user) {
+    const initials = (user.displayName || user.email || '?').slice(0, 2).toUpperCase();
+    document.getElementById('userInfo').innerHTML = `
+      <span style="font-size:13px;color:rgba(255,255,255,0.6)">${esc(user.displayName || user.email)}</span>
+      <div class="avatar" onclick="confirmSignOut()" title="Se déconnecter">${initials}</div>
+    `;
+  }
+
+  function loadMeetings(user) {
+    const q = query(
+      collection(db, 'meetings'),
+      where('organizerId', '==', user.uid),
+      orderBy('startTime', 'desc')
+    );
+    unsubMeetings = onSnapshot(q, snap => {
+      const list = document.getElementById('meetingList');
+      if (snap.empty) {
+        list.innerHTML = `<div class="empty"><div class="icon">📭</div><p>Aucune réunion.<br/>Créez-en une !</p></div>`;
+        return;
+      }
+      list.innerHTML = snap.docs.map(d => {
+        const m = d.data();
+        const statusClass = m.status === 'ongoing' ? 'status-ongoing' : m.status === 'scheduled' ? 'status-scheduled' : 'status-ended';
+        const statusLabel = m.status === 'ongoing' ? '● En cours' : m.status === 'scheduled' ? '⏰ Planifiée' : '✓ Terminée';
+        return `
+          <div class="meeting-card" onclick="openMeeting('${d.id}','${esc(m.title || '')}')">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div class="title">${esc(m.title || 'Réunion sans titre')}</div>
+              <span class="status ${statusClass}">${statusLabel}</span>
+            </div>
+            <div class="meta">
+              <span>📋 ${d.id}</span>
+              <span>·</span>
+              <span>${formatDate(m.startTime)}</span>
+              ${m.isLocked ? '<span>·</span><span>🔒</span>' : ''}
+            </div>
+            <div style="margin-top:8px;display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();copyLink('${d.id}')">Copier lien</button>
+              ${m.status !== 'ended' ? `<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openMeeting('${d.id}','${esc(m.title || '')}')">Rejoindre →</button>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }, err => {
+      console.error(err);
+      document.getElementById('meetingList').innerHTML = `<div class="empty"><p>Erreur de chargement.</p></div>`;
+    });
+  }
+
+  window.openCreateModal  = () => document.getElementById('createModal').classList.add('open');
+  window.openJoinModal    = () => document.getElementById('joinModal').classList.add('open');
+  window.openScheduleModal = () => {
+    const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    document.getElementById('schedTime').value = now.toISOString().slice(0,16);
+    document.getElementById('scheduleModal').classList.add('open');
+  };
+  window.closeModal = id => document.getElementById(id).classList.remove('open');
+
+  // Close modal on backdrop click
+  document.querySelectorAll('.modal-bg').forEach(bg => {
+    bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('open'); });
+  });
+
+  window.createMeeting = async function() {
+    const title   = document.getElementById('newTitle').value.trim() || 'Réunion instantanée';
+    const desc    = document.getElementById('newDesc').value.trim();
+    const pass    = document.getElementById('newPasscode').value.trim();
+    const isLocked = document.getElementById('newWaitingRoom').checked;
+    const btn     = document.getElementById('createBtn');
+    btn.disabled  = true; btn.innerHTML = '<span class="spinner"></span>Démarrage...';
+    try {
+      const meetingId = generateMeetingId();
+      await setDoc(doc(db, 'meetings', meetingId), {
+        id: meetingId,
+        title,
+        description: desc,
+        organizer: currentUser.displayName || currentUser.email,
+        organizerId: currentUser.uid,
+        participants: [currentUser.uid],
+        status: 'ongoing',
+        startTime: serverTimestamp(),
+        endTime: null,
+        isLocked: isLocked,
+        passcode: pass || null,
+        isRecording: false,
+        channelName: meetingId,
+        isLargeConference: true,
+      });
+      closeModal('createModal');
+      window.location.href = '/join/' + meetingId;
+    } catch (e) {
+      toast('Erreur: ' + e.message);
+      btn.disabled = false; btn.innerHTML = 'Démarrer';
+    }
+  };
+
+  window.joinMeeting = function() {
+    let code = document.getElementById('joinCode').value.trim().toUpperCase();
+    if (code.includes('/JOIN/')) code = code.split('/JOIN/').pop();
+    else if (code.includes('/join/')) code = code.split('/join/').pop();
+    code = code.split('?')[0];
+    if (code.length < 6) { toast('Code invalide'); return; }
+    closeModal('joinModal');
+    window.location.href = '/join/' + code;
+  };
+
+  window.scheduleMeeting = async function() {
+    const title = document.getElementById('schedTitle').value.trim() || 'Réunion planifiée';
+    const desc  = document.getElementById('schedDesc').value.trim();
+    const time  = document.getElementById('schedTime').value;
+    if (!time) { toast('Choisissez une date'); return; }
+    const btn = document.getElementById('schedBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Planification...';
+    try {
+      const meetingId = generateMeetingId();
+      await setDoc(doc(db, 'meetings', meetingId), {
+        id: meetingId,
+        title,
+        description: desc,
+        organizer: currentUser.displayName || currentUser.email,
+        organizerId: currentUser.uid,
+        participants: [currentUser.uid],
+        status: 'scheduled',
+        startTime: Timestamp.fromDate(new Date(time)),
+        endTime: null,
+        isLocked: false,
+        passcode: null,
+        isRecording: false,
+        channelName: meetingId,
+        isLargeConference: true,
+      });
+      closeModal('scheduleModal');
+      toast('Réunion planifiée ! Code: ' + meetingId, 5000);
+    } catch (e) {
+      toast('Erreur: ' + e.message);
+    }
+    btn.disabled = false; btn.innerHTML = 'Planifier';
+  };
+
+  window.openMeeting = function(id, title) {
+    window.location.href = '/join/' + id;
+  };
+
+  window.copyLink = function(id) {
+    const link = `https://crux-3c6be.web.app/join/${id}`;
+    navigator.clipboard.writeText(link).then(() => toast('Lien copié !')).catch(() => toast(link));
+  };
+
+  window.confirmSignOut = async function() {
+    if (confirm('Se déconnecter ?')) {
+      if (unsubMeetings) unsubMeetings();
+      await signOut(auth);
+      window.location.href = '/';
+    }
+  };
+</script>
+</body>
+</html>

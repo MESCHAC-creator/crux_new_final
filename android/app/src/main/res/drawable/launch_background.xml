@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Obsidian deep background to match CRUX's dark developer theme -->
+    <item android:drawable="@color/app_background" />
+
+    <!-- Centered high-resolution launcher icon for a polished launch experience -->
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@mipmap/ic_launcher" />
+    </item>
+</layer-list>

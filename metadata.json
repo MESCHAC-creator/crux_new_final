@@ -1,0 +1,11 @@
+{
+  "name": "CRUX",
+  "description": "Visioconférence sans limites - web-based video conferencing utilizing LiveKit Cloud SFU and Firebase",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

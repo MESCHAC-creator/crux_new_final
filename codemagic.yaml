@@ -1,0 +1,93 @@
+workflows:
+  android-release:
+    name: Android Release - CRUX
+    instance_type: linux_x2
+    max_build_duration: 120
+
+    environment:
+      flutter: 3.27.0
+      java: 17
+      groups:
+        - firebase_credentials
+
+    cache:
+      cache_paths:
+        - $FLUTTER_ROOT/.pub-cache
+        - $HOME/.gradle/caches
+
+    scripts:
+      - name: Clean and setup
+        script: |
+          flutter clean
+          flutter pub get
+          flutter --version
+
+      - name: Fix Gradle Wrapper
+        script: |
+          rm -rf android/gradle/wrapper/gradle-wrapper.jar
+          rm -rf android/gradle/wrapper/gradle-wrapper.properties
+          flutter config --android-sdk $ANDROID_SDK_ROOT
+          flutter build apk --config-only || true
+          mkdir -p android/gradle/wrapper
+          curl -L https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+          echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
+          echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "distributionUrl=https://services.gradle.org/distributions/gradle-8.9-all.zip" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "networkTimeout=10000" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "validateDistributionUrl=true" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "zipStoreBase=GRADLE_USER_HOME" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "zipStorePath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
+          cat android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Set up local.properties
+        script: |
+          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
+          echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
+
+      - name: Set up key.properties
+        script: |
+          echo "storePassword=$CM_KEYSTORE_PASSWORD" > android/key.properties
+          echo "keyPassword=$CM_KEY_PASSWORD" >> android/key.properties
+          echo "keyAlias=$CM_KEY_ALIAS" >> android/key.properties
+          echo "storeFile=$CM_KEYSTORE_PATH" >> android/key.properties
+
+      - name: Analyze code
+        script: |
+          flutter analyze --fatal-infos || true
+
+      - name: Run tests
+        script: |
+          flutter test || true
+
+      - name: Build APK
+        script: |
+          cd android && ./gradlew wrapper --gradle-version 8.9 --distribution-type all || true
+          cd ..
+          flutter build apk --release \
+            --target-platform android-arm64 \
+            --build-name=2.38.1 \
+            --build-number=4
+
+      - name: Build AAB
+        script: |
+          flutter build appbundle --release \
+            --build-name=2.38.1 \
+            --build-number=4
+
+      - name: Copy artifacts
+        script: |
+          mkdir -p build/outputs
+          cp build/app/outputs/flutter-apk/app-release.apk build/outputs/crux-release.apk
+          cp build/app/outputs/bundle/release/app-release.aab build/outputs/crux-release.aab
+
+    artifacts:
+      - build/outputs/crux-release.apk
+      - build/outputs/crux-release.aab
+
+    publishing:
+      email:
+        recipients:
+          - kouakouchristevann@gmail.com
+        notify:
+          success: true
+          failure: true

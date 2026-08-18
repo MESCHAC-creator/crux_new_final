@@ -1,0 +1,62 @@
+{
+  "project_info": {
+    "project_number": "33175700363",
+    "project_id": "crux-3c6be",
+    "storage_bucket": "crux-3c6be.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:33175700363:android:47532d59f11f2e1a66658e",
+        "android_client_info": {
+          "package_name": "com.schac_crux.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "33175700363-2kns0ggp38a16mr388ose8kh4s8hg9fo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.schac_crux.app",
+            "certificate_hash": "665958842706b36e53d01a2d002ac35b93e7a394"
+          }
+        },
+        {
+          "client_id": "33175700363-6ovk2e8g5pi3g0pguq83fn3sjtsuhheg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.schac_crux.app",
+            "certificate_hash": "bd663f75e0e3aff72c528728153c00aae10131b2"
+          }
+        },
+        {
+          "client_id": "33175700363-ktla7ksnehcae8s9gt86iim7jlf6vm5b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvdzbDqAszGXUQ5iDesApht-Aps7_ObcQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "33175700363-ktla7ksnehcae8s9gt86iim7jlf6vm5b.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "33175700363-qroq9anm612bo2cdu02rnf9k2vn19ost.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.schac-crux.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
