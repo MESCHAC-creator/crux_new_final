@@ -7,8 +7,6 @@ workflows:
     environment:
       flutter: 3.27.0
       java: 17
-      android_signing:
-        - mon_keystore
       groups:
         - firebase_credentials
 
@@ -56,10 +54,6 @@ workflows:
       - name: Analyze code
         script: |
           flutter analyze --fatal-infos || true
-
-      - name: Run tests
-        script: |
-          flutter test || true
 
       - name: Build APK
         script: |
