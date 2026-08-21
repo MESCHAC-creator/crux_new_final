@@ -10,13 +10,6 @@ workflows:
       groups:
         - firebase_credentials
       vars:
-        # ⚠️ Valeurs injectées via "Environment variables" dans Codemagic UI.
-        # Ne jamais mettre de credentials ici.
-        # LIVEKIT_WSS_URL — wss://... Cloud Run / LiveKit Cloud
-        # LIVEKIT_TOKEN_SERVER_URL — https://... Render /api/livekit-token
-        # Nommés dans Secrets Codemagic
-        LIVEKIT_WSS_URL: ""
-        LIVEKIT_TOKEN_SERVER_URL: ""
         FIREBASE_PROJECT_ID: "crux-3c6be"
         APP_BASE_URL: "https://crux-3c6be.web.app"
 
