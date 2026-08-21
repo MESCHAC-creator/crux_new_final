@@ -301,16 +301,19 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     }
   }
 
-  Future<void> _initWebRTC() async {
+  // Ajouter à video_call_screen.dart — méthode _initWebRTC()
+Future<void> _initWebRTC() async {
+  try {
     final Map<String, dynamic> configuration = {
       'iceServers': [
-        {'urls': 'stun:stun.l.google.com:19302'},
-        {'urls': 'stun:stun1.l.google.com:19302'},
+        {'urls': ['stun:stun.l.google.com:19302']},
+        {'urls': ['stun:stun1.l.google.com:19302']},
+        {'urls': ['stun:stun2.l.google.com:19302']},
       ]
     };
 
     final Map<String, dynamic> constraints = {
-      'mandatory': {},
+      'mandatory': {'OfferToReceiveAudio': true, 'OfferToReceiveVideo': true},
       'optional': [
         {'DtlsSrtpKeyAgreement': true},
       ],
@@ -318,40 +321,67 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
     _peerConnection = await createPeerConnection(configuration, constraints);
 
-    // Get local stream
+    // Initialiser renderer LOCAL avant getUserMedia
+    await _localRenderer.initialize();
+
+    // Constraints média avec permissions explicites
     final mediaConstraints = <String, dynamic>{
-      'audio': _micOn,
+      'audio': {
+        'echoCancellation': true,
+        'noiseSuppression': true,
+        'autoGainControl': true,
+      },
       'video': _camOn
-          ? <String, dynamic>{
+          ? {
+              'width': {'ideal': 1280},
+              'height': {'ideal': 720},
               'facingMode': 'user',
-              'optional': [],
             }
           : false,
     };
 
     _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-    _localRenderer.srcObject = _localStream;
 
-    for (final track in _localStream!.getTracks()) {
-      _peerConnection!.addTrack(track, _localStream!);
+    if (_localStream == null) {
+      throw Exception('Impossible d\'obtenir le flux médias');
     }
 
+    _localRenderer.srcObject = _localStream;
+
+    // Ajouter les tracks à la peer connection
+    for (final track in _localStream!.getTracks()) {
+      await _peerConnection!.addTrack(track, _localStream!);
+    }
+
+    // Gestionnaire onTrack AVANT d'envoyer l'offer
     _peerConnection!.onTrack = (RTCTrackEvent event) {
+      developer.log('📹 Track reçu: ${event.track.kind}');
       if (event.streams.isNotEmpty) {
         final stream = event.streams[0];
         setState(() {
-          _remoteStreams.add(stream);
+          if (!_remoteStreams.contains(stream)) {
+            _remoteStreams.add(stream);
+          }
         });
         _createRemoteRenderer(stream);
       }
     };
 
+    // Gestionnaire ICE candidates
     _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
       _sendSignal({
         'type': 'ice',
         'candidate': candidate.toMap(),
         'senderId': widget.userId,
       });
+    };
+
+    // Gestionnaire connection state
+    _peerConnection!.onConnectionState = (RTCPeerConnectionState state) {
+      developer.log('🔗 État connexion: $state');
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        _announce('Connexion établie.');
+      }
     };
 
     if (widget.isHost) {
@@ -363,17 +393,34 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         'senderId': widget.userId,
       });
     }
-  }
 
-  void _createRemoteRenderer(MediaStream stream) {
+    if (mounted) setState(() => _loading = false);
+  } catch (e, st) {
+    developer.log('❌ WebRTC init error: $e', stackTrace: st);
+    if (mounted) {
+      setState(() {
+        _error = 'Erreur vidéo: $e';
+        _loading = false;
+      });
+    }
+  }
+}
+
+void _createRemoteRenderer(MediaStream stream) async {
+  try {
     final renderer = RTCVideoRenderer();
-    renderer.initialize().then((_) {
-      renderer.srcObject = stream;
+    await renderer.initialize();
+    renderer.srcObject = stream;
+    if (mounted) {
       setState(() {
         _remoteRenderers[stream.id] = renderer;
       });
-    });
+    }
+    developer.log('✅ Renderer distant créé: ${stream.id}');
+  } catch (e) {
+    developer.log('❌ Erreur renderer: $e');
   }
+}
 
   Future<void> _handleSignaling(QuerySnapshot snapshot) async {
     for (final change in snapshot.docChanges) {
