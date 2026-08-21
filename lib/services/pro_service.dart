@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ProService {
@@ -7,11 +9,10 @@ class ProService {
   ProService._internal();
 
   final _db = FirebaseFirestore.instance;
+  final _functions = FirebaseFunctions.instance;
 
-  static const _paymentUrl = 'https://pay.djamo.com/qxmvj';
   static const _priceXof = 25000;
 
-  /// Vérifie si l'utilisateur a un abonnement actif
   Future<bool> checkProStatus(String userId) async {
     try {
       final doc = await _db.collection('users').doc(userId).get();
@@ -19,12 +20,17 @@ class ProService {
       final data = doc.data()!;
       if (data['isPro'] != true) return false;
 
-      final expiryStr = data['proExpiry'] as String?;
-      if (expiryStr == null) return false;
+      final expiresAt = data['proExpiresAt'];
+      DateTime? expiry;
+      if (expiresAt is Timestamp) {
+        expiry = expiresAt.toDate();
+      } else if (expiresAt is String) {
+        expiry = DateTime.tryParse(expiresAt);
+      } else if (expiresAt is int) {
+        expiry = DateTime.fromMillisecondsSinceEpoch(expiresAt);
+      }
 
-      final expiry = DateTime.tryParse(expiryStr);
       if (expiry == null) return false;
-
       return expiry.isAfter(DateTime.now());
     } catch (_) {
       return false;
@@ -36,36 +42,71 @@ class ProService {
       if (!snap.exists) return false;
       final data = snap.data()!;
       if (data['isPro'] != true) return false;
-      final expiry = DateTime.tryParse(data['proExpiry'] ?? '');
+
+      final expiresAt = data['proExpiresAt'];
+      DateTime? expiry;
+      if (expiresAt is Timestamp) {
+        expiry = expiresAt.toDate();
+      } else if (expiresAt is String) {
+        expiry = DateTime.tryParse(expiresAt);
+      } else if (expiresAt is int) {
+        expiry = DateTime.fromMillisecondsSinceEpoch(expiresAt);
+      }
+
       if (expiry == null) return false;
       return expiry.isAfter(DateTime.now());
     });
   }
 
-  /// Opens the Djamo payment link directly
-  Future<void> startPayment({
+  Future<Map<String, dynamic>?> startPayment({
     required String userId,
     required String userName,
     String? userEmail,
   }) async {
-    final uri = Uri.parse(_paymentUrl);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('Vous devez être connecté pour souscrire.');
+    }
+    if (user.uid != userId) {
+      throw Exception('Action non autorisée.');
+    }
+
     try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {
-      await launchUrl(uri, mode: LaunchMode.platformDefault);
+      final result = await _functions.httpsCallable('createPayment').call({
+        'userId': userId,
+        'userName': userName,
+        'userEmail': userEmail,
+      });
+
+      final data = Map<String, dynamic>.from(result.data as Map);
+      final invoiceUrl = data['invoice_url'] as String?;
+
+      if (invoiceUrl != null && invoiceUrl.isNotEmpty) {
+        final uri = Uri.parse(invoiceUrl);
+        try {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } catch (_) {
+          await launchUrl(uri, mode: LaunchMode.platformDefault);
+        }
+      }
+
+      return data;
+    } on FirebaseFunctionsException catch (e) {
+      throw Exception(e.message ?? 'Erreur de paiement');
+    } catch (e) {
+      rethrow;
     }
   }
 
-  /// Called manually by admin or after payment confirmation to activate Pro
-  Future<void> activatePro(String userId) async {
-    final proExpiry = DateTime.now().add(const Duration(days: 30));
+  Future<void> _activateProLegacy(String userId) async {
+    final proExpiresAt = DateTime.now().add(const Duration(days: 30));
     await _db.collection('users').doc(userId).set({
       'isPro': true,
-      'proExpiry': proExpiry.toIso8601String(),
-      'lastPayment': DateTime.now().toIso8601String(),
+      'proExpiresAt': Timestamp.fromDate(proExpiresAt),
+      'proActivatedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
 
   int get priceXof => _priceXof;
-  String get paymentUrl => _paymentUrl;
 }

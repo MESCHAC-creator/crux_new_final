@@ -12,7 +12,9 @@
     "express": "^4.19.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "livekit-server-sdk": "^2.8.0"
+    "livekit-server-sdk": "^2.8.0",
+    "firebase-admin": "^13.10.0",
+    "express-rate-limit": "^7.5.0"
   },
   "type": "commonjs"
 }

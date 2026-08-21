@@ -1,188 +1,167 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
 
-/// **LiveKitService** — Service professionnel centralisé pour LiveKit tokens.
-/// 
-/// PRINCIPES:
-/// - Une seule méthode publique: fetchToken()
-/// - Récupère automatiquement le Firebase ID Token
-/// - Envoie Authorization: Bearer `<FirebaseToken>`
-/// - Timeout strict: 15 secondes
-/// - Logs détaillés pour debugging
-/// - Gestion des exceptions cohérente
-/// - Pas d'URLs hardcodées (AppConfig uniquement)
-/// - Retour: String? (JWT ou null en cas d'erreur)
+/// **LiveKitService** — Token server résilient multi-backend multi-path.
+///
+/// Pipeline d'appel (15 s max par tentative) :
+///   1. [LIVEKIT_TOKEN_SERVER_URL] + `/livekit-token`
+///   2. [LIVEKIT_TOKEN_SERVER_URL] + `/api/livekit-token`
+///   3. Chaque URL de [LIVEKIT_FALLBACK_URLS] (debug only) dans l'ordre,
+///      avec les deux paths ci-dessus.
+///
+/// Toute requête transmet un `Authorization: Bearer <Firebase ID Token>`.
+/// Le backend rejette systématiquement `identity != request.auth.uid`.
 class LiveKitService {
   LiveKitService._();
-
   static final LiveKitService instance = LiveKitService._();
 
-  /// **fetchToken** — Obtient un JWT LiveKit depuis le backend.
-  /// 
-  /// Étapes:
-  /// 1. Vérifier l'authentification Firebase
-  /// 2. Récupérer l'ID token Firebase
-  /// 3. Appeler le backend avec Authorization header
-  /// 4. Parser la réponse JSON
-  /// 5. Retourner le JWT ou null
-  /// 
-  /// Paramètres:
-  /// - room: ID de la room LiveKit (obligatoire)
-  /// - identity: Firebase UID du participant (obligatoire)
-  /// - name: Nom d'affichage du participant (obligatoire)
-  /// - isHost: Si true, crée l'access token avec permissions d'hôte
-  /// 
-  /// Retour:
-  /// - String: JWT valide pour LiveKit
-  /// - null: en cas d'erreur (voir logs pour détails)
+  static const List<String> _endpoints = [
+    '/livekit-token',
+    '/api/livekit-token',
+  ];
+
+  /// Retourne un JWT LiveKit valide ou `null` si tous les backends ont échoué.
   Future<String?> fetchToken({
     required String room,
     required String identity,
     required String name,
     bool isHost = false,
   }) async {
-    try {
-      // Étape 1: Vérifier l'authentification Firebase
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        developer.log(
-          '❌ LiveKitService.fetchToken: User not authenticated',
-          level: 1000,
-        );
-        return null;
-      }
-
-      developer.log(
-        '📋 LiveKitService.fetchToken: Starting token fetch',
-        level: 800,
-      );
-
-      // Étape 2: Récupérer l'ID token Firebase
-      // forceRefresh=true pour s'assurer un token frais
-      final idToken = await user.getIdToken(true);
-
-      if (idToken == null || idToken.isEmpty) {
-        developer.log(
-          '❌ LiveKitService.fetchToken: Failed to get Firebase ID token',
-          level: 1000,
-        );
-        return null;
-      }
-
-      developer.log(
-        '✅ LiveKitService: Firebase ID token acquired (${idToken.length} chars)',
-        level: 800,
-      );
-
-      // Étape 3: Préparer la requête HTTP
-      final uri = Uri.parse(
-        '${AppConfig.livekitTokenServerUrl}/livekit-token',
-      ).replace(
-        queryParameters: {
-          'room': room.trim(),
-          'identity': identity.trim(),
-          'name': name.trim(),
-          'isHost': isHost.toString(),
-        },
-      );
-
-      developer.log(
-        '🌐 LiveKitService: POST ${uri.toString()}',
-        level: 800,
-      );
-
-      // Étape 4: Envoyer la requête avec Authorization header
-      final response = await http
-          .get(
-            uri,
-            headers: {
-              'Authorization': 'Bearer $idToken',
-              'Content-Type': 'application/json',
-              'User-Agent': 'crux-flutter/2.38.1',
-            },
-          )
-          .timeout(
-            AppConfig.tokenTimeout,
-            onTimeout: () {
-              developer.log(
-                '❌ LiveKitService.fetchToken: Request timeout after ${AppConfig.tokenTimeout.inSeconds}s',
-                level: 1000,
-              );
-              throw TimeoutException(
-                'Token server did not respond within ${AppConfig.tokenTimeout.inSeconds}s',
-              );
-            },
-          );
-
-      developer.log(
-        '📡 LiveKitService: HTTP ${response.statusCode}',
-        level: 800,
-      );
-
-      // Étape 5: Vérifier le code de statut
-      if (response.statusCode != 200) {
-        developer.log(
-          '❌ LiveKitService.fetchToken: Server returned ${response.statusCode}',
-          error: response.body,
-          level: 1000,
-        );
-        return null;
-      }
-
-      // Étape 6: Parser la réponse JSON
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-
-      final token = body['token'] as String?;
-      if (token == null || token.isEmpty) {
-        developer.log(
-          '❌ LiveKitService.fetchToken: No token in response',
-          error: body,
-          level: 1000,
-        );
-        return null;
-      }
-
-      developer.log(
-        '✅ LiveKitService: Token acquired successfully (${token.length} chars)',
-        level: 800,
-      );
-
-      return token;
-    } on TimeoutException catch (e) {
-      developer.log(
-        '❌ LiveKitService.fetchToken: Timeout',
-        error: e.message,
-        level: 1000,
-      );
-      return null;
-    } on FirebaseAuthException catch (e) {
-      developer.log(
-        '❌ LiveKitService.fetchToken: Firebase Auth error',
-        error: '${e.code}: ${e.message}',
-        level: 1000,
-      );
-      return null;
-    } catch (e, st) {
-      developer.log(
-        '❌ LiveKitService.fetchToken: Unexpected error',
-        error: e.toString(),
-        stackTrace: st,
-        level: 1000,
-      );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _err('User not authenticated');
       return null;
     }
+
+    // Vérification locale d'identité avant même de sortir
+    if (identity != user.uid) {
+      _err('Identity mismatch (identity=$identity, uid=${user.uid})');
+      return null;
+    }
+
+    String idToken;
+    try {
+      idToken = await user.getIdToken(true);
+    } on FirebaseAuthException catch (e) {
+      _err('Firebase getToken error: ${e.code} ${e.message}');
+      return null;
+    }
+    if (idToken.isEmpty) {
+      _err('Empty Firebase ID token');
+      return null;
+    }
+
+    final query = <String, String>{
+      'room': room.trim(),
+      'identity': identity.trim(),
+      'name': name.trim(),
+      'isHost': isHost.toString(),
+    };
+
+    final serverUrls = <String>[
+      if (AppConfig.livekitTokenServerUrl.isNotEmpty)
+        AppConfig.livekitTokenServerUrl,
+      ...AppConfig.livekitFallbackUrls,
+    ];
+
+    if (serverUrls.isEmpty) {
+      _err('Aucun serveur de tokens configuré (LIVEKIT_TOKEN_SERVER_URL)');
+      return null;
+    }
+
+    // Log le diagnostic (n'apparaît qu'en debug/profile)
+    if (kDebugMode) {
+      developer.log(
+        '📋 LiveKitService: serverUrls=${serverUrls.length} | room=$room | uid=$identity | host=$isHost',
+        level: 800,
+      );
+    }
+
+    String? lastError;
+    for (final baseUrl in serverUrls) {
+      for (final endpoint in _endpoints) {
+        final uri = _buildUri(baseUrl, endpoint, query);
+        try {
+          final token = await _request(uri, idToken);
+          developer.log(
+            '✅ LiveKitService: token from $baseUrl$endpoint '
+            '(${token.length} chars, room=$room, host=$isHost)',
+            level: 800,
+          );
+          return token;
+        } catch (e) {
+          lastError = '$e';
+          developer.log(
+            '⚠️  LiveKitService: $baseUrl$endpoint failed — $e',
+            level: 900,
+          );
+        }
+      }
+    }
+
+    _err('Tous les serveurs de tokens ont échoué. Dernier : $lastError');
+    return null;
+  }
+
+  // ── Internals ──────────────────────────────────────────────────────────
+
+  Uri _buildUri(String base, String endpoint, Map<String, String> query) {
+    var baseUrl = base.endsWith('/')
+        ? base.substring(0, base.length - 1)
+        : base;
+    if (baseUrl.endsWith(endpoint)) {
+      baseUrl = baseUrl.substring(0, baseUrl.length - endpoint.length);
+    }
+    return Uri.parse('$baseUrl$endpoint').replace(queryParameters: query);
+  }
+
+  Future<String> _request(Uri uri, String idToken) async {
+    final response = await http
+        .get(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $idToken',
+            'Content-Type': 'application/json',
+            'User-Agent': 'crux-flutter/${AppConfig.appVersion}',
+          },
+        )
+        .timeout(AppConfig.tokenTimeout);
+
+    if (response.statusCode ~/ 100 != 2) {
+      String detail = response.body;
+      try {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        if (json['error'] != null) detail = json['error'].toString();
+      } catch (_) {}
+      throw HttpFailureException(response.statusCode, detail);
+    }
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final token = body['token'] as String?;
+    if (token == null || token.isEmpty) {
+      throw const FormatException('Pas de champ `token` dans la réponse');
+    }
+    return token;
+  }
+
+  void _err(String msg) {
+    developer.log('❌ LiveKitService.fetchToken: $msg', level: 1000);
   }
 }
 
-/// Exception pour les timeouts HTTP
-class TimeoutException implements Exception {
+class HttpFailureException implements Exception {
+  final int statusCode;
   final String message;
-  TimeoutException(this.message);
+  HttpFailureException(this.statusCode, this.message);
   @override
-  String toString() => 'TimeoutException: $message';
+  String toString() => 'HTTP $statusCode — $message';
 }
+
+typedef DeprecatedTimeoutException = TimeoutException;

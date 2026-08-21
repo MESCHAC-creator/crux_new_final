@@ -9,6 +9,16 @@ workflows:
       java: 17
       groups:
         - firebase_credentials
+      vars:
+        # ⚠️ Valeurs injectées via "Environment variables" dans Codemagic UI.
+        # Ne jamais mettre de credentials ici.
+        # LIVEKIT_WSS_URL — wss://... Cloud Run / LiveKit Cloud
+        # LIVEKIT_TOKEN_SERVER_URL — https://... Render /api/livekit-token
+        # Nommés dans Secrets Codemagic
+        LIVEKIT_WSS_URL: ""
+        LIVEKIT_TOKEN_SERVER_URL: ""
+        FIREBASE_PROJECT_ID: "crux-3c6be"
+        APP_BASE_URL: "https://crux-3c6be.web.app"
 
     cache:
       cache_paths:
@@ -62,13 +72,21 @@ workflows:
           flutter build apk --release \
             --target-platform android-arm64 \
             --build-name=2.38.1 \
-            --build-number=4
+            --build-number=4 \
+            --dart-define=LIVEKIT_WSS_URL="${LIVEKIT_WSS_URL}" \
+            --dart-define=LIVEKIT_TOKEN_SERVER_URL="${LIVEKIT_TOKEN_SERVER_URL}" \
+            --dart-define=FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID}" \
+            --dart-define=APP_BASE_URL="${APP_BASE_URL}"
 
       - name: Build AAB
         script: |
           flutter build appbundle --release \
             --build-name=2.38.1 \
-            --build-number=4
+            --build-number=4 \
+            --dart-define=LIVEKIT_WSS_URL="${LIVEKIT_WSS_URL}" \
+            --dart-define=LIVEKIT_TOKEN_SERVER_URL="${LIVEKIT_TOKEN_SERVER_URL}" \
+            --dart-define=FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID}" \
+            --dart-define=APP_BASE_URL="${APP_BASE_URL}"
 
       - name: Copy artifacts
         script: |

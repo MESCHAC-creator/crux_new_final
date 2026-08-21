@@ -82,9 +82,17 @@ class _SettingsScreenState extends State<SettingsScreen>
         if (doc.exists) {
           final data = doc.data()!;
           final isPro = data['isPro'] == true;
-          final expiry = data['proExpiry'] != null
-              ? DateTime.tryParse(data['proExpiry'])
-              : null;
+
+          final rawExpiry = data['proExpiresAt'] ?? data['proExpiry'];
+          DateTime? expiry;
+          if (rawExpiry is Timestamp) {
+            expiry = rawExpiry.toDate();
+          } else if (rawExpiry is String) {
+            expiry = DateTime.tryParse(rawExpiry);
+          } else if (rawExpiry is int) {
+            expiry = DateTime.fromMillisecondsSinceEpoch(rawExpiry);
+          }
+
           final isValid =
               isPro && expiry != null && expiry.isAfter(DateTime.now());
           if (mounted) {

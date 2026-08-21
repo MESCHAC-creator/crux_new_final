@@ -14,6 +14,9 @@ class AppConfig {
     defaultValue: 'https://crux-3c6be.web.app',
   );
 
+  // ── Version de l'app (affichée dans les logs User-Agent) ─────────────
+  static const String appVersion = '2.38.1';
+
   // ── LiveKit token server (Cloud Run) ───────────────────────────────────
   static const String _tokenServerUrl = String.fromEnvironment(
     'LIVEKIT_TOKEN_SERVER_URL',
@@ -72,7 +75,7 @@ class AppConfig {
   // ── Limites ────────────────────────────────────────────────────────────
   static const int maxParticipantsStandard = 50;
   static const int maxParticipantsLarge = 1000;
-  static const int tokenTtlSeconds = 86400;
+  static const int tokenTtlSeconds = 3600;
 
   /// Durée maximale d'un appel en formule gratuite (non-PRO), en minutes.
   /// Cohérent avec l'argument marketing de ProScreen : "Fini la limite de

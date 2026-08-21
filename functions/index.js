@@ -1,14 +1,16 @@
 const { defineSecret } = require('firebase-functions/params');
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const axios = require('axios');
 
 admin.initializeApp();
 const db = admin.firestore();
 
-// Secrets déclarés - jamais dans le code source
-const PAYDUNYA_MASTER_KEY = defineSecret('**************************');
-const PAYDUNYA_PRIVATE_KEY = defineSecret('**************************');
-const PAYDUNYA_TOKEN = defineSecret('**************************');
+// Secrets déclarés — noms des paramètres dans le Secret Manager Firebase
+// Les valeurs sont stockées dans les secrets Cloud Functions, jamais ici
+const PAYDUNYA_MASTER_KEY = defineSecret('PAYDUNYA_MASTER_KEY');
+const PAYDUNYA_PRIVATE_KEY = defineSecret('PAYDUNYA_PRIVATE_KEY');
+const PAYDUNYA_TOKEN = defineSecret('PAYDUNYA_TOKEN');
 
 const PAYDUNYA_BASE = 'https://app.paydunya.com/api/v1';
 const APP_BASE_URL = 'https://crux-3c6be.web.app';
@@ -58,7 +60,7 @@ exports.createPayment = onCall(
             quantity: 1,
             unit_price: '25000',
             total_price: '25000',
-            description: 'Réunions illimitées pendant 30 jours, HD, E2EE',
+            description: 'Réunions illimitées pendant 30 jours, HD, 1000 participants',
           },
         },
         taxes: {},

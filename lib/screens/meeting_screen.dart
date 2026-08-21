@@ -120,11 +120,11 @@ class _InfoCard extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white12)),
       child: Column(children: [
-        const Icon(Icons.security, color: Colors.green, size: 40),
+        const Icon(Icons.verified_user_outlined, color: Colors.green, size: 40),
         const SizedBox(height: 16),
         const Text("Réunion Sécurisée", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        const Text("Le chiffrement de bout en bout est activé pour cet appel.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, fontSize: 12)),
+        const Text("Vos flux audio/vidéo transitent par LiveKit via WebRTC sécurisé.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, fontSize: 12)),
         const SizedBox(height: 20),
         GestureDetector(
           onTap: onCopy,

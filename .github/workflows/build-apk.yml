@@ -2,9 +2,9 @@ name: Build and Release
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, schac ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, schac ]
   workflow_dispatch:
 
 jobs:
@@ -39,10 +39,34 @@ jobs:
         run: flutter pub get
 
       - name: Build Release APK
-        run: flutter build apk --release --no-tree-shake-icons --build-name=1.0.0 --build-number=${{ github.run_number }}
+        env:
+          LIVEKIT_WSS_URL: ${{ secrets.LIVEKIT_WSS_URL }}
+          LIVEKIT_TOKEN_SERVER_URL: ${{ secrets.LIVEKIT_TOKEN_SERVER_URL }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+        run: |
+          flutter build apk --release --no-tree-shake-icons \
+            --build-name=2.38.1 \
+            --build-number=${{ github.run_number }} \
+            --dart-define=LIVEKIT_WSS_URL="${LIVEKIT_WSS_URL}" \
+            --dart-define=LIVEKIT_TOKEN_SERVER_URL="${LIVEKIT_TOKEN_SERVER_URL}" \
+            --dart-define=FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID}" \
+            --dart-define=APP_BASE_URL="${APP_BASE_URL}"
 
       - name: Build Release AAB
-        run: flutter build appbundle --release --no-tree-shake-icons --build-name=1.0.0 --build-number=${{ github.run_number }}
+        env:
+          LIVEKIT_WSS_URL: ${{ secrets.LIVEKIT_WSS_URL }}
+          LIVEKIT_TOKEN_SERVER_URL: ${{ secrets.LIVEKIT_TOKEN_SERVER_URL }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+        run: |
+          flutter build appbundle --release --no-tree-shake-icons \
+            --build-name=2.38.1 \
+            --build-number=${{ github.run_number }} \
+            --dart-define=LIVEKIT_WSS_URL="${LIVEKIT_WSS_URL}" \
+            --dart-define=LIVEKIT_TOKEN_SERVER_URL="${LIVEKIT_TOKEN_SERVER_URL}" \
+            --dart-define=FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID}" \
+            --dart-define=APP_BASE_URL="${APP_BASE_URL}"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -57,11 +81,11 @@ jobs:
           path: build/app/outputs/bundle/release/app-release.aab
 
       - name: Create Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/schac')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: Release v${{ github.run_number }}
+          tag_name: v2.38.1-${{ github.run_number }}
+          name: Release v2.38.1 build ${{ github.run_number }}
           files: |
             build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/bundle/release/app-release.aab
@@ -73,8 +97,8 @@ jobs:
   build-web:
     name: Build and Deploy Web
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/schac')
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -89,7 +113,17 @@ jobs:
         run: flutter pub get
 
       - name: Build Web
-        run: flutter build web --release
+        env:
+          LIVEKIT_WSS_URL: ${{ secrets.LIVEKIT_WSS_URL }}
+          LIVEKIT_TOKEN_SERVER_URL: ${{ secrets.LIVEKIT_TOKEN_SERVER_URL }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+        run: |
+          flutter build web --release \
+            --dart-define=LIVEKIT_WSS_URL="${LIVEKIT_WSS_URL}" \
+            --dart-define=LIVEKIT_TOKEN_SERVER_URL="${LIVEKIT_TOKEN_SERVER_URL}" \
+            --dart-define=FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID}" \
+            --dart-define=APP_BASE_URL="${APP_BASE_URL}"
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0

@@ -154,7 +154,7 @@ class _ProScreenState extends State<ProScreen> {
               const SizedBox(height: 12),
               Center(
                 child: Text(
-                  'Paiement sécurisé via Djamo',
+                  'Paiement sécurisé via PayDunya',
                   style: GoogleFonts.poppins(color: Colors.white38, fontSize: 12),
                 ),
               ),

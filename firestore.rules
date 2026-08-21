@@ -209,8 +209,10 @@ service cloud.firestore {
       // Any authenticated user can read profiles (needed for names/photos in calls)
       allow read: if isSignedIn();
       // Users can only update their own profile, with "isPro" promotion strictly locked
+      // Note: parens around `'key' in map` are required — negation has higher
+      // precedence than `in` operator in Firestore Rules.
       allow write: if isSignedIn() && request.auth.uid == userId
-                   && (!'isPro' in request.resource.data || request.resource.data.isPro == resource.data.get('isPro', false));
+                   && (!('isPro' in request.resource.data) || request.resource.data.isPro == resource.data.get('isPro', false));
     }
 
     // ── Meeting reports (top-level) ───────────────────────────────────────

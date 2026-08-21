@@ -136,6 +136,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final wallpaper = context.watch<WallpaperProvider>().config;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final useWideLayout = screenWidth >= 720;
 
     final content = SafeArea(
       child: RefreshIndicator(
@@ -159,90 +161,179 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
+    final body = wallpaper.hasImage
+        ? AppBackground(config: wallpaper, child: content)
+        : Container(
+            decoration: const BoxDecoration(gradient: AppColors.heroGradient),
+            child: content,
+          );
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: wallpaper.hasImage
-          ? AppBackground(config: wallpaper, child: _buildLayout(content))
-          : Container(
-              decoration: const BoxDecoration(gradient: AppColors.heroGradient),
-              child: _buildLayout(content),
-            ),
+      body: useWideLayout ? _buildWideLayout(body) : SafeArea(child: body),
+      bottomNavigationBar: useWideLayout ? null : _buildBottomNavBar(),
     );
   }
 
-  Widget _buildLayout(Widget content) {
+  Widget _buildWideLayout(Widget body) {
     return Row(
       children: [
-        // SIDEBAR
+        // ── Material 3 NavigationRail (desktop/tablet) ────────────────
         Container(
-          width: 72,
-          color: AppColors.surface,
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              _navButton(0, Icons.home_outlined, 'Accueil'),
-              _navButton(1, Icons.event_outlined, 'Réunions'),
-              _navButton(2, Icons.settings_outlined, 'Param'),
-              _navButton(3, Icons.person_outline, 'Profil'),
-              const Spacer(),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 20),
-                child: Text('SCHAC',
-                    style: TextStyle(
-                      color: AppColors.textTertiary,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1,
-                    )),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            border: Border(
+              right: BorderSide(color: AppColors.border.withValues(alpha: 0.6)),
+            ),
+          ),
+          child: SafeArea(
+            right: false,
+            child: NavigationRail(
+              selectedIndex: _selectedNav,
+              onDestinationSelected: _handleNavigation,
+              extended: false,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              labelType: NavigationRailLabelType.all,
+              indicatorColor: AppColors.primary.withOpacity(0.15),
+              selectedIconTheme: const IconThemeData(
+                color: AppColors.primary,
+                size: 24,
               ),
-            ],
+              unselectedIconTheme: IconThemeData(
+                color: AppColors.textTertiary,
+                size: 22,
+              ),
+              selectedLabelTextStyle: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
+              unselectedLabelTextStyle: TextStyle(
+                color: AppColors.textTertiary,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home_rounded),
+                  label: Text('Accueil'),
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.event_outlined),
+                  selectedIcon: Icon(Icons.event_rounded),
+                  label: Text('Réunions'),
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.settings_outlined),
+                  selectedIcon: Icon(Icons.settings_rounded),
+                  label: Text('Param.'),
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person_rounded),
+                  label: Text('Profil'),
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                ),
+              ],
+              trailing: Expanded(
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.primaryGradient,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.video_call_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'CRUX',
+                          style: TextStyle(
+                            color: AppColors.textTertiary,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-        // CONTENU
-        Expanded(child: content),
+        // ── Contenu principal ────────────────────────────────────────
+        Expanded(child: SafeArea(left: false, child: body)),
       ],
     );
   }
 
-  Widget _navButton(int index, IconData icon, String label) {
-    final isActive = _selectedNav == index;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: GestureDetector(
-        onTap: () => _handleNavigation(index),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: isActive
-                    ? AppColors.surfaceElevated
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: isActive
-                    ? AppColors.primary
-                    : AppColors.textTertiary,
-                size: 22,
-              ),
+  Widget _buildBottomNavBar() {
+    // ── Material 3 NavigationBar (mobile) ────────────────────────────
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(
+          top: BorderSide(color: AppColors.border.withValues(alpha: 0.6)),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: NavigationBar(
+            selectedIndex: _selectedNav,
+            onDestinationSelected: _handleNavigation,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            height: 64,
+            indicatorColor: AppColors.primary.withOpacity(0.15),
+            indicatorShape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive
-                    ? AppColors.textPrimary
-                    : AppColors.textTertiary,
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.home_outlined, size: 24),
+                selectedIcon: Icon(Icons.home_rounded, size: 26),
+                label: 'Accueil',
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              NavigationDestination(
+                icon: Icon(Icons.event_outlined, size: 24),
+                selectedIcon: Icon(Icons.event_rounded, size: 26),
+                label: 'Réunions',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.settings_outlined, size: 24),
+                selectedIcon: Icon(Icons.settings_rounded, size: 26),
+                label: 'Paramètres',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline, size: 24),
+                selectedIcon: Icon(Icons.person_rounded, size: 26),
+                label: 'Profil',
+              ),
+            ],
+          ),
         ),
       ),
     );
