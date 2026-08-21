@@ -27,12 +27,19 @@ android {
     }
 
     signingConfigs {
-        create("release") {
+    create("release") {
+        val storeFilePath = keystoreProperties.getProperty("storeFile")
+        if (!storeFilePath.isNullOrEmpty()) {
             keyAlias = keystoreProperties.getProperty("keyAlias") ?: ""
             keyPassword = keystoreProperties.getProperty("keyPassword") ?: ""
-            storeFile = keystoreProperties.getProperty("storeFile")?.let {rootProject.file(it)
-            }
+            storeFile = rootProject.file(storeFilePath)
             storePassword = keystoreProperties.getProperty("storePassword") ?: ""
+        } else {
+            // Mode DEBUG : pas de clé signing
+            keyAlias = ""
+            keyPassword = ""
+            storeFile = null
+            storePassword = ""
         }
     }
 
