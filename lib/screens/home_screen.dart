@@ -24,6 +24,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _schedule = ScheduleService();
   final _codeCtrl = TextEditingController();
+  int _selectedNav = 0;
 
   String get _uid =>
       widget.user.uid.isNotEmpty
@@ -36,30 +37,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Les notifications locales sont perdues après un redémarrage système :
-    // on les reprogramme à l'ouverture de l'accueil.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_uid.isNotEmpty) _schedule.resyncReminders(userId: _uid);
     });
-  }
-
-  void _openWallpaperPicker() {
-    Navigator.of(context).pushNamed(AppRoutes.wallpaper);
-    // Pas de rafraîchissement manuel nécessaire : WallpaperProvider est un
-    // ChangeNotifier écouté via context.watch dans build(), toute l'app se
-    // met donc à jour en direct pendant et après la sélection.
   }
 
   @override
   void dispose() {
     _codeCtrl.dispose();
     super.dispose();
-  }
-
-  // ------------------------------------------------------------------ actions
-
-  void _openSchedule() {
-    Navigator.of(context).pushNamed(AppRoutes.schedule);
   }
 
   void _startInstant() {
@@ -127,7 +113,25 @@ class _HomeScreenState extends State<HomeScreen> {
       );
   }
 
-  // ----------------------------------------------------------------------- ui
+  void _handleNavigation(int index) {
+    setState(() => _selectedNav = index);
+    switch (index) {
+      case 0: // Home
+        break;
+      case 1: // Meetings
+        Navigator.of(context).pushNamed(AppRoutes.schedule);
+        setState(() => _selectedNav = 0);
+        break;
+      case 2: // Settings
+        Navigator.of(context).pushNamed(AppRoutes.settings);
+        setState(() => _selectedNav = 0);
+        break;
+      case 3: // Profile
+        Navigator.of(context).pushNamed(AppRoutes.profile);
+        setState(() => _selectedNav = 0);
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -157,14 +161,90 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      // Fond personnalisé si l'utilisateur en a importé un, sinon le
-      // dégradé Obsidian par défaut est conservé à l'identique.
       body: wallpaper.hasImage
-          ? AppBackground(config: wallpaper, child: content)
+          ? AppBackground(config: wallpaper, child: _buildLayout(content))
           : Container(
               decoration: const BoxDecoration(gradient: AppColors.heroGradient),
-              child: content,
+              child: _buildLayout(content),
             ),
+    );
+  }
+
+  Widget _buildLayout(Widget content) {
+    return Row(
+      children: [
+        // SIDEBAR
+        Container(
+          width: 72,
+          color: AppColors.surface,
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              _navButton(0, Icons.home_outlined, 'Accueil'),
+              _navButton(1, Icons.event_outlined, 'Réunions'),
+              _navButton(2, Icons.settings_outlined, 'Param'),
+              _navButton(3, Icons.person_outline, 'Profil'),
+              const Spacer(),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 20),
+                child: Text('SCHAC',
+                    style: TextStyle(
+                      color: AppColors.textTertiary,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                    )),
+              ),
+            ],
+          ),
+        ),
+        // CONTENU
+        Expanded(child: content),
+      ],
+    );
+  }
+
+  Widget _navButton(int index, IconData icon, String label) {
+    final isActive = _selectedNav == index;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: GestureDetector(
+        onTap: () => _handleNavigation(index),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: isActive
+                    ? AppColors.surfaceElevated
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: isActive
+                    ? AppColors.primary
+                    : AppColors.textTertiary,
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive
+                    ? AppColors.textPrimary
+                    : AppColors.textTertiary,
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -202,121 +282,68 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        IconButton(
-          tooltip: 'Fond d\'écran',
-          onPressed: _openWallpaperPicker,
-          icon: Icon(
-            context.watch<WallpaperProvider>().config.hasImage
-                ? Icons.wallpaper_rounded
-                : Icons.wallpaper_outlined,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        IconButton(
-          tooltip: 'Réglages',
-          onPressed: () => Navigator.of(context).pushNamed(AppRoutes.settings),
-          icon: const Icon(Icons.settings_outlined,
-              color: AppColors.textSecondary),
-        ),
-        GestureDetector(
-          onTap: () => Navigator.of(context).pushNamed(AppRoutes.profile),
-          child: Container(
-            width: 42,
-            height: 42,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              gradient: AppColors.glassGradient,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Text(
-              initials,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
 
-  /// Carte principale : le halo blanc évoque le logo laqué, sans couleur.
   Widget _heroCard() {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: AppColors.cardGradient,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.border),
-        boxShadow: AppColors.softShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  gradient: AppColors.logoHalo,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.add_rounded,
-                    color: AppColors.textPrimary, size: 26),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Text(
-                  'Lancez ou planifiez\nune réunion',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 19,
-                    height: 1.25,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-              ),
-            ],
+          const Text(
+            'Lancer ou planifier une réunion',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
+                child: ElevatedButton(
+                  onPressed: _startInstant,
+                  style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.textOnPrimary,
-                    minimumSize: const Size.fromHeight(50),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: _startInstant,
                   child: const Text('Démarrer',
-                      style: TextStyle(fontWeight: FontWeight.w700)),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      )),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton(
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed(AppRoutes.schedule),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
                     side: const BorderSide(color: AppColors.border),
-                    minimumSize: const Size.fromHeight(50),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  // CORRECTIF : route de planification (et non la réunion).
-                  onPressed: _openSchedule,
                   child: const Text('Planifier',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      )),
                 ),
               ),
             ],
@@ -328,136 +355,91 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _joinRow() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.borderSubtle),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
           Expanded(
             child: TextField(
               controller: _codeCtrl,
-              textInputAction: TextInputAction.go,
-              onSubmitted: (_) => _joinByCode(),
-              inputFormatters: [LengthLimitingTextInputFormatter(20)],
-              style: const TextStyle(
-                  color: AppColors.textPrimary, fontSize: 14),
-              cursorColor: AppColors.primary,
+              style: const TextStyle(color: AppColors.textPrimary),
               decoration: const InputDecoration(
                 hintText: 'Entrer un code de réunion',
-                hintStyle:
-                    TextStyle(color: AppColors.textDisabled, fontSize: 14),
+                hintStyle: TextStyle(color: AppColors.textDisabled),
                 border: InputBorder.none,
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                contentPadding: EdgeInsets.symmetric(vertical: 12),
               ),
+              onSubmitted: (_) => _joinByCode(),
             ),
           ),
           IconButton(
             onPressed: _joinByCode,
-            icon: const Icon(Icons.arrow_forward_rounded,
-                color: AppColors.textPrimary, size: 20),
+            icon: const Icon(Icons.arrow_forward,
+                color: AppColors.textTertiary, size: 20),
           ),
         ],
       ),
     );
   }
 
-  Widget _sectionHeader(String label) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.textTertiary,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.4,
-            ),
-          ),
-          TextButton(
-            onPressed: _openSchedule,
-            child: const Text('Nouvelle',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-          ),
-        ],
-      );
+  Widget _sectionHeader(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        color: AppColors.textPrimary,
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.5,
+      ),
+    );
+  }
 
   Widget _upcoming() {
-    if (_uid.isEmpty) return _empty('Connectez-vous pour voir vos réunions.');
-    return StreamBuilder<List<MeetingModel>>(
-      stream: _schedule.streamUpcoming(userId: _uid),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 28),
-            child: Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.textSecondary),
-              ),
-            ),
-          );
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('meetings')
+          .where('participants', arrayContains: _uid)
+          .where('endTime', isGreaterThan: Timestamp.now())
+          .orderBy('endTime')
+          .limit(5)
+          .snapshots(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(
+              child: CircularProgressIndicator(
+                  valueColor:
+                      AlwaysStoppedAnimation(AppColors.primary)));
         }
-        if (snapshot.hasError) {
-          return _empty(
-            'Impossible de charger vos réunions.\n'
-            'Vérifiez l\'index Firestore meetings(participants, status, startTime).',
-          );
-        }
-        final meetings = snapshot.data ?? const <MeetingModel>[];
-        if (meetings.isEmpty) {
-          return _empty('Aucune réunion planifiée.');
+        if (!snap.hasData || snap.data!.docs.isEmpty) {
+          return _empty('Aucune réunion à venir.');
         }
         return Column(
-          children: meetings.map(_meetingTile).toList(),
+          children: snap.data!.docs
+              .map((doc) => _meetingCard(
+                  MeetingModel.fromDoc(doc.id, doc.data() as Map)))
+              .toList(),
         );
       },
     );
   }
 
-  Widget _meetingTile(MeetingModel meeting) {
-    final live = meeting.status == MeetingStatus.ongoing;
+  Widget _meetingCard(MeetingModel meeting) {
+    final live = meeting.endTime.isAfter(DateTime.now()) &&
+        meeting.startTime.isBefore(DateTime.now());
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
-          Container(
-            width: 52,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(
-              children: [
-                Text(
-                  meeting.startTime.day.toString().padLeft(2, '0'),
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  _monthShort(meeting.startTime.month),
-                  style: const TextStyle(
-                      color: AppColors.textTertiary, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -515,7 +497,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ? AppColors.textPrimary
                   : AppColors.textDisabled,
             ),
-            onPressed: meeting.isJoinable ? () => _joinMeeting(meeting) : null,
+            onPressed:
+                meeting.isJoinable ? () => _joinMeeting(meeting) : null,
             child: const Text('Rejoindre',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
           ),
@@ -547,8 +530,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
 
-  // ---------------------------------------------------------------- formats
-
   String _greeting() {
     final h = DateTime.now().hour;
     if (h < 6) return 'BONNE NUIT';
@@ -559,9 +540,4 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _time(DateTime d) =>
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-
-  String _monthShort(int month) => const [
-        'JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN',
-        'JUIL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC',
-      ][month - 1];
 }
