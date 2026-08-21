@@ -142,4 +142,4 @@ dependencies {
     // le plugin Flutter fournir la version native.
     implementation("io.livekit:livekit-android:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-}
+'}'
