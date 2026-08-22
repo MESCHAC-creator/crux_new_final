@@ -513,7 +513,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Column(
           children: snap.data!.docs
               .map((doc) => _meetingCard(
-                  MeetingModel.fromDoc(doc.id, doc.data())))
+                  MeetingModel.fromDoc(doc.id, doc.data() as Map<String, dynamic>)))
               .toList(),
         );
       },
