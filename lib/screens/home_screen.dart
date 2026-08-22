@@ -188,92 +188,94 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           child: SafeArea(
             right: false,
-            child: NavigationRail(
-              selectedIndex: _selectedNav,
-              onDestinationSelected: _handleNavigation,
-              extended: false,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              labelType: NavigationRailLabelType.all,
-              indicatorColor: AppColors.primary.withOpacity(0.15),
-              selectedIconTheme: const IconThemeData(
-                color: AppColors.primary,
-                size: 24,
-              ),
-              unselectedIconTheme: IconThemeData(
-                color: AppColors.textTertiary,
-                size: 22,
-              ),
-              selectedLabelTextStyle: const TextStyle(
-                color: AppColors.primary,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
-              ),
-              unselectedLabelTextStyle: TextStyle(
-                color: AppColors.textTertiary,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-              destinations: const [
-                NavigationRailDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home_rounded),
-                  label: Text('Accueil'),
-                  padding: EdgeInsets.symmetric(vertical: 6),
+              child: NavigationRail(
+                selectedIndex: _selectedNav,
+                onDestinationSelected: _handleNavigation,
+                extended: false,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                labelType: NavigationRailLabelType.all,
+                indicatorColor: AppColors.primary.withOpacity(0.15),
+                selectedIconTheme: const IconThemeData(
+                  color: AppColors.primary,
+                  size: 24,
                 ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.event_outlined),
-                  selectedIcon: Icon(Icons.event_rounded),
-                  label: Text('Réunions'),
-                  padding: EdgeInsets.symmetric(vertical: 6),
+                unselectedIconTheme: IconThemeData(
+                  color: AppColors.textTertiary,
+                  size: 22,
                 ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.settings_outlined),
-                  selectedIcon: Icon(Icons.settings_rounded),
-                  label: Text('Param.'),
-                  padding: EdgeInsets.symmetric(vertical: 6),
+                selectedLabelTextStyle: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
                 ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person_rounded),
-                  label: Text('Profil'),
-                  padding: EdgeInsets.symmetric(vertical: 6),
+                unselectedLabelTextStyle: TextStyle(
+                  color: AppColors.textTertiary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
-              trailing: Expanded(
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            gradient: AppColors.primaryGradient,
-                            borderRadius: BorderRadius.circular(8),
+                destinations: const [
+                  NavigationRailDestination(
+                    icon: Icon(Icons.home_outlined),
+                    selectedIcon: Icon(Icons.home_rounded),
+                    label: Text('Accueil'),
+                    padding: EdgeInsets.symmetric(vertical: 6),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.event_outlined),
+                    selectedIcon: Icon(Icons.event_rounded),
+                    label: Text('Réunions'),
+                    padding: EdgeInsets.symmetric(vertical: 6),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings_rounded),
+                    label: Text('Param.'),
+                    padding: EdgeInsets.symmetric(vertical: 6),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.person_outline),
+                    selectedIcon: Icon(Icons.person_rounded),
+                    label: Text('Profil'),
+                    padding: EdgeInsets.symmetric(vertical: 6),
+                  ),
+                ],
+                trailing: Expanded(
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.video_call_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.video_call_rounded,
-                            color: Colors.white,
-                            size: 16,
+                          const SizedBox(height: 6),
+                          const Text(
+                            'CRUX',
+                            style: TextStyle(
+                              color: AppColors.textTertiary,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.6,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'CRUX',
-                          style: TextStyle(
-                            color: AppColors.textTertiary,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.6,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -511,7 +513,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Column(
           children: snap.data!.docs
               .map((doc) => _meetingCard(
-                  MeetingModel.fromDoc(doc.id, doc.data() as Map)))
+                  MeetingModel.fromDoc(doc.id, doc.data())))
               .toList(),
         );
       },

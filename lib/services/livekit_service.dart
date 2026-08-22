@@ -48,7 +48,7 @@ class LiveKitService {
 
     String idToken;
     try {
-      idToken = await user.getIdToken(true);
+      idToken = await user.getIdToken(true) ?? '';
     } on FirebaseAuthException catch (e) {
       _err('Firebase getToken error: ${e.code} ${e.message}');
       return null;
