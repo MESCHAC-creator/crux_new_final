@@ -27,19 +27,13 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            val storeFilePath = keystoreProperties.getProperty("storeFile")
-            if (!storeFilePath.isNullOrEmpty()) {
+        val storeFilePath = keystoreProperties.getProperty("storeFile")
+        if (!storeFilePath.isNullOrEmpty()) {
+            create("release") {
                 keyAlias = keystoreProperties.getProperty("keyAlias") ?: ""
                 keyPassword = keystoreProperties.getProperty("keyPassword") ?: ""
                 storeFile = rootProject.file(storeFilePath)
                 storePassword = keystoreProperties.getProperty("storePassword") ?: ""
-            } else {
-                // Mode DEBUG : pas de clé signing
-                keyAlias = ""
-                keyPassword = ""
-                storeFile = null
-                storePassword = ""
             }
         }
     }
@@ -74,7 +68,7 @@ android {
         getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
 
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
