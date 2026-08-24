@@ -20,14 +20,17 @@ class BackendApiService {
   BackendApiService._internal();
 
   /// Récupère le token Firebase actuel
-  Future<String> _getAuthToken() async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw Exception('Utilisateur non authentifié');
-    }
-    final token = await user.getIdToken();
-    return token;
+Future<String> _getAuthToken() async {
+  final user = _auth.currentUser;
+  if (user == null) {
+    throw Exception('Utilisateur non authentifié');
   }
+  final token = await user.getIdToken();
+  if (token == null) {
+    throw Exception('Impossible de récupérer le token utilisateur');
+  }
+  return token;
+}
 
   /// Crée une nouvelle réunion via le backend
   Future<Map<String, dynamic>> createMeeting({
