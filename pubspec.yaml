@@ -10,6 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
   flutter_localizations:
     sdk: flutter
 
@@ -18,9 +19,13 @@ dependencies:
   firebase_auth: ^5.5.2
   firebase_messaging: ^15.2.5
   cloud_firestore: ^5.0.0
+  cloud_functions: ^5.6.2
 
   # ── LiveKit ────────────────────────────────────────────────────────────
   livekit_client: ^2.3.6
+
+  # ── WebRTC ─────────────────────────────────────────────────────────────
+  flutter_webrtc: 0.12.12+hotfix.1
 
   # ── Google Sign-In ─────────────────────────────────────────────────────
   google_sign_in: ^6.2.2
@@ -31,24 +36,44 @@ dependencies:
   share_plus: ^11.0.0
   app_links: ^6.3.3
   connectivity_plus: ^6.1.0
+
+  # ── Internationalisation ──────────────────────────────────────────────
   intl: ^0.19.0
+
   # ── Stockage ───────────────────────────────────────────────────────────
   shared_preferences: ^2.5.3
   flutter_secure_storage: ^9.2.4
   path_provider: ^2.1.5
+
+  # ── Notifications ──────────────────────────────────────────────────────
+  flutter_local_notifications: ^19.5.0
+  timezone: ^0.10.1
+  flutter_timezone: ^4.1.1
+
+  # ── Audio / voix ───────────────────────────────────────────────────────
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.5
+
+  # ── Images ─────────────────────────────────────────────────────────────
+  image_picker: ^1.1.2
+
+  # ── State management ──────────────────────────────────────────────────
+  provider: ^6.1.5
 
   # ── UI ─────────────────────────────────────────────────────────────────
   cupertino_icons: ^1.0.8
   google_fonts: ^6.2.1
   flutter_animate: ^4.5.2
 
-  # ── Logging ────────────────────────────────────────────────────────────
+  # ── Logging ─────────────────────────────────────────────────────────────
   logger: ^2.4.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
   flutter_lints: ^5.0.0
+
   flutter_launcher_icons: ^0.14.3
 
 flutter_launcher_icons:
@@ -61,6 +86,7 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+
   assets:
     - assets/images/
 
