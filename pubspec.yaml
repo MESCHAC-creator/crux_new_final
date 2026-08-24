@@ -1,10 +1,11 @@
-name: crux
-description: Application Flutter de visioconférence premium CRUX
-publish_to: "none"
-version: 2.38.1+4
+name: crux_new_final
+description: "CRUX — Vidéoconférence Flutter avec LiveKit."
+publish_to: 'none'
+
+version: 2.38.1+240
 
 environment:
-  sdk: ">=3.3.0 <4.0.0"
+  sdk: '>=3.3.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -12,61 +13,37 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  # UI
-  cupertino_icons: ^1.0.8
-  google_fonts: ^6.2.1
-  flutter_animate: ^4.5.2
+  # ── Firebase ───────────────────────────────────────────────────────────
+  firebase_core: ^3.13.0
+  firebase_auth: ^5.5.2
+  firebase_messaging: ^15.2.5
+  cloud_firestore: ^5.0.0
 
-  # Réseau
+  # ── LiveKit ────────────────────────────────────────────────────────────
+  livekit_client: ^2.3.6
+
+  # ── Google Sign-In ─────────────────────────────────────────────────────
+  google_sign_in: ^6.2.2
+
+  # ── Réseau ─────────────────────────────────────────────────────────────
   http: ^1.2.2
   url_launcher: ^6.3.1
   share_plus: ^11.0.0
   app_links: ^6.3.3
-
-  # Stockage
+  connectivity_plus: ^6.1.0
+  intl: ^0.19.0
+  # ── Stockage ───────────────────────────────────────────────────────────
   shared_preferences: ^2.5.3
   flutter_secure_storage: ^9.2.4
   path_provider: ^2.1.5
 
-  # Firebase
-  firebase_core: ^3.13.0
-  firebase_auth: ^5.5.2
-  cloud_firestore: ^5.6.6
-  firebase_messaging: ^15.2.5
-  cloud_functions: ^5.3.2
+  # ── UI ─────────────────────────────────────────────────────────────────
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.2
 
-  # Auth
-  google_sign_in: ^6.2.2
-
-  # State Management
-  provider: ^6.1.4
-
-  # Vidéo / WebRTC / LiveKit
-  flutter_webrtc: ^0.12.12
-  webrtc_interface: ^1.1.0
-  livekit_client: ^2.3.6
-
-  # Notifications
-  flutter_local_notifications: ^19.1.0
-  timezone: ^0.10.0
-  flutter_timezone: ^4.1.1
-
-  # Permissions
-  permission_handler: ^11.4.0
-
-  # Média
-  image_picker: ^1.1.2
-  speech_to_text: ^7.0.0
-  flutter_tts: ^4.2.2
-
-  # Utilitaires
-  logger: ^2.5.0
-  uuid: ^4.5.1
-  crypto: ^3.0.6
-  device_info_plus: ^11.3.0
-  package_info_plus: ^8.3.0
-  collection: ^1.19.0
-  intl: ^0.19.0
+  # ── Logging ────────────────────────────────────────────────────────────
+  logger: ^2.4.0
 
 dev_dependencies:
   flutter_test:
@@ -86,3 +63,15 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
