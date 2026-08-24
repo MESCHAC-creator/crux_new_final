@@ -4,27 +4,26 @@ class AppConfig {
   AppConfig._();
 
   // ── Firebase ───────────────────────────────────────────────────────────
-  static const String firebaseProjectId = String.fromEnvironment(
-    'FIREBASE_PROJECT_ID',
-    defaultValue: 'crux-3c6be',
-  );
-
-  static const String appBaseUrl = String.fromEnvironment(
-    'APP_BASE_URL',
-    defaultValue: 'https://crux-3c6be.web.app',
-  );
-
-  // ── Version de l'app ───────────────────────────────────────────────────
+  static const String firebaseProjectId = 'crux-3c6be';
+  static const String appBaseUrl = 'https://crux-3c6be.web.app';
   static const String appVersion = '2.38.1';
 
-  // ── LiveKit token server (Cloud Run) ───────────────────────────────────
+  // ── LiveKit Configuration ──────────────────────────────────────────────
+  // EN PRODUCTION : remplacer par votre URL Cloud Run
   static const String _tokenServerUrl = String.fromEnvironment(
-    'LIVEKIT_TOKEN_SERVER_URL',
-    defaultValue: '', // À fournir en build-time
+    'https://crux-6l6num.sandbox.livekit.io',
+    defaultValue: 'https://your-cloud-run-url.cloudfunctions.net',
+  );
+
+  static const String _wssUrl = String.fromEnvironment(
+    'wss://crux-88fihb12.livekit.cloud',
+    defaultValue: 'wss://your-livekit-server.com',
   );
 
   static String get livekitTokenServerUrl => _tokenServerUrl;
+  static String get livekitWssUrl => _wssUrl;
 
+  // ── Fallback URLs (debug only) ─────────────────────────────────────────
   static const String _fallbackUrlsRaw = String.fromEnvironment(
     'LIVEKIT_FALLBACK_URLS',
     defaultValue: '',
@@ -40,50 +39,48 @@ class AppConfig {
   }
 
   static List<String> get livekitTokenUrls => [
-        if (_tokenServerUrl.isNotEmpty) _tokenServerUrl,
+        if (_tokenServerUrl.isNotEmpty && !_tokenServerUrl.contains('your-'))
+          _tokenServerUrl,
         ...livekitFallbackUrls,
       ];
 
-  static const Duration tokenTimeout = Duration(seconds: 15);
+  static bool get isLiveKitConfigured =>
+      _wssUrl.isNotEmpty &&
+      !_wssUrl.contains('your-') &&
+      livekitTokenUrls.isNotEmpty;
 
-  // ── LiveKit SFU (WSS) ──────────────────────────────────────────────────
-  static const String livekitWssUrl = String.fromEnvironment(
-    'LIVEKIT_WSS_URL',
-    defaultValue: '',
-  );
+  // ── Timeouts & Retry ───────────────────────────────────────────────────
+  static const Duration tokenTimeout = Duration(seconds: 30);
+  static const Duration roomConnectionTimeout = Duration(seconds: 45);
+  static const int maxReconnectAttempts = 5;
+  static const Duration reconnectDelay = Duration(seconds: 2);
+  static const Duration retryBackoff = Duration(seconds: 1);
 
-  static bool get isRealtimeConfigured =>
-      livekitWssUrl.isNotEmpty && livekitTokenUrls.isNotEmpty;
-
+  // ── Diagnostics ────────────────────────────────────────────────────────
   static String get configDiagnostics {
-    final missing = <String>[
-      if (livekitWssUrl.isEmpty) 'LIVEKIT_WSS_URL',
-      if (livekitTokenUrls.isEmpty) 'LIVEKIT_TOKEN_SERVER_URL',
-    ];
-    return missing.isEmpty
-        ? 'AppConfig OK (project=$firebaseProjectId)'
-        : 'AppConfig incomplet — dart-define manquants : ${missing.join(', ')}';
+    if (!isLiveKitConfigured) {
+      return '''
+⚠️  LiveKit non configuré. À faire :
+1. flutter run --dart-define=LIVEKIT_TOKEN_SERVER_URL="https://your-cloud-run.cloudfunctions.net"
+2. flutter run --dart-define=LIVEKIT_WSS_URL="wss://your-livekit-server.com"
+
+Ou exporter les variables :
+  export LIVEKIT_TOKEN_SERVER_URL="https://..."
+  export LIVEKIT_WSS_URL="wss://..."
+''';
+    }
+    return '✅ LiveKit OK\n  Token: $livekitTokenServerUrl\n  WSS: $livekitWssUrl';
   }
 
-  // ── Paiement (PayDunya) ────────────────────────────────────────────────
-  static String get paymentSuccessUrl => '$appBaseUrl/payment-success';
-  static String get paymentCancelUrl => '$appBaseUrl/payment-cancel';
-
-  // ── Limites ────────────────────────────────────────────────────────────
+  // ── Meeting Limits ─────────────────────────────────────────────────────
   static const int maxParticipantsStandard = 50;
   static const int maxParticipantsLarge = 1000;
-  static const int tokenTtlSeconds = 3600;
   static const int freeMeetingDurationMinutes = 40;
-
-  static const Duration roomConnectionTimeout = Duration(seconds: 20);
-  static const int maxReconnectAttempts = 5;
-  static const Duration reconnectDelay = Duration(seconds: 3);
-  static const int livekitVisibleTileCap = 50;
 
   static bool isLargeMeeting(int? maxParticipants) =>
       (maxParticipants ?? 0) > maxParticipantsStandard;
 
-  // ── Deep links ─────────────────────────────────────────────────────────
+  // ── Deep Links ─────────────────────────────────────────────────────────
   static const String deepLinkScheme = 'crux';
   static const String deepLinkHost = 'join';
 
@@ -92,22 +89,13 @@ class AppConfig {
 
   static String webJoinLink(String meetingId) => '$appBaseUrl/join/$meetingId';
 
-  static String shareLink(String meetingId) => webJoinLink(meetingId);
-
   static String? parseMeetingId(String link) {
     final uri = Uri.tryParse(link.trim());
     if (uri == null) return null;
     if (uri.scheme == deepLinkScheme) {
-      if (uri.host == deepLinkHost && uri.pathSegments.isNotEmpty) {
-        return uri.pathSegments.first;
-      }
       return uri.host.isNotEmpty ? uri.host : null;
     }
     final segments = uri.pathSegments;
-    final index = segments.indexOf(deepLinkHost);
-    if (index != -1 && index + 1 < segments.length) {
-      return segments[index + 1];
-    }
     return segments.isNotEmpty ? segments.last : null;
   }
 
