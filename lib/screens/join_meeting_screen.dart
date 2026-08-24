@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
+import '../models/meeting_model.dart';
 import '../utils/logger.dart' as crux;
 import '../widgets/custom_button.dart';
 import 'meeting_screen.dart';
@@ -59,62 +61,34 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
     });
 
     try {
-      final meeting = await MeetingService().getMeetingOnce(code);
+      // Try to find meeting by meetingCode first
+      final snap = await FirebaseFirestore.instance
+          .collection('meetings')
+          .where('meetingCode', isEqualTo: code)
+          .limit(1)
+          .get();
+      
       if (!mounted) return;
 
-      if (meeting == null) {
-        setState(() {
-          _loading = false;
-          _error = 'Réunion introuvable ou expirée';
-        });
+      if (snap.docs.isEmpty) {
+        // Fallback to meeting ID if code not found
+        final meeting = await MeetingService().getMeetingOnce(code);
+        if (!mounted) return;
+
+        if (meeting == null) {
+          setState(() {
+            _loading = false;
+            _error = 'Réunion introuvable ou expirée';
+          });
+          return;
+        }
+        
+        _navigateToMeeting(meeting, current);
         return;
       }
-
-      final hasPasscode = meeting.passcode != null && meeting.passcode!.isNotEmpty;
-      if (hasPasscode && !_needsPasscode) {
-        setState(() {
-          _loading = false;
-          _needsPasscode = true;
-        });
-        return;
-      }
-      if (hasPasscode && meeting.passcode != _passcodeCtrl.text.trim()) {
-        setState(() {
-          _loading = false;
-          _error = 'Code d\'accès incorrect';
-        });
-        return;
-      }
-
-      if (!mounted) return;
-
-      if (meeting.isLargeConference) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => LargeConferenceScreen(
-              meetingId: code,
-              meetingName: meeting.title,
-              userId: current.uid,
-              userName: _displayName(),
-            ),
-          ),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MeetingScreen(
-              meetingId: code,
-              meetingName: meeting.title,
-              userId: current.uid,
-              userName: _displayName(),
-              userEmail: current.email,
-              isHost: false,
-            ),
-          ),
-        );
-      }
+      
+      final meeting = MeetingModel.fromDoc(snap.docs.first.id, snap.docs.first.data());
+      _navigateToMeeting(meeting, current);
     } catch (e) {
       crux.logger.e('JoinMeetingScreen._join error', error: e);
       if (mounted) {
@@ -123,6 +97,56 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
           _error = 'Impossible de rejoindre la réunion. Réessaie.';
         });
       }
+    }
+  }
+
+  void _navigateToMeeting(MeetingModel meeting, User current) {
+    if (!mounted) return;
+    
+    final hasPasscode = meeting.passcode != null && meeting.passcode!.isNotEmpty;
+    if (hasPasscode && !_needsPasscode) {
+      setState(() {
+        _loading = false;
+        _needsPasscode = true;
+      });
+      return;
+    }
+    if (hasPasscode && meeting.passcode != _passcodeCtrl.text.trim()) {
+      setState(() {
+        _loading = false;
+        _error = 'Code d\'accès incorrect';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+
+    if (meeting.isLargeConference) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LargeConferenceScreen(
+            meetingId: meeting.id,
+            meetingName: meeting.title,
+            userId: current.uid,
+            userName: _displayName(),
+          ),
+        ),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MeetingScreen(
+            meetingId: meeting.id,
+            meetingName: meeting.title,
+            userId: current.uid,
+            userName: _displayName(),
+            userEmail: current.email,
+            isHost: false,
+          ),
+        ),
+      );
     }
   }
 

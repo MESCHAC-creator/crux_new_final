@@ -9,7 +9,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/theme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../providers/color_provider.dart';
@@ -40,8 +39,6 @@ class _ProfileScreenState extends State<ProfileScreen>
   int _meetingsHosted = 0;
   String? _localPhotoPath; // local file path for profile photo
 
-  static const _photoKey = 'crux_local_photo_path';
-
   @override
   void initState() {
     super.initState();
@@ -61,8 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _loadAll() async {
-    final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString(_photoKey);
+    final path = await UserService.instance.getLocalPhotoPath();
     final uid = _auth.currentUser?.uid;
     if (mounted) setState(() => _localPhotoPath = path);
 
@@ -96,8 +92,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       final dest = '$appDir/profile_photo.jpg';
       final file = await File(picked.path).copy(dest);
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_photoKey, dest);
+      await UserService.instance.setLocalPhotoPath(dest);
 
       // 2. Update UI immediately — local file is already saved
       if (mounted) {
@@ -136,8 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _removePhoto() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_photoKey);
+    await UserService.instance.removeLocalPhotoPath();
     if (_localPhotoPath != null) {
       try {
         await File(_localPhotoPath!).delete();

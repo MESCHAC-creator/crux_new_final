@@ -34,6 +34,7 @@ class MeetingModel {
   final String? recordingUrl;
   final String? passcode; // PIN 4-6 chiffres optionnel défini par l'hôte
   final bool isLargeConference; // true → LiveKit SFU (1000+ participants)
+  final String meetingCode; // Code court pour rejoindre la réunion
 
   /// Co-hôtes (le service écrivait déjà ce champ sans qu'il soit modélisé).
   final List<String> coHosts;
@@ -55,6 +56,7 @@ class MeetingModel {
     this.recordingUrl,
     this.passcode,
     this.isLargeConference = false,
+    this.meetingCode = '',
     this.coHosts = const [],
   });
 
@@ -90,6 +92,7 @@ class MeetingModel {
       'recordingUrl': recordingUrl,
       if (passcode != null && passcode!.isNotEmpty) 'passcode': passcode,
       'isLargeConference': isLargeConference,
+      'meetingCode': meetingCode,
       'coHosts': coHosts,
     };
   }
@@ -116,6 +119,7 @@ class MeetingModel {
       recordingUrl: json['recordingUrl'] as String?,
       passcode: json['passcode'] as String?,
       isLargeConference: json['isLargeConference'] as bool? ?? false,
+      meetingCode: json['meetingCode'] as String? ?? '',
       coHosts: List<String>.from(json['coHosts'] ?? const []),
     );
   }
@@ -153,6 +157,7 @@ class MeetingModel {
     String? recordingUrl,
     String? passcode,
     bool? isLargeConference,
+    String? meetingCode,
     List<String>? coHosts,
   }) {
     return MeetingModel(
@@ -172,6 +177,7 @@ class MeetingModel {
       recordingUrl: recordingUrl ?? this.recordingUrl,
       passcode: passcode ?? this.passcode,
       isLargeConference: isLargeConference ?? this.isLargeConference,
+      meetingCode: meetingCode ?? this.meetingCode,
       coHosts: coHosts ?? this.coHosts,
     );
   }

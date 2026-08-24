@@ -3,12 +3,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
 
 import '../models/meeting_model.dart';
 import '../models/user_model.dart';
 import '../wallpaper/wallpaper_provider.dart';
 import '../routes/app_routes.dart';
 import '../services/schedule_service.dart';
+import '../services/user_service.dart';
 import '../theme/colors.dart';
 import '../wallpaper/app_background.dart';
 
@@ -25,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _schedule = ScheduleService();
   final _codeCtrl = TextEditingController();
   int _selectedNav = 0;
+  String? _localPhotoPath;
 
   String get _uid =>
       widget.user.uid.isNotEmpty
@@ -40,6 +43,12 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_uid.isNotEmpty) _schedule.resyncReminders(userId: _uid);
     });
+    _loadLocalPhoto();
+  }
+
+  Future<void> _loadLocalPhoto() async {
+    final path = await UserService.instance.getLocalPhotoPath();
+    if (mounted) setState(() => _localPhotoPath = path);
   }
 
   @override
@@ -78,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _joinByCode() async {
-    final code = _codeCtrl.text.trim().toLowerCase();
+    final code = _codeCtrl.text.trim().toUpperCase();
     if (code.isEmpty) return;
     FocusScope.of(context).unfocus();
     try {
@@ -119,15 +128,15 @@ class _HomeScreenState extends State<HomeScreen> {
       case 0: // Home
         break;
       case 1: // Meetings
-        Navigator.of(context).pushNamed(AppRoutes.schedule);
+        Navigator.of(context).pushNamed(AppRoutes.schedule).then((_) => _loadLocalPhoto());
         setState(() => _selectedNav = 0);
         break;
       case 2: // Settings
-        Navigator.of(context).pushNamed(AppRoutes.settings);
+        Navigator.of(context).pushNamed(AppRoutes.settings).then((_) => _loadLocalPhoto());
         setState(() => _selectedNav = 0);
         break;
       case 3: // Profile
-        Navigator.of(context).pushNamed(AppRoutes.profile);
+        Navigator.of(context).pushNamed(AppRoutes.profile).then((_) => _loadLocalPhoto());
         setState(() => _selectedNav = 0);
         break;
     }
@@ -345,8 +354,32 @@ class _HomeScreenState extends State<HomeScreen> {
     final initials = _displayName.trim().isEmpty
         ? 'C'
         : _displayName.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0]).join().toUpperCase();
+    
+    Widget avatar;
+    if (_localPhotoPath != null && File(_localPhotoPath!).existsSync()) {
+      avatar = CircleAvatar(
+        radius: 24,
+        backgroundImage: FileImage(File(_localPhotoPath!)),
+      );
+    } else {
+      avatar = CircleAvatar(
+        radius: 24,
+        backgroundColor: AppColors.primary,
+        child: Text(
+          initials,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
+      );
+    }
+    
     return Row(
       children: [
+        avatar,
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,6 +407,11 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
+        ),
+        IconButton(
+          onPressed: () => Navigator.of(context).pushNamed(AppRoutes.wallpaper),
+          icon: const Icon(Icons.wallpaper, color: AppColors.textTertiary),
+          tooltip: 'Modifier le fond d\'écran',
         ),
       ],
     );

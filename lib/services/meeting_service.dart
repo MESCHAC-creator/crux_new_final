@@ -40,6 +40,11 @@ class MeetingService {
 
       final meetingId =
           const Uuid().v4().replaceAll('-', '').substring(0, 12).toUpperCase();
+      final meetingCode = const Uuid()
+          .v4()
+          .replaceAll('-', '')
+          .substring(0, 8)
+          .toUpperCase();
       final now = DateTime.now();
 
       final meeting = MeetingModel(
@@ -56,6 +61,7 @@ class MeetingService {
         createdAt: now,
         passcode: passcode?.isNotEmpty == true ? passcode : null,
         isLargeConference: isLargeConference,
+        meetingCode: meetingCode,
       );
 
       // Retry write with exponential backoff
