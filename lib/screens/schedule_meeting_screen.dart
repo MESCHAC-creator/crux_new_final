@@ -682,7 +682,6 @@ class _ScheduleMeetingScreenState extends State<ScheduleMeetingScreen> {
         dense: true,
         value: value,
         onChanged: onChanged,
-        activeColor: AppColors.textOnPrimary,
         activeTrackColor: AppColors.primary,
         inactiveTrackColor: AppColors.surfaceVariant,
         title: Text(

@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserService {
@@ -9,7 +8,6 @@ class UserService {
   static final UserService instance = UserService._();
 
   final _db = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
   static const _localPhotoKey = 'crux_local_photo_path';
 
   /// Write name and/or photo to the shared Firestore users collection.

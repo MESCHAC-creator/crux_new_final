@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 
@@ -11,6 +10,8 @@ import '../wallpaper/wallpaper_provider.dart';
 import '../routes/app_routes.dart';
 import '../services/schedule_service.dart';
 import '../services/user_service.dart';
+import '../services/meeting_service.dart';
+import '../services/backend_api_service.dart';
 import '../theme/colors.dart';
 import '../wallpaper/app_background.dart';
 
@@ -91,20 +92,46 @@ class _HomeScreenState extends State<HomeScreen> {
     if (code.isEmpty) return;
     FocusScope.of(context).unfocus();
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('meetings')
-          .where('meetingCode', isEqualTo: code)
-          .limit(1)
-          .get();
+      // Try to find meeting by meetingCode via backend API
+      final backendService = BackendApiService();
+      final meetingData = await backendService.getMeetingByCode(code);
+      
       if (!mounted) return;
-      if (snap.docs.isEmpty) {
-        _snack('Aucune réunion pour ce code.');
+      
+      if (meetingData == null) {
+        // Fallback to direct Firestore if backend doesn't find it
+        final snap = await FirebaseFirestore.instance
+            .collection('meetings')
+            .where('meetingCode', isEqualTo: code)
+            .limit(1)
+            .get();
+        if (!mounted) return;
+        if (snap.docs.isEmpty) {
+          _snack('Aucune réunion pour ce code.');
+          return;
+        }
+        final doc = snap.docs.first;
+        _codeCtrl.clear();
+        _joinMeeting(MeetingModel.fromDoc(doc.id, doc.data()));
         return;
       }
-      final doc = snap.docs.first;
-      _codeCtrl.clear();
-      _joinMeeting(MeetingModel.fromDoc(doc.id, doc.data()));
-    } catch (_) {
+      
+      final meeting = backendService.parseMeetingData(meetingData);
+      if (meeting != null) {
+        // Add participant to meeting via backend
+        try {
+          await backendService.addParticipant(meeting.id);
+        } catch (e) {
+          // Fallback to direct Firestore if backend fails
+          await MeetingService().addParticipant(meeting.id, _uid);
+        }
+        
+        _codeCtrl.clear();
+        _joinMeeting(meeting);
+      } else {
+        _snack('Erreur lors de la lecture des données de la réunion.');
+      }
+    } catch (e) {
       if (mounted) _snack('Connexion impossible, réessayez.');
     }
   }
@@ -206,12 +233,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 backgroundColor: Colors.transparent,
                 elevation: 0,
                 labelType: NavigationRailLabelType.all,
-                indicatorColor: AppColors.primary.withOpacity(0.15),
+                indicatorColor: AppColors.primary.withValues(alpha: 0.15),
                 selectedIconTheme: const IconThemeData(
                   color: AppColors.primary,
                   size: 24,
                 ),
-                unselectedIconTheme: IconThemeData(
+                unselectedIconTheme: const IconThemeData(
                   color: AppColors.textTertiary,
                   size: 22,
                 ),
@@ -221,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.2,
                 ),
-                unselectedLabelTextStyle: TextStyle(
+                unselectedLabelTextStyle: const TextStyle(
                   color: AppColors.textTertiary,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
@@ -317,7 +344,7 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundColor: Colors.transparent,
             elevation: 0,
             height: 64,
-            indicatorColor: AppColors.primary.withOpacity(0.15),
+            indicatorColor: AppColors.primary.withValues(alpha: 0.15),
             indicatorShape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),

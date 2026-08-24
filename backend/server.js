@@ -52,7 +52,7 @@ app.use(
       if (allowed) return callback(null, true);
       return callback(new Error(`CORS blocked: ${origin}`));
     },
-    methods: ['GET', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type'],
   })
 );
@@ -155,6 +155,12 @@ app.get('/', (req, res) => {
       health: 'GET /',
       ping: 'GET /ping',
       token: 'GET /livekit-token | GET /api/livekit-token',
+      meetings: {
+        create: 'POST /api/meetings',
+        getByCode: 'GET /api/meetings/code/:code',
+        getById: 'GET /api/meetings/:id',
+        addParticipant: 'PUT /api/meetings/:id/participants',
+      },
     },
   });
 });
@@ -165,6 +171,159 @@ app.get('/ping', (req, res) => {
     service: 'crux-token-server',
     timestamp: Date.now(),
   });
+});
+
+// ============================================================
+// Meeting Management Endpoints
+// ============================================================
+
+// Generate a random meeting code (8 characters, uppercase)
+function generateMeetingCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+// Generate a random meeting ID (12 characters, uppercase)
+function generateMeetingId() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let id = '';
+  for (let i = 0; i < 12; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return id;
+}
+
+// POST /api/meetings - Create a new meeting
+app.post('/api/meetings', verifyFirebaseToken, async (req, res) => {
+  try {
+    const { title, description, organizerName, passcode, isLargeConference } = req.body;
+    const userId = req.user.uid;
+
+    if (!title || !organizerName) {
+      return res.status(400).json({ error: 'Titre et nom de l\'organisateur requis' });
+    }
+
+    // Validate passcode if provided
+    if (passcode && (passcode.length < 4 || passcode.length > 6)) {
+      return res.status(400).json({ error: 'Le code d\'accès doit faire 4 à 6 chiffres' });
+    }
+    if (passcode && !/^\d+$/.test(passcode)) {
+      return res.status(400).json({ error: 'Le code d\'accès ne doit contenir que des chiffres' });
+    }
+
+    const meetingId = generateMeetingId();
+    const meetingCode = generateMeetingCode();
+    const now = new Date();
+    const endTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
+
+    const meetingData = {
+      id: meetingId,
+      title,
+      description: description || '',
+      organizer: organizerName,
+      organizerId: userId,
+      startTime: admin.firestore.Timestamp.fromDate(now),
+      endTime: admin.firestore.Timestamp.fromDate(endTime),
+      participants: [userId],
+      channelName: meetingId,
+      status: 'ongoing',
+      createdAt: admin.firestore.Timestamp.fromDate(now),
+      isRecording: false,
+      isLocked: false,
+      passcode: passcode || null,
+      isLargeConference: isLargeConference || false,
+      meetingCode,
+      coHosts: [],
+    };
+
+    await db.collection('meetings').doc(meetingId).set(meetingData);
+
+    console.log(`[${new Date().toISOString()}] Meeting created: ${meetingId} by ${userId}`);
+
+    return res.status(201).json({
+      id: meetingId,
+      meetingCode,
+      ...meetingData,
+    });
+  } catch (error) {
+    console.error('Create meeting error:', error);
+    return res.status(500).json({ error: 'Erreur création réunion' });
+  }
+});
+
+// GET /api/meetings/code/:code - Get meeting by code
+app.get('/api/meetings/code/:code', verifyFirebaseToken, async (req, res) => {
+  try {
+    const { code } = req.params;
+    const upperCode = code.toUpperCase();
+
+    const snap = await db
+      .collection('meetings')
+      .where('meetingCode', '==', upperCode)
+      .limit(1)
+      .get();
+
+    if (snap.empty) {
+      return res.status(404).json({ error: 'Réunion introuvable' });
+    }
+
+    const doc = snap.docs[0];
+    const meetingData = doc.data();
+
+    return res.json({
+      id: doc.id,
+      ...meetingData,
+    });
+  } catch (error) {
+    console.error('Get meeting by code error:', error);
+    return res.status(500).json({ error: 'Erreur récupération réunion' });
+  }
+});
+
+// GET /api/meetings/:id - Get meeting by ID
+app.get('/api/meetings/:id', verifyFirebaseToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const doc = await db.collection('meetings').doc(id).get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Réunion introuvable' });
+    }
+
+    const meetingData = doc.data();
+
+    return res.json({
+      id: doc.id,
+      ...meetingData,
+    });
+  } catch (error) {
+    console.error('Get meeting by ID error:', error);
+    return res.status(500).json({ error: 'Erreur récupération réunion' });
+  }
+});
+
+// PUT /api/meetings/:id/participants - Add participant to meeting
+app.put('/api/meetings/:id/participants', verifyFirebaseToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.uid;
+
+    await db.collection('meetings').doc(id).update({
+      participants: admin.firestore.FieldValue.arrayUnion(userId),
+    });
+
+    console.log(`[${new Date().toISOString()}] Participant ${userId} added to meeting ${id}`);
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Add participant error:', error);
+    return res.status(500).json({ error: 'Erreur ajout participant' });
+  }
 });
 
 // ============================================================
@@ -259,5 +418,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('Firebase Auth : ON');
   console.log('Firestore host check : ON');
   console.log('LiveKit JWT : ON');
+  console.log('Meeting Management API : ON');
   console.log(`Token TTL : ${TOKEN_TTL_SECONDS}s (${(TOKEN_TTL_SECONDS / 3600).toFixed(1)}h)`);
 });

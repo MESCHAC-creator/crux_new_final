@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
+import '../services/backend_api_service.dart';
 import '../utils/logger.dart' as crux;
 import '../widgets/custom_button.dart';
 import 'meeting_screen.dart';
@@ -72,14 +73,31 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
     });
 
     try {
-      final meetingId = await MeetingService().createMeeting(
-        title: title,
-        description: '',
-        organizerName: _displayName(),
-        organizerId: current.uid,
-        passcode: passcode.isNotEmpty ? passcode : null,
-        isLargeConference: widget.largeConference,
-      );
+      // Try to create meeting via backend API first
+      final backendService = BackendApiService();
+      String meetingId;
+      
+      try {
+        final meetingData = await backendService.createMeeting(
+          title: title,
+          description: '',
+          organizerName: _displayName(),
+          passcode: passcode.isNotEmpty ? passcode : null,
+          isLargeConference: widget.largeConference,
+        );
+        meetingId = meetingData['id'];
+      } catch (e) {
+        crux.logger.w('Backend creation failed, falling back to direct Firestore', error: e);
+        // Fallback to direct Firestore if backend fails
+        meetingId = await MeetingService().createMeeting(
+          title: title,
+          description: '',
+          organizerName: _displayName(),
+          organizerId: current.uid,
+          passcode: passcode.isNotEmpty ? passcode : null,
+          isLargeConference: widget.largeConference,
+        );
+      }
 
       if (!mounted) return;
 
@@ -189,7 +207,7 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
               const SizedBox(height: 20),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                activeColor: AppColors.primary,
+                activeTrackColor: AppColors.primary,
                 value: _showPasscode,
                 onChanged: (v) => setState(() => _showPasscode = v),
                 title: Text(
