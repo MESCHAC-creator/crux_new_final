@@ -7,14 +7,11 @@ workflows:
     environment:
       flutter: 3.27.0
       java: 17
+
       groups:
         - firebase_credentials
+
       vars:
-        # ⚠️ Valeurs injectées via "Environment variables" dans Codemagic UI.
-        # Ne jamais mettre de credentials ici.
-        # LIVEKIT_WSS_URL — wss://... Cloud Run / LiveKit Cloud
-        # LIVEKIT_TOKEN_SERVER_URL — https://... Render /api/livekit-token
-        # Nommés dans Secrets Codemagic
         LIVEKIT_WSS_URL: "wss://crux-88fihb12.livekit.cloud"
         LIVEKIT_TOKEN_SERVER_URL: "https://crux-6l6num.sandbox.livekit.io"
         FIREBASE_PROJECT_ID: "crux-3c6be"
@@ -26,49 +23,67 @@ workflows:
         - $HOME/.gradle/caches
 
     scripts:
+
+      # ──────────────────────────────────────────────────────────────────
+      # 1. Nettoyage et récupération des dépendances
+      # ──────────────────────────────────────────────────────────────────
       - name: Clean and setup
         script: |
-          flutter clean
-          flutter pub get
+          set -e
+
           flutter --version
 
-      - name: Fix Gradle Wrapper
-        script: |
-          rm -rf android/gradle/wrapper/gradle-wrapper.jar
-          rm -rf android/gradle/wrapper/gradle-wrapper.properties
-          flutter config --android-sdk $ANDROID_SDK_ROOT
-          flutter build apk --config-only || true
-          mkdir -p android/gradle/wrapper
-          curl -L https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
-          echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
-          echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
-          echo "distributionUrl=https://services.gradle.org/distributions/gradle-8.9-all.zip" >> android/gradle/wrapper/gradle-wrapper.properties
-          echo "networkTimeout=10000" >> android/gradle/wrapper/gradle-wrapper.properties
-          echo "validateDistributionUrl=true" >> android/gradle/wrapper/gradle-wrapper.properties
-          echo "zipStoreBase=GRADLE_USER_HOME" >> android/gradle/wrapper/gradle-wrapper.properties
-          echo "zipStorePath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
-          cat android/gradle/wrapper/gradle-wrapper.properties
+          flutter clean
 
-      - name: Set up local.properties
-        script: |
-          FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
-          echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
+          rm -rf .dart_tool
 
+          flutter pub get
+
+          flutter pub deps | grep -E "flutter_webrtc|livekit_client|provider|flutter_local_notifications|image_picker|cloud_functions" || true
+
+      # ──────────────────────────────────────────────────────────────────
+      # 2. Configuration Android
+      # ──────────────────────────────────────────────────────────────────
+      - name: Set up Android
+        script: |
+          set -e
+
+          flutter config --android-sdk "$ANDROID_SDK_ROOT"
+
+          if [ ! -f android/local.properties ]; then
+            FLUTTER_SDK=$(which flutter | xargs readlink -f | sed 's|/bin/flutter||')
+            echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
+          fi
+
+          echo "Android SDK: $ANDROID_SDK_ROOT"
+          echo "Flutter SDK: $(which flutter)"
+
+      # ──────────────────────────────────────────────────────────────────
+      # 3. Configuration de la signature Android
+      # ──────────────────────────────────────────────────────────────────
       - name: Set up key.properties
         script: |
+          set -e
+
           echo "storePassword=$CM_KEYSTORE_PASSWORD" > android/key.properties
           echo "keyPassword=$CM_KEY_PASSWORD" >> android/key.properties
           echo "keyAlias=$CM_KEY_ALIAS" >> android/key.properties
           echo "storeFile=$CM_KEYSTORE_PATH" >> android/key.properties
 
+      # ──────────────────────────────────────────────────────────────────
+      # 4. Analyse
+      # ──────────────────────────────────────────────────────────────────
       - name: Analyze code
         script: |
           flutter analyze --fatal-infos || true
 
+      # ──────────────────────────────────────────────────────────────────
+      # 5. Build APK
+      # ──────────────────────────────────────────────────────────────────
       - name: Build APK
         script: |
-          cd android && ./gradlew wrapper --gradle-version 8.9 --distribution-type all || true
-          cd ..
+          set -e
+
           flutter build apk --release \
             --target-platform android-arm64 \
             --build-name=2.38.1 \
@@ -78,8 +93,13 @@ workflows:
             --dart-define=FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID}" \
             --dart-define=APP_BASE_URL="${APP_BASE_URL}"
 
+      # ──────────────────────────────────────────────────────────────────
+      # 6. Build AAB
+      # ──────────────────────────────────────────────────────────────────
       - name: Build AAB
         script: |
+          set -e
+
           flutter build appbundle --release \
             --build-name=2.38.1 \
             --build-number=4 \
@@ -88,11 +108,20 @@ workflows:
             --dart-define=FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID}" \
             --dart-define=APP_BASE_URL="${APP_BASE_URL}"
 
+      # ──────────────────────────────────────────────────────────────────
+      # 7. Copie des artefacts
+      # ──────────────────────────────────────────────────────────────────
       - name: Copy artifacts
         script: |
+          set -e
+
           mkdir -p build/outputs
-          cp build/app/outputs/flutter-apk/app-release.apk build/outputs/crux-release.apk
-          cp build/app/outputs/bundle/release/app-release.aab build/outputs/crux-release.aab
+
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             build/outputs/crux-release.apk
+
+          cp build/app/outputs/bundle/release/app-release.aab \
+             build/outputs/crux-release.aab
 
     artifacts:
       - build/outputs/crux-release.apk
@@ -102,6 +131,7 @@ workflows:
       email:
         recipients:
           - kouakouchristevann@gmail.com
+
         notify:
           success: true
           failure: true
