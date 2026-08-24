@@ -21,7 +21,7 @@ class ErrorHandlerService {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.whiteBg,
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
@@ -87,7 +87,7 @@ class ErrorHandlerService {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.whiteBg,
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
@@ -323,7 +323,7 @@ class ErrorHandlerService {
     if (msg.contains('cancelled') || msg.contains('canceled')) {
       return 'Opération annulée.';
     }
-    
+
     // ── LiveKit / WebRTC ──
     if (msg.contains('ConnectException') || msg.contains('Signal error')) {
       return 'Impossible de joindre le serveur de réunion. Vérifiez votre connexion.';
