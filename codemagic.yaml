@@ -15,7 +15,6 @@ workflows:
 
       vars:
         LIVEKIT_WSS_URL: "wss://crux-88fihb12.livekit.cloud"
-        LIVEKIT_TOKEN_SERVER_URL: "https://crux-6l6num.sandbox.livekit.io"
 
         FIREBASE_PROJECT_ID: "crux-3c6be"
 
