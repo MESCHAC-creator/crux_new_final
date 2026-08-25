@@ -1,69 +1,105 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-
 import '../config/app_config.dart';
 
-/// **LiveKitService** — Token server résilient multi-backend multi-path.
-///
-/// Pipeline d'appel (15 s max par tentative) :
-///   1. [LIVEKIT_TOKEN_SERVER_URL] + `/livekit-token`
-///   2. [LIVEKIT_TOKEN_SERVER_URL] + `/api/livekit-token`
-///   3. Chaque URL de [LIVEKIT_FALLBACK_URLS] (debug only) dans l'ordre,
-///      avec les deux paths ci-dessus.
-///
-/// Toute requête transmet un `Authorization: Bearer <Firebase ID Token>`.
-/// Le backend rejette systématiquement `identity != request.auth.uid`.
 class LiveKitService {
   LiveKitService._();
+
   static final LiveKitService instance = LiveKitService._();
+
+  // ══════════════════════════════════════════════════════════════════════
+  // ENDPOINTS
+  // ══════════════════════════════════════════════════════════════════════
 
   static const List<String> _endpoints = [
     '/livekit-token',
     '/api/livekit-token',
   ];
 
-  /// Retourne un JWT LiveKit valide ou `null` si tous les backends ont échoué.
+  // ══════════════════════════════════════════════════════════════════════
+  // FETCH TOKEN
+  // ══════════════════════════════════════════════════════════════════════
+
   Future<String?> fetchToken({
     required String room,
     required String identity,
     required String name,
     bool isHost = false,
   }) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      _err('User not authenticated');
+    final normalizedRoom = room.trim();
+    final normalizedIdentity = identity.trim();
+    final normalizedName = name.trim();
+
+    // ────────────────────────────────────────────────────────────────────
+    // Validation locale
+    // ────────────────────────────────────────────────────────────────────
+
+    if (normalizedRoom.isEmpty) {
+      _error('Room vide');
       return null;
     }
 
-    // Vérification locale d'identité avant même de sortir
-    if (identity != user.uid) {
-      _err('Identity mismatch (identity=$identity, uid=${user.uid})');
+    if (normalizedIdentity.isEmpty) {
+      _error('Identity vide');
       return null;
     }
+
+    // ────────────────────────────────────────────────────────────────────
+    // Firebase
+    // ────────────────────────────────────────────────────────────────────
+
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      _error('Utilisateur Firebase non authentifié');
+      return null;
+    }
+
+    // L'identité LiveKit doit correspondre à l'utilisateur Firebase.
+    if (normalizedIdentity != user.uid) {
+      _error(
+        'Identity mismatch: '
+        'identity=$normalizedIdentity '
+        'firebaseUid=${user.uid}',
+      );
+      return null;
+    }
+
+    // ────────────────────────────────────────────────────────────────────
+    // Firebase ID token
+    // ────────────────────────────────────────────────────────────────────
 
     String idToken;
+
     try {
       idToken = await user.getIdToken(true) ?? '';
-    } on FirebaseAuthException catch (e) {
-      _err('Firebase getToken error: ${e.code} ${e.message}');
+    } on FirebaseAuthException catch (e, stackTrace) {
+      _error(
+        'Firebase getIdToken failed: '
+        '${e.code} — ${e.message}',
+        stackTrace,
+      );
       return null;
-    }
-    if (idToken.isEmpty) {
-      _err('Empty Firebase ID token');
+    } catch (e, stackTrace) {
+      _error(
+        'Firebase getIdToken failed: $e',
+        stackTrace,
+      );
       return null;
     }
 
-    final query = <String, String>{
-      'room': room.trim(),
-      'identity': identity.trim(),
-      'name': name.trim(),
-      'isHost': isHost.toString(),
-    };
+    if (idToken.isEmpty) {
+      _error('Firebase ID token vide');
+      return null;
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // SERVER URLS
+    // ════════════════════════════════════════════════════════════════════
 
     final serverUrls = <String>[
       if (AppConfig.livekitTokenServerUrl.isNotEmpty)
@@ -71,97 +107,325 @@ class LiveKitService {
       ...AppConfig.livekitFallbackUrls,
     ];
 
-    if (serverUrls.isEmpty) {
-      _err('Aucun serveur de tokens configuré (LIVEKIT_TOKEN_SERVER_URL)');
+    final uniqueServerUrls = serverUrls
+        .where((url) => url.isNotEmpty)
+        .map(_removeTrailingSlash)
+        .toSet()
+        .toList();
+
+    if (uniqueServerUrls.isEmpty) {
+      _error(
+        'Aucun serveur de tokens configuré. '
+        'Définissez LIVEKIT_TOKEN_SERVER_URL.',
+      );
       return null;
     }
 
-    // Log le diagnostic (n'apparaît qu'en debug/profile)
+    // ════════════════════════════════════════════════════════════════════
+    // QUERY
+    // ════════════════════════════════════════════════════════════════════
+
+    final query = <String, String>{
+      'room': normalizedRoom,
+      'identity': normalizedIdentity,
+      'name': normalizedName.isEmpty ? normalizedIdentity : normalizedName,
+      'isHost': isHost.toString(),
+    };
+
     if (kDebugMode) {
       developer.log(
-        '📋 LiveKitService: serverUrls=${serverUrls.length} | room=$room | uid=$identity | host=$isHost',
-        level: 800,
+        'LiveKitService → '
+        'servers=${uniqueServerUrls.length} '
+        'room=$normalizedRoom '
+        'identity=$normalizedIdentity '
+        'host=$isHost',
+        name: 'CRUX.LiveKit',
       );
     }
 
     String? lastError;
-    for (final baseUrl in serverUrls) {
+
+    // ════════════════════════════════════════════════════════════════════
+    // TRY SERVERS
+    // ════════════════════════════════════════════════════════════════════
+
+    for (final baseUrl in uniqueServerUrls) {
       for (final endpoint in _endpoints) {
-        final uri = _buildUri(baseUrl, endpoint, query);
+        final uri = _buildUri(
+          baseUrl,
+          endpoint,
+          query,
+        );
+
         try {
-          final token = await _request(uri, idToken);
-          developer.log(
-            '✅ LiveKitService: token from $baseUrl$endpoint '
-            '(${token.length} chars, room=$room, host=$isHost)',
-            level: 800,
+          if (kDebugMode) {
+            developer.log(
+              'Trying token endpoint: $uri',
+              name: 'CRUX.LiveKit',
+            );
+          }
+
+          final token = await _request(
+            uri,
+            idToken,
           );
+
+          if (token.isEmpty) {
+            throw const FormatException(
+              'Le serveur a retourné un token vide.',
+            );
+          }
+
+          if (kDebugMode) {
+            developer.log(
+              'Token LiveKit reçu '
+              '(${token.length} caractères)',
+              name: 'CRUX.LiveKit',
+            );
+          }
+
           return token;
-        } catch (e) {
-          lastError = '$e';
+        } on TimeoutException catch (e, stackTrace) {
+          lastError = 'Timeout: $e';
+
+          if (kDebugMode) {
+            developer.log(
+              'Token endpoint timeout: $uri',
+              name: 'CRUX.LiveKit',
+              error: e,
+              stackTrace: stackTrace,
+            );
+          }
+        } on http.ClientException catch (e, stackTrace) {
+          lastError = 'Network: $e';
+
+          if (kDebugMode) {
+            developer.log(
+              'Network error: $uri',
+              name: 'CRUX.LiveKit',
+              error: e,
+              stackTrace: stackTrace,
+            );
+          }
+        } on HttpFailureException catch (e, stackTrace) {
+          lastError = e.toString();
+
           developer.log(
-            '⚠️  LiveKitService: $baseUrl$endpoint failed — $e',
-            level: 900,
+            'Token server HTTP failure: $uri',
+            name: 'CRUX.LiveKit',
+            error: e,
+            stackTrace: stackTrace,
+          );
+        } catch (e, stackTrace) {
+          lastError = e.toString();
+
+          developer.log(
+            'Token endpoint failed: $uri',
+            name: 'CRUX.LiveKit',
+            error: e,
+            stackTrace: stackTrace,
           );
         }
       }
     }
 
-    _err('Tous les serveurs de tokens ont échoué. Dernier : $lastError');
+    _error(
+      'Tous les serveurs de tokens ont échoué. '
+      'Dernière erreur: $lastError',
+    );
+
     return null;
   }
 
-  // ── Internals ──────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════
+  // HTTP REQUEST
+  // ══════════════════════════════════════════════════════════════════════
 
-  Uri _buildUri(String base, String endpoint, Map<String, String> query) {
-    var baseUrl = base.endsWith('/')
-        ? base.substring(0, base.length - 1)
-        : base;
-    if (baseUrl.endsWith(endpoint)) {
-      baseUrl = baseUrl.substring(0, baseUrl.length - endpoint.length);
-    }
-    return Uri.parse('$baseUrl$endpoint').replace(queryParameters: query);
-  }
-
-  Future<String> _request(Uri uri, String idToken) async {
+  Future<String> _request(
+    Uri uri,
+    String firebaseIdToken,
+  ) async {
     final response = await http
         .get(
           uri,
           headers: {
-            'Authorization': 'Bearer $idToken',
-            'Content-Type': 'application/json',
-            'User-Agent': 'crux-flutter/${AppConfig.appVersion}',
+            'Authorization': 'Bearer $firebaseIdToken',
+            'Accept': 'application/json',
+            'User-Agent': 'CRUX/${AppConfig.appVersion}',
           },
         )
-        .timeout(AppConfig.tokenTimeout);
+        .timeout(
+          AppConfig.tokenTimeout,
+        );
 
-    if (response.statusCode ~/ 100 != 2) {
-      String detail = response.body;
-      try {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        if (json['error'] != null) detail = json['error'].toString();
-      } catch (_) {}
-      throw HttpFailureException(response.statusCode, detail);
+    // ────────────────────────────────────────────────────────────────────
+    // HTTP ERROR
+    // ────────────────────────────────────────────────────────────────────
+
+    if (response.statusCode < 200 ||
+        response.statusCode >= 300) {
+      throw HttpFailureException(
+        response.statusCode,
+        _extractErrorMessage(response.body),
+      );
     }
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    final token = body['token'] as String?;
-    if (token == null || token.isEmpty) {
-      throw const FormatException('Pas de champ `token` dans la réponse');
+    // ────────────────────────────────────────────────────────────────────
+    // JSON
+    // ────────────────────────────────────────────────────────────────────
+
+    dynamic decoded;
+
+    try {
+      decoded = jsonDecode(response.body);
+    } on FormatException catch (e) {
+      throw FormatException(
+        'Réponse JSON invalide du serveur LiveKit: $e',
+      );
     }
-    return token;
+
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException(
+        'La réponse du serveur LiveKit doit être un objet JSON.',
+      );
+    }
+
+    final tokenValue = decoded['token'];
+
+    if (tokenValue is! String ||
+        tokenValue.trim().isEmpty) {
+      throw const FormatException(
+        'Le champ "token" est absent ou vide.',
+      );
+    }
+
+    return tokenValue.trim();
   }
 
-  void _err(String msg) {
-    developer.log('❌ LiveKitService.fetchToken: $msg', level: 1000);
+  // ══════════════════════════════════════════════════════════════════════
+  // URI
+  // ══════════════════════════════════════════════════════════════════════
+
+  Uri _buildUri(
+    String baseUrl,
+    String endpoint,
+    Map<String, String> query,
+  ) {
+    var normalizedBase = _removeTrailingSlash(
+      baseUrl,
+    );
+
+    final normalizedEndpoint = endpoint.startsWith('/')
+        ? endpoint
+        : '/$endpoint';
+
+    // Si l'URL fournie contient déjà /livekit-token,
+    // on évite de générer :
+    //
+    // /livekit-token/livekit-token
+    //
+
+    if (normalizedBase.endsWith(normalizedEndpoint)) {
+      normalizedBase = normalizedBase.substring(
+        0,
+        normalizedBase.length - normalizedEndpoint.length,
+      );
+    }
+
+    final uri = Uri.parse(
+      '$normalizedBase$normalizedEndpoint',
+    );
+
+    return uri.replace(
+      queryParameters: query,
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // ERROR EXTRACTION
+  // ══════════════════════════════════════════════════════════════════════
+
+  String _extractErrorMessage(String body) {
+    if (body.trim().isEmpty) {
+      return 'Réponse vide du serveur.';
+    }
+
+    try {
+      final decoded = jsonDecode(body);
+
+      if (decoded is Map<String, dynamic>) {
+        final error = decoded['error'];
+
+        if (error != null) {
+          return error.toString();
+        }
+
+        final message = decoded['message'];
+
+        if (message != null) {
+          return message.toString();
+        }
+      }
+    } catch (_) {
+      // On conserve le body brut.
+    }
+
+    // Évite d'afficher une réponse serveur gigantesque.
+    if (body.length > 500) {
+      return '${body.substring(0, 500)}...';
+    }
+
+    return body;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // HELPERS
+  // ══════════════════════════════════════════════════════════════════════
+
+  String _removeTrailingSlash(String value) {
+    var result = value.trim();
+
+    while (result.endsWith('/')) {
+      result = result.substring(
+        0,
+        result.length - 1,
+      );
+    }
+
+    return result;
+  }
+
+  void _error(
+    String message, [
+    StackTrace? stackTrace,
+  ]) {
+    developer.log(
+      message,
+      name: 'CRUX.LiveKit',
+      level: 1000,
+      stackTrace: stackTrace,
+    );
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// HTTP FAILURE
+// ══════════════════════════════════════════════════════════════════════════
 
 class HttpFailureException implements Exception {
   final int statusCode;
   final String message;
-  HttpFailureException(this.statusCode, this.message);
+
+  const HttpFailureException(
+    this.statusCode,
+    this.message,
+  );
+
   @override
-  String toString() => 'HTTP $statusCode — $message';
+  String toString() {
+    return 'HTTP $statusCode — $message';
+  }
 }
 
+/// Alias conservé pour compatibilité avec d'éventuels anciens fichiers.
 typedef DeprecatedTimeoutException = TimeoutException;
