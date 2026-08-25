@@ -303,6 +303,41 @@ class MeetingService {
     }
   }
 
+  /// Récupère une réunion par son code de réunion (8 caractères)
+  Future<MeetingModel?> getMeetingByCode(String meetingCode) async {
+    try {
+      final upperCode = meetingCode.toUpperCase();
+      final snap = await _firestore
+          .collection('meetings')
+          .where('meetingCode', '==', upperCode)
+          .limit(1)
+          .get(const GetOptions(source: Source.server));
+      
+      if (snap.docs.isEmpty) {
+        return null;
+      }
+      
+      return MeetingModel.fromJson(snap.docs.first.data());
+    } catch (e) {
+      _log.w('getMeetingByCode error: $e');
+      try {
+        final snap = await _firestore
+            .collection('meetings')
+            .where('meetingCode', '==', meetingCode.toUpperCase())
+            .limit(1)
+            .get();
+        
+        if (snap.docs.isEmpty) {
+          return null;
+        }
+        
+        return MeetingModel.fromJson(snap.docs.first.data());
+      } catch (_) {
+        return null;
+      }
+    }
+  }
+
   /// Récupère une réunion planifiée par ID.
   Future<ScheduledMeetingModel?> getScheduledMeeting(String meetingId) async {
     try {

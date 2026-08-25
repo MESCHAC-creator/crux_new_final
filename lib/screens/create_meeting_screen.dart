@@ -86,6 +86,7 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
           isLargeConference: widget.largeConference,
         );
         meetingId = meetingData['id'];
+        crux.logger.i('✅ Réunion créée via backend: $meetingId');
       } catch (e) {
         crux.logger.w('Backend creation failed, falling back to direct Firestore', error: e);
         // Fallback to direct Firestore if backend fails
@@ -97,6 +98,7 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
           passcode: passcode.isNotEmpty ? passcode : null,
           isLargeConference: widget.largeConference,
         );
+        crux.logger.i('✅ Réunion créée via direct Firestore: $meetingId');
       }
 
       if (!mounted) return;

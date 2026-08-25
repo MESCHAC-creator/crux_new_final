@@ -92,6 +92,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (code.isEmpty) return;
     FocusScope.of(context).unfocus();
     try {
+      print('🔍 Tentative de rejoindre réunion avec code: $code');
+      
       // Try to find meeting by meetingCode via backend API
       final backendService = BackendApiService();
       final meetingData = await backendService.getMeetingByCode(code);
@@ -99,39 +101,43 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       
       if (meetingData == null) {
-        // Fallback to direct Firestore if backend doesn't find it
-        final snap = await FirebaseFirestore.instance
-            .collection('meetings')
-            .where('meetingCode', isEqualTo: code)
-            .limit(1)
-            .get();
+        print('⚠️ Backend n\'a pas trouvé la réunion, tentative via Firestore direct');
+        // Fallback to direct Firestore lookup by code
+        final meeting = await MeetingService().getMeetingByCode(code);
         if (!mounted) return;
-        if (snap.docs.isEmpty) {
+        if (meeting == null) {
+          print('❌ Réunion introuvable via Firestore pour le code: $code');
           _snack('Aucune réunion pour ce code.');
           return;
         }
-        final doc = snap.docs.first;
+        print('✅ Réunion trouvée via Firestore: ${meeting.id}');
         _codeCtrl.clear();
-        _joinMeeting(MeetingModel.fromDoc(doc.id, doc.data()));
+        _joinMeeting(meeting);
         return;
       }
       
       final meeting = backendService.parseMeetingData(meetingData);
       if (meeting != null) {
+        print('✅ Réunion trouvée via backend: ${meeting.id}');
         // Add participant to meeting via backend
         try {
           await backendService.addParticipant(meeting.id);
+          print('✅ Participant ajouté via backend');
         } catch (e) {
+          print('⚠️ Échec ajout participant via backend, tentative direct');
           // Fallback to direct Firestore if backend fails
           await MeetingService().addParticipant(meeting.id, _uid);
+          print('✅ Participant ajouté via Firestore direct');
         }
         
         _codeCtrl.clear();
         _joinMeeting(meeting);
       } else {
+        print('❌ Erreur parsing meeting data du backend');
         _snack('Erreur lors de la lecture des données de la réunion.');
       }
     } catch (e) {
+      print('❌ Erreur lors de la jonction: $e');
       if (mounted) _snack('Connexion impossible, réessayez.');
     }
   }

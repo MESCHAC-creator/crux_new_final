@@ -75,6 +75,7 @@ Future<String> _getAuthToken() async {
   /// Récupère une réunion par son code via le backend
   Future<Map<String, dynamic>?> getMeetingByCode(String code) async {
     try {
+      crux.logger.i('🔍 Recherche réunion par code via backend: $code');
       final token = await _getAuthToken();
       
       final response = await http.get(
@@ -86,13 +87,14 @@ Future<String> _getAuthToken() async {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        crux.logger.i('✅ Réunion trouvée par code: $code');
+        crux.logger.i('✅ Réunion trouvée par code via backend: $code');
         return data;
       } else if (response.statusCode == 404) {
-        crux.logger.w('⚠️ Réunion non trouvée pour le code: $code');
+        crux.logger.w('⚠️ Réunion non trouvée pour le code via backend: $code');
         return null;
       } else {
         final error = jsonDecode(response.body);
+        crux.logger.e('❌ Erreur backend recherche réunion: ${error['error']}');
         throw Exception(error['error'] ?? 'Erreur récupération réunion');
       }
     } catch (e) {

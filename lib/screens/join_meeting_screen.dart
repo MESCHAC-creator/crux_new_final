@@ -60,6 +60,8 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
     });
 
     try {
+      crux.logger.i('🔍 Tentative de rejoindre réunion avec code: $code');
+      
       // Try to find meeting by meetingCode via backend API
       final backendService = BackendApiService();
       final meetingData = await backendService.getMeetingByCode(code);
@@ -67,11 +69,13 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
       if (!mounted) return;
 
       if (meetingData == null) {
-        // Fallback to meeting ID if code not found
-        final meeting = await MeetingService().getMeetingOnce(code);
+        crux.logger.w('⚠️ Backend n\'a pas trouvé la réunion, tentative via Firestore direct');
+        // Fallback to direct Firestore lookup by code
+        final meeting = await MeetingService().getMeetingByCode(code);
         if (!mounted) return;
 
         if (meeting == null) {
+          crux.logger.e('❌ Réunion introuvable via Firestore pour le code: $code');
           setState(() {
             _loading = false;
             _error = 'Réunion introuvable ou expirée';
@@ -79,29 +83,34 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
           return;
         }
         
+        crux.logger.i('✅ Réunion trouvée via Firestore: ${meeting.id}');
         _navigateToMeeting(meeting, current);
         return;
       }
       
       final meeting = backendService.parseMeetingData(meetingData);
       if (meeting != null) {
+        crux.logger.i('✅ Réunion trouvée via backend: ${meeting.id}');
         // Add participant to meeting via backend
         try {
           await backendService.addParticipant(meeting.id);
+          crux.logger.i('✅ Participant ajouté via backend');
         } catch (e) {
           crux.logger.w('Failed to add participant via backend, trying direct Firestore', error: e);
           await MeetingService().addParticipant(meeting.id, current.uid);
+          crux.logger.i('✅ Participant ajouté via Firestore direct');
         }
         
         _navigateToMeeting(meeting, current);
       } else {
+        crux.logger.e('❌ Erreur parsing meeting data du backend');
         setState(() {
           _loading = false;
           _error = 'Erreur lors de la lecture des données de la réunion';
         });
       }
     } catch (e) {
-      crux.logger.e('JoinMeetingScreen._join error', error: e);
+      crux.logger.e('❌ JoinMeetingScreen._join error', error: e);
       if (mounted) {
         setState(() {
           _loading = false;
