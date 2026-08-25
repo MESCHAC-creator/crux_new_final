@@ -77,15 +77,14 @@ workflows:
 
       - name: Build Android APK
         script: |
-          flutter build apk \
-            --release \
-            --target-platform android-arm64 \
-            --build-name=2.38.1 \
-            --build-number=240 \
-            --dart-define=LIVEKIT_WSS_URL="$LIVEKIT_WSS_URL" \
-            --dart-define=LIVEKIT_TOKEN_SERVER_URL="$LIVEKIT_TOKEN_SERVER_URL" \
-            --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
-            --dart-define=APP_BASE_URL="$APP_BASE_URL"
+         flutter build apk \
+           --release \
+           --target-platform android-arm64 \
+           --build-name=2.38.1 \
+           --build-number=240 \
+           --dart-define=LIVEKIT_WSS_URL="$LIVEKIT_WSS_URL" \
+           --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
+           --dart-define=APP_BASE_URL="$APP_BASE_URL"
 
       # ═══════════════════════════════════════════════════════════════
       # BUILD AAB
