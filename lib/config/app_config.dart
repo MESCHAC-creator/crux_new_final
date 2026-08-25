@@ -3,42 +3,61 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   AppConfig._();
 
-  // ══════════════════════════════════════════════════════════════════════
-  // APPLICATION
-  // ══════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
+  // FIREBASE
+  // ═══════════════════════════════════════════════════════════════════════
 
-  static const String firebaseProjectId = String.fromEnvironment(
-    'FIREBASE_PROJECT_ID',
-    defaultValue: 'crux-3c6be',
-  );
+  static const String firebaseProjectId = 'crux-3c6be';
 
-  static const String appBaseUrl = String.fromEnvironment(
-    'APP_BASE_URL',
-    defaultValue: 'https://crux-3c6be.web.app',
-  );
+  static const String appBaseUrl =
+      'https://crux-3c6be.web.app';
 
   static const String appVersion = '2.38.1';
 
-  // ══════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
   // LIVEKIT
-  // ══════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
 
-  static const String livekitWssUrl = String.fromEnvironment(
-    'LIVEKIT_WSS_URL',
-    defaultValue: 'wss://crux-88fihb12.livekit.cloud',
-  );
-
-  static const String livekitTokenServerUrl =
+  /// URL HTTP officielle du serveur sandbox LiveKit.
+  ///
+  /// Ce n'est PAS l'URL utilisée par Room.connect().
+  /// Elle sert uniquement à demander les credentials.
+  static const String livekitSandboxApi =
       'https://cloud-api.livekit.io/api/sandbox/connection-details';
 
+  /// ID du serveur sandbox LiveKit.
   static const String livekitSandboxId = 'crux-6l6num';
 
-  // ══════════════════════════════════════════════════════════════════════
-  // TIMEOUTS
-  // ══════════════════════════════════════════════════════════════════════
+  /// URL LiveKit Cloud.
+  ///
+  /// Elle est normalement retournée par le serveur sandbox
+  /// dans le champ `serverUrl`.
+  ///
+  /// Cette valeur sert de fallback uniquement.
+  static const String livekitWssUrl =
+      'wss://crux-88fihb12.livekit.cloud';
+
+  /// Ancien nom conservé pour compatibilité avec le reste du projet.
+  static const String livekitTokenServerUrl =
+      livekitSandboxApi;
+
+  static const List<String> livekitFallbackUrls = <String>[];
+
+  static const List<String> livekitTokenUrls = <String>[
+    livekitSandboxApi,
+  ];
+
+  static bool get isLiveKitConfigured {
+    return livekitSandboxApi.isNotEmpty &&
+        livekitSandboxId.isNotEmpty;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // TIMEOUTS & RECONNECTION
+  // ═══════════════════════════════════════════════════════════════════════
 
   static const Duration tokenTimeout =
-      Duration(seconds: 30);
+      Duration(seconds: 20);
 
   static const Duration roomConnectionTimeout =
       Duration(seconds: 45);
@@ -46,31 +65,61 @@ class AppConfig {
   static const int maxReconnectAttempts = 5;
 
   static const Duration reconnectDelay =
-      Duration(seconds: 2);
+      Duration(seconds: 3);
 
   static const Duration retryBackoff =
       Duration(seconds: 1);
 
-  // ══════════════════════════════════════════════════════════════════════
-  // MEETINGS
-  // ══════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
+  // DIAGNOSTICS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  static String get configDiagnostics {
+    if (!isLiveKitConfigured) {
+      return '''
+⚠️ LiveKit Sandbox non configuré.
+
+Sandbox API:
+$livekitSandboxApi
+
+Sandbox ID:
+$livekitSandboxId
+''';
+    }
+
+    return '''
+✅ LiveKit Sandbox configuré
+
+Sandbox API:
+$livekitSandboxApi
+
+Sandbox ID:
+$livekitSandboxId
+
+Fallback WSS:
+$livekitWssUrl
+''';
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // MEETING LIMITS
+  // ═══════════════════════════════════════════════════════════════════════
 
   static const int maxParticipantsStandard = 50;
 
   static const int maxParticipantsLarge = 1000;
 
-  static const int livekitVisibleTileCap = 16;
-
   static const int freeMeetingDurationMinutes = 40;
 
+  static const int livekitVisibleTileCap = 16;
+
   static bool isLargeMeeting(int? maxParticipants) {
-    return (maxParticipants ?? 0) >
-        maxParticipantsStandard;
+    return (maxParticipants ?? 0) > maxParticipantsStandard;
   }
 
-  // ══════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
   // DEEP LINKS
-  // ══════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
 
   static const String deepLinkScheme = 'crux';
 
@@ -91,31 +140,29 @@ class AppConfig {
       return null;
     }
 
-    // crux://join/ABC123
     if (uri.scheme == deepLinkScheme) {
       if (uri.host == deepLinkHost &&
           uri.pathSegments.isNotEmpty) {
-        return uri.pathSegments.last;
+        return uri.pathSegments.first;
       }
 
       return null;
     }
 
-    // https://crux-3c6be.web.app/join/ABC123
-    if (uri.pathSegments.length >= 2 &&
-        uri.pathSegments[
-              uri.pathSegments.length - 2
-            ] ==
-            'join') {
-      return uri.pathSegments.last;
+    final segments = uri.pathSegments
+        .where((segment) => segment.isNotEmpty)
+        .toList();
+
+    if (segments.isEmpty) {
+      return null;
     }
 
-    return null;
+    return segments.last;
   }
 
-  // ══════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
   // FIRESTORE
-  // ══════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
 
   static const String meetingsCollection = 'meetings';
 
@@ -123,25 +170,15 @@ class AppConfig {
 
   static const String messagesCollection = 'messages';
 
-  // ══════════════════════════════════════════════════════════════════════
-  // DIAGNOSTICS
-  // ══════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
+  // DEBUG
+  // ═══════════════════════════════════════════════════════════════════════
 
-  static bool get isLiveKitConfigured {
-    return livekitWssUrl.startsWith('wss://') &&
-        livekitSandboxId.isNotEmpty;
-  }
+  static void printDiagnostics() {
+    if (!kDebugMode) {
+      return;
+    }
 
-  static String get configDiagnostics {
-    return '''
-LiveKit configured:
-WSS: $livekitWssUrl
-Sandbox: $livekitSandboxId
-Token endpoint: $livekitTokenServerUrl
-''';
-  }
-
-  static List<String> get livekitFallbackUrls {
-    return const [];
+    debugPrint(configDiagnostics);
   }
 }
