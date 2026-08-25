@@ -1,7 +1,9 @@
 workflows:
   android-release:
     name: Android Release - CRUX
+
     instance_type: linux_x2
+
     max_build_duration: 120
 
     environment:
@@ -12,6 +14,9 @@ workflows:
         - firebase_credentials
 
       vars:
+        LIVEKIT_WSS_URL: "wss://crux-88fihb12.livekit.cloud"
+        LIVEKIT_SANDBOX_ID: "crux-6l6num"
+
         FIREBASE_PROJECT_ID: "crux-3c6be"
         APP_BASE_URL: "https://crux-3c6be.web.app"
 
@@ -22,34 +27,55 @@ workflows:
 
     scripts:
 
-      - name: Clean and get dependencies
+      # ═══════════════════════════════════════════════════════════════
+      # CLEAN
+      # ═══════════════════════════════════════════════════════════════
+
+      - name: Clean Flutter project
         script: |
           flutter clean
           flutter pub get
           flutter --version
 
-      - name: Set up local.properties
+      # ═══════════════════════════════════════════════════════════════
+      # LOCAL PROPERTIES
+      # ═══════════════════════════════════════════════════════════════
+
+      - name: Configure Flutter SDK
         script: |
-          FLUTTER_SDK=$(dirname $(dirname $(readlink -f $(which flutter))))
+          FLUTTER_SDK=$(dirname "$(dirname "$(readlink -f "$(which flutter)")")")
+
           echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
 
-          echo "Generated android/local.properties:"
+          echo "Flutter SDK:"
           cat android/local.properties
 
-      - name: Set up key.properties
+      # ═══════════════════════════════════════════════════════════════
+      # SIGNING
+      # ═══════════════════════════════════════════════════════════════
+
+      - name: Configure Android signing
         script: |
-          echo "storePassword=$CM_KEYSTORE_PASSWORD" > android/key.properties
-          echo "keyPassword=$CM_KEY_PASSWORD" >> android/key.properties
-          echo "keyAlias=$CM_KEY_ALIAS" >> android/key.properties
-          echo "storeFile=$CM_KEYSTORE_PATH" >> android/key.properties
+          cat > android/key.properties <<EOF
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=$CM_KEYSTORE_PATH
+          EOF
+
+          echo "key.properties configured"
+
+      # ═══════════════════════════════════════════════════════════════
+      # ANALYZE
+      # ═══════════════════════════════════════════════════════════════
 
       - name: Analyze Flutter project
         script: |
-          flutter analyze --fatal-infos || true
+          flutter analyze || true
 
-      - name: Verify Flutter dependencies
-        script: |
-          flutter pub deps
+      # ═══════════════════════════════════════════════════════════════
+      # BUILD APK
+      # ═══════════════════════════════════════════════════════════════
 
       - name: Build APK
         script: |
@@ -57,20 +83,32 @@ workflows:
             --release \
             --target-platform android-arm64 \
             --build-name=2.38.1 \
-            --build-number=4 \
+            --build-number=240 \
+            --dart-define=LIVEKIT_WSS_URL="$LIVEKIT_WSS_URL" \
+            --dart-define=LIVEKIT_SANDBOX_ID="$LIVEKIT_SANDBOX_ID" \
             --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
             --dart-define=APP_BASE_URL="$APP_BASE_URL"
+
+      # ═══════════════════════════════════════════════════════════════
+      # BUILD AAB
+      # ═══════════════════════════════════════════════════════════════
 
       - name: Build AAB
         script: |
           flutter build appbundle \
             --release \
             --build-name=2.38.1 \
-            --build-number=4 \
+            --build-number=240 \
+            --dart-define=LIVEKIT_WSS_URL="$LIVEKIT_WSS_URL" \
+            --dart-define=LIVEKIT_SANDBOX_ID="$LIVEKIT_SANDBOX_ID" \
             --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
             --dart-define=APP_BASE_URL="$APP_BASE_URL"
 
-      - name: Copy artifacts
+      # ═══════════════════════════════════════════════════════════════
+      # ARTIFACTS
+      # ═══════════════════════════════════════════════════════════════
+
+      - name: Copy release artifacts
         script: |
           mkdir -p build/outputs
 
