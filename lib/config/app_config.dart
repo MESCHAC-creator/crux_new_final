@@ -4,13 +4,18 @@ class AppConfig {
   AppConfig._();
 
   // ═══════════════════════════════════════════════════════════════════════
-  // FIREBASE
+  // APP
   // ═══════════════════════════════════════════════════════════════════════
 
-  static const String firebaseProjectId = 'crux-3c6be';
+  static const String firebaseProjectId = String.fromEnvironment(
+    'FIREBASE_PROJECT_ID',
+    defaultValue: 'crux-3c6be',
+  );
 
-  static const String appBaseUrl =
-      'https://crux-3c6be.web.app';
+  static const String appBaseUrl = String.fromEnvironment(
+    'APP_BASE_URL',
+    defaultValue: 'https://crux-3c6be.web.app',
+  );
 
   static const String appVersion = '2.38.1';
 
@@ -18,46 +23,27 @@ class AppConfig {
   // LIVEKIT
   // ═══════════════════════════════════════════════════════════════════════
 
-  /// URL HTTP officielle du serveur sandbox LiveKit.
-  ///
-  /// Ce n'est PAS l'URL utilisée par Room.connect().
-  /// Elle sert uniquement à demander les credentials.
-  static const String livekitSandboxApi =
+  /// LiveKit Cloud URL.
+  static const String livekitWssUrl = String.fromEnvironment(
+    'LIVEKIT_WSS_URL',
+    defaultValue: 'wss://crux-88fihb12.livekit.cloud',
+  );
+
+  /// LiveKit Sandbox ID.
+  static const String livekitSandboxId = String.fromEnvironment(
+    'LIVEKIT_SANDBOX_ID',
+    defaultValue: 'crux-6l6num',
+  );
+
+  /// Sandbox connection-details endpoint.
+  static const String livekitSandboxEndpoint =
       'https://cloud-api.livekit.io/api/sandbox/connection-details';
 
-  /// ID du serveur sandbox LiveKit.
-  static const String livekitSandboxId = 'crux-6l6num';
-
-  /// URL LiveKit Cloud.
-  ///
-  /// Elle est normalement retournée par le serveur sandbox
-  /// dans le champ `serverUrl`.
-  ///
-  /// Cette valeur sert de fallback uniquement.
-  static const String livekitWssUrl =
-      'wss://crux-88fihb12.livekit.cloud';
-
-  /// Ancien nom conservé pour compatibilité avec le reste du projet.
-  static const String livekitTokenServerUrl =
-      livekitSandboxApi;
-
-  static const List<String> livekitFallbackUrls = <String>[];
-
-  static const List<String> livekitTokenUrls = <String>[
-    livekitSandboxApi,
-  ];
-
-  static bool get isLiveKitConfigured {
-    return livekitSandboxApi.isNotEmpty &&
-        livekitSandboxId.isNotEmpty;
-  }
-
   // ═══════════════════════════════════════════════════════════════════════
-  // TIMEOUTS & RECONNECTION
+  // TIMEOUTS
   // ═══════════════════════════════════════════════════════════════════════
 
-  static const Duration tokenTimeout =
-      Duration(seconds: 20);
+  static const Duration tokenTimeout = Duration(seconds: 30);
 
   static const Duration roomConnectionTimeout =
       Duration(seconds: 45);
@@ -71,38 +57,7 @@ class AppConfig {
       Duration(seconds: 1);
 
   // ═══════════════════════════════════════════════════════════════════════
-  // DIAGNOSTICS
-  // ═══════════════════════════════════════════════════════════════════════
-
-  static String get configDiagnostics {
-    if (!isLiveKitConfigured) {
-      return '''
-⚠️ LiveKit Sandbox non configuré.
-
-Sandbox API:
-$livekitSandboxApi
-
-Sandbox ID:
-$livekitSandboxId
-''';
-    }
-
-    return '''
-✅ LiveKit Sandbox configuré
-
-Sandbox API:
-$livekitSandboxApi
-
-Sandbox ID:
-$livekitSandboxId
-
-Fallback WSS:
-$livekitWssUrl
-''';
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // MEETING LIMITS
+  // MEETINGS
   // ═══════════════════════════════════════════════════════════════════════
 
   static const int maxParticipantsStandard = 50;
@@ -111,11 +66,17 @@ $livekitWssUrl
 
   static const int freeMeetingDurationMinutes = 40;
 
-  static const int livekitVisibleTileCap = 16;
+  static const int livekitVisibleTileCap = 100;
 
   static bool isLargeMeeting(int? maxParticipants) {
     return (maxParticipants ?? 0) > maxParticipantsStandard;
   }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RECONNECTION
+  // ═══════════════════════════════════════════════════════════════════════
+
+  static const int maxReconnects = 5;
 
   // ═══════════════════════════════════════════════════════════════════════
   // DEEP LINKS
@@ -141,17 +102,16 @@ $livekitWssUrl
     }
 
     if (uri.scheme == deepLinkScheme) {
-      if (uri.host == deepLinkHost &&
-          uri.pathSegments.isNotEmpty) {
-        return uri.pathSegments.first;
+      final segments = uri.pathSegments;
+
+      if (segments.isNotEmpty) {
+        return segments.last;
       }
 
       return null;
     }
 
-    final segments = uri.pathSegments
-        .where((segment) => segment.isNotEmpty)
-        .toList();
+    final segments = uri.pathSegments;
 
     if (segments.isEmpty) {
       return null;
@@ -169,6 +129,42 @@ $livekitWssUrl
   static const String usersCollection = 'users';
 
   static const String messagesCollection = 'messages';
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // DIAGNOSTICS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  static bool get isLiveKitConfigured {
+    return livekitWssUrl.startsWith('wss://') &&
+        livekitSandboxId.isNotEmpty;
+  }
+
+  static String get configDiagnostics {
+    if (!isLiveKitConfigured) {
+      return '''
+LiveKit non configuré.
+
+LIVEKIT_WSS_URL:
+$livekitWssUrl
+
+LIVEKIT_SANDBOX_ID:
+$livekitSandboxId
+''';
+    }
+
+    return '''
+LiveKit OK
+
+WSS:
+$livekitWssUrl
+
+Sandbox:
+$livekitSandboxId
+
+Endpoint:
+$livekitSandboxEndpoint
+''';
+  }
 
   // ═══════════════════════════════════════════════════════════════════════
   // DEBUG
