@@ -1,109 +1,95 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'package:flutter/foundation.dart';
+
 import 'package:http/http.dart' as http;
+
 import '../config/app_config.dart';
 
-/// Service LiveKit utilisant le serveur Sandbox officiel LiveKit.
+/// LiveKitService
 ///
-/// IMPORTANT:
-/// Ce serveur est destiné au prototypage/développement.
-/// Il ne doit pas être considéré comme une architecture de production.
+/// Utilise le Development/Sandbox Token Server de LiveKit.
 ///
-/// Endpoint:
+/// Requête:
+///
 /// POST https://cloud-api.livekit.io/api/sandbox/connection-details
 ///
-/// Header:
+/// Headers:
 /// X-Sandbox-ID: crux-6l6num
+/// Content-Type: application/json
 ///
 /// Body:
 /// {
 ///   "room_name": "...",
 ///   "participant_name": "..."
 /// }
+///
+/// Réponse:
+/// {
+///   "serverUrl": "...",
+///   "participantToken": "...",
+///   "roomName": "...",
+///   "participantName": "..."
+/// }
 class LiveKitService {
   LiveKitService._();
 
-  static final LiveKitService instance = LiveKitService._();
+  static final LiveKitService instance =
+      LiveKitService._();
 
-  // ══════════════════════════════════════════════════════════════════════
-  // LIVEKIT SANDBOX
-  // ══════════════════════════════════════════════════════════════════════
-
-  static const String _sandboxEndpoint =
-      'https://cloud-api.livekit.io/api/sandbox/connection-details';
-
-  static const String _sandboxId = 'crux-6l6num';
-
-  // ══════════════════════════════════════════════════════════════════════
-  // FETCH TOKEN
-  // ══════════════════════════════════════════════════════════════════════
-
+  /// Récupère les credentials nécessaires à Room.connect().
+  ///
+  /// Retourne uniquement le participantToken.
+  ///
+  /// Le serverUrl retourné par LiveKit est stocké dans
+  /// [lastServerUrl] afin que le caller puisse l'utiliser.
   Future<String?> fetchToken({
     required String room,
     required String identity,
     required String name,
     bool isHost = false,
   }) async {
-    final normalizedRoom = room.trim();
-    final normalizedIdentity = identity.trim();
-    final normalizedName = name.trim();
+    final roomName = room.trim();
+    final participantName = name.trim();
 
-    // ────────────────────────────────────────────────────────────────────
-    // Validation
-    // ────────────────────────────────────────────────────────────────────
-
-    if (normalizedRoom.isEmpty) {
-      _error('Room name is empty.');
+    if (roomName.isEmpty) {
+      _err('Room name is empty');
       return null;
     }
 
-    if (normalizedIdentity.isEmpty) {
-      _error('Participant identity is empty.');
+    if (identity.trim().isEmpty) {
+      _err('Participant identity is empty');
       return null;
     }
 
-    final participantName = normalizedName.isEmpty
-        ? normalizedIdentity
-        : normalizedName;
-
-    // ────────────────────────────────────────────────────────────────────
-    // Diagnostic
-    // ────────────────────────────────────────────────────────────────────
-
-    if (isHost) {
-      developer.log(
-        'Generating LiveKit token for HOST',
-        name: 'CRUX.LiveKit',
-      );
+    if (participantName.isEmpty) {
+      _err('Participant name is empty');
+      return null;
     }
-
-    if (kDebugMode) {
-      developer.log(
-        'LiveKit Sandbox request: '
-        'room=$normalizedRoom '
-        'identity=$normalizedIdentity '
-        'name=$participantName',
-        name: 'CRUX.LiveKit',
-      );
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // REQUEST
-    // ════════════════════════════════════════════════════════════════════
 
     try {
+      final uri = Uri.parse(
+        AppConfig.livekitSandboxApi,
+      );
+
+      developer.log(
+        '🔌 Requesting LiveKit sandbox credentials',
+        level: 800,
+      );
+
       final response = await http
           .post(
-            Uri.parse(_sandboxEndpoint),
-            headers: const {
-              'X-Sandbox-ID': _sandboxId,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
+            uri,
+            headers: {
+              'X-Sandbox-ID':
+                  AppConfig.livekitSandboxId,
+              'Content-Type':
+                  'application/json',
+              'Accept':
+                  'application/json',
             },
             body: jsonEncode({
-              'room_name': normalizedRoom,
+              'room_name': roomName,
               'participant_name': participantName,
             }),
           )
@@ -111,171 +97,167 @@ class LiveKitService {
             AppConfig.tokenTimeout,
           );
 
-      // ═════════════════════════════════════════════════════════════════
-      // HTTP ERROR
-      // ═════════════════════════════════════════════════════════════════
+      developer.log(
+        'LiveKit token server response: '
+        '${response.statusCode}',
+        level: 800,
+      );
 
       if (response.statusCode < 200 ||
           response.statusCode >= 300) {
-        final errorMessage = _extractErrorMessage(
-          response.body,
+        throw HttpFailureException(
+          response.statusCode,
+          _extractError(response.body),
         );
-
-        _error(
-          'LiveKit Sandbox HTTP ${response.statusCode}: '
-          '$errorMessage',
-        );
-
-        return null;
       }
 
-      // ═════════════════════════════════════════════════════════════════
-      // PARSE JSON
-      // ═════════════════════════════════════════════════════════════════
-
-      final dynamic decoded;
-
-      try {
-        decoded = jsonDecode(response.body);
-      } catch (e) {
-        _error(
-          'Invalid JSON returned by LiveKit Sandbox: $e',
-        );
-        return null;
-      }
+      final decoded = jsonDecode(response.body);
 
       if (decoded is! Map<String, dynamic>) {
-        _error(
-          'LiveKit Sandbox returned an invalid JSON object.',
+        throw const FormatException(
+          'Réponse LiveKit invalide.',
         );
-        return null;
       }
-
-      // ═════════════════════════════════════════════════════════════════
-      // PARTICIPANT TOKEN
-      // ═════════════════════════════════════════════════════════════════
 
       final participantToken =
-          decoded['participantToken'];
-
-      if (participantToken is! String ||
-          participantToken.trim().isEmpty) {
-        _error(
-          'LiveKit Sandbox response does not contain '
-          'a valid participantToken.',
-        );
-        return null;
-      }
-
-      // ═════════════════════════════════════════════════════════════════
-      // SERVER URL
-      // ═════════════════════════════════════════════════════════════════
+          decoded['participantToken'] as String?;
 
       final serverUrl =
-          decoded['serverUrl'];
+          decoded['serverUrl'] as String?;
 
-      if (serverUrl is String &&
-          serverUrl.isNotEmpty &&
-          serverUrl != AppConfig.livekitWssUrl) {
-        developer.log(
-          'LiveKit server returned: $serverUrl',
-          name: 'CRUX.LiveKit',
+      if (participantToken == null ||
+          participantToken.isEmpty) {
+        throw const FormatException(
+          'Le serveur LiveKit n\'a pas retourné participantToken.',
         );
       }
 
-      // ═════════════════════════════════════════════════════════════════
-      // ROOM VALIDATION
-      // ═════════════════════════════════════════════════════════════════
-
-      final returnedRoom =
-          decoded['roomName'];
-
-      if (returnedRoom is String &&
-          returnedRoom.isNotEmpty &&
-          returnedRoom != normalizedRoom) {
-        developer.log(
-          'Warning: returned room differs from requested room. '
-          'requested=$normalizedRoom returned=$returnedRoom',
-          name: 'CRUX.LiveKit',
+      if (serverUrl == null ||
+          serverUrl.isEmpty) {
+        throw const FormatException(
+          'Le serveur LiveKit n\'a pas retourné serverUrl.',
         );
       }
 
-      // ═════════════════════════════════════════════════════════════════
-      // SUCCESS
-      // ═════════════════════════════════════════════════════════════════
+      // On conserve l'URL retournée par LiveKit.
+      lastServerUrl = serverUrl;
+
+      lastRoomName =
+          decoded['roomName'] as String? ?? roomName;
+
+      lastParticipantName =
+          decoded['participantName'] as String? ??
+              participantName;
 
       developer.log(
-        'LiveKit token received successfully.',
-        name: 'CRUX.LiveKit',
+        '✅ LiveKit credentials received',
+        level: 800,
       );
 
-      return participantToken.trim();
-    } on TimeoutException catch (e, stackTrace) {
-      _error(
-        'LiveKit Sandbox timeout: $e',
-        stackTrace,
+      developer.log(
+        '   serverUrl=$serverUrl',
+        level: 800,
+      );
+
+      developer.log(
+        '   room=$lastRoomName',
+        level: 800,
+      );
+
+      developer.log(
+        '   participant=$lastParticipantName',
+        level: 800,
+      );
+
+      return participantToken;
+    } on TimeoutException catch (e) {
+      _err(
+        'LiveKit token server timeout: $e',
       );
       return null;
-    } on http.ClientException catch (e, stackTrace) {
-      _error(
-        'LiveKit Sandbox network error: $e',
-        stackTrace,
+    } on HttpFailureException catch (e) {
+      _err(
+        'LiveKit token server HTTP error: $e',
+      );
+      return null;
+    } on FormatException catch (e) {
+      _err(
+        'LiveKit response format error: $e',
       );
       return null;
     } catch (e, stackTrace) {
-      _error(
-        'Unexpected LiveKit Sandbox error: $e',
-        stackTrace,
+      developer.log(
+        '❌ LiveKitService.fetchToken failed',
+        level: 1000,
+        error: e,
+        stackTrace: stackTrace,
       );
+
       return null;
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // ERROR PARSER
-  // ══════════════════════════════════════════════════════════════════════
+  /// URL LiveKit retournée par le sandbox.
+  String? lastServerUrl;
 
-  String _extractErrorMessage(String body) {
+  /// Nom de la room retourné par LiveKit.
+  String? lastRoomName;
+
+  /// Nom du participant retourné par LiveKit.
+  String? lastParticipantName;
+
+  /// Récupère le message d'erreur du serveur.
+  String _extractError(String body) {
     if (body.trim().isEmpty) {
-      return 'Empty response.';
+      return 'Réponse vide du serveur LiveKit.';
     }
 
     try {
       final decoded = jsonDecode(body);
 
       if (decoded is Map<String, dynamic>) {
-        if (decoded['error'] != null) {
-          return decoded['error'].toString();
-        }
+        final error =
+            decoded['error'] ??
+            decoded['message'] ??
+            decoded['detail'];
 
-        if (decoded['message'] != null) {
-          return decoded['message'].toString();
+        if (error != null) {
+          return error.toString();
         }
       }
     } catch (_) {
-      // On utilise la réponse brute ci-dessous.
+      // La réponse n'est pas du JSON.
     }
 
-    if (body.length > 500) {
-      return '${body.substring(0, 500)}...';
-    }
-
-    return body;
+    return body.length > 500
+        ? body.substring(0, 500)
+        : body;
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // LOGGING
-  // ══════════════════════════════════════════════════════════════════════
-
-  void _error(
-    String message, [
-    StackTrace? stackTrace,
-  ]) {
+  void _err(String message) {
     developer.log(
-      message,
-      name: 'CRUX.LiveKit',
+      '❌ LiveKitService: $message',
       level: 1000,
-      stackTrace: stackTrace,
     );
   }
 }
+
+/// Erreur HTTP du serveur LiveKit.
+class HttpFailureException implements Exception {
+  final int statusCode;
+  final String message;
+
+  HttpFailureException(
+    this.statusCode,
+    this.message,
+  );
+
+  @override
+  String toString() {
+    return 'HTTP $statusCode — $message';
+  }
+}
+
+/// Compatibilité avec d'éventuels anciens appels.
+typedef DeprecatedTimeoutException =
+    TimeoutException;
