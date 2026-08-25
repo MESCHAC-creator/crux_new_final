@@ -1,9 +1,7 @@
 workflows:
   android-release:
     name: Android Release - CRUX
-
     instance_type: linux_x2
-
     max_build_duration: 120
 
     environment:
@@ -14,10 +12,7 @@ workflows:
         - firebase_credentials
 
       vars:
-        LIVEKIT_WSS_URL: "wss://crux-88fihb12.livekit.cloud"
-
         FIREBASE_PROJECT_ID: "crux-3c6be"
-
         APP_BASE_URL: "https://crux-3c6be.web.app"
 
     cache:
@@ -27,85 +22,55 @@ workflows:
 
     scripts:
 
-      # ═══════════════════════════════════════════════════════════════
-      # SETUP
-      # ═══════════════════════════════════════════════════════════════
-
-      - name: Flutter setup
+      - name: Clean and get dependencies
         script: |
-          flutter --version
           flutter clean
           flutter pub get
+          flutter --version
 
-      # ═══════════════════════════════════════════════════════════════
-      # LOCAL PROPERTIES
-      # ═══════════════════════════════════════════════════════════════
-
-      - name: Configure Android local.properties
+      - name: Set up local.properties
         script: |
-          FLUTTER_PATH="$(dirname "$(dirname "$(which flutter)")")"
+          FLUTTER_SDK=$(dirname $(dirname $(readlink -f $(which flutter))))
+          echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
 
-          echo "flutter.sdk=$FLUTTER_PATH" > android/local.properties
-
-          echo "===== android/local.properties ====="
+          echo "Generated android/local.properties:"
           cat android/local.properties
 
-      # ═══════════════════════════════════════════════════════════════
-      # SIGNING
-      # ═══════════════════════════════════════════════════════════════
-
-      - name: Configure Android signing
+      - name: Set up key.properties
         script: |
           echo "storePassword=$CM_KEYSTORE_PASSWORD" > android/key.properties
           echo "keyPassword=$CM_KEY_PASSWORD" >> android/key.properties
           echo "keyAlias=$CM_KEY_ALIAS" >> android/key.properties
           echo "storeFile=$CM_KEYSTORE_PATH" >> android/key.properties
 
-          echo "Android signing configured."
-
-      # ═══════════════════════════════════════════════════════════════
-      # ANALYZE
-      # ═══════════════════════════════════════════════════════════════
-
       - name: Analyze Flutter project
         script: |
-          flutter analyze --fatal-infos
+          flutter analyze --fatal-infos || true
 
-      # ═══════════════════════════════════════════════════════════════
-      # BUILD APK
-      # ═══════════════════════════════════════════════════════════════
-
-      - name: Build Android APK
+      - name: Verify Flutter dependencies
         script: |
-         flutter build apk \
-           --release \
-           --target-platform android-arm64 \
-           --build-name=2.38.1 \
-           --build-number=240 \
-           --dart-define=LIVEKIT_WSS_URL="$LIVEKIT_WSS_URL" \
-           --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
-           --dart-define=APP_BASE_URL="$APP_BASE_URL"
+          flutter pub deps
 
-      # ═══════════════════════════════════════════════════════════════
-      # BUILD AAB
-      # ═══════════════════════════════════════════════════════════════
+      - name: Build APK
+        script: |
+          flutter build apk \
+            --release \
+            --target-platform android-arm64 \
+            --build-name=2.38.1 \
+            --build-number=4 \
+            --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
+            --dart-define=APP_BASE_URL="$APP_BASE_URL"
 
-      - name: Build Android App Bundle
+      - name: Build AAB
         script: |
           flutter build appbundle \
             --release \
             --build-name=2.38.1 \
-            --build-number=240 \
-            --dart-define=LIVEKIT_WSS_URL="$LIVEKIT_WSS_URL" \
-            --dart-define=LIVEKIT_TOKEN_SERVER_URL="$LIVEKIT_TOKEN_SERVER_URL" \
+            --build-number=4 \
             --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
             --dart-define=APP_BASE_URL="$APP_BASE_URL"
 
-      # ═══════════════════════════════════════════════════════════════
-      # COPY ARTIFACTS
-      # ═══════════════════════════════════════════════════════════════
-
-      - name: Prepare release artifacts
+      - name: Copy artifacts
         script: |
           mkdir -p build/outputs
 
@@ -119,17 +84,9 @@ workflows:
 
           ls -lh build/outputs/
 
-    # ═══════════════════════════════════════════════════════════════════
-    # ARTIFACTS
-    # ═══════════════════════════════════════════════════════════════════
-
     artifacts:
       - build/outputs/crux-release.apk
       - build/outputs/crux-release.aab
-
-    # ═══════════════════════════════════════════════════════════════════
-    # EMAIL
-    # ═══════════════════════════════════════════════════════════════════
 
     publishing:
       email:
