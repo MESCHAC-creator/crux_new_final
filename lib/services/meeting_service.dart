@@ -304,39 +304,7 @@ class MeetingService {
   }
 
   /// Récupère une réunion par son code de réunion (8 caractères)
-  Future<MeetingModel?> getMeetingByCode(String meetingCode) async {
-    try {
-      final upperCode = meetingCode.toUpperCase();
-      final snap = await _firestore
-          .collection('meetings')
-          .where('meetingCode', '==', upperCode)
-          .limit(1)
-          .get(const GetOptions(source: Source.server));
-      
-      if (snap.docs.isEmpty) {
-        return null;
-      }
-      
-      return MeetingModel.fromJson(snap.docs.first.data());
-    } catch (e) {
-      _log.w('getMeetingByCode error: $e');
-      try {
-        final snap = await _firestore
-            .collection('meetings')
-            .where('meetingCode', '==', meetingCode.toUpperCase())
-            .limit(1)
-            .get();
-        
-        if (snap.docs.isEmpty) {
-          return null;
-        }
-        
-        return MeetingModel.fromJson(snap.docs.first.data());
-      } catch (_) {
-        return null;
-      }
-    }
-  }
+  Future<MeetingModel?> getMeetingByCode(String meetingCode) async {\n    try {\n      final upperCode = meetingCode.toUpperCase();\n      final snap = await _firestore\n          .collection('meetings')\n          .where('meetingCode', '==', upperCode)\n          .limit(1)\n          .get(const GetOptions(source: Source.server));\n      \n      if (snap.docs.isEmpty) {\n        return null;\n      }\n      \n      return MeetingModel.fromJson(snap.docs.first.data());\n    } catch (e) {\n      _log.w('getMeetingByCode error: $e');\n      try {\n        final snap = await _firestore\n            .collection('meetings')\n            .where('meetingCode', '==', meetingCode.toUpperCase())\n            .limit(1)\n            .get();\n        \n        if (snap.docs.isEmpty) {\n          return null;\n        }\n        \n        return MeetingModel.fromJson(snap.docs.first.data());\n      } catch (_) {\n        return null;\n      }\n    }\n  }
 
   /// Récupère une réunion planifiée par ID.
   Future<ScheduledMeetingModel?> getScheduledMeeting(String meetingId) async {
@@ -621,6 +589,77 @@ class MeetingService {
       });
     } catch (e) {
       _log.e('removeCoHost error: $e');
+    }
+  }
+
+  /// Rejoins une réunion via le code de réunion court.
+  /// Retourne {meetingId, isHost} ou lève une exception si non trouvée.
+  Future<Map<String, dynamic>> joinMeetingByCode(
+    String meetingCode,
+    String userId,
+  ) async {
+    try {
+      final cleanCode = meetingCode.trim().toUpperCase();
+      
+      if (cleanCode.isEmpty) {
+        throw Exception('meeting_code_empty');
+      }
+
+      // Chercher la réunion par meetingCode
+      final snapshot = await _firestore
+          .collection('meetings')
+          .where('meetingCode', isEqualTo: cleanCode)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        _log.e('❌ Réunion non trouvée: $cleanCode');
+        throw Exception('meeting_not_found');
+      }
+
+      final meetingDoc = snapshot.docs.first;
+      final meetingId = meetingDoc.id;
+      final meeting = MeetingModel.fromDoc(meetingId, meetingDoc.data());
+
+      // Ajouter l'utilisateur aux participants (s'il n'est pas déjà dedans)
+      if (!meeting.participants.contains(userId)) {
+        await addParticipant(meetingId, userId);
+      }
+
+      // Déterminer le rôle : host si c'est l'organizerId, sinon participant
+      final isHost = meeting.organizerId == userId;
+
+      _log.i('✅ Utilisateur $userId rejoint réunion $meetingId (host=$isHost)');
+
+      return {
+        'meetingId': meetingId,
+        'isHost': isHost,
+        'meetingTitle': meeting.title,
+      };
+    } catch (e) {
+      _log.e('❌ joinMeetingByCode error: $e');
+      rethrow;
+    }
+  }
+
+  /// Vérifie si l'utilisateur est l'hôte (organizerId) de la réunion.
+  /// L'hôte reste hôte même après déconnexion/reconnexion.
+  Future<bool> isUserHostOfMeeting(String meetingId, String userId) async {
+    try {
+      final meetingDoc = await _firestore
+          .collection('meetings')
+          .doc(meetingId)
+          .get();
+
+      if (!meetingDoc.exists) {
+        return false;
+      }
+
+      final meeting = MeetingModel.fromDoc(meetingId, meetingDoc.data()!);
+      return meeting.organizerId == userId;
+    } catch (e) {
+      _log.e('❌ isUserHostOfMeeting error: $e');
+      return false;
     }
   }
 }
