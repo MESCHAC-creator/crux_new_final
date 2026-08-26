@@ -27,19 +27,17 @@ workflows:
 
     scripts:
 
-      # ═══════════════════════════════════════════════════════════════
-      # CLEAN
-      # ═══════════════════════════════════════════════════════════════
-
       - name: Clean Flutter project
         script: |
           flutter clean
+          rm -rf pubspec.lock
           flutter pub get
+
+          echo "=== FLUTTER ==="
           flutter --version
 
-      # ═══════════════════════════════════════════════════════════════
-      # LOCAL PROPERTIES
-      # ═══════════════════════════════════════════════════════════════
+          echo "=== DEPENDENCIES ==="
+          flutter pub deps | grep -E "livekit_client|flutter_webrtc|path"
 
       - name: Configure Flutter SDK
         script: |
@@ -49,10 +47,6 @@ workflows:
 
           echo "Flutter SDK:"
           cat android/local.properties
-
-      # ═══════════════════════════════════════════════════════════════
-      # SIGNING
-      # ═══════════════════════════════════════════════════════════════
 
       - name: Configure Android signing
         script: |
@@ -65,17 +59,9 @@ workflows:
 
           echo "key.properties configured"
 
-      # ═══════════════════════════════════════════════════════════════
-      # ANALYZE
-      # ═══════════════════════════════════════════════════════════════
-
       - name: Analyze Flutter project
         script: |
-          flutter analyze || true
-
-      # ═══════════════════════════════════════════════════════════════
-      # BUILD APK
-      # ═══════════════════════════════════════════════════════════════
+          flutter analyze
 
       - name: Build APK
         script: |
@@ -89,10 +75,6 @@ workflows:
             --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
             --dart-define=APP_BASE_URL="$APP_BASE_URL"
 
-      # ═══════════════════════════════════════════════════════════════
-      # BUILD AAB
-      # ═══════════════════════════════════════════════════════════════
-
       - name: Build AAB
         script: |
           flutter build appbundle \
@@ -103,10 +85,6 @@ workflows:
             --dart-define=LIVEKIT_SANDBOX_ID="$LIVEKIT_SANDBOX_ID" \
             --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
             --dart-define=APP_BASE_URL="$APP_BASE_URL"
-
-      # ═══════════════════════════════════════════════════════════════
-      # ARTIFACTS
-      # ═══════════════════════════════════════════════════════════════
 
       - name: Copy release artifacts
         script: |
