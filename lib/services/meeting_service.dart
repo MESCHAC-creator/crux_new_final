@@ -2,28 +2,65 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import 'package:logger/logger.dart';
+
 import '../models/meeting_model.dart';
 import '../models/scheduled_meeting_model.dart';
+
 export '../models/meeting_model.dart';
 export '../models/scheduled_meeting_model.dart';
 
 class MeetingService {
   static final MeetingService _instance = MeetingService._internal();
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final _log = Logger();
+  final Logger _log = Logger();
 
   factory MeetingService() => _instance;
+
   MeetingService._internal();
 
-  /// Vérifie que l'utilisateur est authentifié
+  // ---------------------------------------------------------------------------
+  // AUTH
+  // ---------------------------------------------------------------------------
+
   String _getCurrentUserId() {
     final userId = _auth.currentUser?.uid;
-    if (userId == null) {
+
+    if (userId == null || userId.isEmpty) {
       throw Exception('auth_required');
     }
+
     return userId;
   }
+
+  // ---------------------------------------------------------------------------
+  // HELPERS
+  // ---------------------------------------------------------------------------
+
+  String _generateMeetingId() {
+    return const Uuid()
+        .v4()
+        .replaceAll('-', '')
+        .substring(0, 12)
+        .toUpperCase();
+  }
+
+  String _generateMeetingCode() {
+    return const Uuid()
+        .v4()
+        .replaceAll('-', '')
+        .substring(0, 8)
+        .toUpperCase();
+  }
+
+  String _enumValue(Object value) {
+    return value.toString().split('.').last;
+  }
+
+  // ---------------------------------------------------------------------------
+  // CREATE IMMEDIATE MEETING
+  // ---------------------------------------------------------------------------
 
   Future<String> createMeeting({
     required String title,
@@ -34,85 +71,135 @@ class MeetingService {
     bool isLargeConference = false,
   }) async {
     try {
-      // Vérifier l'authentification
       final userId = _getCurrentUserId();
-      final finalOrganizerID = organizerId ?? userId;
 
-      final meetingId =
-          const Uuid().v4().replaceAll('-', '').substring(0, 12).toUpperCase();
-      final meetingCode = const Uuid()
-          .v4()
-          .replaceAll('-', '')
-          .substring(0, 8)
-          .toUpperCase();
+      final cleanTitle = title.trim();
+      final cleanDescription = description.trim();
+      final cleanOrganizerName = organizerName.trim();
+
+      if (cleanTitle.isEmpty) {
+        throw Exception('title_required');
+      }
+
+      if (cleanOrganizerName.isEmpty) {
+        throw Exception('organizer_name_required');
+      }
+
+      // Le compte authentifié reste la source de vérité.
+      final finalOrganizerId = userId;
+
+      // Si un organizerId est fourni, il doit correspondre
+      // au compte actuellement authentifié.
+      if (organizerId != null &&
+          organizerId.isNotEmpty &&
+          organizerId != userId) {
+        _log.w(
+          'organizerId fourni ($organizerId) différent du compte '
+          'authentifié ($userId). Utilisation de $userId.',
+        );
+      }
+
+      final cleanPasscode =
+          passcode?.trim().isNotEmpty == true ? passcode!.trim() : null;
+
+      if (cleanPasscode != null) {
+        if (cleanPasscode.length < 4 || cleanPasscode.length > 6) {
+          throw Exception('passcode_invalid_length');
+        }
+
+        if (!RegExp(r'^\d+$').hasMatch(cleanPasscode)) {
+          throw Exception('passcode_must_be_digits');
+        }
+      }
+
+      final meetingId = _generateMeetingId();
+      final meetingCode = _generateMeetingCode();
       final now = DateTime.now();
 
       final meeting = MeetingModel(
         id: meetingId,
-        title: title,
-        description: description,
-        organizer: organizerName,
-        organizerId: finalOrganizerID,
+        title: cleanTitle,
+        description: cleanDescription,
+        organizer: cleanOrganizerName,
+        organizerId: finalOrganizerId,
         startTime: now,
         endTime: now.add(const Duration(hours: 1)),
-        participants: [finalOrganizerID],
+        participants: [finalOrganizerId],
         channelName: meetingId,
         status: MeetingStatus.ongoing,
         createdAt: now,
-        passcode: passcode?.isNotEmpty == true ? passcode : null,
+        passcode: cleanPasscode,
         isLargeConference: isLargeConference,
         meetingCode: meetingCode,
       );
 
-      // Retry write with exponential backoff
+      final meetingRef =
+          _firestore.collection('meetings').doc(meetingId);
+
       bool written = false;
+
       for (int attempt = 0; attempt < 3 && !written; attempt++) {
         try {
-          await _firestore
-              .collection('meetings')
-              .doc(meetingId)
-              .set(meeting.toJson());
+          await meetingRef.set(meeting.toJson());
+
           written = true;
-          _log.i('✅ Réunion créée: $meetingId');
-        } catch (e) {
-          _log.w('createMeeting attempt ${attempt + 1} failed: $e');
+
+          _log.i('Réunion créée: $meetingId');
+        } catch (e, stackTrace) {
+          _log.w(
+            'createMeeting attempt ${attempt + 1} failed: $e',
+            error: e,
+            stackTrace: stackTrace,
+          );
+
           if (attempt < 2) {
-            await Future.delayed(Duration(milliseconds: 100 * (1 << attempt)));
+            await Future.delayed(
+              Duration(milliseconds: 100 * (1 << attempt)),
+            );
           }
         }
       }
 
       if (!written) {
-        _log.e('❌ Écriture Firestore échouée après 3 tentatives');
         throw Exception('firestore_write_failed');
       }
 
-      // Vérifier serveur
+      // Vérification serveur.
       try {
-        final snap = await _firestore
-            .collection('meetings')
-            .doc(meetingId)
-            .get(const GetOptions(source: Source.server));
+        final snap = await meetingRef.get(
+          const GetOptions(source: Source.server),
+        );
+
         if (!snap.exists) {
-          _log.e('❌ Réunion non trouvée après écriture');
           throw Exception('meeting_verification_failed');
         }
+
+        _log.d('Réunion vérifiée sur Firestore: $meetingId');
       } catch (e) {
-        _log.w('Server verify skipped: $e');
+        _log.e('Vérification Firestore échouée: $e');
+
+        // Ici on ne masque plus l'erreur de vérification.
+        rethrow;
       }
 
       return meetingId;
     } on FirebaseAuthException catch (e) {
-      _log.e('❌ Firebase Auth error: ${e.code}');
+      _log.e('Firebase Auth error: ${e.code}');
       throw Exception('auth_failed: ${e.code}');
-    } catch (e) {
-      _log.e('❌ createMeeting error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'createMeeting error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
       rethrow;
     }
   }
 
-  /// Crée une réunion planifiée avec support complet des champs professionnels.
-  /// Ceci est la nouvelle méthode pour Phase 1-3 de la roadmap.
+  // ---------------------------------------------------------------------------
+  // SCHEDULED PROFESSIONAL MEETING
+  // ---------------------------------------------------------------------------
+
   Future<ScheduledMeetingModel> scheduleProMeeting({
     required String title,
     required String description,
@@ -143,55 +230,76 @@ class MeetingService {
   }) async {
     try {
       final userId = _getCurrentUserId();
+
+      final cleanTitle = title.trim();
+      final cleanDescription = description.trim();
+      final cleanOrganizerName = organizerName.trim();
+      final cleanOrganizerEmail = organizerEmail.trim();
+
+      if (cleanTitle.isEmpty) {
+        throw Exception('title_required');
+      }
+
+      if (cleanOrganizerName.isEmpty) {
+        throw Exception('organizer_name_required');
+      }
+
+      if (cleanOrganizerEmail.isEmpty) {
+        throw Exception('organizer_email_required');
+      }
+
       final now = DateTime.now();
+
       final start = startTime ?? now.add(const Duration(hours: 1));
       final end = endTime ?? start.add(const Duration(hours: 1));
 
-      // Validation
       if (start.isBefore(now.subtract(const Duration(minutes: 5)))) {
         throw Exception('start_time_in_past');
       }
-      if (end.isBefore(start)) {
+
+      if (!end.isAfter(start)) {
         throw Exception('end_time_before_start');
       }
 
-      final meetingId = const Uuid()
-          .v4()
-          .replaceAll('-', '')
-          .substring(0, 12)
-          .toUpperCase();
-      final meetingCode = const Uuid()
-          .v4()
-          .replaceAll('-', '')
-          .substring(0, 8)
-          .toUpperCase();
-      final meetingLink = 'https://crux-app.web/join/$meetingId';
+      final cleanPasscode =
+          passcode?.trim().isNotEmpty == true ? passcode!.trim() : null;
 
-      // Validation passcode
-      if (passcode != null &&
-          passcode.isNotEmpty &&
-          (passcode.length < 4 || passcode.length > 6)) {
-        throw Exception('passcode_invalid_length');
+      if (cleanPasscode != null) {
+        if (cleanPasscode.length < 4 ||
+            cleanPasscode.length > 6) {
+          throw Exception('passcode_invalid_length');
+        }
+
+        if (!RegExp(r'^\d+$').hasMatch(cleanPasscode)) {
+          throw Exception('passcode_must_be_digits');
+        }
       }
-      if (passcode != null &&
-          passcode.isNotEmpty &&
-          !RegExp(r'^\d+$').hasMatch(passcode)) {
-        throw Exception('passcode_must_be_digits');
-      }
+
+      final cleanInvitedEmails = invitedEmails
+          .map((email) => email.trim().toLowerCase())
+          .where((email) => email.isNotEmpty)
+          .toSet()
+          .toList();
+
+      final meetingId = _generateMeetingId();
+      final meetingCode = _generateMeetingCode();
+
+      final meetingLink =
+          'https://crux-app.web/join/$meetingId';
 
       final meeting = ScheduledMeetingModel(
         id: meetingId,
-        title: title,
-        description: description,
+        title: cleanTitle,
+        description: cleanDescription,
         organizerId: userId,
-        organizerName: organizerName,
-        organizerEmail: organizerEmail,
+        organizerName: cleanOrganizerName,
+        organizerEmail: cleanOrganizerEmail,
         createdAt: now,
         scheduledStart: start,
         scheduledEnd: end,
         timezone: timezone,
         status: ScheduledMeetingStatus.scheduled,
-        passcode: passcode?.isNotEmpty == true ? passcode : null,
+        passcode: cleanPasscode,
         waitingRoomEnabled: waitingRoomEnabled,
         allowBeforeHost: allowBeforeHost,
         disableGuests: disableGuests,
@@ -203,8 +311,8 @@ class MeetingService {
         recordAutomatically: recordAutomatically,
         recordingType: recordingType,
         participants: [userId],
-        invitedEmails: invitedEmails,
-        coHosts: [],
+        invitedEmails: cleanInvitedEmails,
+        coHosts: const [],
         notifyAtOneHour: notifyAtOneHour,
         notifyAtFifteenMin: notifyAtFifteenMin,
         notifyAtFiveMin: notifyAtFiveMin,
@@ -213,23 +321,36 @@ class MeetingService {
         meetingCode: meetingCode,
         meetingType: meetingType,
         isLargeConference: isLargeConference,
-        settings: customSettings,
+        settings: Map<String, dynamic>.from(customSettings),
       );
 
+      final meetingRef = _firestore
+          .collection('scheduled_meetings')
+          .doc(meetingId);
+
       bool written = false;
+
       for (int attempt = 0; attempt < 3 && !written; attempt++) {
         try {
-          await _firestore
-              .collection('scheduled_meetings')
-              .doc(meetingId)
-              .set(meeting.toJson());
+          await meetingRef.set(meeting.toJson());
+
           written = true;
+
           _log.i(
-              '✅ Réunion planifiée créée: $meetingId (${meeting.scheduledStart})');
-        } catch (e) {
-          _log.w('scheduleProMeeting attempt ${attempt + 1} failed: $e');
+            'Réunion planifiée créée: '
+            '$meetingId (${meeting.scheduledStart})',
+          );
+        } catch (e, stackTrace) {
+          _log.w(
+            'scheduleProMeeting attempt ${attempt + 1} failed: $e',
+            error: e,
+            stackTrace: stackTrace,
+          );
+
           if (attempt < 2) {
-            await Future.delayed(Duration(milliseconds: 100 * (1 << attempt)));
+            await Future.delayed(
+              Duration(milliseconds: 100 * (1 << attempt)),
+            );
           }
         }
       }
@@ -240,16 +361,22 @@ class MeetingService {
 
       return meeting;
     } on FirebaseAuthException catch (e) {
-      _log.e('❌ Firebase Auth error: ${e.code}');
+      _log.e('Firebase Auth error: ${e.code}');
       throw Exception('auth_failed: ${e.code}');
-    } catch (e) {
-      _log.e('❌ scheduleProMeeting error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'scheduleProMeeting error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
       rethrow;
     }
   }
 
-  /// Ancienne méthode scheduleMeeting — conservée pour compatibilité.
-  /// Utilise scheduleProMeeting en interne.
+  // ---------------------------------------------------------------------------
+  // LEGACY SCHEDULE METHOD
+  // ---------------------------------------------------------------------------
+
   Future<String> scheduleMeeting({
     required String title,
     required String description,
@@ -258,31 +385,51 @@ class MeetingService {
     String? passcode,
   }) async {
     try {
-      final current = FirebaseAuth.instance.currentUser;
+      final currentUser = _auth.currentUser;
+
+      if (currentUser == null) {
+        throw Exception('auth_required');
+      }
 
       final meeting = await scheduleProMeeting(
         title: title,
         description: description,
         organizerName: organizerName,
-        organizerEmail: current?.email ?? 'unknown@crux.app',
+        organizerEmail: currentUser.email ?? 'unknown@crux.app',
         startTime: startTime,
         passcode: passcode,
       );
 
       return meeting.id;
     } on FirebaseAuthException catch (e) {
-      _log.e('❌ Firebase Auth error: ${e.code}');
+      _log.e('Firebase Auth error: ${e.code}');
       throw Exception('auth_failed: ${e.code}');
-    } catch (e) {
-      _log.e('❌ scheduleMeeting error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'scheduleMeeting error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
       rethrow;
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // GET MEETING
+  // ---------------------------------------------------------------------------
+
   Stream<MeetingModel?> getMeeting(String meetingId) {
-    return _firestore.collection('meetings').doc(meetingId).snapshots().map(
-          (snap) => snap.exists ? MeetingModel.fromJson(snap.data()!) : null,
-        );
+    return _firestore
+        .collection('meetings')
+        .doc(meetingId)
+        .snapshots()
+        .map((snap) {
+      if (!snap.exists || snap.data() == null) {
+        return null;
+      }
+
+      return MeetingModel.fromJson(snap.data()!);
+    });
   }
 
   Future<MeetingModel?> getMeetingOnce(String meetingId) async {
@@ -290,52 +437,51 @@ class MeetingService {
       final snap = await _firestore
           .collection('meetings')
           .doc(meetingId)
-          .get(const GetOptions(source: Source.server));
-      return snap.exists ? MeetingModel.fromJson(snap.data()!) : null;
-    } catch (_) {
+          .get(
+            const GetOptions(source: Source.server),
+          );
+
+      if (!snap.exists || snap.data() == null) {
+        return null;
+      }
+
+      return MeetingModel.fromJson(snap.data()!);
+    } catch (e) {
+      _log.w('getMeetingOnce server error: $e');
+
       try {
-        final snap =
-            await _firestore.collection('meetings').doc(meetingId).get();
-        return snap.exists ? MeetingModel.fromJson(snap.data()!) : null;
-      } catch (_) {
+        final snap = await _firestore
+            .collection('meetings')
+            .doc(meetingId)
+            .get();
+
+        if (!snap.exists || snap.data() == null) {
+          return null;
+        }
+
+        return MeetingModel.fromJson(snap.data()!);
+      } catch (fallbackError) {
+        _log.w(
+          'getMeetingOnce fallback error: $fallbackError',
+        );
+
         return null;
       }
     }
   }
 
- /// Récupère une réunion par son code de réunion (8 caractères).
-Future<MeetingModel?> getMeetingByCode(String meetingCode) async {
-  final upperCode = meetingCode.trim().toUpperCase();
+  // ---------------------------------------------------------------------------
+  // GET MEETING BY CODE
+  // ---------------------------------------------------------------------------
 
-  if (upperCode.isEmpty) {
-    return null;
-  }
+  Future<MeetingModel?> getMeetingByCode(
+    String meetingCode,
+  ) async {
+    final upperCode = meetingCode.trim().toUpperCase();
 
-  try {
-    final snap = await _firestore
-        .collection('meetings')
-        .where(
-          'meetingCode',
-          isEqualTo: upperCode,
-        )
-        .limit(1)
-        .get(
-          const GetOptions(
-            source: Source.server,
-          ),
-        );
-
-    if (snap.docs.isEmpty) {
+    if (upperCode.isEmpty) {
       return null;
     }
-
-    return MeetingModel.fromJson(
-      snap.docs.first.data(),
-    );
-  } catch (e) {
-    _log.w(
-      'getMeetingByCode server error: $e',
-    );
 
     try {
       final snap = await _firestore
@@ -345,7 +491,9 @@ Future<MeetingModel?> getMeetingByCode(String meetingCode) async {
             isEqualTo: upperCode,
           )
           .limit(1)
-          .get();
+          .get(
+            const GetOptions(source: Source.server),
+          );
 
       if (snap.docs.isEmpty) {
         return null;
@@ -354,117 +502,224 @@ Future<MeetingModel?> getMeetingByCode(String meetingCode) async {
       return MeetingModel.fromJson(
         snap.docs.first.data(),
       );
-    } catch (fallbackError) {
+    } catch (e) {
       _log.w(
-        'getMeetingByCode fallback error: '
-        '$fallbackError',
+        'getMeetingByCode server error: $e',
       );
 
-      return null;
+      try {
+        final snap = await _firestore
+            .collection('meetings')
+            .where(
+              'meetingCode',
+              isEqualTo: upperCode,
+            )
+            .limit(1)
+            .get();
+
+        if (snap.docs.isEmpty) {
+          return null;
+        }
+
+        return MeetingModel.fromJson(
+          snap.docs.first.data(),
+        );
+      } catch (fallbackError) {
+        _log.w(
+          'getMeetingByCode fallback error: $fallbackError',
+        );
+
+        return null;
+      }
     }
   }
-}
 
-  /// Récupère une réunion planifiée par ID.
-  Future<ScheduledMeetingModel?> getScheduledMeeting(String meetingId) async {
+  // ---------------------------------------------------------------------------
+  // GET SCHEDULED MEETING
+  // ---------------------------------------------------------------------------
+
+  Future<ScheduledMeetingModel?> getScheduledMeeting(
+    String meetingId,
+  ) async {
     try {
       final snap = await _firestore
           .collection('scheduled_meetings')
           .doc(meetingId)
-          .get(const GetOptions(source: Source.server));
+          .get(
+            const GetOptions(source: Source.server),
+          );
 
-      if (!snap.exists) return null;
-      return ScheduledMeetingModel.fromJson(snap.data()!);
+      if (!snap.exists || snap.data() == null) {
+        return null;
+      }
+
+      return ScheduledMeetingModel.fromJson(
+        snap.data()!,
+      );
     } catch (e) {
       _log.w('getScheduledMeeting error: $e');
       return null;
     }
   }
 
-  /// Flux des réunions planifiées d'un utilisateur.
-  Stream<List<ScheduledMeetingModel>> streamUserScheduledMeetings(
+  // ---------------------------------------------------------------------------
+  // STREAM USER SCHEDULED MEETINGS
+  // ---------------------------------------------------------------------------
+
+  Stream<List<ScheduledMeetingModel>>
+      streamUserScheduledMeetings(
     String userId, {
     ScheduledMeetingStatus? statusFilter,
   }) {
-    Query query = _firestore
+    Query<Map<String, dynamic>> query = _firestore
         .collection('scheduled_meetings')
-        .where('participants', arrayContains: userId);
+        .where(
+          'participants',
+          arrayContains: userId,
+        );
 
     if (statusFilter != null) {
-      final statusStr = statusFilter.toString().split('.').last;
-      query = query.where('status', isEqualTo: statusStr);
+      query = query.where(
+        'status',
+        isEqualTo: _enumValue(statusFilter),
+      );
     }
 
     query = query.orderBy('scheduledStart');
 
     return query.snapshots().map((snap) {
       return snap.docs
-          .map((d) =>
-              ScheduledMeetingModel.fromJson(d.data() as Map<String, dynamic>))
+          .map(
+            (doc) => ScheduledMeetingModel.fromJson(
+              doc.data(),
+            ),
+          )
           .toList();
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // STATUS
+  // ---------------------------------------------------------------------------
+
   Future<void> updateMeetingStatus(
-      String meetingId, MeetingStatus status) async {
+    String meetingId,
+    MeetingStatus status,
+  ) async {
     try {
-      await _firestore.collection('meetings').doc(meetingId).update({
-        'status': status.toString().split('.').last,
+      await _firestore
+          .collection('meetings')
+          .doc(meetingId)
+          .update({
+        'status': _enumValue(status),
       });
-    } catch (e) {
-      _log.e('updateMeetingStatus error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'updateMeetingStatus error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  /// Met à jour le statut d'une réunion planifiée.
   Future<void> updateScheduledMeetingStatus(
-      String meetingId, ScheduledMeetingStatus status) async {
+    String meetingId,
+    ScheduledMeetingStatus status,
+  ) async {
     try {
-      final data = {
-        'status': status.toString().split('.').last,
+      final Map<String, dynamic> data = {
+        'status': _enumValue(status),
       };
+
       if (status == ScheduledMeetingStatus.live) {
-        data['actualStart'] = DateTime.now().toIso8601String();
+        data['actualStart'] =
+            FieldValue.serverTimestamp();
       } else if (status == ScheduledMeetingStatus.ended) {
-        data['actualEnd'] = DateTime.now().toIso8601String();
+        data['actualEnd'] =
+            FieldValue.serverTimestamp();
       }
+
       await _firestore
           .collection('scheduled_meetings')
           .doc(meetingId)
           .update(data);
-      _log.i('✅ Statut réunion planifiée mise à jour: $meetingId -> $status');
-    } catch (e) {
-      _log.e('updateScheduledMeetingStatus error: $e');
+
+      _log.i(
+        'Statut réunion planifiée mis à jour: '
+        '$meetingId -> ${_enumValue(status)}',
+      );
+    } catch (e, stackTrace) {
+      _log.e(
+        'updateScheduledMeetingStatus error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  /// Annule une réunion planifiée.
-  Future<void> cancelScheduledMeeting(String meetingId,
-      {String reason = 'Cancelled by organizer'}) async {
+  // ---------------------------------------------------------------------------
+  // CANCEL
+  // ---------------------------------------------------------------------------
+
+  Future<void> cancelScheduledMeeting(
+    String meetingId, {
+    String reason = 'Cancelled by organizer',
+  }) async {
     try {
-      await _firestore.collection('scheduled_meetings').doc(meetingId).update({
-        'status': 'cancelled',
+      await _firestore
+          .collection('scheduled_meetings')
+          .doc(meetingId)
+          .update({
+        'status': _enumValue(
+          ScheduledMeetingStatus.cancelled,
+        ),
         'cancellationReason': reason,
       });
-      _log.i('✅ Réunion planifiée annulée: $meetingId');
-    } catch (e) {
-      _log.e('cancelScheduledMeeting error: $e');
+
+      _log.i(
+        'Réunion planifiée annulée: $meetingId',
+      );
+    } catch (e, stackTrace) {
+      _log.e(
+        'cancelScheduledMeeting error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  Future<void> addParticipant(String meetingId, String userId) async {
+  // ---------------------------------------------------------------------------
+  // PARTICIPANTS
+  // ---------------------------------------------------------------------------
+
+  Future<void> addParticipant(
+    String meetingId,
+    String userId,
+  ) async {
     try {
-      await _firestore.collection('meetings').doc(meetingId).update({
+      await _firestore
+          .collection('meetings')
+          .doc(meetingId)
+          .update({
         'participants': FieldValue.arrayUnion([userId]),
       });
-    } catch (e) {
-      _log.e('addParticipant error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'addParticipant error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  /// Ajoute un participant à une réunion planifiée.
   Future<void> addParticipantToScheduled(
-      String meetingId, String userId) async {
+    String meetingId,
+    String userId,
+  ) async {
     try {
       await _firestore
           .collection('scheduled_meetings')
@@ -472,14 +727,20 @@ Future<MeetingModel?> getMeetingByCode(String meetingCode) async {
           .update({
         'participants': FieldValue.arrayUnion([userId]),
       });
-    } catch (e) {
-      _log.e('addParticipantToScheduled error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'addParticipantToScheduled error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  /// Supprime un participant d'une réunion planifiée.
   Future<void> removeParticipantFromScheduled(
-      String meetingId, String userId) async {
+    String meetingId,
+    String userId,
+  ) async {
     try {
       await _firestore
           .collection('scheduled_meetings')
@@ -487,44 +748,78 @@ Future<MeetingModel?> getMeetingByCode(String meetingCode) async {
           .update({
         'participants': FieldValue.arrayRemove([userId]),
       });
-    } catch (e) {
-      _log.e('removeParticipantFromScheduled error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'removeParticipantFromScheduled error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  Future<void> removeParticipant(String meetingId, String userId) async {
+  Future<void> removeParticipant(
+    String meetingId,
+    String userId,
+  ) async {
     try {
-      await _firestore.collection('meetings').doc(meetingId).update({
+      await _firestore
+          .collection('meetings')
+          .doc(meetingId)
+          .update({
         'participants': FieldValue.arrayRemove([userId]),
       });
-    } catch (e) {
-      _log.e('removeParticipant error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'removeParticipant error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // PRESENCE
+  // ---------------------------------------------------------------------------
 
   Future<void> registerPresence(
-      String meetingId, String userId, String userName) async {
+    String meetingId,
+    String userId,
+    String userName,
+  ) async {
     try {
       await _firestore
           .collection('meetings')
           .doc(meetingId)
           .collection('presence')
           .doc(userId)
-          .set({
-        'userId': userId,
-        'name': userName,
-        'micOn': true,
-        'camOn': true,
-        'handRaised': false,
-        'isSpeaking': false,
-        'joinedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    } catch (e) {
-      _log.e('registerPresence error: $e');
+          .set(
+        {
+          'userId': userId,
+          'name': userName,
+          'micOn': true,
+          'camOn': true,
+          'handRaised': false,
+          'isSpeaking': false,
+          'joinedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (e, stackTrace) {
+      _log.e(
+        'registerPresence error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  Future<void> removePresence(String meetingId, String userId) async {
+  Future<void> removePresence(
+    String meetingId,
+    String userId,
+  ) async {
     try {
       await _firestore
           .collection('meetings')
@@ -532,10 +827,19 @@ Future<MeetingModel?> getMeetingByCode(String meetingCode) async {
           .collection('presence')
           .doc(userId)
           .delete();
-    } catch (e) {
-      _log.e('removePresence error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'removePresence error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // HISTORY
+  // ---------------------------------------------------------------------------
 
   Future<void> saveMeetingHistoryForUser({
     required String meetingId,
@@ -545,90 +849,167 @@ Future<MeetingModel?> getMeetingByCode(String meetingCode) async {
     bool endMeeting = false,
   }) async {
     try {
-      final userRef = _firestore.collection('users').doc(userId);
-      final historyRef = userRef.collection('meeting_history').doc(meetingId);
-      final meetingRef = _firestore.collection('meetings').doc(meetingId);
-      final safeDuration = durationSeconds < 0 ? 0 : durationSeconds;
+      final userRef =
+          _firestore.collection('users').doc(userId);
 
-      await _firestore.runTransaction((transaction) async {
-        final existingHistory = await transaction.get(historyRef);
-        transaction.set(
-          historyRef,
-          {
-            'meetingId': meetingId,
-            'title': title,
-            'duration': safeDuration,
-            'endedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
-        if (!existingHistory.exists) {
+      final historyRef =
+          userRef.collection('meeting_history').doc(meetingId);
+
+      final meetingRef =
+          _firestore.collection('meetings').doc(meetingId);
+
+      final safeDuration =
+          durationSeconds < 0 ? 0 : durationSeconds;
+
+      await _firestore.runTransaction(
+        (transaction) async {
+          final existingHistory =
+              await transaction.get(historyRef);
+
           transaction.set(
-            userRef,
+            historyRef,
             {
-              'meetingCount': FieldValue.increment(1),
-              'totalDuration': FieldValue.increment(safeDuration),
-            },
-            SetOptions(merge: true),
-          );
-        }
-        if (endMeeting) {
-          transaction.set(
-            meetingRef,
-            {
-              'status': MeetingStatus.ended.toString().split('.').last,
+              'meetingId': meetingId,
+              'title': title,
+              'duration': safeDuration,
               'endedAt': FieldValue.serverTimestamp(),
             },
             SetOptions(merge: true),
           );
-        }
-      });
-    } catch (e) {
-      _log.e('saveMeetingHistoryForUser error: $e');
+
+          if (!existingHistory.exists) {
+            transaction.set(
+              userRef,
+              {
+                'meetingCount':
+                    FieldValue.increment(1),
+                'totalDuration':
+                    FieldValue.increment(safeDuration),
+              },
+              SetOptions(merge: true),
+            );
+          }
+
+          if (endMeeting) {
+            transaction.set(
+              meetingRef,
+              {
+                'status': _enumValue(
+                  MeetingStatus.ended,
+                ),
+                'endedAt':
+                    FieldValue.serverTimestamp(),
+              },
+              SetOptions(merge: true),
+            );
+          }
+        },
+      );
+    } catch (e, stackTrace) {
+      _log.e(
+        'saveMeetingHistoryForUser error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  Stream<List<Map<String, dynamic>>> streamPresence(String meetingId) {
+  // ---------------------------------------------------------------------------
+  // PRESENCE STREAM
+  // ---------------------------------------------------------------------------
+
+  Stream<List<Map<String, dynamic>>> streamPresence(
+    String meetingId,
+  ) {
     return _firestore
         .collection('meetings')
         .doc(meetingId)
         .collection('presence')
         .snapshots()
-        .map((snap) => snap.docs.map((d) => d.data()).toList());
+        .map(
+          (snap) => snap.docs
+              .map(
+                (doc) => doc.data(),
+              )
+              .toList(),
+        );
   }
 
-  Future<void> setLocked(String meetingId, bool locked) async {
+  // ---------------------------------------------------------------------------
+  // LOCK / MUTE ALL
+  // ---------------------------------------------------------------------------
+
+  Future<void> setLocked(
+    String meetingId,
+    bool locked,
+  ) async {
     try {
-      await _firestore.collection('meetings').doc(meetingId).update({
+      await _firestore
+          .collection('meetings')
+          .doc(meetingId)
+          .update({
         'isLocked': locked,
       });
-    } catch (e) {
-      _log.e('setLocked error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'setLocked error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  Future<void> triggerMuteAll(String meetingId) async {
+  Future<void> triggerMuteAll(
+    String meetingId,
+  ) async {
     try {
-      await _firestore.collection('meetings').doc(meetingId).update({
+      await _firestore
+          .collection('meetings')
+          .doc(meetingId)
+          .update({
         'muteAllCount': FieldValue.increment(1),
       });
-    } catch (e) {
-      _log.e('triggerMuteAll error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'triggerMuteAll error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  Future<void> addCoHost(String meetingId, String userId) async {
+  // ---------------------------------------------------------------------------
+  // CO-HOSTS
+  // ---------------------------------------------------------------------------
+
+  Future<void> addCoHost(
+    String meetingId,
+    String userId,
+  ) async {
     try {
-      await _firestore.collection('meetings').doc(meetingId).update({
+      await _firestore
+          .collection('meetings')
+          .doc(meetingId)
+          .update({
         'coHosts': FieldValue.arrayUnion([userId]),
       });
-    } catch (e) {
-      _log.e('addCoHost error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'addCoHost error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  /// Ajoute un co-hôte à une réunion planifiée.
-  Future<void> addCoHostToScheduled(String meetingId, String userId) async {
+  Future<void> addCoHostToScheduled(
+    String meetingId,
+    String userId,
+  ) async {
     try {
       await _firestore
           .collection('scheduled_meetings')
@@ -636,88 +1017,156 @@ Future<MeetingModel?> getMeetingByCode(String meetingCode) async {
           .update({
         'coHosts': FieldValue.arrayUnion([userId]),
       });
-    } catch (e) {
-      _log.e('addCoHostToScheduled error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'addCoHostToScheduled error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  Future<void> removeCoHost(String meetingId, String userId) async {
+  Future<void> removeCoHost(
+    String meetingId,
+    String userId,
+  ) async {
     try {
-      await _firestore.collection('meetings').doc(meetingId).update({
+      await _firestore
+          .collection('meetings')
+          .doc(meetingId)
+          .update({
         'coHosts': FieldValue.arrayRemove([userId]),
       });
-    } catch (e) {
-      _log.e('removeCoHost error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'removeCoHost error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
-  /// Rejoins une réunion via le code de réunion court.
-  /// Retourne {meetingId, isHost} ou lève une exception si non trouvée.
+  // ---------------------------------------------------------------------------
+  // JOIN BY CODE
+  // ---------------------------------------------------------------------------
+
   Future<Map<String, dynamic>> joinMeetingByCode(
     String meetingCode,
     String userId,
   ) async {
     try {
-      final cleanCode = meetingCode.trim().toUpperCase();
-      
+      final authenticatedUserId = _getCurrentUserId();
+
+      if (userId.trim().isEmpty) {
+        throw Exception('user_id_empty');
+      }
+
+      if (userId != authenticatedUserId) {
+        throw Exception('user_id_mismatch');
+      }
+
+      final cleanCode =
+          meetingCode.trim().toUpperCase();
+
       if (cleanCode.isEmpty) {
         throw Exception('meeting_code_empty');
       }
 
-      // Chercher la réunion par meetingCode
       final snapshot = await _firestore
           .collection('meetings')
-          .where('meetingCode', isEqualTo: cleanCode)
+          .where(
+            'meetingCode',
+            isEqualTo: cleanCode,
+          )
           .limit(1)
           .get();
 
       if (snapshot.docs.isEmpty) {
-        _log.e('❌ Réunion non trouvée: $cleanCode');
+        _log.e(
+          'Réunion non trouvée: $cleanCode',
+        );
+
         throw Exception('meeting_not_found');
       }
 
       final meetingDoc = snapshot.docs.first;
-      final meetingId = meetingDoc.id;
-      final meeting = MeetingModel.fromDoc(meetingId, meetingDoc.data());
 
-      // Ajouter l'utilisateur aux participants (s'il n'est pas déjà dedans)
-      if (!meeting.participants.contains(userId)) {
-        await addParticipant(meetingId, userId);
+      final meetingId = meetingDoc.id;
+
+      final meeting = MeetingModel.fromDoc(
+        meetingId,
+        meetingDoc.data(),
+      );
+
+      // Vérification d'une réunion terminée.
+      if (meeting.status == MeetingStatus.ended) {
+        throw Exception('meeting_ended');
       }
 
-      // Déterminer le rôle : host si c'est l'organizerId, sinon participant
-      final isHost = meeting.organizerId == userId;
+      if (!meeting.participants.contains(userId)) {
+        await addParticipant(
+          meetingId,
+          userId,
+        );
+      }
 
-      _log.i('✅ Utilisateur $userId rejoint réunion $meetingId (host=$isHost)');
+      final isHost =
+          meeting.organizerId == userId;
+
+      _log.i(
+        'Utilisateur $userId rejoint '
+        'réunion $meetingId (host=$isHost)',
+      );
 
       return {
         'meetingId': meetingId,
         'isHost': isHost,
         'meetingTitle': meeting.title,
       };
-    } catch (e) {
-      _log.e('❌ joinMeetingByCode error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'joinMeetingByCode error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
       rethrow;
     }
   }
 
-  /// Vérifie si l'utilisateur est l'hôte (organizerId) de la réunion.
-  /// L'hôte reste hôte même après déconnexion/reconnexion.
-  Future<bool> isUserHostOfMeeting(String meetingId, String userId) async {
+  // ---------------------------------------------------------------------------
+  // HOST CHECK
+  // ---------------------------------------------------------------------------
+
+  Future<bool> isUserHostOfMeeting(
+    String meetingId,
+    String userId,
+  ) async {
     try {
       final meetingDoc = await _firestore
           .collection('meetings')
           .doc(meetingId)
           .get();
 
-      if (!meetingDoc.exists) {
+      if (!meetingDoc.exists ||
+          meetingDoc.data() == null) {
         return false;
       }
 
-      final meeting = MeetingModel.fromDoc(meetingId, meetingDoc.data()!);
+      final meeting = MeetingModel.fromDoc(
+        meetingId,
+        meetingDoc.data()!,
+      );
+
       return meeting.organizerId == userId;
-    } catch (e) {
-      _log.e('❌ isUserHostOfMeeting error: $e');
+    } catch (e, stackTrace) {
+      _log.e(
+        'isUserHostOfMeeting error: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+
       return false;
     }
   }
