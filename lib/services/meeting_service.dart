@@ -303,8 +303,67 @@ class MeetingService {
     }
   }
 
-  /// Récupère une réunion par son code de réunion (8 caractères)
-  Future<MeetingModel?> getMeetingByCode(String meetingCode) async {\n    try {\n      final upperCode = meetingCode.toUpperCase();\n      final snap = await _firestore\n          .collection('meetings')\n          .where('meetingCode', '==', upperCode)\n          .limit(1)\n          .get(const GetOptions(source: Source.server));\n      \n      if (snap.docs.isEmpty) {\n        return null;\n      }\n      \n      return MeetingModel.fromJson(snap.docs.first.data());\n    } catch (e) {\n      _log.w('getMeetingByCode error: $e');\n      try {\n        final snap = await _firestore\n            .collection('meetings')\n            .where('meetingCode', '==', meetingCode.toUpperCase())\n            .limit(1)\n            .get();\n        \n        if (snap.docs.isEmpty) {\n          return null;\n        }\n        \n        return MeetingModel.fromJson(snap.docs.first.data());\n      } catch (_) {\n        return null;\n      }\n    }\n  }
+ /// Récupère une réunion par son code de réunion (8 caractères).
+Future<MeetingModel?> getMeetingByCode(String meetingCode) async {
+  final upperCode = meetingCode.trim().toUpperCase();
+
+  if (upperCode.isEmpty) {
+    return null;
+  }
+
+  try {
+    final snap = await _firestore
+        .collection('meetings')
+        .where(
+          'meetingCode',
+          isEqualTo: upperCode,
+        )
+        .limit(1)
+        .get(
+          const GetOptions(
+            source: Source.server,
+          ),
+        );
+
+    if (snap.docs.isEmpty) {
+      return null;
+    }
+
+    return MeetingModel.fromJson(
+      snap.docs.first.data(),
+    );
+  } catch (e) {
+    _log.w(
+      'getMeetingByCode server error: $e',
+    );
+
+    try {
+      final snap = await _firestore
+          .collection('meetings')
+          .where(
+            'meetingCode',
+            isEqualTo: upperCode,
+          )
+          .limit(1)
+          .get();
+
+      if (snap.docs.isEmpty) {
+        return null;
+      }
+
+      return MeetingModel.fromJson(
+        snap.docs.first.data(),
+      );
+    } catch (fallbackError) {
+      _log.w(
+        'getMeetingByCode fallback error: '
+        '$fallbackError',
+      );
+
+      return null;
+    }
+  }
+}
 
   /// Récupère une réunion planifiée par ID.
   Future<ScheduledMeetingModel?> getScheduledMeeting(String meetingId) async {
