@@ -22,7 +22,7 @@ dependencies:
   cloud_functions: ^5.6.2
 
   # LiveKit
-  livekit_client: ^2.7.0
+  livekit_client: ^2.4.3
 
   # Google
   google_sign_in: ^6.2.2
