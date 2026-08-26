@@ -23,8 +23,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen>
     with SingleTickerProviderStateMixin {
-  final _errorHandler = ErrorHandlerService();
-  final _proService = ProService();
+  final ErrorHandlerService _errorHandler = ErrorHandlerService();
+  final ProService _proService = ProService();
 
   bool _notificationsEnabled = true;
   bool _micDefault = true;
@@ -37,10 +37,12 @@ class _SettingsScreenState extends State<SettingsScreen>
   String _videoQuality = 'HD (720p)';
 
   bool _dndEnabled = false;
+
   TimeOfDay _dndStart = const TimeOfDay(
     hour: 22,
     minute: 0,
   );
+
   TimeOfDay _dndEnd = const TimeOfDay(
     hour: 8,
     minute: 0,
@@ -177,8 +179,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   }) async {
     final picked = await showTimePicker(
       context: context,
-      initialTime:
-          isStart ? _dndStart : _dndEnd,
+      initialTime: isStart ? _dndStart : _dndEnd,
       builder: (ctx, child) {
         return Theme(
           data: Theme.of(ctx).copyWith(
@@ -195,8 +196,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     if (picked == null) return;
 
-    final prefs =
-        await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
 
     if (isStart) {
       setState(() {
@@ -305,22 +305,17 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ),
                     ),
                   ),
-                  flexibleSpace:
-                      FlexibleSpaceBar(
+                  flexibleSpace: FlexibleSpaceBar(
                     background: Container(
-                      decoration:
-                          const BoxDecoration(
-                        gradient:
-                            AppColors.heroGradient,
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.heroGradient,
                       ),
                       child: Stack(
                         children: [
                           Positioned.fill(
                             child: DecoratedBox(
-                              decoration:
-                                  const BoxDecoration(
-                                gradient:
-                                    AppColors.logoHalo,
+                              decoration: const BoxDecoration(
+                                gradient: AppColors.logoHalo,
                               ),
                             ),
                           ),
@@ -334,8 +329,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                 12,
                               ),
                               child: Align(
-                                alignment:
-                                    Alignment.bottomLeft,
+                                alignment: Alignment.bottomLeft,
                                 child: Text(
                                   AppTranslations.t(
                                     'settings',
@@ -378,6 +372,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             lang,
                           ),
                         ),
+
                         GestureDetector(
                           onTap: () {
                             Navigator.pushNamed(
@@ -411,8 +406,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                                   .first ??
                                               'Utilisateur',
                                           style:
-                                              GoogleFonts
-                                                  .poppins(
+                                              GoogleFonts.poppins(
                                             fontWeight:
                                                 FontWeight.w600,
                                             fontSize: 16,
@@ -427,8 +421,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                                   ?.email ??
                                               '',
                                           style:
-                                              GoogleFonts
-                                                  .poppins(
+                                              GoogleFonts.poppins(
                                             fontSize: 13,
                                             color: AppColors
                                                 .textSecondary,
@@ -487,23 +480,34 @@ class _SettingsScreenState extends State<SettingsScreen>
                                         .selectionClick();
 
                                     context
-                                        .read<
-                                            ThemeProvider>()
-                                        .setDarkMode(
-                                          value,
-                                        );
+                                        .read<ThemeProvider>()
+                                        .setDarkMode(value);
                                   },
-                                  activeTrackColor:
-                                      AppColors
-                                          .overlayMedium,
-                                  activeThumbColor:
-                                      AppColors.primary,
-                                  inactiveTrackColor:
-                                      AppColors
-                                          .overlayLight,
-                                  inactiveThumbColor:
-                                      AppColors
-                                          .textTertiary,
+                                  trackColor:
+                                      WidgetStateProperty
+                                          .resolveWith<Color?>(
+                                    (states) {
+                                      return states.contains(
+                                        WidgetState.selected,
+                                      )
+                                          ? AppColors
+                                              .overlayMedium
+                                          : AppColors
+                                              .overlayLight;
+                                    },
+                                  ),
+                                  thumbColor:
+                                      WidgetStateProperty
+                                          .resolveWith<Color?>(
+                                    (states) {
+                                      return states.contains(
+                                        WidgetState.selected,
+                                      )
+                                          ? AppColors.primary
+                                          : AppColors
+                                              .textTertiary;
+                                    },
+                                  ),
                                 ),
                               ),
                               const _Hairline(),
@@ -553,6 +557,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                     _showQualityDialog,
                               ),
                               const _Hairline(),
+
                               _Tile(
                                 icon:
                                     Icons.mic_outlined,
@@ -563,8 +568,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                 ),
                                 trailing: Switch(
                                   value: _micDefault,
-                                  onChanged:
-                                      (value) async {
+                                  onChanged: (value) async {
                                     HapticFeedback
                                         .selectionClick();
 
@@ -582,20 +586,36 @@ class _SettingsScreenState extends State<SettingsScreen>
                                       value,
                                     );
                                   },
-                                  activeTrackColor:
-                                      AppColors
-                                          .overlayMedium,
-                                  activeThumbColor:
-                                      AppColors.primary,
-                                  inactiveTrackColor:
-                                      AppColors
-                                          .overlayLight,
-                                  inactiveThumbColor:
-                                      AppColors
-                                          .textTertiary,
+                                  trackColor:
+                                      WidgetStateProperty
+                                          .resolveWith<Color?>(
+                                    (states) {
+                                      return states.contains(
+                                        WidgetState.selected,
+                                      )
+                                          ? AppColors
+                                              .overlayMedium
+                                          : AppColors
+                                              .overlayLight;
+                                    },
+                                  ),
+                                  thumbColor:
+                                      WidgetStateProperty
+                                          .resolveWith<Color?>(
+                                    (states) {
+                                      return states.contains(
+                                        WidgetState.selected,
+                                      )
+                                          ? AppColors.primary
+                                          : AppColors
+                                              .textTertiary;
+                                    },
+                                  ),
                                 ),
                               ),
+
                               const _Hairline(),
+
                               _Tile(
                                 icon:
                                     Icons
@@ -607,8 +627,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                 ),
                                 trailing: Switch(
                                   value: _camDefault,
-                                  onChanged:
-                                      (value) async {
+                                  onChanged: (value) async {
                                     HapticFeedback
                                         .selectionClick();
 
@@ -626,17 +645,31 @@ class _SettingsScreenState extends State<SettingsScreen>
                                       value,
                                     );
                                   },
-                                  activeTrackColor:
-                                      AppColors
-                                          .overlayMedium,
-                                  activeThumbColor:
-                                      AppColors.primary,
-                                  inactiveTrackColor:
-                                      AppColors
-                                          .overlayLight,
-                                  inactiveThumbColor:
-                                      AppColors
-                                          .textTertiary,
+                                  trackColor:
+                                      WidgetStateProperty
+                                          .resolveWith<Color?>(
+                                    (states) {
+                                      return states.contains(
+                                        WidgetState.selected,
+                                      )
+                                          ? AppColors
+                                              .overlayMedium
+                                          : AppColors
+                                              .overlayLight;
+                                    },
+                                  ),
+                                  thumbColor:
+                                      WidgetStateProperty
+                                          .resolveWith<Color?>(
+                                    (states) {
+                                      return states.contains(
+                                        WidgetState.selected,
+                                      )
+                                          ? AppColors.primary
+                                          : AppColors
+                                              .textTertiary;
+                                    },
+                                  ),
                                 ),
                               ),
                             ],
@@ -676,8 +709,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                 trailing: Switch(
                                   value:
                                       _notificationsEnabled,
-                                  onChanged:
-                                      (value) async {
+                                  onChanged: (value) async {
                                     HapticFeedback
                                         .selectionClick();
 
@@ -695,20 +727,36 @@ class _SettingsScreenState extends State<SettingsScreen>
                                       value,
                                     );
                                   },
-                                  activeTrackColor:
-                                      AppColors
-                                          .overlayMedium,
-                                  activeThumbColor:
-                                      AppColors.primary,
-                                  inactiveTrackColor:
-                                      AppColors
-                                          .overlayLight,
-                                  inactiveThumbColor:
-                                      AppColors
-                                          .textTertiary,
+                                  trackColor:
+                                      WidgetStateProperty
+                                          .resolveWith<Color?>(
+                                    (states) {
+                                      return states.contains(
+                                        WidgetState.selected,
+                                      )
+                                          ? AppColors
+                                              .overlayMedium
+                                          : AppColors
+                                              .overlayLight;
+                                    },
+                                  ),
+                                  thumbColor:
+                                      WidgetStateProperty
+                                          .resolveWith<Color?>(
+                                    (states) {
+                                      return states.contains(
+                                        WidgetState.selected,
+                                      )
+                                          ? AppColors.primary
+                                          : AppColors
+                                              .textTertiary;
+                                    },
+                                  ),
                                 ),
                               ),
+
                               const _Hairline(),
+
                               _Tile(
                                 icon: Icons
                                     .do_not_disturb_on_outlined,
@@ -720,8 +768,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                     : 'Désactivé',
                                 trailing: Switch(
                                   value: _dndEnabled,
-                                  onChanged:
-                                      (value) async {
+                                  onChanged: (value) async {
                                     HapticFeedback
                                         .selectionClick();
 
@@ -739,19 +786,34 @@ class _SettingsScreenState extends State<SettingsScreen>
                                       value,
                                     );
                                   },
-                                  activeTrackColor:
-                                      AppColors
-                                          .overlayMedium,
-                                  activeThumbColor:
-                                      AppColors.primary,
-                                  inactiveTrackColor:
-                                      AppColors
-                                          .overlayLight,
-                                  inactiveThumbColor:
-                                      AppColors
-                                          .textTertiary,
+                                  trackColor:
+                                      WidgetStateProperty
+                                          .resolveWith<Color?>(
+                                    (states) {
+                                      return states.contains(
+                                        WidgetState.selected,
+                                      )
+                                          ? AppColors
+                                              .overlayMedium
+                                          : AppColors
+                                              .overlayLight;
+                                    },
+                                  ),
+                                  thumbColor:
+                                      WidgetStateProperty
+                                          .resolveWith<Color?>(
+                                    (states) {
+                                      return states.contains(
+                                        WidgetState.selected,
+                                      )
+                                          ? AppColors.primary
+                                          : AppColors
+                                              .textTertiary;
+                                    },
+                                  ),
                                 ),
                               ),
+
                               if (_dndEnabled) ...[
                                 const _Hairline(),
                                 Padding(
@@ -812,9 +874,6 @@ class _SettingsScreenState extends State<SettingsScreen>
 
                         const SizedBox(height: 28),
 
-                        // --------------------------------------------------
-                        // ABONNEMENT
-                        // --------------------------------------------------
                         _SectionLabel(
                           AppTranslations.t(
                             'subscription',
@@ -844,8 +903,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             }
 
                             try {
-                              await _proService
-                                  .startPayment(
+                              await _proService.startPayment(
                                 userId: uid,
                                 userName: FirebaseAuth
                                         .instance
@@ -860,8 +918,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             } catch (error) {
                               if (!mounted) return;
 
-                              _errorHandler
-                                  .showErrorSnackBar(
+                              _errorHandler.showError(
                                 context,
                                 error.toString(),
                               );
@@ -937,18 +994,15 @@ class _SettingsScreenState extends State<SettingsScreen>
                                                     lang,
                                                   )),
                                         style:
-                                            GoogleFonts
-                                                .poppins(
+                                            GoogleFonts.poppins(
                                           fontWeight:
-                                              FontWeight
-                                                  .w700,
+                                              FontWeight.w700,
                                           fontSize: 15,
                                           color: AppColors
                                               .textPrimary,
                                         ),
                                       ),
-                                      const SizedBox(
-                                          height: 2),
+                                      const SizedBox(height: 2),
                                       Text(
                                         _loadingPro
                                             ? ''
@@ -960,8 +1014,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                                     lang,
                                                   )),
                                         style:
-                                            GoogleFonts
-                                                .poppins(
+                                            GoogleFonts.poppins(
                                           fontSize: 12,
                                           color: AppColors
                                               .textSecondary,
@@ -1011,8 +1064,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                         lang,
                                       ),
                                       style:
-                                          GoogleFonts
-                                              .poppins(
+                                          GoogleFonts.poppins(
                                         color: AppColors
                                             .warning,
                                         fontWeight:
@@ -1065,8 +1117,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                       size: 20,
                                     ),
                                   ),
-                                  const SizedBox(
-                                      width: 12),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -1074,17 +1125,14 @@ class _SettingsScreenState extends State<SettingsScreen>
                                               .start,
                                       children: [
                                         Text(
-                                          AppTranslations
-                                              .t(
+                                          AppTranslations.t(
                                             'pro_account',
                                             lang,
                                           ),
                                           style:
-                                              GoogleFonts
-                                                  .poppins(
+                                              GoogleFonts.poppins(
                                             fontWeight:
-                                                FontWeight
-                                                    .w600,
+                                                FontWeight.w600,
                                             fontSize: 16,
                                             color: AppColors
                                                 .textPrimary,
@@ -1093,8 +1141,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                         Text(
                                           _proExpiryText(),
                                           style:
-                                              GoogleFonts
-                                                  .poppins(
+                                              GoogleFonts.poppins(
                                             fontSize: 13,
                                             color: AppColors
                                                 .textSecondary,
@@ -1424,14 +1471,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                           Text(
                             quality,
                             style:
-                                GoogleFonts
-                                    .poppins(
+                                GoogleFonts.poppins(
                               fontWeight:
                                   selected
-                                      ? FontWeight
-                                          .w700
-                                      : FontWeight
-                                          .w500,
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
                               color: selected
                                   ? AppColors
                                       .textPrimary
@@ -1596,8 +1640,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             .selectionClick();
 
                         context
-                            .read<
-                                LocaleProvider>()
+                            .read<LocaleProvider>()
                             .setLanguage(
                               language,
                             );
@@ -1643,14 +1686,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                             Text(
                               language,
                               style:
-                                  GoogleFonts
-                                      .poppins(
+                                  GoogleFonts.poppins(
                                 fontWeight:
                                     selected
-                                        ? FontWeight
-                                            .w700
-                                        : FontWeight
-                                            .w500,
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
                                 fontSize: 15,
                                 color: selected
                                     ? AppColors
@@ -1785,8 +1825,8 @@ class _Tile extends StatelessWidget {
                 height: 38,
                 decoration:
                     BoxDecoration(
-                  color: AppColors
-                      .surfaceElevated,
+                  color:
+                      AppColors.surfaceElevated,
                   borderRadius:
                       BorderRadius.circular(
                     12,
@@ -1812,8 +1852,8 @@ class _Tile extends StatelessWidget {
                         fontWeight:
                             FontWeight.w600,
                         fontSize: 16,
-                        color: AppColors
-                            .textPrimary,
+                        color:
+                            AppColors.textPrimary,
                       ),
                     ),
                     if (subtitle != null)
@@ -1834,8 +1874,8 @@ class _Tile extends StatelessWidget {
                           showChevron
                       ? const Icon(
                           Icons.chevron_right,
-                          color: AppColors
-                              .textTertiary,
+                          color:
+                              AppColors.textTertiary,
                           size: 20,
                         )
                       : const SizedBox()),
@@ -1874,8 +1914,7 @@ class _IconBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        decoration:
-            BoxDecoration(
+        decoration: BoxDecoration(
           color:
               AppColors.overlayMedium,
           borderRadius:
