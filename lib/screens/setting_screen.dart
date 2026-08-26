@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_translations.dart';
-import '../providers/color_provider.dart';
 import '../providers/locale_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/error_handler_service.dart';
@@ -152,7 +151,6 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   Widget build(BuildContext context) {
     final localeProvider = context.watch<LocaleProvider>();
-    final colorProvider = context.watch<ColorProvider>();
     final lang = localeProvider.locale.languageCode;
     final isDark = context.watch<ThemeProvider>().isDark;
 
@@ -281,164 +279,6 @@ class _SettingsScreenState extends State<SettingsScreen>
                                   ),
                                 ],
                               ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 28),
-                        _SectionLabel(
-                          AppTranslations.t('app_color', lang),
-                        ),
-                        _Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.surfaceElevated,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: AppColors.borderFocused,
-                                        ),
-                                      ),
-                                      child: const Icon(
-                                        Icons.palette_outlined,
-                                        color: AppColors.primaryDark,
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          AppTranslations.t(
-                                            'current_theme',
-                                            lang,
-                                          ),
-                                          style: GoogleFonts.poppins(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 16,
-                                            color: AppColors.textPrimary,
-                                          ),
-                                        ),
-                                        Text(
-                                          colorProvider.name,
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 13,
-                                            color: AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                                Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  children: List.generate(
-                                    ColorProvider.palette.length,
-                                    (i) {
-                                      final selected =
-                                          colorProvider.selectedIndex == i;
-                                      return GestureDetector(
-                                        onTap: () {
-                                          HapticFeedback.selectionClick();
-                                          colorProvider.setColor(i);
-                                        },
-                                        child: AnimatedContainer(
-                                          duration: const Duration(
-                                            milliseconds: 250,
-                                          ),
-                                          width: 48,
-                                          height: 48,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.surfaceElevated,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: selected
-                                                  ? AppColors.borderFocused
-                                                  : AppColors.border,
-                                              width: selected ? 2 : 1,
-                                            ),
-                                            boxShadow: selected
-                                                ? AppColors.glowShadow
-                                                : null,
-                                          ),
-                                          child: selected
-                                              ? const Icon(
-                                                  Icons.check,
-                                                  color: AppColors.textPrimary,
-                                                  size: 20,
-                                                )
-                                              : Center(
-                                                  child: Text(
-                                                    ColorProvider.palette[i]
-                                                        .name[0],
-                                                    style: GoogleFonts.poppins(
-                                                      color: AppColors
-                                                          .textSecondary,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      fontSize: 13,
-                                                    ),
-                                                  ),
-                                                ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 10,
-                                  runSpacing: 6,
-                                  children: List.generate(
-                                    ColorProvider.palette.length,
-                                    (i) {
-                                      final selected =
-                                          colorProvider.selectedIndex == i;
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: selected
-                                              ? AppColors.overlayMedium
-                                              : Colors.transparent,
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                          border: selected
-                                              ? Border.all(
-                                                  color: AppColors.borderFocused,
-                                                )
-                                              : null,
-                                        ),
-                                        child: Text(
-                                          ColorProvider.palette[i].name,
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 10,
-                                            fontWeight: selected
-                                                ? FontWeight.w700
-                                                : FontWeight.w400,
-                                            color: selected
-                                                ? AppColors.textPrimary
-                                                : AppColors.textTertiary,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
                         ),
@@ -585,7 +425,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                   inactiveThumbColor: AppColors.textTertiary,
                                 ),
                               ),
-                              if (_dndEnabled) ...[
+                              if (_dndEnabled) ...[ 
                                 const _Hairline(),
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
@@ -605,18 +445,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                               _pickDndTime(isStart: true),
                                         ),
                                       ),
-                                      const Padding(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                        ),
-                                        child: Text(
-                                          '→',
-                                          style: TextStyle(
-                                            color: AppColors.textTertiary,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ),
+                                      const SizedBox(width: 10),
                                       Expanded(
                                         child: _DndChip(
                                           label: AppTranslations.t(
@@ -636,195 +465,94 @@ class _SettingsScreenState extends State<SettingsScreen>
                           ),
                         ),
                         const SizedBox(height: 28),
-                        _SectionLabel(
-                          AppTranslations.t('subscription', lang),
-                        ),
-                        GestureDetector(
-                          onTap: () async {
-                            HapticFeedback.mediumImpact();
-                            final uid =
-                                FirebaseAuth.instance.currentUser?.uid ?? '';
-                            if (_isPro) {
-                              _errorHandler.showInfoSnackBar(
-                                context,
-                                'CRUX PRO actif — ${_proExpiryText()}',
-                              );
-                            } else {
-                              try {
-                                await _proService.startPayment(
-                                  userId: uid,
-                                  userName: FirebaseAuth.instance.currentUser
-                                          ?.displayName ??
-                                      'Utilisateur',
-                                );
-                              } catch (_) {}
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              gradient: AppColors.cardGradient,
-                              borderRadius:
-                                  BorderRadius.circular(AppColors.radiusCard),
-                              border: Border.all(
-                                color: _isPro
-                                    ? AppColors.success
-                                    : AppColors.border,
-                              ),
-                              boxShadow: AppColors.softShadow,
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.surfaceElevated,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    _isPro
-                                        ? Icons.verified
-                                        : Icons.workspace_premium,
-                                    color: _isPro
-                                        ? AppColors.success
-                                        : AppColors.primaryDark,
-                                    size: 26,
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _loadingPro
-                                            ? AppTranslations.t('loading', lang)
-                                            : (_isPro
-                                                ? AppTranslations.t(
-                                                    'pro_active',
-                                                    lang,
-                                                  )
-                                                : AppTranslations.t(
-                                                    'pro_inactive',
-                                                    lang,
-                                                  )),
-                                        style: GoogleFonts.poppins(
-                                          color: AppColors.textPrimary,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                      Text(
-                                        _loadingPro
-                                            ? ''
-                                            : (_isPro
-                                                ? _proExpiryText()
-                                                : AppTranslations.t(
-                                                    'pro_inactive_sub',
-                                                    lang,
-                                                  )),
-                                        style: GoogleFonts.poppins(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (_loadingPro)
-                                  const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      color: AppColors.primary,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                else if (!_isPro)
+                        if (!_loadingPro && _isPro) ...[ 
+                          _SectionLabel('PRO'),
+                          _Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 8,
-                                    ),
-                                    constraints: const BoxConstraints(
-                                      minHeight: 48,
-                                    ),
-                                    alignment: Alignment.center,
+                                    width: 40,
+                                    height: 40,
                                     decoration: BoxDecoration(
-                                      gradient: AppColors.primaryGradient,
-                                      borderRadius: BorderRadius.circular(
-                                        AppColors.radiusButton,
+                                      color: AppColors.surfaceElevated,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: AppColors.borderFocused,
                                       ),
                                     ),
-                                    child: Text(
-                                      AppTranslations.t('activate', lang),
-                                      style: GoogleFonts.poppins(
-                                        color: AppColors.textOnPrimary,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13,
-                                      ),
+                                    child: const Icon(
+                                      Icons.diamond_outlined,
+                                      color: AppColors.primaryDark,
+                                      size: 20,
                                     ),
-                                  )
-                                else
-                                  const Icon(
-                                    Icons.check_circle,
-                                    color: AppColors.success,
-                                    size: 24,
                                   ),
-                              ],
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          AppTranslations.t('pro_account', lang),
+                                          style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                        Text(
+                                          _proExpiryText(),
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 13,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
+                          const SizedBox(height: 28),
+                        ],
+                        _SectionLabel(
+                          AppTranslations.t('about', lang),
                         ),
-                        const SizedBox(height: 28),
-                        _SectionLabel(AppTranslations.t('legal', lang)),
-                        _Card(
-                          child: Column(
-                            children: [
-                              _Tile(
-                                icon: Icons.shield_outlined,
-                                title: AppTranslations.t(
-                                  'privacy_policy',
-                                  lang,
-                                ),
-                                onTap: () =>
-                                    Navigator.pushNamed(context, '/privacy'),
-                              ),
-                              const _Hairline(),
-                              _Tile(
-                                icon: Icons.gavel_outlined,
-                                title: AppTranslations.t('terms_of_use', lang),
-                                onTap: () =>
-                                    Navigator.pushNamed(context, '/terms'),
-                              ),
-                              const _Hairline(),
-                              _Tile(
-                                icon: Icons.headset_mic_outlined,
-                                title: AppTranslations.t('support_label', lang),
-                                subtitle: 'kouakouchristevann@gmail.com',
-                                onTap: () async {
-                                  final uri = Uri(
-                                    scheme: 'mailto',
-                                    path: 'kouakouchristevann@gmail.com',
-                                    query: 'subject=Support CRUX',
-                                  );
-                                  if (await canLaunchUrl(uri)) {
-                                    await launchUrl(uri);
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 28),
                         _Card(
                           child: Column(
                             children: [
                               _Tile(
                                 icon: Icons.info_outline,
-                                title: AppTranslations.t('version', lang),
-                                subtitle: '2.38.1',
+                                title: AppTranslations.t('app_name', lang),
+                                subtitle: 'CRUX v1.0.0',
                                 showChevron: false,
+                              ),
+                              const _Hairline(),
+                              _Tile(
+                                icon: Icons.description_outlined,
+                                title: AppTranslations.t('terms', lang),
+                                onTap: () async {
+                                  const url =
+                                      'https://crux.app/terms';
+                                  if (await canLaunchUrl(Uri.parse(url))) {
+                                    await launchUrl(Uri.parse(url));
+                                  }
+                                },
+                              ),
+                              const _Hairline(),
+                              _Tile(
+                                icon: Icons.privacy_tip_outlined,
+                                title: AppTranslations.t('privacy', lang),
+                                onTap: () async {
+                                  const url =
+                                      'https://crux.app/privacy';
+                                  if (await canLaunchUrl(Uri.parse(url))) {
+                                    await launchUrl(Uri.parse(url));
+                                  }
+                                },
                               ),
                               const _Hairline(),
                               _Tile(
