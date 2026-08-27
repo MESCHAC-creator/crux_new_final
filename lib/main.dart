@@ -23,7 +23,6 @@ import 'providers/auth_provider.dart' show CruxAuthProvider;
 import 'providers/meeting_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
-import 'providers/color_provider.dart';
 import 'routes/app_routes.dart';
 import 'theme/colors.dart';
 import 'theme/theme.dart';
@@ -88,9 +87,6 @@ void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    // CORRECTIF : le fond d'écran doit être initialisé quoi qu'il arrive,
-    // pas seulement dans la branche d'erreur Firebase (sinon
-    // LateInitializationError sur `_prefs` dès l'ouverture du sélecteur).
     try {
       await WallpaperManager().init();
     } catch (e) {
@@ -114,7 +110,6 @@ void main() {
 
     try {
       NotificationService().initialize().catchError((e) => crux.logger.e('Notification init failed', error: e));
-      // CORRECTIF : sans cet appel, aucun rappel de réunion n'était programmé.
       MeetingNotificationManager.instance
           .initialize()
           .catchError((e) => crux.logger.e('Meeting reminders init failed', error: e));
@@ -210,7 +205,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MeetingProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
-        ChangeNotifierProvider(create: (_) => ColorProvider()),
         ChangeNotifierProvider(create: (_) => VirtualBackgroundController()),
         ChangeNotifierProvider(create: (_) => WallpaperProvider()),
       ],
@@ -227,7 +221,6 @@ class MyApp extends StatelessWidget {
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
             onGenerateRoute: AppRoutes.generateRoute,
-            // Le fond choisi par l'utilisateur habille TOUTE l'application.
             builder: (context, child) => AppBackground(
               config: wallpaper.config,
               child: child ?? const SizedBox.shrink(),
