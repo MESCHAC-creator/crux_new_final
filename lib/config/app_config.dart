@@ -45,16 +45,16 @@ class AppConfig {
   // ===========================================================================
 
   /// Capacité cible CRUX.
-  static const int webinarMinimumParticipants = 5000;
+  static const int webinarMinimumParticipants = 10000;
 
   /// Nombre maximal de vidéos affichées simultanément.
   ///
   /// IMPORTANT :
   /// ce nombre n'est PAS la capacité de la room.
-  static const int maxVisibleVideoTiles = 9;
+  static const int maxVisibleVideoTiles = 10;
 
   /// Nombre maximal de speakers affichés sur la scène.
-  static const int maxStageParticipants = 9;
+  static const int maxStageParticipants = 10;
 
   /// Nombre maximal de messages chargés localement.
   static const int maxLocalChatMessages = 200;
@@ -63,9 +63,10 @@ class AppConfig {
   // STANDARD / OTHER MODES
   // ===========================================================================
 
-  static const int maxParticipantsStandard = 800;
+  static const int maxParticipantsStandard = 1000;
 
-  static const int maxParticipantsLarge = 5000;
+  static const int maxParticipantsLarge = 10000;
+  static const int livekitVisibleTileCap = 10;
 
   // ===========================================================================
   // TIMEOUTS
@@ -83,7 +84,7 @@ class AppConfig {
   // FREE
   // ===========================================================================
 
-  static const int freeMeetingDurationMinutes = 60;
+  static const int freeMeetingDurationMinutes = 45;
 
   // ===========================================================================
   // FIRESTORE
