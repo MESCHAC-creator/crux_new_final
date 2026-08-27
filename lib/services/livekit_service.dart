@@ -6,33 +6,35 @@ import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
 
-/// Service centralisé pour récupérer les credentials LiveKit.
+/// Service centralisé de connexion au token server LiveKit.
 ///
-/// Architecture CRUX Large Conference / Webinar:
+/// Architecture CRUX Large Conference:
 ///
-/// - Host / speaker:
-///     canPublish = true
-///     canSubscribe = true
+/// - Speaker / Host:
+///     canPublish     = true
+///     canSubscribe   = true
 ///
 /// - Audience:
-///     canPublish = false
-///     canSubscribe = true
+///     canPublish     = false
+///     canSubscribe   = true
 ///
-/// Le contrôle réel de ces permissions DOIT être effectué par le serveur
-/// qui signe le token LiveKit. Elles ne doivent jamais être considérées
-/// comme fiables lorsqu'elles sont définies uniquement côté Flutter.
+/// IMPORTANT:
+/// Les permissions envoyées au token server doivent être validées
+/// côté serveur. Le client Flutter ne constitue jamais une autorité
+/// de sécurité.
 class LiveKitService {
   LiveKitService._();
 
   static final LiveKitService instance = LiveKitService._();
 
-  /// Nombre de participants visés par CRUX Large Conference.
+  // ===========================================================================
+  // LARGE CONFERENCE
+  // ===========================================================================
+
   static const int targetCapacity = 5000;
 
-  /// Nombre maximum de vidéos que le client affiche simultanément.
   static const int maxVisibleVideoTiles = 10;
 
-  /// Nombre maximum de tentatives HTTP.
   static const int maxTokenAttempts = 3;
 
   // ===========================================================================
@@ -64,35 +66,29 @@ class LiveKitService {
       return null;
     }
 
-    /*
-     * IMPORTANT
-     *
-     * Le endpoint actuel du dépôt est le Sandbox LiveKit.
-     *
-     * Pour la production 5K, remplacez ce endpoint par votre propre
-     * token-server HTTPS.
-     *
-     * Le serveur doit retourner au minimum:
-     *
-     * {
-     *   "participantToken": "...",
-     *   "serverUrl": "wss://....livekit.cloud"
-     * }
-     *
-     * et doit appliquer les permissions:
-     *
-     * HOST/SPEAKER:
-     *   roomJoin       = true
-     *   canPublish     = true
-     *   canSubscribe   = true
-     *
-     * AUDIENCE:
-     *   roomJoin       = true
-     *   canPublish     = false
-     *   canSubscribe   = true
-     */
+    final endpoint = AppConfig.livekitTokenEndpoint.trim();
 
-    for (int attempt = 1; attempt <= maxTokenAttempts; attempt++) {
+    if (endpoint.isEmpty) {
+      _error(
+        'LIVEKIT_TOKEN_SERVER_URL / LIVEKIT_TOKEN_ENDPOINT is empty.',
+      );
+      return null;
+    }
+
+    final uri = Uri.tryParse(endpoint);
+
+    if (uri == null || !uri.hasScheme) {
+      _error(
+        'Invalid LiveKit token endpoint: $endpoint',
+      );
+      return null;
+    }
+
+    for (
+      var attempt = 1;
+      attempt <= maxTokenAttempts;
+      attempt++
+    ) {
       try {
         developer.log(
           'LiveKit token request '
@@ -105,122 +101,122 @@ class LiveKitService {
 
         final response = await http
             .post(
-              Uri.parse(AppConfig.livekitSandboxEndpoint),
-              headers: {
+              uri,
+              headers: const {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'X-Sandbox-ID': AppConfig.livekitSandboxId,
-                'User-Agent': 'crux-flutter/${AppConfig.appVersion}',
               },
               body: jsonEncode({
                 'room_name': cleanRoom,
                 'participant_name': cleanIdentity,
 
-                // Ces champs sont utiles pour votre token-server
-                // personnalisé. Le Sandbox peut simplement les ignorer.
+                'room': cleanRoom,
                 'identity': cleanIdentity,
                 'name': cleanName,
+
                 'isHost': isHost,
 
-                // Configuration webinar CRUX.
-                'role': isHost ? 'speaker' : 'audience',
+                'role': isHost
+                    ? 'speaker'
+                    : 'audience',
+
                 'canPublish': isHost,
                 'canSubscribe': true,
 
-                // Métadonnées utiles côté backend.
                 'conferenceType': 'large_webinar',
+
                 'targetCapacity': targetCapacity,
-                'maxVisibleVideoTiles': maxVisibleVideoTiles,
+
+                'maxVisibleVideoTiles':
+                    maxVisibleVideoTiles,
               }),
             )
-            .timeout(AppConfig.tokenTimeout);
+            .timeout(
+              AppConfig.tokenTimeout,
+            );
 
         developer.log(
-          'LiveKit token response: ${response.statusCode}',
+          'LiveKit token response: '
+          '${response.statusCode}',
           level: 800,
         );
 
         if (response.statusCode < 200 ||
             response.statusCode >= 300) {
           _error(
-            'LiveKit token server HTTP ${response.statusCode}: '
+            'Token server HTTP ${response.statusCode}: '
             '${response.body}',
           );
 
           if (attempt < maxTokenAttempts) {
-            await Future<void>.delayed(
-              AppConfig.retryBackoff * attempt,
-            );
+            await _waitBeforeRetry(attempt);
             continue;
           }
 
           return null;
         }
 
-        final dynamic decoded = jsonDecode(response.body);
+        final dynamic decoded =
+            jsonDecode(response.body);
 
         if (decoded is! Map<String, dynamic>) {
-          _error('Invalid LiveKit response format.');
-
-          if (attempt < maxTokenAttempts) {
-            await Future<void>.delayed(
-              AppConfig.retryBackoff * attempt,
-            );
-            continue;
-          }
-
-          return null;
-        }
-
-        final String? token =
-            _extractToken(decoded);
-
-        if (token == null || token.isEmpty) {
           _error(
-            'LiveKit response does not contain a participant token.',
+            'Invalid LiveKit response format.',
           );
 
           if (attempt < maxTokenAttempts) {
-            await Future<void>.delayed(
-              AppConfig.retryBackoff * attempt,
-            );
+            await _waitBeforeRetry(attempt);
             continue;
           }
 
           return null;
         }
 
-        final String? serverUrl =
+        final token = _extractToken(decoded);
+
+        if (token == null || token.isEmpty) {
+          _error(
+            'LiveKit response does not contain '
+            'a participant token.',
+          );
+
+          if (attempt < maxTokenAttempts) {
+            await _waitBeforeRetry(attempt);
+            continue;
+          }
+
+          return null;
+        }
+
+        final serverUrl =
             _extractServerUrl(decoded);
 
         developer.log(
           'LiveKit credentials received. '
-          'serverUrl=${serverUrl ?? 'provided-by-config'}',
+          'serverUrl=${serverUrl ?? AppConfig.livekitWssUrl}',
           level: 800,
         );
 
         return token;
       } on TimeoutException {
         _error(
-          'LiveKit token request timed out after '
-          '${AppConfig.tokenTimeout.inSeconds}s.',
+          'LiveKit token request timed out '
+          'after ${AppConfig.tokenTimeout.inSeconds}s.',
         );
 
         if (attempt < maxTokenAttempts) {
-          await Future<void>.delayed(
-            AppConfig.retryBackoff * attempt,
-          );
+          await _waitBeforeRetry(attempt);
           continue;
         }
 
         return null;
       } on FormatException catch (e) {
-        _error('Invalid LiveKit JSON response: $e');
+        _error(
+          'Invalid LiveKit JSON response: $e',
+        );
 
         if (attempt < maxTokenAttempts) {
-          await Future<void>.delayed(
-            AppConfig.retryBackoff * attempt,
-          );
+          await _waitBeforeRetry(attempt);
           continue;
         }
 
@@ -234,9 +230,7 @@ class LiveKitService {
         );
 
         if (attempt < maxTokenAttempts) {
-          await Future<void>.delayed(
-            AppConfig.retryBackoff * attempt,
-          );
+          await _waitBeforeRetry(attempt);
           continue;
         }
 
@@ -251,7 +245,9 @@ class LiveKitService {
   // TOKEN EXTRACTION
   // ===========================================================================
 
-  String? _extractToken(Map<String, dynamic> data) {
+  String? _extractToken(
+    Map<String, dynamic> data,
+  ) {
     final candidates = <dynamic>[
       data['participantToken'],
       data['participant_token'],
@@ -260,8 +256,35 @@ class LiveKitService {
       data['access_token'],
     ];
 
+    // Certains token servers encapsulent la réponse.
+    final credentials =
+        data['credentials'];
+
+    if (credentials is Map) {
+      candidates.addAll([
+        credentials['participantToken'],
+        credentials['participant_token'],
+        credentials['token'],
+        credentials['accessToken'],
+        credentials['access_token'],
+      ]);
+    }
+
+    final dataField = data['data'];
+
+    if (dataField is Map) {
+      candidates.addAll([
+        dataField['participantToken'],
+        dataField['participant_token'],
+        dataField['token'],
+        dataField['accessToken'],
+        dataField['access_token'],
+      ]);
+    }
+
     for (final value in candidates) {
-      if (value is String && value.trim().isNotEmpty) {
+      if (value is String &&
+          value.trim().isNotEmpty) {
         return value.trim();
       }
     }
@@ -269,21 +292,52 @@ class LiveKitService {
     return null;
   }
 
-  String? _extractServerUrl(Map<String, dynamic> data) {
+  String? _extractServerUrl(
+    Map<String, dynamic> data,
+  ) {
     final candidates = <dynamic>[
       data['serverUrl'],
       data['server_url'],
       data['url'],
       data['livekitUrl'],
+      data['livekit_url'],
     ];
 
+    final credentials =
+        data['credentials'];
+
+    if (credentials is Map) {
+      candidates.addAll([
+        credentials['serverUrl'],
+        credentials['server_url'],
+        credentials['url'],
+        credentials['livekitUrl'],
+      ]);
+    }
+
     for (final value in candidates) {
-      if (value is String && value.trim().isNotEmpty) {
+      if (value is String &&
+          value.trim().isNotEmpty) {
         return value.trim();
       }
     }
 
     return null;
+  }
+
+  // ===========================================================================
+  // RETRY
+  // ===========================================================================
+
+  Future<void> _waitBeforeRetry(
+    int attempt,
+  ) async {
+    final multiplier =
+        attempt.clamp(1, 3);
+
+    await Future<void>.delayed(
+      AppConfig.retryBackoff * multiplier,
+    );
   }
 
   // ===========================================================================
@@ -300,7 +354,14 @@ Transport           : LiveKit SFU
 Adaptive Stream     : enabled
 Dynacast            : enabled
 Simulcast           : enabled
-Audience publishing : disabled by token server
+
+Host/Speaker:
+  canPublish     = true
+  canSubscribe   = true
+
+Audience:
+  canPublish     = false
+  canSubscribe   = true
 ''';
   }
 
