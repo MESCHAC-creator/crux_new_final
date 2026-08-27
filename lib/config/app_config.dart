@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   AppConfig._();
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // APP
-  // ═══════════════════════════════════════════════════════════════════════
+  // ===========================================================================
+  // APPLICATION
+  // ===========================================================================
 
   static const String firebaseProjectId = String.fromEnvironment(
     'FIREBASE_PROJECT_ID',
@@ -19,68 +19,85 @@ class AppConfig {
 
   static const String appVersion = '2.38.1';
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // LIVEKIT
-  // ═══════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
-  /// LiveKit Cloud URL.
+  /// URL LiveKit Cloud de production.
+  ///
+  /// Ne mets pas ici le Sandbox endpoint.
   static const String livekitWssUrl = String.fromEnvironment(
     'LIVEKIT_WSS_URL',
     defaultValue: 'wss://crux-88fihb12.livekit.cloud',
   );
 
-  /// LiveKit Sandbox ID.
-  static const String livekitSandboxId = String.fromEnvironment(
-    'LIVEKIT_SANDBOX_ID',
-    defaultValue: 'crux-6l6num',
+  /// Endpoint de TON serveur de tokens.
+  ///
+  /// Exemple :
+  /// https://ton-backend.example.com/api/livekit/connection-details
+  static const String livekitTokenEndpoint = String.fromEnvironment(
+    'LIVEKIT_TOKEN_ENDPOINT',
+    defaultValue: '',
   );
 
-  /// Sandbox connection-details endpoint.
-  static const String livekitSandboxEndpoint =
-      'https://cloud-api.livekit.io/api/sandbox/connection-details';
+  // ===========================================================================
+  // WEBINAR SCALE
+  // ===========================================================================
 
-  // ═══════════════════════════════════════════════════════════════════════
+  /// Capacité cible CRUX.
+  static const int webinarMinimumParticipants = 5000;
+
+  /// Nombre maximal de vidéos affichées simultanément.
+  ///
+  /// IMPORTANT :
+  /// ce nombre n'est PAS la capacité de la room.
+  static const int maxVisibleVideoTiles = 9;
+
+  /// Nombre maximal de speakers affichés sur la scène.
+  static const int maxStageParticipants = 9;
+
+  /// Nombre maximal de messages chargés localement.
+  static const int maxLocalChatMessages = 200;
+
+  // ===========================================================================
+  // STANDARD / OTHER MODES
+  // ===========================================================================
+
+  static const int maxParticipantsStandard = 800;
+
+  static const int maxParticipantsLarge = 5000;
+
+  // ===========================================================================
   // TIMEOUTS
-  // ═══════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   static const Duration tokenTimeout = Duration(seconds: 30);
 
-  static const Duration roomConnectionTimeout =
-      Duration(seconds: 45);
+  static const Duration roomConnectionTimeout = Duration(seconds: 45);
 
-  static const int maxReconnectAttempts = 5;
+  static const Duration reconnectDelay = Duration(seconds: 10);
 
-  static const Duration reconnectDelay =
-      Duration(seconds: 3);
+  static const int maxReconnectAttempts = 8;
 
-  static const Duration retryBackoff =
-      Duration(seconds: 1);
+  // ===========================================================================
+  // FREE
+  // ===========================================================================
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // MEETINGS
-  // ═══════════════════════════════════════════════════════════════════════
+  static const int freeMeetingDurationMinutes = 60;
 
-  static const int maxParticipantsStandard = 50;
+  // ===========================================================================
+  // FIRESTORE
+  // ===========================================================================
 
-  static const int maxParticipantsLarge = 1000;
+  static const String meetingsCollection = 'meetings';
 
-  static const int freeMeetingDurationMinutes = 40;
+  static const String usersCollection = 'users';
 
-  static const int livekitVisibleTileCap = 100;
+  static const String messagesCollection = 'messages';
 
-  static bool isLargeMeeting(int? maxParticipants) {
-    return (maxParticipants ?? 0) > maxParticipantsStandard;
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // RECONNECTION
-  // ═══════════════════════════════════════════════════════════════════════
-
-  static const int maxReconnects = 5;
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // DEEP LINKS
-  // ═══════════════════════════════════════════════════════════════════════
+  // ===========================================================================
+  // LINKS
+  // ===========================================================================
 
   static const String deepLinkScheme = 'crux';
 
@@ -102,78 +119,49 @@ class AppConfig {
     }
 
     if (uri.scheme == deepLinkScheme) {
-      final segments = uri.pathSegments;
-
-      if (segments.isNotEmpty) {
-        return segments.last;
+      if (uri.pathSegments.isEmpty) {
+        return null;
       }
 
+      return uri.pathSegments.last;
+    }
+
+    if (uri.pathSegments.isEmpty) {
       return null;
     }
 
-    final segments = uri.pathSegments;
-
-    if (segments.isEmpty) {
-      return null;
-    }
-
-    return segments.last;
+    return uri.pathSegments.last;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // FIRESTORE
-  // ═══════════════════════════════════════════════════════════════════════
-
-  static const String meetingsCollection = 'meetings';
-
-  static const String usersCollection = 'users';
-
-  static const String messagesCollection = 'messages';
-
-  // ═══════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // DIAGNOSTICS
-  // ═══════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   static bool get isLiveKitConfigured {
     return livekitWssUrl.startsWith('wss://') &&
-        livekitSandboxId.isNotEmpty;
+        livekitTokenEndpoint.startsWith('http');
   }
 
   static String get configDiagnostics {
-    if (!isLiveKitConfigured) {
-      return '''
-LiveKit non configuré.
-
-LIVEKIT_WSS_URL:
-$livekitWssUrl
-
-LIVEKIT_SANDBOX_ID:
-$livekitSandboxId
-''';
-    }
-
     return '''
-LiveKit OK
+CRUX LiveKit configuration
 
 WSS:
 $livekitWssUrl
 
-Sandbox:
-$livekitSandboxId
+Token endpoint:
+$livekitTokenEndpoint
 
-Endpoint:
-$livekitSandboxEndpoint
+Webinar capacity target:
+$webinarMinimumParticipants
+
+Visible video tiles:
+$maxVisibleVideoTiles
 ''';
   }
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // DEBUG
-  // ═══════════════════════════════════════════════════════════════════════
-
   static void printDiagnostics() {
-    if (!kDebugMode) {
-      return;
-    }
+    if (!kDebugMode) return;
 
     debugPrint(configDiagnostics);
   }
