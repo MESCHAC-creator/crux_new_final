@@ -9,15 +9,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:livekit_client/livekit_client.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../config/app_config.dart';
-import '../providers/locale_provider.dart';
-import '../services/error_handler_service.dart';
 import '../services/livekit_service.dart';
 import '../services/meeting_service.dart';
+import '../services/note_service.dart';
 import '../services/pro_service.dart';
 import '../theme/colors.dart';
 import '../utils/logger.dart' as crux;
@@ -45,33 +43,40 @@ class LargeConferenceScreen extends StatefulWidget {
       _LargeConferenceScreenState();
 }
 
-class _LargeConferenceScreenState extends State<LargeConferenceScreen>
+class _LargeConferenceScreenState
+    extends State<LargeConferenceScreen>
     with WidgetsBindingObserver {
   // ===========================================================================
-  // CONFIGURATION WEBINAR
+  // LARGE WEBINAR
   // ===========================================================================
 
   static const int _maxVisibleVideos = 10;
-  static const int _targetParticipants = 5000;
+
+  static const int _targetParticipants = 10000;
 
   // ===========================================================================
   // SERVICES
   // ===========================================================================
 
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final ErrorHandlerService _errorHandler = ErrorHandlerService();
+  final FirebaseFirestore _db =
+      FirebaseFirestore.instance;
 
-  final FlutterTts _tts = FlutterTts();
-  final stt.SpeechToText _speech = stt.SpeechToText();
+  final FlutterTts _tts =
+      FlutterTts();
+
+  final stt.SpeechToText _speech =
+      stt.SpeechToText();
 
   // ===========================================================================
   // LIVEKIT
   // ===========================================================================
 
   Room? _room;
+
   EventsListener<RoomEvent>? _roomListener;
 
   bool _isConnecting = false;
+
   bool _isReconnecting = false;
 
   int _reconnectAttempts = 0;
@@ -80,17 +85,25 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // PARTICIPANTS
   // ===========================================================================
 
-  List<RemoteParticipant> _remoteParticipants = [];
+  List<RemoteParticipant>
+      _remoteParticipants =
+      <RemoteParticipant>[];
 
   String? _activeSpeakerId;
+
   String? _organizerId;
+
+  final Set<String> _raisedHands =
+      <String>{};
 
   // ===========================================================================
   // LOCAL MEDIA
   // ===========================================================================
 
   bool _micOn = true;
+
   bool _camOn = true;
+
   bool _screenSharing = false;
 
   // ===========================================================================
@@ -98,27 +111,29 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   bool _loading = true;
+
   String? _error;
 
   bool _showChat = false;
+
   bool _showParticipants = false;
+
   bool _showNotes = false;
-  bool _showMore = false;
 
   bool _voiceAssistant = false;
+
   bool _liveCaptions = false;
+
   bool _handRaised = false;
 
-  final Set<String> _raisedHands = <String>{};
-
   // ===========================================================================
-  // TRANSCRIPTION
+  // CAPTIONS
   // ===========================================================================
 
   String _currentTranscription = '';
 
   // ===========================================================================
-  // TIMER / PRO
+  // TIMER
   // ===========================================================================
 
   Timer? _callTimer;
@@ -126,26 +141,31 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   int _secondsElapsed = 0;
 
   bool _isPro = false;
+
   bool _paywallShown = false;
 
   // ===========================================================================
   // FIRESTORE
   // ===========================================================================
 
-  StreamSubscription<QuerySnapshot>? _presenceSubscription;
+  StreamSubscription<QuerySnapshot>?
+      _presenceSubscription;
+
+  StreamSubscription<QuerySnapshot>?
+      _chatSubscription;
 
   // ===========================================================================
   // CONTROLLERS
   // ===========================================================================
 
-  late final TextEditingController _chatController;
-  late final TextEditingController _noteController;
+  late final TextEditingController
+      _chatController;
 
-  // ===========================================================================
-  // CHAT
-  // ===========================================================================
+  late final TextEditingController
+      _noteController;
 
-  final List<_ChatMessage> _chatMessages = <_ChatMessage>[];
+  final List<_ChatMessage> _chatMessages =
+      <_ChatMessage>[];
 
   // ===========================================================================
   // LIFECYCLE
@@ -155,48 +175,63 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   void initState() {
     super.initState();
 
-    _chatController = TextEditingController();
-    _noteController = TextEditingController();
+    _chatController =
+        TextEditingController();
 
-    WidgetsBinding.instance.addObserver(this);
+    _noteController =
+        TextEditingController();
+
+    WidgetsBinding.instance
+        .addObserver(this);
 
     _initialize();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    WidgetsBinding.instance
+        .removeObserver(this);
 
     _callTimer?.cancel();
 
     _presenceSubscription?.cancel();
+
+    _chatSubscription?.cancel();
 
     _roomListener?.dispose();
 
     _room?.disconnect();
 
     _tts.stop();
+
     _speech.stop();
 
     _chatController.dispose();
+
     _noteController.dispose();
 
     super.dispose();
   }
 
   // ===========================================================================
-  // INITIALISATION
+  // INITIALIZATION
   // ===========================================================================
 
   Future<void> _initialize() async {
     try {
       await _loadPreferences();
+
       await _checkPro();
+
       await _loadOrganizer();
+
       await _registerPresence();
+
       await _connect();
 
       _listenPresence();
+
+      _listenChat();
 
       _startTimer();
 
@@ -205,14 +240,19 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       setState(() {
         _loading = false;
       });
-    } catch (e, st) {
+    } catch (e, stackTrace) {
       crux.logger.e(
         'Large conference initialization failed',
         error: e,
-        stackTrace: st,
+        stackTrace: stackTrace,
       );
 
-      _showError(e);
+      if (!mounted) return;
+
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
     }
   }
 
@@ -222,13 +262,23 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
   Future<void> _loadPreferences() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs =
+          await SharedPreferences.getInstance();
 
       if (!mounted) return;
 
       setState(() {
-        _micOn = prefs.getBool('crux_mic_default') ?? true;
-        _camOn = prefs.getBool('crux_cam_default') ?? true;
+        _micOn =
+            prefs.getBool(
+                  'crux_mic_default',
+                ) ??
+                true;
+
+        _camOn =
+            prefs.getBool(
+                  'crux_cam_default',
+                ) ??
+                true;
       });
     } catch (e) {
       crux.logger.w(
@@ -245,7 +295,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   Future<void> _checkPro() async {
     try {
       final value =
-          await ProService().checkProStatus(widget.userId);
+          await ProService()
+              .checkProStatus(
+        widget.userId,
+      );
 
       if (!mounted) return;
 
@@ -267,7 +320,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   Future<void> _loadOrganizer() async {
     try {
       final doc = await _db
-          .collection(AppConfig.meetingsCollection)
+          .collection(
+            AppConfig.meetingsCollection,
+          )
           .doc(widget.meetingId)
           .get();
 
@@ -277,7 +332,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
       if (data == null) return;
 
-      _organizerId = data['organizerId']?.toString();
+      _organizerId =
+          data['organizerId']?.toString();
     } catch (e) {
       crux.logger.w(
         'Could not load organizer',
@@ -291,14 +347,16 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   Future<void> _registerPresence() async {
-    await MeetingService().registerPresence(
+    await MeetingService()
+        .registerPresence(
       widget.meetingId,
       widget.userId,
       widget.userName,
     );
 
     if (widget.isHost) {
-      await MeetingService().updateMeetingStatus(
+      await MeetingService()
+          .updateMeetingStatus(
         widget.meetingId,
         MeetingStatus.ongoing,
       );
@@ -306,21 +364,26 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   }
 
   void _listenPresence() {
-    _presenceSubscription = _db
-        .collection(AppConfig.meetingsCollection)
-        .doc(widget.meetingId)
-        .collection('presence')
-        .snapshots()
-        .listen(
+    _presenceSubscription =
+        _db
+            .collection(
+              AppConfig.meetingsCollection,
+            )
+            .doc(widget.meetingId)
+            .collection('presence')
+            .snapshots()
+            .listen(
       (snapshot) {
         if (!mounted) return;
 
         final hands = <String>{};
 
-        for (final doc in snapshot.docs) {
+        for (final doc
+            in snapshot.docs) {
           final data = doc.data();
 
-          if (data['handRaised'] == true) {
+          if (data['handRaised'] ==
+              true) {
             hands.add(doc.id);
           }
         }
@@ -335,6 +398,115 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   }
 
   // ===========================================================================
+  // CHAT
+  // ===========================================================================
+
+  void _listenChat() {
+    _chatSubscription =
+        _db
+            .collection(
+              AppConfig.meetingsCollection,
+            )
+            .doc(widget.meetingId)
+            .collection('chat')
+            .orderBy(
+              'timestamp',
+              descending: false,
+            )
+            .limit(
+              AppConfig.maxLocalChatMessages,
+            )
+            .snapshots()
+            .listen(
+      (snapshot) {
+        if (!mounted) return;
+
+        final messages =
+            <_ChatMessage>[];
+
+        for (final doc
+            in snapshot.docs) {
+          final data = doc.data();
+
+          messages.add(
+            _ChatMessage(
+              senderId:
+                  data['senderId']
+                      ?.toString() ??
+                  '',
+              sender:
+                  data['sender']
+                      ?.toString() ??
+                  'Anonyme',
+              message:
+                  data['message']
+                      ?.toString() ??
+                  data['text']
+                      ?.toString() ??
+                  '',
+              timestamp:
+                  data['timestamp']
+                      is Timestamp
+                  ? (data['timestamp']
+                          as Timestamp)
+                      .toDate()
+                  : null,
+              isPrivate:
+                  data['isPrivate'] ==
+                  true,
+            ),
+          );
+        }
+
+        setState(() {
+          _chatMessages
+            ..clear()
+            ..addAll(messages);
+        });
+      },
+    );
+  }
+
+  Future<void> _sendChat() async {
+    final text =
+        _chatController.text.trim();
+
+    if (text.isEmpty) return;
+
+    _chatController.clear();
+
+    try {
+      await _db
+          .collection(
+            AppConfig.meetingsCollection,
+          )
+          .doc(widget.meetingId)
+          .collection('chat')
+          .add({
+        'senderId': widget.userId,
+        'sender': widget.userName,
+        'message': text,
+        'text': text,
+        'timestamp':
+            FieldValue.serverTimestamp(),
+        'isPrivate': false,
+      });
+
+      await _sendData({
+        'type': 'chat',
+        'senderId': widget.userId,
+        'sender': widget.userName,
+        'message': text,
+      });
+    } catch (e) {
+      crux.logger.w(
+        'Chat send failed',
+        error: e,
+      );
+    }
+  }
+
+  // ===========================================================================
   // LIVEKIT CONNECTION
   // ===========================================================================
 
@@ -346,39 +518,38 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     try {
       if (!AppConfig.isLiveKitConfigured) {
         throw Exception(
-          'LiveKit n’est pas correctement configuré.',
+          'LiveKit n’est pas configuré. '
+          'Vérifiez LIVEKIT_WSS_URL et '
+          'LIVEKIT_TOKEN_SERVER_URL.',
         );
       }
 
-      crux.logger.i(
-        'Connecting to webinar ${widget.meetingId}',
-      );
-
       final token =
-          await LiveKitService.instance.fetchToken(
+          await LiveKitService.instance
+              .fetchToken(
         room: widget.meetingId,
         identity: widget.userId,
         name: widget.userName,
         isHost: widget.isHost,
       );
 
-      if (token == null || token.isEmpty) {
+      if (token == null ||
+          token.isEmpty) {
         throw Exception(
-          'Impossible d’obtenir le token LiveKit.',
+          'Le serveur LiveKit n’a pas retourné '
+          'de token valide.',
         );
       }
 
       await _disposeRoom();
 
-      // -----------------------------------------------------------------------
-      // ROOM OPTIMISÉE POUR GRANDE CONFÉRENCE
-      // -----------------------------------------------------------------------
-
       final room = Room(
-        roomOptions: const RoomOptions(
+        roomOptions:
+            const RoomOptions(
           adaptiveStream: true,
           dynacast: true,
-          defaultVideoPublishOptions: VideoPublishOptions(
+          defaultVideoPublishOptions:
+              VideoPublishOptions(
             simulcast: true,
           ),
         ),
@@ -386,17 +557,12 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
       _room = room;
 
-      // -----------------------------------------------------------------------
-      // EVENT LISTENER AVANT CONNECTION
-      // -----------------------------------------------------------------------
+      _roomListener =
+          room.createListener();
 
-      _roomListener = room.createListener();
-
-      _setupRoomEvents(_roomListener!);
-
-      // -----------------------------------------------------------------------
-      // CONNECTION
-      // -----------------------------------------------------------------------
+      _setupRoomEvents(
+        _roomListener!,
+      );
 
       await room
           .connect(
@@ -407,32 +573,58 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         AppConfig.roomConnectionTimeout,
         onTimeout: () {
           throw TimeoutException(
-            'La connexion LiveKit a expiré.',
+            'Connexion LiveKit expirée.',
           );
         },
       );
 
-      // -----------------------------------------------------------------------
-      // LOCAL PARTICIPANT
-      // -----------------------------------------------------------------------
-
-      final local = room.localParticipant;
+      final local =
+          room.localParticipant;
 
       if (local != null) {
-        await local.setMicrophoneEnabled(_micOn);
-        await local.setCameraEnabled(_camOn);
+        await local
+            .setMicrophoneEnabled(
+          _micOn,
+        );
+
+        await local
+            .setCameraEnabled(
+          _camOn,
+        );
       }
 
       _refreshParticipants();
 
       _reconnectAttempts = 0;
 
-      crux.logger.i(
-        'Connected to webinar. '
-        'remoteParticipants=${room.remoteParticipants.length}',
-      );
+      if (mounted) {
+        setState(() {
+          _isReconnecting = false;
+        });
+      }
     } finally {
       _isConnecting = false;
+    }
+  }
+
+  Future<void> _disposeRoom() async {
+    _roomListener?.dispose();
+
+    _roomListener = null;
+
+    final oldRoom = _room;
+
+    _room = null;
+
+    if (oldRoom != null) {
+      try {
+        await oldRoom.disconnect();
+      } catch (e) {
+        crux.logger.w(
+          'LiveKit disconnect failed',
+          error: e,
+        );
+      }
     }
   }
 
@@ -446,11 +638,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     listener
       ..on<RoomConnectedEvent>((_) {
         _refreshParticipants();
-      })
-      ..on<RoomDisconnectedEvent>((_) {
-        if (!mounted) return;
-
-        _attemptReconnect();
       })
       ..on<RoomReconnectingEvent>((_) {
         if (!mounted) return;
@@ -470,48 +657,97 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
         _refreshParticipants();
       })
-      ..on<ParticipantConnectedEvent>((event) {
-        _refreshParticipants();
-
-        if (_voiceAssistant) {
-          _announce(
-            '${event.participant.name.isNotEmpty ? event.participant.name : 'Un participant'} a rejoint.',
-          );
-        }
-      })
-      ..on<ParticipantDisconnectedEvent>((event) {
-        _refreshParticipants();
-
-        if (_voiceAssistant) {
-          _announce(
-            '${event.participant.name.isNotEmpty ? event.participant.name : 'Un participant'} a quitté.',
-          );
-        }
-      })
-      ..on<ActiveSpeakersChangedEvent>((event) {
+      ..on<RoomDisconnectedEvent>((_) {
         if (!mounted) return;
 
-        if (event.speakers.isEmpty) {
-          setState(() {
-            _activeSpeakerId = null;
-          });
-        } else {
+        _attemptReconnect();
+      })
+      ..on<ParticipantConnectedEvent>(
+        (event) {
+          _refreshParticipants();
+
+          if (_voiceAssistant) {
+            final name =
+                event.participant.name
+                        .trim()
+                        .isNotEmpty
+                    ? event.participant.name
+                    : 'Un participant';
+
+            _announce(
+              '$name a rejoint.',
+            );
+          }
+        },
+      )
+      ..on<ParticipantDisconnectedEvent>(
+        (event) {
+          _refreshParticipants();
+
+          if (_voiceAssistant) {
+            final name =
+                event.participant.name
+                        .trim()
+                        .isNotEmpty
+                    ? event.participant.name
+                    : 'Un participant';
+
+            _announce(
+              '$name a quitté.',
+            );
+          }
+        },
+      )
+      ..on<ActiveSpeakersChangedEvent>(
+        (event) {
+          if (!mounted) return;
+
+          if (event.speakers.isEmpty) {
+            setState(() {
+              _activeSpeakerId =
+                  null;
+            });
+
+            return;
+          }
+
           setState(() {
             _activeSpeakerId =
-                event.speakers.first.identity;
+                event.speakers
+                    .first
+                    .identity;
           });
-        }
-      })
-      ..on<ParticipantMetadataChangedEvent>((_) {
-        _refreshParticipants();
-      })
-      ..on<TrackSubscribedEvent>((_) {
-        _refreshParticipants();
-      })
-      ..on<TrackUnsubscribedEvent>((_) {
-        _refreshParticipants();
-      })
-      ..on<DataReceivedEvent>(_handleDataReceived);
+        },
+      )
+      ..on<
+          ParticipantMetadataUpdatedEvent>(
+        (_) {
+          _refreshParticipants();
+        },
+      )
+      ..on<TrackSubscribedEvent>(
+        (_) {
+          _refreshParticipants();
+        },
+      )
+      ..on<TrackUnsubscribedEvent>(
+        (_) {
+          _refreshParticipants();
+        },
+      )
+      ..on<TrackPublishedEvent>(
+        (_) {
+          _refreshParticipants();
+        },
+      )
+      ..on<TrackUnpublishedEvent>(
+        (_) {
+          _refreshParticipants();
+        },
+      )
+      ..on<DataReceivedEvent>(
+        _handleDataReceived,
+      );
   }
 
   // ===========================================================================
@@ -521,22 +757,28 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   void _refreshParticipants() {
     final room = _room;
 
-    if (!mounted || room == null) return;
+    if (!mounted || room == null) {
+      return;
+    }
+
+    final participants =
+        room.remoteParticipants.values
+            .toList();
 
     setState(() {
       _remoteParticipants =
-          room.remoteParticipants.values.toList();
+          participants;
     });
   }
 
-  /// IMPORTANT :
+  /// Retourne uniquement les participants
+  /// qui doivent être affichés.
   ///
-  /// La room peut contenir des milliers de participants.
-  ///
-  /// Cette méthode est la barrière de rendu :
-  /// Flutter ne reçoit dans la grille que les 10 participants
-  /// prioritaires.
-  List<RemoteParticipant> get _visibleParticipants {
+  /// La room peut contenir des milliers
+  /// de personnes, mais Flutter ne rend
+  /// jamais des milliers de vidéos.
+  List<RemoteParticipant>
+      get _visibleParticipants {
     final participants =
         List<RemoteParticipant>.from(
       _remoteParticipants,
@@ -544,23 +786,36 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
     participants.sort(
       (a, b) {
-        // 1. Active speaker
         final aActive =
-            a.identity == _activeSpeakerId;
+            a.identity ==
+            _activeSpeakerId;
+
         final bActive =
-            b.identity == _activeSpeakerId;
+            b.identity ==
+            _activeSpeakerId;
 
-        if (aActive && !bActive) return -1;
-        if (!aActive && bActive) return 1;
+        if (aActive && !bActive) {
+          return -1;
+        }
 
-        // 2. Participants avec vidéo publiée
-        final aVideo = _hasVideo(a);
-        final bVideo = _hasVideo(b);
+        if (!aActive && bActive) {
+          return 1;
+        }
 
-        if (aVideo && !bVideo) return -1;
-        if (!aVideo && bVideo) return 1;
+        final aVideo =
+            _hasVideo(a);
 
-        // 3. Nom
+        final bVideo =
+            _hasVideo(b);
+
+        if (aVideo && !bVideo) {
+          return -1;
+        }
+
+        if (!aVideo && bVideo) {
+          return 1;
+        }
+
         return a.name
             .toLowerCase()
             .compareTo(
@@ -570,49 +825,58 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     );
 
     return participants
-        .take(_maxVisibleVideos - 1)
+        .take(
+          _maxVisibleVideos - 1,
+        )
         .toList();
   }
 
-  bool _hasVideo(RemoteParticipant participant) {
-    return participant.videoTrackPublications.values.any(
-      (publication) =>
-          publication.subscribed &&
-          !publication.muted,
-    );
-  }
-
-  int get _participantCount {
-    final room = _room;
-
-    if (room == null) {
-      return _remoteParticipants.length + 1;
+  bool _hasVideo(
+    RemoteParticipant participant,
+  ) {
+    for (final publication
+        in participant
+            .videoTrackPublications) {
+      if (publication.subscribed &&
+          !publication.muted &&
+          publication.track !=
+              null) {
+        return true;
+      }
     }
 
-    return room.remoteParticipants.length + 1;
+    return false;
   }
 
   // ===========================================================================
-  // DATA MESSAGES
+  // DATA
   // ===========================================================================
 
-  void _handleDataReceived(DataReceivedEvent event) {
+  void _handleDataReceived(
+    DataReceivedEvent event,
+  ) {
     try {
-      final text = utf8.decode(event.data);
+      final text =
+          utf8.decode(event.data);
 
-      final dynamic decoded = jsonDecode(text);
+      final decoded =
+          jsonDecode(text);
 
-      if (decoded is! Map<String, dynamic>) {
+      if (decoded
+          is! Map<String, dynamic>) {
         return;
       }
 
-      final type = decoded['type']?.toString();
+      final type =
+          decoded['type']?.toString();
 
       if (type == 'mute_all') {
         final sender =
-            event.participant?.identity;
+            event.participant
+                ?.identity;
 
-        if (sender == _organizerId &&
+        if (sender ==
+                _organizerId &&
             _micOn) {
           _toggleMic();
 
@@ -626,13 +890,18 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
       if (type == 'raise_hand') {
         final identity =
-            decoded['identity']?.toString();
+            decoded['identity']
+                ?.toString();
 
-        if (identity == null) return;
+        if (identity == null) {
+          return;
+        }
 
         if (mounted) {
           setState(() {
-            _raisedHands.add(identity);
+            _raisedHands.add(
+              identity,
+            );
           });
         }
 
@@ -641,171 +910,55 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
       if (type == 'lower_hand') {
         final identity =
-            decoded['identity']?.toString();
+            decoded['identity']
+                ?.toString();
 
-        if (identity == null) return;
+        if (identity == null) {
+          return;
+        }
 
         if (mounted) {
           setState(() {
-            _raisedHands.remove(identity);
+            _raisedHands.remove(
+              identity,
+            );
           });
         }
 
         return;
       }
-
-      if (type == 'chat') {
-        final sender =
-            decoded['sender']?.toString() ??
-                'Participant';
-
-        final message =
-            decoded['message']?.toString() ?? '';
-
-        if (message.isEmpty) return;
-
-        if (mounted) {
-          setState(() {
-            _chatMessages.add(
-              _ChatMessage(
-                sender: sender,
-                message: message,
-                isMe: false,
-              ),
-            );
-          });
-        }
-      }
     } catch (e) {
       crux.logger.w(
-        'Invalid LiveKit data packet',
+        'LiveKit data decoding failed',
         error: e,
       );
     }
   }
 
-  // ===========================================================================
-  // RECONNECTION
-  // ===========================================================================
+  Future<void> _sendData(
+    Map<String, dynamic> payload,
+  ) async {
+    final room = _room;
 
-  Future<void> _attemptReconnect() async {
-    if (_isReconnecting ||
-        !mounted ||
-        _reconnectAttempts >=
-            AppConfig.maxReconnectAttempts) {
-      return;
-    }
+    if (room == null) return;
 
-    _isReconnecting = true;
+    final local =
+        room.localParticipant;
 
-    _reconnectAttempts++;
+    if (local == null) return;
 
     try {
-      await Future<void>.delayed(
-        AppConfig.reconnectDelay *
-            _reconnectAttempts,
+      final data = utf8.encode(
+        jsonEncode(payload),
       );
 
-      await _connect();
-
-      if (mounted) {
-        setState(() {
-          _isReconnecting = false;
-        });
-      }
-    } catch (e) {
-      crux.logger.w(
-        'Reconnect attempt $_reconnectAttempts failed',
-        error: e,
+      await local.publishData(
+        data,
+        reliable: true,
       );
-
-      if (mounted) {
-        setState(() {
-          _isReconnecting = false;
-        });
-      }
-
-      if (_reconnectAttempts <
-          AppConfig.maxReconnectAttempts) {
-        unawaited(_attemptReconnect());
-      }
-    }
-  }
-
-  // ===========================================================================
-  // TIMER
-  // ===========================================================================
-
-  void _startTimer() {
-    _callTimer?.cancel();
-
-    _callTimer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) {
-        if (!mounted) return;
-
-        setState(() {
-          _secondsElapsed++;
-        });
-
-        if (_isPro) return;
-
-        final limit =
-            AppConfig.freeMeetingDurationMinutes *
-                60;
-
-        final warning = limit - 300;
-
-        if (_secondsElapsed == warning &&
-            warning > 0) {
-          _announce(
-            'Attention, votre réunion gratuite se terminera dans 5 minutes.',
-          );
-        }
-
-        if (_secondsElapsed >= limit &&
-            !_paywallShown) {
-          _paywallShown = true;
-
-          _callTimer?.cancel();
-
-          _showPaywall();
-        }
-      },
-    );
-  }
-
-  String _formatDuration() {
-    final hours = _secondsElapsed ~/ 3600;
-    final minutes =
-        (_secondsElapsed % 3600) ~/ 60;
-    final seconds =
-        _secondsElapsed % 60;
-
-    if (hours > 0) {
-      return '${hours.toString().padLeft(2, '0')}:'
-          '${minutes.toString().padLeft(2, '0')}:'
-          '${seconds.toString().padLeft(2, '0')}';
-    }
-
-    return '${minutes.toString().padLeft(2, '0')}:'
-        '${seconds.toString().padLeft(2, '0')}';
-  }
-
-  // ===========================================================================
-  // AUDIO
-  // ===========================================================================
-
-  Future<void> _announce(String text) async {
-    if (!_voiceAssistant) return;
-
-    try {
-      await _tts.setLanguage('fr-FR');
-      await _tts.setPitch(1.0);
-      await _tts.speak(text);
     } catch (e) {
       crux.logger.w(
-        'TTS failed',
+        'LiveKit data send failed',
         error: e,
       );
     }
@@ -816,23 +969,30 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   Future<void> _toggleMic() async {
-    final room = _room;
-
-    if (room == null) return;
-
-    final local = room.localParticipant;
-
-    if (local == null) return;
-
     final next = !_micOn;
 
-    await local.setMicrophoneEnabled(next);
+    try {
+      final local =
+          _room?.localParticipant;
 
-    if (!mounted) return;
+      if (local == null) return;
 
-    setState(() {
-      _micOn = next;
-    });
+      await local
+          .setMicrophoneEnabled(
+        next,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _micOn = next;
+      });
+    } catch (e) {
+      crux.logger.w(
+        'Microphone toggle failed',
+        error: e,
+      );
+    }
   }
 
   // ===========================================================================
@@ -840,23 +1000,30 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   Future<void> _toggleCamera() async {
-    final room = _room;
-
-    if (room == null) return;
-
-    final local = room.localParticipant;
-
-    if (local == null) return;
-
     final next = !_camOn;
 
-    await local.setCameraEnabled(next);
+    try {
+      final local =
+          _room?.localParticipant;
 
-    if (!mounted) return;
+      if (local == null) return;
 
-    setState(() {
-      _camOn = next;
-    });
+      await local
+          .setCameraEnabled(
+        next,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _camOn = next;
+      });
+    } catch (e) {
+      crux.logger.w(
+        'Camera toggle failed',
+        error: e,
+      );
+    }
   }
 
   // ===========================================================================
@@ -864,18 +1031,17 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   Future<void> _toggleScreenShare() async {
-    final room = _room;
-
-    if (room == null) return;
-
-    final local = room.localParticipant;
+    final local =
+        _room?.localParticipant;
 
     if (local == null) return;
 
-    try {
-      final next = !_screenSharing;
+    final next =
+        !_screenSharing;
 
-      await local.setScreenShareEnabled(
+    try {
+      await local
+          .setScreenShareEnabled(
         next,
       );
 
@@ -893,76 +1059,123 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   }
 
   // ===========================================================================
-  // CAMERA SWITCH
-  // ===========================================================================
-
-  Future<void> _switchCamera() async {
-    final room = _room;
-
-    if (room == null) return;
-
-    final local = room.localParticipant;
-
-    if (local == null) return;
-
-    try {
-      final publication =
-          local.videoTrackPublications.values
-              .firstWhere(
-        (p) => p.track != null,
-      );
-
-      final track = publication.track;
-
-      if (track != null) {
-        await track.switchCamera();
-      }
-    } catch (e) {
-      crux.logger.w(
-        'Camera switch failed',
-        error: e,
-      );
-    }
-  }
-
-  // ===========================================================================
   // RAISE HAND
   // ===========================================================================
 
   Future<void> _toggleRaiseHand() async {
     final next = !_handRaised;
 
-    if (!mounted) return;
+    try {
+      await _db
+          .collection(
+            AppConfig.meetingsCollection,
+          )
+          .doc(widget.meetingId)
+          .collection('presence')
+          .doc(widget.userId)
+          .set(
+        {
+          'handRaised': next,
+          'userId': widget.userId,
+          'userName': widget.userName,
+        },
+        SetOptions(merge: true),
+      );
 
-    setState(() {
-      _handRaised = next;
-    });
-
-    await _db
-        .collection(AppConfig.meetingsCollection)
-        .doc(widget.meetingId)
-        .collection('presence')
-        .doc(widget.userId)
-        .set(
-      {
-        'handRaised': next,
-        'userId': widget.userId,
-        'userName': widget.userName,
-      },
-      SetOptions(merge: true),
-    );
-
-    _sendData(
-      {
-        'type':
-            next ? 'raise_hand' : 'lower_hand',
+      await _sendData({
+        'type': next
+            ? 'raise_hand'
+            : 'lower_hand',
         'identity': widget.userId,
-      },
-    );
+      });
+
+      if (!mounted) return;
+
+      setState(() {
+        _handRaised = next;
+      });
+
+      if (next) {
+        _announce(
+          'Vous avez levé la main.',
+        );
+      }
+    } catch (e) {
+      crux.logger.w(
+        'Raise hand failed',
+        error: e,
+      );
+    }
   }
 
   // ===========================================================================
-  // LIVE CAPTIONS
+  // MUTE ALL
+  // ===========================================================================
+
+  Future<void> _muteAllOthers() async {
+    if (!widget.isHost &&
+        widget.userId !=
+            _organizerId) {
+      return;
+    }
+
+    final confirmed =
+        await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor:
+              AppColors.surface,
+          title: const Text(
+            'Muter tout le monde ?',
+            style: TextStyle(
+              color: Colors.white,
+            ),
+          ),
+          content: const Text(
+            'Cette action demandera aux autres participants de couper leur microphone.',
+            style: TextStyle(
+              color: Colors.white70,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(
+                context,
+                false,
+              ),
+              child: const Text(
+                'Annuler',
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () =>
+                  Navigator.pop(
+                context,
+                true,
+              ),
+              child: const Text(
+                'Muter',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    await _sendData({
+      'type': 'mute_all',
+      'identity': widget.userId,
+    });
+  }
+
+  // ===========================================================================
+  // CAPTIONS
   // ===========================================================================
 
   Future<void> _toggleCaptions() async {
@@ -1019,223 +1232,90 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   }
 
   // ===========================================================================
-  // SEND DATA
+  // VOICE ASSISTANT
   // ===========================================================================
 
-  Future<void> _sendData(
-    Map<String, dynamic> payload,
+  Future<void> _announce(
+    String text,
   ) async {
-    final room = _room;
-
-    if (room == null) return;
+    if (!_voiceAssistant) {
+      return;
+    }
 
     try {
-      final data = utf8.encode(
-        jsonEncode(payload),
+      await _tts.setLanguage(
+        'fr-FR',
       );
 
-      await room.localParticipant.publishData(
-        data,
-        reliable: true,
-      );
+      await _tts.setPitch(1.0);
+
+      await _tts.speak(text);
     } catch (e) {
       crux.logger.w(
-        'LiveKit data send failed',
+        'TTS failed',
         error: e,
       );
     }
   }
 
   // ===========================================================================
-  // CHAT
+  // TIMER
   // ===========================================================================
 
-  Future<void> _sendChat() async {
-    final text =
-        _chatController.text.trim();
+  void _startTimer() {
+    _callTimer?.cancel();
 
-    if (text.isEmpty) return;
+    _callTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) {
+        if (!mounted) return;
 
-    _chatController.clear();
+        setState(() {
+          _secondsElapsed++;
+        });
 
-    if (mounted) {
-      setState(() {
-        _chatMessages.add(
-          _ChatMessage(
-            sender: widget.userName,
-            message: text,
-            isMe: true,
-          ),
-        );
-      });
-    }
+        if (_isPro) return;
 
-    await _sendData(
-      {
-        'type': 'chat',
-        'sender': widget.userName,
-        'senderId': widget.userId,
-        'message': text,
+        final limit =
+            AppConfig
+                    .freeMeetingDurationMinutes *
+                60;
+
+        if (_secondsElapsed ==
+            limit - 300) {
+          _announce(
+            'Attention, votre appel gratuit se terminera dans 5 minutes.',
+          );
+        }
+
+        if (_secondsElapsed >= limit &&
+            !_paywallShown) {
+          _paywallShown = true;
+
+          _showPaywall();
+        }
       },
     );
-
-    try {
-      await _db
-          .collection(AppConfig.meetingsCollection)
-          .doc(widget.meetingId)
-          .collection('chat')
-          .add(
-        {
-          'senderId': widget.userId,
-          'sender': widget.userName,
-          'message': text,
-          'timestamp':
-              FieldValue.serverTimestamp(),
-        },
-      );
-    } catch (e) {
-      crux.logger.w(
-        'Firestore chat failed',
-        error: e,
-      );
-    }
   }
 
-  // ===========================================================================
-  // MUTE ALL
-  // ===========================================================================
+  String _formatElapsedDuration() {
+    final hours =
+        _secondsElapsed ~/ 3600;
 
-  Future<void> _muteAll() async {
-    if (!_isOrganizer) return;
+    final minutes =
+        (_secondsElapsed % 3600) ~/ 60;
 
-    await _sendData(
-      {
-        'type': 'mute_all',
-        'senderId': widget.userId,
-      },
-    );
+    final seconds =
+        _secondsElapsed % 60;
 
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Demande de coupure envoyée aux intervenants.',
-        ),
-      ),
-    );
-  }
-
-  bool get _isOrganizer {
-    return widget.isHost ||
-        widget.userId == _organizerId;
-  }
-
-  // ===========================================================================
-  // LEAVE
-  // ===========================================================================
-
-  Future<void> _confirmLeave() async {
-    final result =
-        await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: AppColors.surface,
-          title: const Text(
-            'Quitter la réunion ?',
-            style: TextStyle(
-              color: Colors.white,
-            ),
-          ),
-          content: const Text(
-            'Voulez-vous vraiment quitter cette conférence ?',
-            style: TextStyle(
-              color: Colors.white70,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.pop(ctx, false),
-              child: const Text('Rester'),
-            ),
-            ElevatedButton(
-              onPressed: () =>
-                  Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    AppColors.error,
-              ),
-              child: const Text('Quitter'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result == true) {
-      await _leave();
-    }
-  }
-
-  Future<void> _leave() async {
-    try {
-      _callTimer?.cancel();
-
-      await MeetingService()
-          .saveMeetingHistoryForUser(
-        meetingId: widget.meetingId,
-        userId: widget.userId,
-        title: widget.meetingName,
-        durationSeconds: _secondsElapsed,
-        endMeeting: widget.isHost,
-      );
-
-      await MeetingService().removePresence(
-        widget.meetingId,
-        widget.userId,
-      );
-
-      await _disposeRoom();
-
-      if (!mounted) return;
-
-      Navigator.of(context).pop();
-    } catch (e) {
-      crux.logger.w(
-        'Leave conference error',
-        error: e,
-      );
-
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    }
-  }
-
-  // ===========================================================================
-  // ROOM DISPOSAL
-  // ===========================================================================
-
-  Future<void> _disposeRoom() async {
-    try {
-      await _roomListener?.dispose();
-    } catch (_) {}
-
-    _roomListener = null;
-
-    final room = _room;
-
-    _room = null;
-
-    if (room != null) {
-      try {
-        await room.disconnect();
-      } catch (_) {}
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:'
+          '${minutes.toString().padLeft(2, '0')}:'
+          '${seconds.toString().padLeft(2, '0')}';
     }
 
-    _remoteParticipants = [];
+    return '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}';
   }
 
   // ===========================================================================
@@ -1248,38 +1328,37 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) {
+      builder: (context) {
         return AlertDialog(
-          backgroundColor: AppColors.surface,
+          backgroundColor:
+              AppColors.surface,
           title: const Text(
             'Temps écoulé',
             style: TextStyle(
               color: Colors.white,
             ),
           ),
-          content: Text(
-            'La limite de '
-            '${AppConfig.freeMeetingDurationMinutes} '
-            'minutes de la formule gratuite est atteinte.',
-            style: const TextStyle(
+          content: const Text(
+            'La limite de la réunion gratuite est atteinte.',
+            style: TextStyle(
               color: Colors.white70,
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _leave();
-              },
-              child: const Text('Quitter'),
+              onPressed: _leave,
+              child: const Text(
+                'Quitter',
+              ),
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(ctx);
-
-                ProService().startPayment(
-                  userId: widget.userId,
-                  userName: widget.userName,
+                ProService()
+                    .startPayment(
+                  userId:
+                      widget.userId,
+                  userName:
+                      widget.userName,
                 );
               },
               child: const Text(
@@ -1293,25 +1372,149 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   }
 
   // ===========================================================================
-  // ERROR
+  // RECONNECT
   // ===========================================================================
 
-  void _showError(Object error) {
-    if (!mounted) return;
+  Future<void> _attemptReconnect() async {
+    if (!mounted ||
+        _isConnecting) {
+      return;
+    }
 
-    final lang =
-        context.read<LocaleProvider>()
-            .locale.languageCode;
+    if (_reconnectAttempts >=
+        AppConfig
+            .maxReconnectAttempts) {
+      setState(() {
+        _isReconnecting = false;
+        _error =
+            'La connexion à la conférence a été interrompue.';
+      });
+
+      return;
+    }
+
+    _reconnectAttempts++;
 
     setState(() {
-      _loading = false;
-
-      _error =
-          _errorHandler.getMeetingErrorMessageL(
-        error.toString(),
-        lang,
-      );
+      _isReconnecting = true;
     });
+
+    await Future<void>.delayed(
+      AppConfig.reconnectDelay,
+    );
+
+    if (!mounted) return;
+
+    try {
+      await _connect();
+
+      if (!mounted) return;
+
+      setState(() {
+        _isReconnecting = false;
+      });
+    } catch (e) {
+      crux.logger.w(
+        'Reconnect attempt failed',
+        error: e,
+      );
+
+      if (mounted) {
+        unawaited(
+          _attemptReconnect(),
+        );
+      }
+    }
+  }
+
+  // ===========================================================================
+  // LEAVE
+  // ===========================================================================
+
+  Future<void> _confirmLeave() async {
+    final result =
+        await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor:
+              AppColors.surface,
+          title: const Text(
+            'Quitter la réunion ?',
+            style: TextStyle(
+              color: Colors.white,
+            ),
+          ),
+          content: const Text(
+            'Voulez-vous quitter cette conférence ?',
+            style: TextStyle(
+              color: Colors.white70,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(
+                context,
+                false,
+              ),
+              child: const Text(
+                'Rester',
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () =>
+                  Navigator.pop(
+                context,
+                true,
+              ),
+              child: const Text(
+                'Quitter',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true) {
+      await _leave();
+    }
+  }
+
+  Future<void> _leave() async {
+    try {
+      await MeetingService()
+          .saveMeetingHistoryForUser(
+        meetingId:
+            widget.meetingId,
+        userId:
+            widget.userId,
+        title:
+            widget.meetingName,
+        durationSeconds:
+            _secondsElapsed,
+        endMeeting:
+            widget.isHost,
+      );
+
+      await MeetingService()
+          .removePresence(
+        widget.meetingId,
+        widget.userId,
+      );
+    } catch (e) {
+      crux.logger.w(
+        'Meeting cleanup failed',
+        error: e,
+      );
+    }
+
+    await _disposeRoom();
+
+    if (!mounted) return;
+
+    Navigator.of(context).pop();
   }
 
   // ===========================================================================
@@ -1319,53 +1522,46 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     if (_error != null) {
       return _buildError();
     }
 
+    if (_loading) {
+      return _buildLoading();
+    }
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        top: false,
-        bottom: false,
-        child: Stack(
-          children: [
-            _buildConferenceBackground(),
+      backgroundColor:
+          AppColors.background,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: _buildConference(),
+          ),
 
-            if (_loading)
-              _buildLoading()
-            else
-              _buildMainConference(),
+          _buildTopBar(),
 
-            if (_isReconnecting)
-              _buildReconnectBanner(),
+          if (_currentTranscription
+              .isNotEmpty)
+            _buildCaptions(),
 
-            if (_showChat)
-              _buildChatPanel(),
+          _buildBottomBar(),
 
-            if (_showParticipants)
-              _buildParticipantsPanel(),
+          if (_showChat)
+            _buildChatPanel(),
 
-            if (_showNotes)
-              _buildNotesPanel(),
+          if (_showParticipants)
+            _buildParticipantsPanel(),
 
-            if (_showMore)
-              _buildMorePanel(),
-          ],
-        ),
-      ),
-    );
-  }
+          if (_showNotes)
+            _buildNotesPanel(),
 
-  // ===========================================================================
-  // BACKGROUND
-  // ===========================================================================
-
-  Widget _buildConferenceBackground() {
-    return Positioned.fill(
-      child: Container(
-        color: AppColors.background,
+          if (_isReconnecting)
+            _buildReconnectBanner(),
+        ],
       ),
     );
   }
@@ -1375,177 +1571,183 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   Widget _buildLoading() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(
-            color: AppColors.primary,
-            strokeWidth: 2,
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Connexion au webinaire...',
-            style: GoogleFonts.poppins(
-              color: Colors.white70,
-              fontSize: 14,
+    return Scaffold(
+      backgroundColor:
+          AppColors.background,
+      body: Center(
+        child: Column(
+          mainAxisSize:
+              MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(
+              color: AppColors.primary,
+              strokeWidth: 2,
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'CRUX Large Conference',
-            style: GoogleFonts.poppins(
-              color: Colors.white38,
-              fontSize: 11,
+            const SizedBox(
+              height: 20,
             ),
-          ),
-        ],
+            Text(
+              'Connexion au webinaire...',
+              style:
+                  GoogleFonts.poppins(
+                color:
+                    Colors.white70,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(
+              height: 8,
+            ),
+            Text(
+              'Jusqu’à $_targetParticipants participants',
+              style:
+                  GoogleFonts.poppins(
+                color:
+                    Colors.white38,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   // ===========================================================================
-  // MAIN
+  // ERROR
   // ===========================================================================
 
-  Widget _buildMainConference() {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: _buildVideoArea(),
+  Widget _buildError() {
+    return Scaffold(
+      backgroundColor:
+          AppColors.background,
+      body: Center(
+        child: Padding(
+          padding:
+              const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize:
+                MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color:
+                    AppColors.error,
+                size: 64,
+              ),
+              const SizedBox(
+                height: 20,
+              ),
+              Text(
+                _error ??
+                    'Erreur inconnue',
+                textAlign:
+                    TextAlign.center,
+                style:
+                    const TextStyle(
+                  color:
+                      Colors.white70,
+                ),
+              ),
+              const SizedBox(
+                height: 24,
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _error = null;
+                    _loading = true;
+                  });
+
+                  _initialize();
+                },
+                child: const Text(
+                  'Réessayer',
+                ),
+              ),
+            ],
+          ),
         ),
-
-        _buildTopBar(),
-
-        _buildCaptionOverlay(),
-
-        _buildBottomControls(),
-      ],
+      ),
     );
   }
 
   // ===========================================================================
-  // VIDEO AREA
+  // CONFERENCE
   // ===========================================================================
 
-  Widget _buildVideoArea() {
+  Widget _buildConference() {
     final visible =
         _visibleParticipants;
 
-    final totalTiles =
-        visible.length + 1;
+    final tiles =
+        <Widget>[
+      _VideoTile(
+        participant:
+            _room?.localParticipant,
+        isLocal: true,
+        userName:
+            widget.userName,
+        active:
+            widget.userId ==
+                _activeSpeakerId,
+      ),
+      ...visible.map(
+        (participant) {
+          return _VideoTile(
+            participant:
+                participant,
+            isLocal: false,
+            userName:
+                participant.name,
+            active:
+                participant.identity ==
+                    _activeSpeakerId,
+          );
+        },
+      ),
+    ];
+
+    final count = tiles.length;
+
+    int columns;
+
+    if (count <= 1) {
+      columns = 1;
+    } else if (count <= 4) {
+      columns = 2;
+    } else {
+      columns = 3;
+    }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        10,
+      padding:
+          const EdgeInsets.fromLTRB(
+        12,
         90,
-        10,
-        120,
+        12,
+        110,
       ),
-      child: totalTiles == 1
-          ? _buildSoloSpeaker()
-          : GridView.builder(
-              physics:
-                  const BouncingScrollPhysics(),
-              gridDelegate:
-                  SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount:
-                    _calculateColumns(
-                  totalTiles,
-                ),
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                childAspectRatio:
-                    _calculateAspectRatio(
-                  totalTiles,
-                ),
-              ),
-              itemCount: totalTiles,
-              itemBuilder: (_, index) {
-                if (index == 0) {
-                  return _buildLocalTile();
-                }
-
-                return _buildRemoteTile(
-                  visible[index - 1],
-                );
-              },
-            ),
-    );
-  }
-
-  int _calculateColumns(int count) {
-    if (count <= 2) return 1;
-    if (count <= 4) return 2;
-    if (count <= 9) return 3;
-    return 5;
-  }
-
-  double _calculateAspectRatio(int count) {
-    if (count <= 2) return 1.45;
-    if (count <= 4) return 1.25;
-    return 1.15;
-  }
-
-  // ===========================================================================
-  // SOLO
-  // ===========================================================================
-
-  Widget _buildSoloSpeaker() {
-    return _buildLocalTile(
-      large: true,
-    );
-  }
-
-  // ===========================================================================
-  // LOCAL TILE
-  // ===========================================================================
-
-  Widget _buildLocalTile({
-    bool large = false,
-  }) {
-    final room = _room;
-
-    final local = room?.localParticipant;
-
-    return _VideoTile(
-      participant: local,
-      name: '${widget.userName} (vous)',
-      isLocal: true,
-      active:
-          _activeSpeakerId ==
-          widget.userId,
-      large: large,
-      camEnabled: _camOn,
-      raised:
-          _raisedHands.contains(
-        widget.userId,
+      child: GridView.builder(
+        physics:
+            const BouncingScrollPhysics(),
+        gridDelegate:
+            SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount:
+              columns,
+          crossAxisSpacing:
+              10,
+          mainAxisSpacing:
+              10,
+          childAspectRatio:
+              16 / 10,
+        ),
+        itemCount:
+            tiles.length,
+        itemBuilder:
+            (_, index) =>
+                tiles[index],
       ),
-    );
-  }
-
-  // ===========================================================================
-  // REMOTE TILE
-  // ===========================================================================
-
-  Widget _buildRemoteTile(
-    RemoteParticipant participant,
-  ) {
-    return _VideoTile(
-      participant: participant,
-      name: participant.name.isNotEmpty
-          ? participant.name
-          : 'Participant',
-      active:
-          participant.identity ==
-          _activeSpeakerId,
-      raised:
-          _raisedHands.contains(
-        participant.identity,
-      ),
-      large:
-          participant.identity ==
-          _activeSpeakerId,
     );
   }
 
@@ -1564,13 +1766,16 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           16,
           12,
           16,
-          18,
+          16,
         ),
         decoration:
             const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+          gradient:
+              LinearGradient(
+            begin:
+                Alignment.topCenter,
+            end:
+                Alignment.bottomCenter,
             colors: [
               Colors.black87,
               Colors.transparent,
@@ -1578,7 +1783,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           ),
         ),
         child: SafeArea(
-          bottom: false,
           child: Row(
             children: [
               Expanded(
@@ -1593,108 +1797,58 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                           TextOverflow.ellipsis,
                       style:
                           GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 16,
+                        color:
+                            Colors.white,
                         fontWeight:
                             FontWeight.w800,
+                        fontSize: 16,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration:
-                              const BoxDecoration(
-                            color: Colors.green,
-                            shape:
-                                BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$_participantCount participants',
-                          style:
-                              GoogleFonts.poppins(
-                            color:
-                                Colors.white60,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(
+                      height: 2,
+                    ),
+                    Text(
+                      'Webinaire • '
+                      '$_participantCountLabel',
+                      style:
+                          GoogleFonts.poppins(
+                        color:
+                            Colors.white54,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
               ),
-
-              _buildTopChip(
-                icon: Icons.timer_outlined,
+              _TopPill(
+                icon:
+                    Icons.timer_outlined,
                 text:
-                    _formatDuration(),
+                    _formatElapsedDuration(),
               ),
-
-              const SizedBox(width: 6),
-
-              _CircleButton(
-                icon: Icons.link,
-                onTap: _copyLink,
+              const SizedBox(
+                width: 8,
               ),
-
-              const SizedBox(width: 6),
-
-              _CircleButton(
-                icon: _voiceAssistant
-                    ? Icons.volume_up
-                    : Icons.volume_off,
-                onTap: () {
-                  setState(() {
-                    _voiceAssistant =
-                        !_voiceAssistant;
-                  });
-                },
+              _TopPill(
+                icon:
+                    Icons.people_outline,
+                text:
+                    _participantCount
+                        .toString(),
               ),
-
-              const SizedBox(width: 6),
-
-              GestureDetector(
-                onTap: _confirmLeave,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(
-                    horizontal: 13,
-                    vertical: 9,
-                  ),
-                  decoration:
-                      BoxDecoration(
-                    color:
-                        AppColors.error
-                            .withValues(
-                      alpha: 0.18,
-                    ),
-                    borderRadius:
-                        BorderRadius.circular(
-                      12,
-                    ),
-                    border:
-                        Border.all(
-                      color:
-                          AppColors.error
-                              .withValues(
-                        alpha: 0.45,
-                      ),
-                    ),
-                  ),
-                  child: const Text(
+              const SizedBox(
+                width: 8,
+              ),
+              IconButton(
+                tooltip:
                     'Quitter',
-                    style: TextStyle(
-                      color:
-                          AppColors.error,
-                      fontWeight:
-                          FontWeight.bold,
-                      fontSize: 11,
-                    ),
-                  ),
+                onPressed:
+                    _confirmLeave,
+                icon:
+                    const Icon(
+                  Icons.close,
+                  color:
+                      Colors.white,
                 ),
               ),
             ],
@@ -1704,91 +1858,60 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     );
   }
 
-  Widget _buildTopChip({
-    required IconData icon,
-    required String text,
-  }) {
-    return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 7,
-      ),
-      decoration:
-          BoxDecoration(
-        color: Colors.black45,
-        borderRadius:
-            BorderRadius.circular(
-          999,
-        ),
-        border:
-            Border.all(
-          color: Colors.white10,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 13,
-            color: Colors.white70,
-          ),
-          const SizedBox(width: 5),
-          Text(
-            text,
-            style:
-                GoogleFonts.poppins(
-              color: Colors.white70,
-              fontSize: 10,
-              fontWeight:
-                  FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
+  String get _participantCountLabel {
+    if (_participantCount >=
+        1000) {
+      final value =
+          _participantCount /
+              1000;
+
+      return '${value.toStringAsFixed(1)}K participants';
+    }
+
+    return '$_participantCount participants';
+  }
+
+  int get _participantCount {
+    final room = _room;
+
+    if (room == null) {
+      return _remoteParticipants.length +
+          1;
+    }
+
+    return room.remoteParticipants
+            .length +
+        1;
   }
 
   // ===========================================================================
   // CAPTIONS
   // ===========================================================================
 
-  Widget _buildCaptionOverlay() {
-    if (!_liveCaptions ||
-        _currentTranscription.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
+  Widget _buildCaptions() {
     return Positioned(
-      left: 25,
-      right: 25,
-      bottom: 130,
+      left: 24,
+      right: 24,
+      bottom: 115,
       child: ClipRRect(
         borderRadius:
-            BorderRadius.circular(18),
+            BorderRadius.circular(
+          16,
+        ),
         child: BackdropFilter(
           filter:
               ImageFilter.blur(
-            sigmaX: 15,
-            sigmaY: 15,
+            sigmaX: 12,
+            sigmaY: 12,
           ),
           child: Container(
             padding:
-                const EdgeInsets.symmetric(
-              horizontal: 18,
-              vertical: 13,
+                const EdgeInsets.all(
+              14,
             ),
-            decoration:
-                BoxDecoration(
-              color: Colors.black54,
-              borderRadius:
-                  BorderRadius.circular(
-                18,
-              ),
-              border:
-                  Border.all(
-                color: Colors.white12,
-              ),
+            color:
+                Colors.black.withValues(
+              alpha: 0.65,
             ),
             child: Text(
               _currentTranscription,
@@ -1796,9 +1919,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                   TextAlign.center,
               style:
                   GoogleFonts.poppins(
-                color: Colors.white,
+                color:
+                    Colors.white,
                 fontSize: 13,
-                height: 1.4,
               ),
             ),
           ),
@@ -1808,58 +1931,70 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   }
 
   // ===========================================================================
-  // BOTTOM CONTROLS
+  // BOTTOM BAR
   // ===========================================================================
 
-  Widget _buildBottomControls() {
+  Widget _buildBottomBar() {
     return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        padding:
-            const EdgeInsets.fromLTRB(
-          12,
-          12,
-          12,
-          28,
-        ),
-        decoration:
-            const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius:
-              BorderRadius.vertical(
-            top: Radius.circular(28),
+      left: 12,
+      right: 12,
+      bottom: 12,
+      child: SafeArea(
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
           ),
-        ),
-        child: SafeArea(
-          top: false,
+          decoration:
+              BoxDecoration(
+            color:
+                AppColors.surface
+                    .withValues(
+              alpha: 0.96,
+            ),
+            borderRadius:
+                BorderRadius.circular(
+              24,
+            ),
+            border:
+                Border.all(
+              color:
+                  Colors.white10,
+            ),
+          ),
           child: Row(
             mainAxisAlignment:
-                MainAxisAlignment.spaceEvenly,
+                MainAxisAlignment
+                    .spaceEvenly,
             children: [
               _ControlButton(
                 icon: _micOn
                     ? Icons.mic
                     : Icons.mic_off,
-                label: 'Micro',
                 active: _micOn,
-                danger: !_micOn,
-                onTap: _toggleMic,
+                onTap:
+                    _toggleMic,
               ),
               _ControlButton(
                 icon: _camOn
                     ? Icons.videocam
                     : Icons.videocam_off,
-                label: 'Caméra',
                 active: _camOn,
-                danger: !_camOn,
-                onTap: _toggleCamera,
+                onTap:
+                    _toggleCamera,
+              ),
+              _ControlButton(
+                icon:
+                    Icons.screen_share_outlined,
+                active:
+                    _screenSharing,
+                onTap:
+                    _toggleScreenShare,
               ),
               _ControlButton(
                 icon:
                     Icons.chat_bubble_outline,
-                label: 'Chat',
                 onTap: () {
                   setState(() {
                     _showChat = true;
@@ -1869,8 +2004,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
               _ControlButton(
                 icon:
                     Icons.people_outline,
-                label:
-                    '$_participantCount',
                 onTap: () {
                   setState(() {
                     _showParticipants =
@@ -1880,8 +2013,23 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
               ),
               _ControlButton(
                 icon:
+                    Icons.back_hand_outlined,
+                active:
+                    _handRaised,
+                onTap:
+                    _toggleRaiseHand,
+              ),
+              _ControlButton(
+                icon:
+                    Icons.closed_caption_outlined,
+                active:
+                    _liveCaptions,
+                onTap:
+                    _toggleCaptions,
+              ),
+              _ControlButton(
+                icon:
                     Icons.note_alt_outlined,
-                label: 'Notes',
                 onTap: () {
                   setState(() {
                     _showNotes = true;
@@ -1891,12 +2039,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
               _ControlButton(
                 icon:
                     Icons.more_horiz,
-                label: 'Plus',
-                onTap: () {
-                  setState(() {
-                    _showMore = true;
-                  });
-                },
+                onTap:
+                    _showMoreOptions,
               ),
             ],
           ),
@@ -1910,7 +2054,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   Widget _buildChatPanel() {
-    return _BasePanel(
+    return _Panel(
       title: 'Chat',
       onClose: () {
         setState(() {
@@ -1920,36 +2064,43 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       child: Column(
         children: [
           Expanded(
-            child: _chatMessages.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Aucun message',
-                      style: TextStyle(
-                        color:
-                            Colors.white38,
+            child:
+                _chatMessages.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Aucun message',
+                          style:
+                              TextStyle(
+                            color:
+                                Colors.white38,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding:
+                            const EdgeInsets
+                                .all(
+                          16,
+                        ),
+                        itemCount:
+                            _chatMessages
+                                .length,
+                        itemBuilder:
+                            (_, index) {
+                          final message =
+                              _chatMessages[
+                                  index];
+
+                          return _ChatBubble(
+                            message:
+                                message,
+                            isMe:
+                                message.senderId ==
+                                    widget.userId,
+                          );
+                        },
                       ),
-                    ),
-                  )
-                : ListView.builder(
-                    padding:
-                        const EdgeInsets.all(
-                      16,
-                    ),
-                    itemCount:
-                        _chatMessages.length,
-                    itemBuilder:
-                        (_, index) {
-                      final message =
-                          _chatMessages[
-                              index];
-
-                      return _ChatBubble(
-                        message: message,
-                      );
-                    },
-                  ),
           ),
-
           Container(
             padding:
                 const EdgeInsets.fromLTRB(
@@ -1966,10 +2117,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                         _chatController,
                     style:
                         const TextStyle(
-                      color: Colors.white,
+                      color:
+                          Colors.white,
                     ),
-                    minLines: 1,
-                    maxLines: 4,
                     decoration:
                         InputDecoration(
                       hintText:
@@ -1979,31 +2129,35 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                         color:
                             Colors.white38,
                       ),
-                      filled: true,
+                      filled:
+                          true,
                       fillColor:
                           Colors.white
                               .withValues(
-                        alpha: 0.06,
+                        alpha:
+                            0.06,
                       ),
                       border:
                           OutlineInputBorder(
                         borderRadius:
                             BorderRadius
                                 .circular(
-                          25,
+                          24,
                         ),
                         borderSide:
                             BorderSide.none,
                       ),
                     ),
-                    onSubmitted: (_) =>
-                        _sendChat(),
+                    onSubmitted:
+                        (_) =>
+                            _sendChat(),
                   ),
                 ),
-                const SizedBox(width: 8),
                 IconButton(
-                  onPressed: _sendChat,
-                  icon: const Icon(
+                  onPressed:
+                      _sendChat,
+                  icon:
+                      const Icon(
                     Icons.send,
                     color:
                         AppColors.primary,
@@ -2022,187 +2176,120 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   Widget _buildParticipantsPanel() {
-    return _BasePanel(
+    final participants =
+        <RemoteParticipant>[
+      ..._remoteParticipants,
+    ];
+
+    return _Panel(
       title:
           'Participants ($_participantCount)',
       onClose: () {
         setState(() {
-          _showParticipants = false;
+          _showParticipants =
+              false;
         });
       },
       child: Column(
         children: [
-          if (_isOrganizer)
+          if (widget.isHost ||
+              widget.userId ==
+                  _organizerId)
             Padding(
               padding:
-                  const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
+                  const EdgeInsets.all(
+                16,
+              ),
+              child:
+                  SizedBox(
+                width:
+                    double.infinity,
                 child:
                     ElevatedButton.icon(
-                  onPressed: _muteAll,
-                  icon: const Icon(
+                  onPressed:
+                      _muteAllOthers,
+                  icon:
+                      const Icon(
                     Icons.mic_off,
                   ),
-                  label: const Text(
+                  label:
+                      const Text(
                     'Muter tous les autres',
                   ),
-                  style:
-                      ElevatedButton.styleFrom(
-                    backgroundColor:
-                        AppColors.error,
-                    padding:
-                        const EdgeInsets
-                            .symmetric(
-                      vertical: 13,
-                    ),
-                  ),
                 ),
               ),
             ),
-
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(
-              horizontal: 16,
-            ),
-            child: Container(
-              padding:
-                  const EdgeInsets.all(14),
-              decoration:
-                  BoxDecoration(
-                color: AppColors.primary
-                    .withValues(
-                  alpha: 0.08,
-                ),
-                borderRadius:
-                    BorderRadius.circular(
-                  16,
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.groups_2_outlined,
-                    color:
-                        AppColors.primary,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Webinaire CRUX • '
-                      'jusqu’à $_targetParticipants+ '
-                      'participants',
-                      style:
-                          GoogleFonts.poppins(
-                        color:
-                            Colors.white70,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
           Expanded(
-            child: ListView.builder(
-              itemCount:
-                  _remoteParticipants.length +
-                      1,
-              itemBuilder:
-                  (context, index) {
-                if (index == 0) {
-                  return _participantListTile(
-                    name:
-                        '${widget.userName} (vous)',
-                    identity:
-                        widget.userId,
-                    organizer:
-                        widget.userId ==
-                            _organizerId,
-                    local: true,
-                  );
-                }
+            child:
+                participants.isEmpty
+                    ? const Center(
+                        child:
+                            Text(
+                          'Aucun participant distant',
+                          style:
+                              TextStyle(
+                            color:
+                                Colors.white38,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount:
+                            participants
+                                .length,
+                        itemBuilder:
+                            (_, index) {
+                          final p =
+                              participants[
+                                  index];
 
-                final participant =
-                    _remoteParticipants[
-                        index - 1];
+                          final raised =
+                              _raisedHands
+                                  .contains(
+                            p.identity,
+                          );
 
-                return _participantListTile(
-                  name:
-                      participant.name.isNotEmpty
-                          ? participant.name
-                          : 'Participant',
-                  identity:
-                      participant.identity,
-                  organizer:
-                      participant.identity ==
-                          _organizerId,
-                );
-              },
-            ),
+                          return ListTile(
+                            leading:
+                                _Avatar(
+                              name:
+                                  p.name,
+                            ),
+                            title:
+                                Text(
+                              p.name.isNotEmpty
+                                  ? p.name
+                                  : 'Participant',
+                              style:
+                                  const TextStyle(
+                                color:
+                                    Colors.white,
+                              ),
+                            ),
+                            subtitle:
+                                Text(
+                              p.identity,
+                              style:
+                                  const TextStyle(
+                                color:
+                                    Colors.white38,
+                                fontSize:
+                                    10,
+                              ),
+                            ),
+                            trailing:
+                                raised
+                                    ? const Icon(
+                                        Icons
+                                            .back_hand,
+                                        color:
+                                            Colors.orange,
+                                      )
+                                    : null,
+                          );
+                        },
+                      ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _participantListTile({
-    required String name,
-    required String identity,
-    bool organizer = false,
-    bool local = false,
-  }) {
-    return ListTile(
-      leading: _Avatar(
-        name: name,
-      ),
-      title: Text(
-        name,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 13,
-        ),
-      ),
-      subtitle: organizer
-          ? const Text(
-              'Organisateur',
-              style: TextStyle(
-                color:
-                    AppColors.primary,
-                fontSize: 10,
-              ),
-            )
-          : null,
-      trailing: Row(
-        mainAxisSize:
-            MainAxisSize.min,
-        children: [
-          if (_raisedHands
-              .contains(identity))
-            const Icon(
-              Icons.back_hand,
-              color: Colors.orange,
-              size: 17,
-            ),
-          if (!local)
-            IconButton(
-              icon: const Icon(
-                Icons.message_outlined,
-                color: Colors.white38,
-              ),
-              onPressed: () {
-                setState(() {
-                  _showParticipants =
-                      false;
-                  _showChat = true;
-                });
-              },
-            ),
         ],
       ),
     );
@@ -2213,30 +2300,55 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   Widget _buildNotesPanel() {
-    return _BasePanel(
-      title: 'Notes de réunion',
-      onClose: _saveNotesAndClose,
+    return _Panel(
+      title:
+          'Notes de réunion',
+      onClose: () async {
+        await NoteService.instance
+            .saveMeetingNote(
+          userId:
+              widget.userId,
+          meetingId:
+              widget.meetingId,
+          meetingName:
+              widget.meetingName,
+          content:
+              _noteController.text,
+        );
+
+        if (!mounted) return;
+
+        setState(() {
+          _showNotes = false;
+        });
+      },
       child: Padding(
         padding:
-            const EdgeInsets.all(20),
+            const EdgeInsets.all(
+          20,
+        ),
         child: TextField(
           controller:
               _noteController,
-          expands: true,
           maxLines: null,
-          minLines: null,
+          expands: true,
+          textAlignVertical:
+              TextAlignVertical.top,
           style:
-              GoogleFonts.poppins(
-            color: Colors.white,
-            height: 1.6,
+              const TextStyle(
+            color:
+                Colors.white,
+            height:
+                1.5,
           ),
           decoration:
               const InputDecoration(
             hintText:
-                'Tapez vos notes ici...',
+                'Écrivez vos notes...',
             hintStyle:
                 TextStyle(
-              color: Colors.white24,
+              color:
+                  Colors.white24,
             ),
             border:
                 InputBorder.none,
@@ -2246,260 +2358,163 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     );
   }
 
-  Future<void> _saveNotesAndClose() async {
-    try {
-      // Utilise le service existant du projet.
-      await MeetingService()
-          .saveMeetingHistoryForUser(
-        meetingId: widget.meetingId,
-        userId: widget.userId,
-        title: widget.meetingName,
-        durationSeconds:
-            _secondsElapsed,
-        endMeeting: false,
-      );
-    } catch (_) {}
-
-    if (!mounted) return;
-
-    setState(() {
-      _showNotes = false;
-    });
-  }
-
   // ===========================================================================
-  // MORE PANEL
+  // MORE OPTIONS
   // ===========================================================================
 
-  Widget _buildMorePanel() {
-    return _BasePanel(
-      title: 'Options',
-      onClose: () {
-        setState(() {
-          _showMore = false;
-        });
-      },
-      child: ListView(
-        padding:
-            const EdgeInsets.symmetric(
-          vertical: 10,
-        ),
-        children: [
-          _optionTile(
-            icon:
-                Icons.back_hand_outlined,
-            title: _handRaised
-                ? 'Baisser la main'
-                : 'Lever la main',
-            active: _handRaised,
-            onTap: () {
-              Navigator.pop(context);
-              _toggleRaiseHand();
-            },
-          ),
-          _optionTile(
-            icon:
-                Icons.closed_caption_outlined,
-            title: _liveCaptions
-                ? 'Désactiver les sous-titres'
-                : 'Sous-titres en direct',
-            active: _liveCaptions,
-            onTap: () {
-              Navigator.pop(context);
-              _toggleCaptions();
-            },
-          ),
-          _optionTile(
-            icon:
-                Icons.screen_share_outlined,
-            title: _screenSharing
-                ? 'Arrêter le partage'
-                : 'Partager l’écran',
-            active: _screenSharing,
-            onTap: () {
-              Navigator.pop(context);
-              _toggleScreenShare();
-            },
-          ),
-          _optionTile(
-            icon:
-                Icons.cameraswitch_outlined,
-            title: 'Changer de caméra',
-            onTap: () {
-              Navigator.pop(context);
-              _switchCamera();
-            },
-          ),
-          _optionTile(
-            icon:
-                Icons.link_outlined,
-            title:
-                'Copier le lien de la réunion',
-            onTap: () {
-              Navigator.pop(context);
-              _copyLink();
-            },
-          ),
-          _optionTile(
-            icon:
-                Icons.info_outline,
-            title:
-                'Informations de la réunion',
-            onTap: () {
-              Navigator.pop(context);
-              _showMeetingInfo();
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _optionTile({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    bool active = false,
-  }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: active
-            ? AppColors.primary
-            : Colors.white70,
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white,
-        ),
-      ),
-      onTap: onTap,
-    );
-  }
-
-  // ===========================================================================
-  // MEETING INFO
-  // ===========================================================================
-
-  void _showMeetingInfo() {
-    showModalBottomSheet<void>(
+  void _showMoreOptions() {
+    showModalBottomSheet(
       context: context,
       backgroundColor:
           Colors.transparent,
-      builder: (_) {
+      builder: (context) {
         return Container(
           padding:
-              const EdgeInsets.all(24),
+              const EdgeInsets.symmetric(
+            vertical: 16,
+          ),
           decoration:
               const BoxDecoration(
-            color: AppColors.surface,
+            color:
+                AppColors.surface,
             borderRadius:
                 BorderRadius.vertical(
-              top: Radius.circular(28),
+              top: Radius.circular(
+                28,
+              ),
             ),
           ),
-          child: Column(
-            mainAxisSize:
-                MainAxisSize.min,
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Informations',
-                style:
-                    GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight:
-                      FontWeight.bold,
+          child: SafeArea(
+            child: Column(
+              mainAxisSize:
+                  MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading:
+                      const Icon(
+                    Icons.closed_caption_outlined,
+                    color:
+                        Colors.white,
+                  ),
+                  title:
+                      const Text(
+                    'Sous-titres en direct',
+                    style:
+                        TextStyle(
+                      color:
+                          Colors.white,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(
+                      context,
+                    );
+
+                    _toggleCaptions();
+                  },
                 ),
-              ),
-              const SizedBox(height: 20),
-              _infoRow(
-                'Nom',
-                widget.meetingName,
-              ),
-              _infoRow(
-                'ID',
-                widget.meetingId,
-              ),
-              _infoRow(
-                'Participants',
-                '$_participantCount',
-              ),
-              _infoRow(
-                'Vidéos affichées',
-                '${_visibleParticipants.length + 1}/$_maxVisibleVideos',
-              ),
-              _infoRow(
-                'Type',
-                'Large Conference / Webinar',
-              ),
-              _infoRow(
-                'Transport',
-                'LiveKit SFU',
-              ),
-            ],
+                ListTile(
+                  leading:
+                      const Icon(
+                    Icons.screen_share_outlined,
+                    color:
+                        Colors.white,
+                  ),
+                  title:
+                      Text(
+                    _screenSharing
+                        ? 'Arrêter le partage'
+                        : 'Partager l’écran',
+                        style:
+                            const TextStyle(
+                          color:
+                              Colors.white,
+                        ),
+                      ),
+                  onTap: () {
+                    Navigator.pop(
+                      context,
+                    );
+
+                    _toggleScreenShare();
+                  },
+                ),
+                ListTile(
+                  leading:
+                      const Icon(
+                    Icons.volume_up_outlined,
+                    color:
+                        Colors.white,
+                  ),
+                  title:
+                      Text(
+                    _voiceAssistant
+                        ? 'Désactiver l’assistant vocal'
+                        : 'Activer l’assistant vocal',
+                    style:
+                        const TextStyle(
+                      color:
+                          Colors.white,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(
+                      context,
+                    );
+
+                    setState(() {
+                      _voiceAssistant =
+                          !_voiceAssistant;
+                    });
+                  },
+                ),
+                ListTile(
+                  leading:
+                      const Icon(
+                    Icons.copy_outlined,
+                    color:
+                        Colors.white,
+                  ),
+                  title:
+                      const Text(
+                    'Copier le lien',
+                    style:
+                        TextStyle(
+                      color:
+                          Colors.white,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(
+                      context,
+                    );
+
+                    _copyMeetingLink();
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _infoRow(
-    String label,
-    String value,
-  ) {
-    return Padding(
-      padding:
-          const EdgeInsets.symmetric(
-        vertical: 5,
-      ),
-      child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(
-              label,
-              style:
-                  const TextStyle(
-                color:
-                    Colors.white38,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style:
-                  const TextStyle(
-                color:
-                    Colors.white70,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ===========================================================================
-  // COPY LINK
+  // LINK
   // ===========================================================================
 
-  Future<void> _copyLink() async {
+  Future<void>
+      _copyMeetingLink() async {
     final link =
         AppConfig.webJoinLink(
       widget.meetingId,
     );
 
     await Clipboard.setData(
-      ClipboardData(text: link),
+      ClipboardData(
+        text: link,
+      ),
     );
 
     if (!mounted) return;
@@ -2507,8 +2522,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     ScaffoldMessenger.of(context)
         .showSnackBar(
       const SnackBar(
-        content: Text(
-          'Lien de réunion copié.',
+        content:
+            Text(
+          'Lien copié.',
         ),
       ),
     );
@@ -2520,307 +2536,99 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
   Widget _buildReconnectBanner() {
     return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: SafeArea(
-        bottom: false,
-        child: Container(
-          margin:
-              const EdgeInsets.all(12),
-          padding:
-              const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 10,
+      top: 80,
+      left: 20,
+      right: 20,
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 10,
+        ),
+        decoration:
+            BoxDecoration(
+          color:
+              Colors.orange.withValues(
+            alpha: 0.92,
           ),
-          decoration:
-              BoxDecoration(
-            color: Colors.orange
-                .withValues(
-              alpha: 0.9,
-            ),
-            borderRadius:
-                BorderRadius.circular(
-              14,
-            ),
-          ),
-          child: const Row(
-            mainAxisSize:
-                MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 15,
-                height: 15,
-                child:
-                    CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              ),
-              SizedBox(width: 10),
-              Text(
-                'Reconnexion...',
-                style:
-                    TextStyle(
-                  color: Colors.white,
-                  fontWeight:
-                      FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ],
+          borderRadius:
+              BorderRadius.circular(
+            12,
           ),
         ),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // ERROR SCREEN
-  // ===========================================================================
-
-  Widget _buildError() {
-    return Scaffold(
-      backgroundColor:
-          AppColors.background,
-      body: Center(
-        child: Padding(
-          padding:
-              const EdgeInsets.all(30),
-          child: Column(
-            mainAxisSize:
-                MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.error_outline,
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child:
+                  CircularProgressIndicator(
+                strokeWidth: 2,
                 color:
-                    AppColors.error,
-                size: 58,
+                    Colors.white,
               ),
-              const SizedBox(height: 18),
-              Text(
-                _error!,
-                textAlign:
-                    TextAlign.center,
+            ),
+            const SizedBox(
+              width: 10,
+            ),
+            const Expanded(
+              child:
+                  Text(
+                'Reconnexion à la conférence...',
                 style:
-                    const TextStyle(
+                    TextStyle(
                   color:
-                      Colors.white70,
+                      Colors.white,
+                  fontWeight:
+                      FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(
-                    context,
-                  );
-                },
-                child:
-                    const Text('Retour'),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ==============================================================================
+// =============================================================================
 // VIDEO TILE
-// ==============================================================================
+// =============================================================================
 
-class _VideoTile extends StatelessWidget {
-  final Participant? participant;
-  final String name;
+class _VideoTile
+    extends StatelessWidget {
+  final Participant?
+      participant;
+
   final bool isLocal;
+
+  final String userName;
+
   final bool active;
-  final bool raised;
-  final bool large;
-  final bool camEnabled;
 
   const _VideoTile({
     required this.participant,
-    required this.name,
-    this.isLocal = false,
-    this.active = false,
-    this.raised = false,
-    this.large = false,
-    this.camEnabled = true,
+    required this.isLocal,
+    required this.userName,
+    required this.active,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    final videoTrack =
-        _findVideoTrack();
-
-    final hasVideo =
-        videoTrack != null &&
-        !videoTrack.muted;
-
-    return AnimatedContainer(
-      duration:
-          const Duration(
-        milliseconds: 250,
-      ),
-      decoration:
-          BoxDecoration(
-        color: AppColors.surface,
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
-        border:
-            Border.all(
-          color: active
-              ? AppColors.primary
-              : Colors.white
-                  .withValues(
-            alpha: 0.06,
-          ),
-          width: active ? 2 : 1,
-        ),
-        boxShadow: active
-            ? [
-                BoxShadow(
-                  color: AppColors.primary
-                      .withValues(
-                    alpha: 0.15,
-                  ),
-                  blurRadius: 18,
-                  spreadRadius: 1,
-                ),
-              ]
-            : null,
-      ),
-      child: ClipRRect(
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (hasVideo)
-              VideoTrackRenderer(
-                videoTrack,
-                fit: RTCVideoViewObjectFit
-                    .RTCVideoViewObjectFitCover,
-              )
-            else
-              _buildAvatarArea(),
-
-            _buildGradient(),
-
-            Positioned(
-              left: 10,
-              right: 10,
-              bottom: 10,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      name,
-                      maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style:
-                          GoogleFonts.poppins(
-                        color:
-                            Colors.white,
-                        fontSize:
-                            large ? 12 : 10,
-                        fontWeight:
-                            FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  if (raised)
-                    const Padding(
-                      padding:
-                          EdgeInsets.only(
-                        left: 7,
-                      ),
-                      child: Icon(
-                        Icons.back_hand,
-                        color:
-                            Colors.orange,
-                        size: 16,
-                      ),
-                    ),
-                  if (participant != null &&
-                      _isMuted())
-                    const Padding(
-                      padding:
-                          EdgeInsets.only(
-                        left: 7,
-                      ),
-                      child: Icon(
-                        Icons.mic_off,
-                        color:
-                            Colors.white70,
-                        size: 15,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            if (active)
-              Positioned(
-                top: 10,
-                left: 10,
-                child: Container(
-                  padding:
-                      const EdgeInsets
-                          .symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration:
-                      BoxDecoration(
-                    color:
-                        AppColors.primary,
-                    borderRadius:
-                        BorderRadius
-                            .circular(
-                      999,
-                    ),
-                  ),
-                  child: const Text(
-                    'PARLE',
-                    style:
-                        TextStyle(
-                      color:
-                          Colors.white,
-                      fontSize: 8,
-                      fontWeight:
-                          FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    ).animate().fadeIn(
-          duration:
-              220.ms,
-        );
-  }
-
-  TrackPublication<RemoteTrack>? _findVideoTrack() {
+  VideoTrack? _findVideoTrack() {
     final p = participant;
 
-    if (p == null) return null;
+    if (p == null) {
+      return null;
+    }
 
     if (p is LocalParticipant) {
       for (final publication
-          in p.videoTrackPublications.values) {
-        final track = publication.track;
+          in p.videoTrackPublications) {
+        final track =
+            publication.track;
 
-        if (track != null) {
-          return publication;
+        if (track is VideoTrack &&
+            !publication.muted) {
+          return track;
         }
       }
 
@@ -2829,15 +2637,17 @@ class _VideoTile extends StatelessWidget {
 
     if (p is RemoteParticipant) {
       for (final publication
-          in p.videoTrackPublications.values) {
-        if (!publication.subscribed) {
+          in p.videoTrackPublications) {
+        if (!publication.subscribed ||
+            publication.muted) {
           continue;
         }
 
-        final track = publication.track;
+        final track =
+            publication.track;
 
-        if (track != null) {
-          return publication;
+        if (track is VideoTrack) {
+          return track;
         }
       }
     }
@@ -2845,58 +2655,239 @@ class _VideoTile extends StatelessWidget {
     return null;
   }
 
-  bool _isMuted() {
-    final p = participant;
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
+    final track =
+        _findVideoTrack();
 
-    if (p == null) return false;
-
-    if (p is LocalParticipant) {
-      return !p.isMicrophoneEnabled();
-    }
-
-    if (p is RemoteParticipant) {
-      return p.audioTrackPublications.values
-          .every(
-        (publication) =>
-            publication.muted ||
-            publication.track == null,
-      );
-    }
-
-    return false;
-  }
-
-  Widget _buildAvatarArea() {
-    return Container(
-      color:
-          AppColors.background,
-      alignment:
-          Alignment.center,
-      child: _Avatar(
-        name: name,
-        large: large,
+    return AnimatedContainer(
+      duration:
+          const Duration(
+        milliseconds: 250,
       ),
-    );
+      decoration:
+          BoxDecoration(
+        color:
+            AppColors.surface,
+        borderRadius:
+            BorderRadius.circular(
+          20,
+        ),
+        border:
+            Border.all(
+          color: active
+              ? AppColors.primary
+              : Colors.white10,
+          width:
+              active ? 2 : 1,
+        ),
+      ),
+      clipBehavior:
+          Clip.antiAlias,
+      child: Stack(
+        fit:
+            StackFit.expand,
+        children: [
+          if (track != null)
+            VideoTrackRenderer(
+              track,
+              fit:
+                  VideoViewFit.cover,
+              mirrorMode:
+                  isLocal
+                      ? VideoViewMirrorMode
+                          .mirror
+                      : VideoViewMirrorMode
+                          .auto,
+            )
+          else
+            Container(
+              color:
+                  AppColors.surface,
+              alignment:
+                  Alignment.center,
+              child:
+                  _Avatar(
+                name:
+                    userName,
+                large:
+                    true,
+              ),
+            ),
+          Positioned(
+            left: 10,
+            right: 10,
+            bottom: 10,
+            child:
+                Row(
+              children: [
+                Expanded(
+                  child:
+                      Container(
+                    padding:
+                        const EdgeInsets
+                            .symmetric(
+                      horizontal: 9,
+                      vertical: 6,
+                    ),
+                    decoration:
+                        BoxDecoration(
+                      color:
+                          Colors.black
+                              .withValues(
+                        alpha:
+                            0.55,
+                      ),
+                      borderRadius:
+                          BorderRadius.circular(
+                        9,
+                      ),
+                    ),
+                    child:
+                        Text(
+                      isLocal
+                          ? '$userName (vous)'
+                          : (userName.isEmpty
+                              ? 'Participant'
+                              : userName),
+                      maxLines:
+                          1,
+                      overflow:
+                          TextOverflow.ellipsis,
+                      style:
+                          const TextStyle(
+                        color:
+                            Colors.white,
+                        fontSize:
+                            11,
+                        fontWeight:
+                            FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                if (active) ...[
+                  const SizedBox(
+                    width:
+                        6,
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.all(
+                      6,
+                    ),
+                    decoration:
+                        const BoxDecoration(
+                      color:
+                          AppColors.primary,
+                      shape:
+                          BoxShape.circle,
+                    ),
+                    child:
+                        const Icon(
+                      Icons.graphic_eq,
+                      size:
+                          13,
+                      color:
+                          Colors.white,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    )
+        .animate()
+        .fadeIn(
+          duration:
+              250.ms,
+        );
   }
+}
 
-  Widget _buildGradient() {
+// =============================================================================
+// PANEL
+// =============================================================================
+
+class _Panel
+    extends StatelessWidget {
+  final String title;
+
+  final Widget child;
+
+  final VoidCallback onClose;
+
+  const _Panel({
+    required this.title,
+    required this.child,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
     return Positioned.fill(
-      child: DecoratedBox(
-        decoration:
-            const BoxDecoration(
-          gradient: LinearGradient(
-            begin:
-                Alignment.topCenter,
-            end:
-                Alignment.bottomCenter,
-            stops: [
-              0.55,
-              1.0,
-            ],
-            colors: [
-              Colors.transparent,
-              Colors.black87,
-            ],
+      child: ClipRect(
+        child: BackdropFilter(
+          filter:
+              ImageFilter.blur(
+            sigmaX: 18,
+            sigmaY: 18,
+          ),
+          child: Container(
+            color:
+                Colors.black.withValues(
+              alpha:
+                  0.90,
+            ),
+            child:
+                Column(
+              children: [
+                SafeArea(
+                  bottom:
+                      false,
+                  child:
+                      Row(
+                    children: [
+                      IconButton(
+                        onPressed:
+                            onClose,
+                        icon:
+                            const Icon(
+                          Icons.close,
+                          color:
+                              Colors.white,
+                        ),
+                      ),
+                      Expanded(
+                        child:
+                            Text(
+                          title,
+                          style:
+                              GoogleFonts.poppins(
+                            color:
+                                Colors.white,
+                            fontWeight:
+                                FontWeight.w700,
+                            fontSize:
+                                17,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child:
+                      child,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2904,12 +2895,278 @@ class _VideoTile extends StatelessWidget {
   }
 }
 
-// ==============================================================================
-// AVATAR
-// ==============================================================================
+// =============================================================================
+// CHAT MESSAGE
+// =============================================================================
 
-class _Avatar extends StatelessWidget {
+class _ChatMessage {
+  final String senderId;
+
+  final String sender;
+
+  final String message;
+
+  final DateTime? timestamp;
+
+  final bool isPrivate;
+
+  const _ChatMessage({
+    required this.senderId,
+    required this.sender,
+    required this.message,
+    required this.timestamp,
+    required this.isPrivate,
+  });
+}
+
+// =============================================================================
+// CHAT BUBBLE
+// =============================================================================
+
+class _ChatBubble
+    extends StatelessWidget {
+  final _ChatMessage message;
+
+  final bool isMe;
+
+  const _ChatBubble({
+    required this.message,
+    required this.isMe,
+  });
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
+    final time =
+        message.timestamp == null
+            ? ''
+            : '${message.timestamp!.hour.toString().padLeft(2, '0')}:'
+                '${message.timestamp!.minute.toString().padLeft(2, '0')}';
+
+    return Align(
+      alignment:
+          isMe
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
+      child:
+          Container(
+        constraints:
+            const BoxConstraints(
+          maxWidth:
+              340,
+        ),
+        margin:
+            const EdgeInsets.symmetric(
+          vertical:
+              4,
+        ),
+        padding:
+            const EdgeInsets.all(
+          12,
+        ),
+        decoration:
+            BoxDecoration(
+          color:
+              isMe
+                  ? AppColors.primary
+                  : Colors.white10,
+          borderRadius:
+              BorderRadius.circular(
+            16,
+          ),
+        ),
+        child:
+            Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            if (!isMe)
+              Text(
+                message.sender,
+                style:
+                    const TextStyle(
+                  color:
+                      Colors.white54,
+                  fontSize:
+                      10,
+                  fontWeight:
+                      FontWeight.w700,
+                ),
+              ),
+            Text(
+              message.message,
+              style:
+                  const TextStyle(
+                color:
+                    Colors.white,
+                fontSize:
+                    13,
+              ),
+            ),
+            if (time.isNotEmpty)
+              Align(
+                alignment:
+                    Alignment.centerRight,
+                child:
+                    Text(
+                  time,
+                  style:
+                      const TextStyle(
+                    color:
+                        Colors.white38,
+                    fontSize:
+                        9,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// TOP PILL
+// =============================================================================
+
+class _TopPill
+    extends StatelessWidget {
+  final IconData icon;
+
+  final String text;
+
+  const _TopPill({
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(
+        horizontal:
+            10,
+        vertical:
+            7,
+      ),
+      decoration:
+          BoxDecoration(
+        color:
+            Colors.black45,
+        borderRadius:
+            BorderRadius.circular(
+          999,
+        ),
+        border:
+            Border.all(
+          color:
+              Colors.white10,
+        ),
+      ),
+      child:
+          Row(
+        mainAxisSize:
+            MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size:
+                14,
+            color:
+                Colors.white70,
+          ),
+          const SizedBox(
+            width:
+                5,
+          ),
+          Text(
+            text,
+            style:
+                const TextStyle(
+              color:
+                  Colors.white70,
+              fontSize:
+                  10,
+              fontWeight:
+                  FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// CONTROL BUTTON
+// =============================================================================
+
+class _ControlButton
+    extends StatelessWidget {
+  final IconData icon;
+
+  final bool active;
+
+  final VoidCallback onTap;
+
+  const _ControlButton({
+    required this.icon,
+    required this.onTap,
+    this.active = false,
+  });
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
+    return Material(
+      color:
+          active
+              ? Colors.white10
+              : Colors.transparent,
+      shape:
+          const CircleBorder(),
+      child:
+          InkWell(
+        customBorder:
+            const CircleBorder(),
+        onTap:
+            onTap,
+        child:
+            Padding(
+          padding:
+              const EdgeInsets.all(
+            10,
+          ),
+          child:
+              Icon(
+            icon,
+            color:
+                active
+                    ? Colors.white
+                    : Colors.white60,
+            size:
+                22,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// AVATAR
+// =============================================================================
+
+class _Avatar
+    extends StatelessWidget {
   final String name;
+
   final bool large;
 
   const _Avatar({
@@ -2918,333 +3175,48 @@ class _Avatar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final letter = name.trim().isEmpty
-        ? '?'
-        : name
-            .trim()
-            .characters
-            .first
-            .toUpperCase();
+  Widget build(
+    BuildContext context,
+  ) {
+    final size =
+        large ? 72.0 : 42.0;
+
+    final initial =
+        name.trim().isEmpty
+            ? '?'
+            : name
+                .trim()
+                .characters
+                .first
+                .toUpperCase();
 
     return Container(
-      width: large ? 80 : 55,
-      height: large ? 80 : 55,
+      width:
+          size,
+      height:
+          size,
       decoration:
           const BoxDecoration(
         gradient:
             AppColors.primaryGradient,
-        shape: BoxShape.circle,
+        shape:
+            BoxShape.circle,
       ),
       alignment:
           Alignment.center,
-      child: Text(
-        letter,
+      child:
+          Text(
+        initial,
         style:
             TextStyle(
-          color: Colors.white,
-          fontWeight:
-              FontWeight.bold,
-          fontSize:
-              large ? 30 : 20,
-        ),
-      ),
-    );
-  }
-}
-
-// ==============================================================================
-// CIRCLE BUTTON
-// ==============================================================================
-
-class _CircleButton
-    extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _CircleButton({
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black45,
-      shape:
-          const CircleBorder(),
-      child: InkWell(
-        customBorder:
-            const CircleBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding:
-              const EdgeInsets.all(9),
-          child: Icon(
-            icon,
-            color:
-                Colors.white70,
-            size: 19,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ==============================================================================
-// CONTROL BUTTON
-// ==============================================================================
-
-class _ControlButton
-    extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool active;
-  final bool danger;
-
-  const _ControlButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.active = false,
-    this.danger = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final Color iconColor = danger
-        ? AppColors.error
-        : active
-            ? Colors.white
-            : Colors.white60;
-
-    return InkWell(
-      borderRadius:
-          BorderRadius.circular(
-        15,
-      ),
-      onTap: onTap,
-      child: Padding(
-        padding:
-            const EdgeInsets.symmetric(
-          horizontal: 7,
-          vertical: 4,
-        ),
-        child: Column(
-          mainAxisSize:
-              MainAxisSize.min,
-          children: [
-            Container(
-              width: 46,
-              height: 42,
-              decoration:
-                  BoxDecoration(
-                color: danger
-                    ? AppColors.error
-                        .withValues(
-                      alpha: 0.12,
-                    )
-                    : Colors.white
-                        .withValues(
-                      alpha:
-                          active
-                              ? 0.08
-                              : 0.04,
-                    ),
-                borderRadius:
-                    BorderRadius.circular(
-                  14,
-                ),
-              ),
-              alignment:
-                  Alignment.center,
-              child: Icon(
-                icon,
-                color: iconColor,
-                size: 22,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style:
-                  const TextStyle(
-                color:
-                    Colors.white54,
-                fontSize: 9,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ==============================================================================
-// BASE PANEL
-// ==============================================================================
-
-class _BasePanel
-    extends StatelessWidget {
-  final String title;
-  final Widget child;
-  final VoidCallback onClose;
-
-  const _BasePanel({
-    required this.title,
-    required this.child,
-    required this.onClose,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: BackdropFilter(
-        filter:
-            ImageFilter.blur(
-          sigmaX: 18,
-          sigmaY: 18,
-        ),
-        child: Container(
           color:
-              Colors.black.withValues(
-            alpha: 0.92,
-          ),
-          child: Column(
-            children: [
-              AppBar(
-                backgroundColor:
-                    Colors.transparent,
-                elevation: 0,
-                title: Text(
-                  title,
-                  style:
-                      GoogleFonts.poppins(
-                    color:
-                        Colors.white,
-                    fontWeight:
-                        FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                leading:
-                    IconButton(
-                  onPressed: onClose,
-                  icon: const Icon(
-                    Icons.close,
-                    color:
-                        Colors.white,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: child,
-              ),
-            ],
-          ),
-        ),
-      ),
-    )
-        .animate()
-        .slideY(
-          begin: 1,
-          end: 0,
-          duration:
-              280.ms,
-          curve:
-              Curves.easeOutCubic,
-        );
-  }
-}
-
-// ==============================================================================
-// CHAT MESSAGE
-// ==============================================================================
-
-class _ChatMessage {
-  final String sender;
-  final String message;
-  final bool isMe;
-
-  const _ChatMessage({
-    required this.sender,
-    required this.message,
-    required this.isMe,
-  });
-}
-
-// ==============================================================================
-// CHAT BUBBLE
-// ==============================================================================
-
-class _ChatBubble
-    extends StatelessWidget {
-  final _ChatMessage message;
-
-  const _ChatBubble({
-    required this.message,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: message.isMe
-          ? Alignment.centerRight
-          : Alignment.centerLeft,
-      child: Container(
-        margin:
-            const EdgeInsets.only(
-          bottom: 8,
-        ),
-        padding:
-            const EdgeInsets.all(12),
-        constraints:
-            const BoxConstraints(
-          maxWidth: 320,
-        ),
-        decoration:
-            BoxDecoration(
-          color: message.isMe
-              ? AppColors.primary
-              : Colors.white12,
-          borderRadius:
-              BorderRadius.circular(
-            16,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-          children: [
-            if (!message.isMe)
-              Text(
-                message.sender,
-                style:
-                    const TextStyle(
-                  color:
-                      Colors.white54,
-                  fontSize: 9,
-                  fontWeight:
-                      FontWeight.bold,
-                ),
-              ),
-            if (!message.isMe)
-              const SizedBox(height: 4),
-            Text(
-              message.message,
-              style:
-                  const TextStyle(
-                color:
-                    Colors.white,
-                fontSize: 13,
-              ),
-            ),
-          ],
+              Colors.white,
+          fontWeight:
+              FontWeight.w800,
+          fontSize:
+              large ? 28 : 17,
         ),
       ),
     );
   }
-} 
+}
