@@ -6,134 +6,123 @@ import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
 
+enum LiveKitRole {
+  host,
+  speaker,
+  audience,
+}
+
+class LiveKitConnectionDetails {
+  final String token;
+  final String serverUrl;
+
+  const LiveKitConnectionDetails({
+    required this.token,
+    required this.serverUrl,
+  });
+}
+
 class LiveKitService {
   LiveKitService._();
 
   static final LiveKitService instance = LiveKitService._();
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // FETCH CONNECTION DETAILS
-  // ═══════════════════════════════════════════════════════════════════════
-
-  Future<String?> fetchToken({
+  Future<LiveKitConnectionDetails?> fetchConnectionDetails({
     required String room,
     required String identity,
     required String name,
-    bool isHost = false,
+    required LiveKitRole role,
   }) async {
     final cleanRoom = room.trim();
     final cleanIdentity = identity.trim();
     final cleanName = name.trim();
 
-    if (cleanRoom.isEmpty) {
-      _error('Room name is empty');
+    if (cleanRoom.isEmpty ||
+        cleanIdentity.isEmpty ||
+        cleanName.isEmpty) {
+      _logError('Invalid LiveKit connection parameters.');
       return null;
     }
 
-    if (cleanIdentity.isEmpty) {
-      _error('Participant identity is empty');
-      return null;
-    }
-
-    if (cleanName.isEmpty) {
-      _error('Participant name is empty');
+    if (!AppConfig.isLiveKitConfigured) {
+      _logError(
+        'LiveKit is not configured. '
+        'Set LIVEKIT_WSS_URL and LIVEKIT_TOKEN_ENDPOINT.',
+      );
       return null;
     }
 
     try {
-      developer.log(
-        'Connecting to LiveKit Sandbox '
-        'room=$cleanRoom identity=$cleanIdentity host=$isHost',
-        level: 800,
-      );
-
       final response = await http
           .post(
-            Uri.parse(AppConfig.livekitSandboxEndpoint),
-            headers: {
+            Uri.parse(AppConfig.livekitTokenEndpoint),
+            headers: const {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
-              'X-Sandbox-ID': AppConfig.livekitSandboxId,
-              'User-Agent': 'crux-flutter/${AppConfig.appVersion}',
             },
             body: jsonEncode({
               'room_name': cleanRoom,
-              'participant_name': cleanIdentity,
+              'participant_identity': cleanIdentity,
+              'participant_name': cleanName,
+
+              // Le backend doit utiliser ces informations
+              // pour construire les permissions LiveKit.
+              'role': role.name,
+
+              'can_publish': role != LiveKitRole.audience,
+              'can_subscribe': true,
+              'can_publish_data': true,
             }),
           )
           .timeout(AppConfig.tokenTimeout);
 
-      developer.log(
-        'LiveKit Sandbox response: ${response.statusCode}',
-        level: 800,
-      );
-
       if (response.statusCode < 200 ||
           response.statusCode >= 300) {
-        _error(
-          'LiveKit Sandbox HTTP ${response.statusCode}: '
+        _logError(
+          'Token server returned HTTP ${response.statusCode}: '
           '${response.body}',
         );
-
         return null;
       }
 
       final decoded = jsonDecode(response.body);
 
       if (decoded is! Map<String, dynamic>) {
-        _error('Invalid LiveKit response format');
+        _logError('Invalid token server response.');
         return null;
       }
 
-      final participantToken =
-          decoded['participantToken'] as String?;
-
-      if (participantToken == null ||
-          participantToken.isEmpty) {
-        _error(
-          'LiveKit response does not contain participantToken',
-        );
-
-        return null;
-      }
+      final token =
+          decoded['participantToken']?.toString() ??
+          decoded['token']?.toString();
 
       final serverUrl =
-          decoded['serverUrl'] as String?;
+          decoded['serverUrl']?.toString() ??
+          AppConfig.livekitWssUrl;
 
-      if (serverUrl != null && serverUrl.isNotEmpty) {
-        developer.log(
-          'LiveKit server returned: $serverUrl',
-          level: 800,
-        );
+      if (token == null || token.isEmpty) {
+        _logError('No participant token returned by backend.');
+        return null;
       }
 
-      final roomName =
-          decoded['roomName'] as String?;
+      if (!serverUrl.startsWith('wss://')) {
+        _logError('Invalid LiveKit server URL: $serverUrl');
+        return null;
+      }
 
-      final participantName =
-          decoded['participantName'] as String?;
-
-      developer.log(
-        'LiveKit connection details received '
-        'room=$roomName participant=$participantName',
-        level: 800,
+      return LiveKitConnectionDetails(
+        token: token,
+        serverUrl: serverUrl,
       );
-
-      return participantToken;
     } on TimeoutException {
-      _error(
-        'LiveKit Sandbox request timed out after '
-        '${AppConfig.tokenTimeout.inSeconds}s',
-      );
-
+      _logError('LiveKit token request timed out.');
       return null;
     } on FormatException catch (e) {
-      _error('Invalid LiveKit JSON response: $e');
-
+      _logError('Invalid JSON from token server: $e');
       return null;
     } catch (e, stackTrace) {
       developer.log(
-        'LiveKit token request failed',
+        'LiveKit connection details request failed.',
         error: e,
         stackTrace: stackTrace,
         level: 1000,
@@ -143,7 +132,25 @@ class LiveKitService {
     }
   }
 
-  void _error(String message) {
+  Future<String?> fetchToken({
+    required String room,
+    required String identity,
+    required String name,
+    bool isHost = false,
+  }) async {
+    final details = await fetchConnectionDetails(
+      room: room,
+      identity: identity,
+      name: name,
+      role: isHost
+          ? LiveKitRole.host
+          : LiveKitRole.audience,
+    );
+
+    return details?.token;
+  }
+
+  void _logError(String message) {
     developer.log(
       'LiveKitService: $message',
       level: 1000,
