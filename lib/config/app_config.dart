@@ -23,60 +23,82 @@ class AppConfig {
   // LIVEKIT
   // ===========================================================================
 
-  /// URL LiveKit Cloud de production.
+  /// URL WebSocket LiveKit Cloud.
   ///
-  /// Ne mets pas ici le Sandbox endpoint.
+  /// IMPORTANT :
+  /// Cette valeur ne doit PAS être le endpoint HTTP du token server.
   static const String livekitWssUrl = String.fromEnvironment(
     'LIVEKIT_WSS_URL',
     defaultValue: 'wss://crux-88fihb12.livekit.cloud',
   );
 
-  /// Endpoint de TON serveur de tokens.
+  /// Endpoint HTTP/HTTPS du serveur qui génère les tokens LiveKit.
   ///
-  /// Exemple :
-  /// https://ton-backend.example.com/api/livekit/connection-details
+  /// Le workflow actuel de CRUX utilise LIVEKIT_TOKEN_SERVER_URL.
+  ///
+  /// On accepte également LIVEKIT_TOKEN_ENDPOINT afin de rester
+  /// compatible avec les anciennes configurations.
   static const String livekitTokenEndpoint = String.fromEnvironment(
-    'LIVEKIT_TOKEN_ENDPOINT',
-    defaultValue: '',
+    'LIVEKIT_TOKEN_SERVER_URL',
+    defaultValue: String.fromEnvironment(
+      'LIVEKIT_TOKEN_ENDPOINT',
+      defaultValue: '',
+    ),
   );
 
   // ===========================================================================
-  // WEBINAR SCALE
+  // LARGE CONFERENCE / WEBINAR
   // ===========================================================================
 
-  /// Capacité cible CRUX.
+  /// Objectif d'audience CRUX.
+  ///
+  /// Cette constante représente la capacité visée par l'architecture
+  /// applicative. La capacité réelle dépend du cluster LiveKit utilisé.
   static const int webinarMinimumParticipants = 10000;
 
-  /// Nombre maximal de vidéos affichées simultanément.
+  /// Capacité maximale cible configurée côté application.
+  static const int maxParticipantsLarge = 8000;
+
+  /// Nombre de vidéos réellement rendues simultanément.
   ///
-  /// IMPORTANT :
-  /// ce nombre n'est PAS la capacité de la room.
+  /// Même avec 5 000 participants dans la room, le navigateur ne doit
+  /// jamais essayer d'afficher 5 000 flux vidéo.
   static const int maxVisibleVideoTiles = 10;
 
-  /// Nombre maximal de speakers affichés sur la scène.
+  /// Alias conservé pour les autres écrans CRUX.
+  static const int livekitVisibleTileCap = 10;
+
+  /// Nombre maximum de personnes considérées comme speakers/stage.
   static const int maxStageParticipants = 10;
 
-  /// Nombre maximal de messages chargés localement.
+  /// Nombre de messages conservés localement.
   static const int maxLocalChatMessages = 200;
 
   // ===========================================================================
-  // STANDARD / OTHER MODES
+  // STANDARD / AUTRES MODES
   // ===========================================================================
 
   static const int maxParticipantsStandard = 1000;
-
-  static const int maxParticipantsLarge = 10000;
-  static const int livekitVisibleTileCap = 10;
 
   // ===========================================================================
   // TIMEOUTS
   // ===========================================================================
 
-  static const Duration tokenTimeout = Duration(seconds: 30);
+  static const Duration tokenTimeout = Duration(
+    seconds: 30,
+  );
 
-  static const Duration roomConnectionTimeout = Duration(seconds: 45);
+  static const Duration roomConnectionTimeout = Duration(
+    seconds: 45,
+  );
 
-  static const Duration reconnectDelay = Duration(seconds: 10);
+  static const Duration reconnectDelay = Duration(
+    seconds: 5,
+  );
+
+  static const Duration retryBackoff = Duration(
+    seconds: 2,
+  );
 
   static const int maxReconnectAttempts = 8;
 
@@ -153,16 +175,24 @@ $livekitWssUrl
 Token endpoint:
 $livekitTokenEndpoint
 
-Webinar capacity target:
+Webinar target:
 $webinarMinimumParticipants
+
+Large room target:
+$maxParticipantsLarge
 
 Visible video tiles:
 $maxVisibleVideoTiles
+
+Stage participants:
+$maxStageParticipants
 ''';
   }
 
   static void printDiagnostics() {
-    if (!kDebugMode) return;
+    if (!kDebugMode) {
+      return;
+    }
 
     debugPrint(configDiagnostics);
   }
