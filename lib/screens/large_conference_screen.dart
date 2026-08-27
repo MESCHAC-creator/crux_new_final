@@ -43,29 +43,34 @@ class LargeConferenceScreen extends StatefulWidget {
       _LargeConferenceScreenState();
 }
 
-class _LargeConferenceScreenState
-    extends State<LargeConferenceScreen>
+class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     with WidgetsBindingObserver {
   // ===========================================================================
-  // LARGE WEBINAR
+  // LARGE WEBINAR CONFIGURATION
   // ===========================================================================
 
+  /// Nombre maximum de vidéos rendues simultanément.
+  ///
+  /// IMPORTANT :
+  /// La room peut contenir des milliers de participants.
+  /// L'interface ne doit jamais essayer de construire des milliers de vidéos.
   static const int _maxVisibleVideos = 10;
 
+  /// Capacité cible de ce mode webinaire.
+  ///
+  /// Cette valeur est uniquement une indication UI.
+  /// Elle ne configure pas la capacité réelle de LiveKit.
   static const int _targetParticipants = 10000;
 
   // ===========================================================================
   // SERVICES
   // ===========================================================================
 
-  final FirebaseFirestore _db =
-      FirebaseFirestore.instance;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  final FlutterTts _tts =
-      FlutterTts();
+  final FlutterTts _tts = FlutterTts();
 
-  final stt.SpeechToText _speech =
-      stt.SpeechToText();
+  final stt.SpeechToText _speech = stt.SpeechToText();
 
   // ===========================================================================
   // LIVEKIT
@@ -85,16 +90,14 @@ class _LargeConferenceScreenState
   // PARTICIPANTS
   // ===========================================================================
 
-  List<RemoteParticipant>
-      _remoteParticipants =
+  List<RemoteParticipant> _remoteParticipants =
       <RemoteParticipant>[];
 
   String? _activeSpeakerId;
 
   String? _organizerId;
 
-  final Set<String> _raisedHands =
-      <String>{};
+  final Set<String> _raisedHands = <String>{};
 
   // ===========================================================================
   // LOCAL MEDIA
@@ -158,11 +161,9 @@ class _LargeConferenceScreenState
   // CONTROLLERS
   // ===========================================================================
 
-  late final TextEditingController
-      _chatController;
+  late final TextEditingController _chatController;
 
-  late final TextEditingController
-      _noteController;
+  late final TextEditingController _noteController;
 
   final List<_ChatMessage> _chatMessages =
       <_ChatMessage>[];
@@ -175,22 +176,18 @@ class _LargeConferenceScreenState
   void initState() {
     super.initState();
 
-    _chatController =
-        TextEditingController();
+    _chatController = TextEditingController();
 
-    _noteController =
-        TextEditingController();
+    _noteController = TextEditingController();
 
-    WidgetsBinding.instance
-        .addObserver(this);
+    WidgetsBinding.instance.addObserver(this);
 
     _initialize();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance
-        .removeObserver(this);
+    WidgetsBinding.instance.removeObserver(this);
 
     _callTimer?.cancel();
 
@@ -262,23 +259,16 @@ class _LargeConferenceScreenState
 
   Future<void> _loadPreferences() async {
     try {
-      final prefs =
-          await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance();
 
       if (!mounted) return;
 
       setState(() {
         _micOn =
-            prefs.getBool(
-                  'crux_mic_default',
-                ) ??
-                true;
+            prefs.getBool('crux_mic_default') ?? true;
 
         _camOn =
-            prefs.getBool(
-                  'crux_cam_default',
-                ) ??
-                true;
+            prefs.getBool('crux_cam_default') ?? true;
       });
     } catch (e) {
       crux.logger.w(
@@ -294,9 +284,7 @@ class _LargeConferenceScreenState
 
   Future<void> _checkPro() async {
     try {
-      final value =
-          await ProService()
-              .checkProStatus(
+      final value = await ProService().checkProStatus(
         widget.userId,
       );
 
@@ -320,9 +308,7 @@ class _LargeConferenceScreenState
   Future<void> _loadOrganizer() async {
     try {
       final doc = await _db
-          .collection(
-            AppConfig.meetingsCollection,
-          )
+          .collection(AppConfig.meetingsCollection)
           .doc(widget.meetingId)
           .get();
 
@@ -347,16 +333,14 @@ class _LargeConferenceScreenState
   // ===========================================================================
 
   Future<void> _registerPresence() async {
-    await MeetingService()
-        .registerPresence(
+    await MeetingService().registerPresence(
       widget.meetingId,
       widget.userId,
       widget.userName,
     );
 
     if (widget.isHost) {
-      await MeetingService()
-          .updateMeetingStatus(
+      await MeetingService().updateMeetingStatus(
         widget.meetingId,
         MeetingStatus.ongoing,
       );
@@ -364,26 +348,21 @@ class _LargeConferenceScreenState
   }
 
   void _listenPresence() {
-    _presenceSubscription =
-        _db
-            .collection(
-              AppConfig.meetingsCollection,
-            )
-            .doc(widget.meetingId)
-            .collection('presence')
-            .snapshots()
-            .listen(
+    _presenceSubscription = _db
+        .collection(AppConfig.meetingsCollection)
+        .doc(widget.meetingId)
+        .collection('presence')
+        .snapshots()
+        .listen(
       (snapshot) {
         if (!mounted) return;
 
         final hands = <String>{};
 
-        for (final doc
-            in snapshot.docs) {
+        for (final doc in snapshot.docs) {
           final data = doc.data();
 
-          if (data['handRaised'] ==
-              true) {
+          if (data['handRaised'] == true) {
             hands.add(doc.id);
           }
         }
@@ -402,58 +381,43 @@ class _LargeConferenceScreenState
   // ===========================================================================
 
   void _listenChat() {
-    _chatSubscription =
-        _db
-            .collection(
-              AppConfig.meetingsCollection,
-            )
-            .doc(widget.meetingId)
-            .collection('chat')
-            .orderBy(
-              'timestamp',
-              descending: false,
-            )
-            .limit(
-              AppConfig.maxLocalChatMessages,
-            )
-            .snapshots()
-            .listen(
+    _chatSubscription = _db
+        .collection(AppConfig.meetingsCollection)
+        .doc(widget.meetingId)
+        .collection('chat')
+        .orderBy(
+          'timestamp',
+          descending: false,
+        )
+        .limit(AppConfig.maxLocalChatMessages)
+        .snapshots()
+        .listen(
       (snapshot) {
         if (!mounted) return;
 
-        final messages =
-            <_ChatMessage>[];
+        final messages = <_ChatMessage>[];
 
-        for (final doc
-            in snapshot.docs) {
+        for (final doc in snapshot.docs) {
           final data = doc.data();
 
           messages.add(
             _ChatMessage(
               senderId:
-                  data['senderId']
-                      ?.toString() ??
-                  '',
+                  data['senderId']?.toString() ?? '',
               sender:
-                  data['sender']
-                      ?.toString() ??
-                  'Anonyme',
+                  data['sender']?.toString() ??
+                      'Anonyme',
               message:
-                  data['message']
-                      ?.toString() ??
-                  data['text']
-                      ?.toString() ??
-                  '',
+                  data['message']?.toString() ??
+                      data['text']?.toString() ??
+                      '',
               timestamp:
-                  data['timestamp']
-                      is Timestamp
-                  ? (data['timestamp']
-                          as Timestamp)
-                      .toDate()
-                  : null,
+                  data['timestamp'] is Timestamp
+                      ? (data['timestamp'] as Timestamp)
+                          .toDate()
+                      : null,
               isPrivate:
-                  data['isPrivate'] ==
-                  true,
+                  data['isPrivate'] == true,
             ),
           );
         }
@@ -468,8 +432,7 @@ class _LargeConferenceScreenState
   }
 
   Future<void> _sendChat() async {
-    final text =
-        _chatController.text.trim();
+    final text = _chatController.text.trim();
 
     if (text.isEmpty) return;
 
@@ -477,9 +440,7 @@ class _LargeConferenceScreenState
 
     try {
       await _db
-          .collection(
-            AppConfig.meetingsCollection,
-          )
+          .collection(AppConfig.meetingsCollection)
           .doc(widget.meetingId)
           .collection('chat')
           .add({
@@ -487,8 +448,7 @@ class _LargeConferenceScreenState
         'sender': widget.userName,
         'message': text,
         'text': text,
-        'timestamp':
-            FieldValue.serverTimestamp(),
+        'timestamp': FieldValue.serverTimestamp(),
         'isPrivate': false,
       });
 
@@ -525,16 +485,14 @@ class _LargeConferenceScreenState
       }
 
       final token =
-          await LiveKitService.instance
-              .fetchToken(
+          await LiveKitService.instance.fetchToken(
         room: widget.meetingId,
         identity: widget.userId,
         name: widget.userName,
         isHost: widget.isHost,
       );
 
-      if (token == null ||
-          token.isEmpty) {
+      if (token == null || token.isEmpty) {
         throw Exception(
           'Le serveur LiveKit n’a pas retourné '
           'de token valide.',
@@ -544,8 +502,7 @@ class _LargeConferenceScreenState
       await _disposeRoom();
 
       final room = Room(
-        roomOptions:
-            const RoomOptions(
+        roomOptions: const RoomOptions(
           adaptiveStream: true,
           dynacast: true,
           defaultVideoPublishOptions:
@@ -557,12 +514,9 @@ class _LargeConferenceScreenState
 
       _room = room;
 
-      _roomListener =
-          room.createListener();
+      _roomListener = room.createListener();
 
-      _setupRoomEvents(
-        _roomListener!,
-      );
+      _setupRoomEvents(_roomListener!);
 
       await room
           .connect(
@@ -578,19 +532,12 @@ class _LargeConferenceScreenState
         },
       );
 
-      final local =
-          room.localParticipant;
+      final local = room.localParticipant;
 
       if (local != null) {
-        await local
-            .setMicrophoneEnabled(
-          _micOn,
-        );
+        await local.setMicrophoneEnabled(_micOn);
 
-        await local
-            .setCameraEnabled(
-          _camOn,
-        );
+        await local.setCameraEnabled(_camOn);
       }
 
       _refreshParticipants();
@@ -660,7 +607,7 @@ class _LargeConferenceScreenState
       ..on<RoomDisconnectedEvent>((_) {
         if (!mounted) return;
 
-        _attemptReconnect();
+        unawaited(_attemptReconnect());
       })
       ..on<ParticipantConnectedEvent>(
         (event) {
@@ -668,15 +615,11 @@ class _LargeConferenceScreenState
 
           if (_voiceAssistant) {
             final name =
-                event.participant.name
-                        .trim()
-                        .isNotEmpty
+                event.participant.name.trim().isNotEmpty
                     ? event.participant.name
                     : 'Un participant';
 
-            _announce(
-              '$name a rejoint.',
-            );
+            _announce('$name a rejoint.');
           }
         },
       )
@@ -686,15 +629,11 @@ class _LargeConferenceScreenState
 
           if (_voiceAssistant) {
             final name =
-                event.participant.name
-                        .trim()
-                        .isNotEmpty
+                event.participant.name.trim().isNotEmpty
                     ? event.participant.name
                     : 'Un participant';
 
-            _announce(
-              '$name a quitté.',
-            );
+            _announce('$name a quitté.');
           }
         },
       )
@@ -704,8 +643,7 @@ class _LargeConferenceScreenState
 
           if (event.speakers.isEmpty) {
             setState(() {
-              _activeSpeakerId =
-                  null;
+              _activeSpeakerId = null;
             });
 
             return;
@@ -713,14 +651,11 @@ class _LargeConferenceScreenState
 
           setState(() {
             _activeSpeakerId =
-                event.speakers
-                    .first
-                    .identity;
+                event.speakers.first.identity;
           });
         },
       )
-      ..on<
-          ParticipantMetadataUpdatedEvent>(
+      ..on<ParticipantMetadataUpdatedEvent>(
         (_) {
           _refreshParticipants();
         },
@@ -762,23 +697,18 @@ class _LargeConferenceScreenState
     }
 
     final participants =
-        room.remoteParticipants.values
-            .toList();
+        room.remoteParticipants.values.toList();
 
     setState(() {
-      _remoteParticipants =
-          participants;
+      _remoteParticipants = participants;
     });
   }
 
-  /// Retourne uniquement les participants
-  /// qui doivent être affichés.
+  /// Retourne uniquement les participants affichés.
   ///
-  /// La room peut contenir des milliers
-  /// de personnes, mais Flutter ne rend
-  /// jamais des milliers de vidéos.
-  List<RemoteParticipant>
-      get _visibleParticipants {
+  /// Même avec 5 000 participants dans la room,
+  /// l'interface ne construit que 10 tuiles vidéo.
+  List<RemoteParticipant> get _visibleParticipants {
     final participants =
         List<RemoteParticipant>.from(
       _remoteParticipants,
@@ -787,12 +717,10 @@ class _LargeConferenceScreenState
     participants.sort(
       (a, b) {
         final aActive =
-            a.identity ==
-            _activeSpeakerId;
+            a.identity == _activeSpeakerId;
 
         final bActive =
-            b.identity ==
-            _activeSpeakerId;
+            b.identity == _activeSpeakerId;
 
         if (aActive && !bActive) {
           return -1;
@@ -802,11 +730,9 @@ class _LargeConferenceScreenState
           return 1;
         }
 
-        final aVideo =
-            _hasVideo(a);
+        final aVideo = _hasVideo(a);
 
-        final bVideo =
-            _hasVideo(b);
+        final bVideo = _hasVideo(b);
 
         if (aVideo && !bVideo) {
           return -1;
@@ -824,10 +750,9 @@ class _LargeConferenceScreenState
       },
     );
 
+    // 1 vidéo locale + 9 vidéos distantes = 10 maximum.
     return participants
-        .take(
-          _maxVisibleVideos - 1,
-        )
+        .take(_maxVisibleVideos - 1)
         .toList();
   }
 
@@ -835,12 +760,10 @@ class _LargeConferenceScreenState
     RemoteParticipant participant,
   ) {
     for (final publication
-        in participant
-            .videoTrackPublications) {
+        in participant.videoTrackPublications) {
       if (publication.subscribed &&
           !publication.muted &&
-          publication.track !=
-              null) {
+          publication.track != null) {
         return true;
       }
     }
@@ -849,35 +772,28 @@ class _LargeConferenceScreenState
   }
 
   // ===========================================================================
-  // DATA
+  // LIVEKIT DATA
   // ===========================================================================
 
   void _handleDataReceived(
     DataReceivedEvent event,
   ) {
     try {
-      final text =
-          utf8.decode(event.data);
+      final text = utf8.decode(event.data);
 
-      final decoded =
-          jsonDecode(text);
+      final decoded = jsonDecode(text);
 
-      if (decoded
-          is! Map<String, dynamic>) {
+      if (decoded is! Map<String, dynamic>) {
         return;
       }
 
-      final type =
-          decoded['type']?.toString();
+      final type = decoded['type']?.toString();
 
       if (type == 'mute_all') {
         final sender =
-            event.participant
-                ?.identity;
+            event.participant?.identity;
 
-        if (sender ==
-                _organizerId &&
-            _micOn) {
+        if (sender == _organizerId && _micOn) {
           _toggleMic();
 
           _announce(
@@ -890,8 +806,7 @@ class _LargeConferenceScreenState
 
       if (type == 'raise_hand') {
         final identity =
-            decoded['identity']
-                ?.toString();
+            decoded['identity']?.toString();
 
         if (identity == null) {
           return;
@@ -899,9 +814,7 @@ class _LargeConferenceScreenState
 
         if (mounted) {
           setState(() {
-            _raisedHands.add(
-              identity,
-            );
+            _raisedHands.add(identity);
           });
         }
 
@@ -910,8 +823,7 @@ class _LargeConferenceScreenState
 
       if (type == 'lower_hand') {
         final identity =
-            decoded['identity']
-                ?.toString();
+            decoded['identity']?.toString();
 
         if (identity == null) {
           return;
@@ -919,9 +831,7 @@ class _LargeConferenceScreenState
 
         if (mounted) {
           setState(() {
-            _raisedHands.remove(
-              identity,
-            );
+            _raisedHands.remove(identity);
           });
         }
 
@@ -942,8 +852,7 @@ class _LargeConferenceScreenState
 
     if (room == null) return;
 
-    final local =
-        room.localParticipant;
+    final local = room.localParticipant;
 
     if (local == null) return;
 
@@ -972,15 +881,11 @@ class _LargeConferenceScreenState
     final next = !_micOn;
 
     try {
-      final local =
-          _room?.localParticipant;
+      final local = _room?.localParticipant;
 
       if (local == null) return;
 
-      await local
-          .setMicrophoneEnabled(
-        next,
-      );
+      await local.setMicrophoneEnabled(next);
 
       if (!mounted) return;
 
@@ -1003,15 +908,11 @@ class _LargeConferenceScreenState
     final next = !_camOn;
 
     try {
-      final local =
-          _room?.localParticipant;
+      final local = _room?.localParticipant;
 
       if (local == null) return;
 
-      await local
-          .setCameraEnabled(
-        next,
-      );
+      await local.setCameraEnabled(next);
 
       if (!mounted) return;
 
@@ -1031,19 +932,14 @@ class _LargeConferenceScreenState
   // ===========================================================================
 
   Future<void> _toggleScreenShare() async {
-    final local =
-        _room?.localParticipant;
+    final local = _room?.localParticipant;
 
     if (local == null) return;
 
-    final next =
-        !_screenSharing;
+    final next = !_screenSharing;
 
     try {
-      await local
-          .setScreenShareEnabled(
-        next,
-      );
+      await local.setScreenShareEnabled(next);
 
       if (!mounted) return;
 
@@ -1067,9 +963,7 @@ class _LargeConferenceScreenState
 
     try {
       await _db
-          .collection(
-            AppConfig.meetingsCollection,
-          )
+          .collection(AppConfig.meetingsCollection)
           .doc(widget.meetingId)
           .collection('presence')
           .doc(widget.userId)
@@ -1114,18 +1008,15 @@ class _LargeConferenceScreenState
 
   Future<void> _muteAllOthers() async {
     if (!widget.isHost &&
-        widget.userId !=
-            _organizerId) {
+        widget.userId != _organizerId) {
       return;
     }
 
-    final confirmed =
-        await showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor:
-              AppColors.surface,
+          backgroundColor: AppColors.surface,
           title: const Text(
             'Muter tout le monde ?',
             style: TextStyle(
@@ -1141,20 +1032,14 @@ class _LargeConferenceScreenState
           actions: [
             TextButton(
               onPressed: () =>
-                  Navigator.pop(
-                context,
-                false,
-              ),
+                  Navigator.pop(context, false),
               child: const Text(
                 'Annuler',
               ),
             ),
             ElevatedButton(
               onPressed: () =>
-                  Navigator.pop(
-                context,
-                true,
-              ),
+                  Navigator.pop(context, true),
               child: const Text(
                 'Muter',
               ),
@@ -1180,7 +1065,14 @@ class _LargeConferenceScreenState
 
   Future<void> _toggleCaptions() async {
     if (_liveCaptions) {
-      await _speech.stop();
+      try {
+        await _speech.stop();
+      } catch (e) {
+        crux.logger.w(
+          'Speech recognition stop failed',
+          error: e,
+        );
+      }
 
       if (!mounted) return;
 
@@ -1197,6 +1089,16 @@ class _LargeConferenceScreenState
           await _speech.initialize();
 
       if (!available) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'La reconnaissance vocale n’est pas disponible sur cet appareil.',
+              ),
+            ),
+          );
+        }
+
         return;
       }
 
@@ -1207,7 +1109,12 @@ class _LargeConferenceScreenState
       });
 
       await _speech.listen(
-        localeId: 'fr_FR',
+        listenOptions:
+            const stt.SpeechListenOptions(
+          localeId: 'fr_FR',
+          partialResults: true,
+          cancelOnError: false,
+        ),
         onResult: (result) {
           if (!mounted) return;
 
@@ -1217,15 +1124,17 @@ class _LargeConferenceScreenState
           });
         },
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       crux.logger.w(
         'Speech recognition failed',
         error: e,
+        stackTrace: stackTrace,
       );
 
       if (mounted) {
         setState(() {
           _liveCaptions = false;
+          _currentTranscription = '';
         });
       }
     }
@@ -1235,17 +1144,13 @@ class _LargeConferenceScreenState
   // VOICE ASSISTANT
   // ===========================================================================
 
-  Future<void> _announce(
-    String text,
-  ) async {
+  Future<void> _announce(String text) async {
     if (!_voiceAssistant) {
       return;
     }
 
     try {
-      await _tts.setLanguage(
-        'fr-FR',
-      );
+      await _tts.setLanguage('fr-FR');
 
       await _tts.setPitch(1.0);
 
@@ -1277,12 +1182,9 @@ class _LargeConferenceScreenState
         if (_isPro) return;
 
         final limit =
-            AppConfig
-                    .freeMeetingDurationMinutes *
-                60;
+            AppConfig.freeMeetingDurationMinutes * 60;
 
-        if (_secondsElapsed ==
-            limit - 300) {
+        if (_secondsElapsed == limit - 300) {
           _announce(
             'Attention, votre appel gratuit se terminera dans 5 minutes.',
           );
@@ -1299,14 +1201,12 @@ class _LargeConferenceScreenState
   }
 
   String _formatElapsedDuration() {
-    final hours =
-        _secondsElapsed ~/ 3600;
+    final hours = _secondsElapsed ~/ 3600;
 
     final minutes =
         (_secondsElapsed % 3600) ~/ 60;
 
-    final seconds =
-        _secondsElapsed % 60;
+    final seconds = _secondsElapsed % 60;
 
     if (hours > 0) {
       return '${hours.toString().padLeft(2, '0')}:'
@@ -1330,8 +1230,7 @@ class _LargeConferenceScreenState
       barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
-          backgroundColor:
-              AppColors.surface,
+          backgroundColor: AppColors.surface,
           title: const Text(
             'Temps écoulé',
             style: TextStyle(
@@ -1353,12 +1252,9 @@ class _LargeConferenceScreenState
             ),
             ElevatedButton(
               onPressed: () {
-                ProService()
-                    .startPayment(
-                  userId:
-                      widget.userId,
-                  userName:
-                      widget.userName,
+                ProService().startPayment(
+                  userId: widget.userId,
+                  userName: widget.userName,
                 );
               },
               child: const Text(
@@ -1376,14 +1272,12 @@ class _LargeConferenceScreenState
   // ===========================================================================
 
   Future<void> _attemptReconnect() async {
-    if (!mounted ||
-        _isConnecting) {
+    if (!mounted || _isConnecting) {
       return;
     }
 
     if (_reconnectAttempts >=
-        AppConfig
-            .maxReconnectAttempts) {
+        AppConfig.maxReconnectAttempts) {
       setState(() {
         _isReconnecting = false;
         _error =
@@ -1432,13 +1326,11 @@ class _LargeConferenceScreenState
   // ===========================================================================
 
   Future<void> _confirmLeave() async {
-    final result =
-        await showDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor:
-              AppColors.surface,
+          backgroundColor: AppColors.surface,
           title: const Text(
             'Quitter la réunion ?',
             style: TextStyle(
@@ -1454,20 +1346,14 @@ class _LargeConferenceScreenState
           actions: [
             TextButton(
               onPressed: () =>
-                  Navigator.pop(
-                context,
-                false,
-              ),
+                  Navigator.pop(context, false),
               child: const Text(
                 'Rester',
               ),
             ),
             ElevatedButton(
               onPressed: () =>
-                  Navigator.pop(
-                context,
-                true,
-              ),
+                  Navigator.pop(context, true),
               child: const Text(
                 'Quitter',
               ),
@@ -1486,20 +1372,14 @@ class _LargeConferenceScreenState
     try {
       await MeetingService()
           .saveMeetingHistoryForUser(
-        meetingId:
-            widget.meetingId,
-        userId:
-            widget.userId,
-        title:
-            widget.meetingName,
-        durationSeconds:
-            _secondsElapsed,
-        endMeeting:
-            widget.isHost,
+        meetingId: widget.meetingId,
+        userId: widget.userId,
+        title: widget.meetingName,
+        durationSeconds: _secondsElapsed,
+        endMeeting: widget.isHost,
       );
 
-      await MeetingService()
-          .removePresence(
+      await MeetingService().removePresence(
         widget.meetingId,
         widget.userId,
       );
@@ -1522,9 +1402,7 @@ class _LargeConferenceScreenState
   // ===========================================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     if (_error != null) {
       return _buildError();
     }
@@ -1534,8 +1412,7 @@ class _LargeConferenceScreenState
     }
 
     return Scaffold(
-      backgroundColor:
-          AppColors.background,
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
           Positioned.fill(
@@ -1544,8 +1421,7 @@ class _LargeConferenceScreenState
 
           _buildTopBar(),
 
-          if (_currentTranscription
-              .isNotEmpty)
+          if (_currentTranscription.isNotEmpty)
             _buildCaptions(),
 
           _buildBottomBar(),
@@ -1572,12 +1448,10 @@ class _LargeConferenceScreenState
 
   Widget _buildLoading() {
     return Scaffold(
-      backgroundColor:
-          AppColors.background,
+      backgroundColor: AppColors.background,
       body: Center(
         child: Column(
-          mainAxisSize:
-              MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min,
           children: [
             const CircularProgressIndicator(
               color: AppColors.primary,
@@ -1588,10 +1462,8 @@ class _LargeConferenceScreenState
             ),
             Text(
               'Connexion au webinaire...',
-              style:
-                  GoogleFonts.poppins(
-                color:
-                    Colors.white70,
+              style: GoogleFonts.poppins(
+                color: Colors.white70,
                 fontSize: 14,
               ),
             ),
@@ -1600,10 +1472,8 @@ class _LargeConferenceScreenState
             ),
             Text(
               'Jusqu’à $_targetParticipants participants',
-              style:
-                  GoogleFonts.poppins(
-                color:
-                    Colors.white38,
+              style: GoogleFonts.poppins(
+                color: Colors.white38,
                 fontSize: 11,
               ),
             ),
@@ -1619,34 +1489,26 @@ class _LargeConferenceScreenState
 
   Widget _buildError() {
     return Scaffold(
-      backgroundColor:
-          AppColors.background,
+      backgroundColor: AppColors.background,
       body: Center(
         child: Padding(
-          padding:
-              const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(32),
           child: Column(
-            mainAxisSize:
-                MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
                 Icons.error_outline,
-                color:
-                    AppColors.error,
+                color: AppColors.error,
                 size: 64,
               ),
               const SizedBox(
                 height: 20,
               ),
               Text(
-                _error ??
-                    'Erreur inconnue',
-                textAlign:
-                    TextAlign.center,
-                style:
-                    const TextStyle(
-                  color:
-                      Colors.white70,
+                _error ?? 'Erreur inconnue',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white70,
                 ),
               ),
               const SizedBox(
@@ -1677,29 +1539,22 @@ class _LargeConferenceScreenState
   // ===========================================================================
 
   Widget _buildConference() {
-    final visible =
-        _visibleParticipants;
+    final visible = _visibleParticipants;
 
-    final tiles =
-        <Widget>[
+    final tiles = <Widget>[
       _VideoTile(
-        participant:
-            _room?.localParticipant,
+        participant: _room?.localParticipant,
         isLocal: true,
-        userName:
-            widget.userName,
+        userName: widget.userName,
         active:
-            widget.userId ==
-                _activeSpeakerId,
+            widget.userId == _activeSpeakerId,
       ),
       ...visible.map(
         (participant) {
           return _VideoTile(
-            participant:
-                participant,
+            participant: participant,
             isLocal: false,
-            userName:
-                participant.name,
+            userName: participant.name,
             active:
                 participant.identity ==
                     _activeSpeakerId,
@@ -1710,19 +1565,14 @@ class _LargeConferenceScreenState
 
     final count = tiles.length;
 
-    int columns;
-
-    if (count <= 1) {
-      columns = 1;
-    } else if (count <= 4) {
-      columns = 2;
-    } else {
-      columns = 3;
-    }
+    final columns = switch (count) {
+      0 || 1 => 1,
+      2 || 3 || 4 => 2,
+      _ => 3,
+    };
 
     return Padding(
-      padding:
-          const EdgeInsets.fromLTRB(
+      padding: const EdgeInsets.fromLTRB(
         12,
         90,
         12,
@@ -1733,20 +1583,15 @@ class _LargeConferenceScreenState
             const BouncingScrollPhysics(),
         gridDelegate:
             SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount:
-              columns,
-          crossAxisSpacing:
-              10,
-          mainAxisSpacing:
-              10,
-          childAspectRatio:
-              16 / 10,
+          crossAxisCount: columns,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 16 / 10,
         ),
-        itemCount:
-            tiles.length,
-        itemBuilder:
-            (_, index) =>
-                tiles[index],
+        itemCount: tiles.length,
+        itemBuilder: (_, index) {
+          return tiles[index];
+        },
       ),
     );
   }
@@ -1761,21 +1606,16 @@ class _LargeConferenceScreenState
       left: 0,
       right: 0,
       child: Container(
-        padding:
-            const EdgeInsets.fromLTRB(
+        padding: const EdgeInsets.fromLTRB(
           16,
           12,
           16,
           16,
         ),
-        decoration:
-            const BoxDecoration(
-          gradient:
-              LinearGradient(
-            begin:
-                Alignment.topCenter,
-            end:
-                Alignment.bottomCenter,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
             colors: [
               Colors.black87,
               Colors.transparent,
@@ -1795,10 +1635,8 @@ class _LargeConferenceScreenState
                       maxLines: 1,
                       overflow:
                           TextOverflow.ellipsis,
-                      style:
-                          GoogleFonts.poppins(
-                        color:
-                            Colors.white,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
                         fontWeight:
                             FontWeight.w800,
                         fontSize: 16,
@@ -1810,10 +1648,8 @@ class _LargeConferenceScreenState
                     Text(
                       'Webinaire • '
                       '$_participantCountLabel',
-                      style:
-                          GoogleFonts.poppins(
-                        color:
-                            Colors.white54,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white54,
                         fontSize: 11,
                       ),
                     ),
@@ -1821,34 +1657,26 @@ class _LargeConferenceScreenState
                 ),
               ),
               _TopPill(
-                icon:
-                    Icons.timer_outlined,
-                text:
-                    _formatElapsedDuration(),
+                icon: Icons.timer_outlined,
+                text: _formatElapsedDuration(),
               ),
               const SizedBox(
                 width: 8,
               ),
               _TopPill(
-                icon:
-                    Icons.people_outline,
-                text:
-                    _participantCount
-                        .toString(),
+                icon: Icons.people_outline,
+                text: _participantCount
+                    .toString(),
               ),
               const SizedBox(
                 width: 8,
               ),
               IconButton(
-                tooltip:
-                    'Quitter',
-                onPressed:
-                    _confirmLeave,
-                icon:
-                    const Icon(
+                tooltip: 'Quitter',
+                onPressed: _confirmLeave,
+                icon: const Icon(
                   Icons.close,
-                  color:
-                      Colors.white,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -1859,11 +1687,9 @@ class _LargeConferenceScreenState
   }
 
   String get _participantCountLabel {
-    if (_participantCount >=
-        1000) {
+    if (_participantCount >= 1000) {
       final value =
-          _participantCount /
-              1000;
+          _participantCount / 1000;
 
       return '${value.toStringAsFixed(1)}K participants';
     }
@@ -1875,13 +1701,10 @@ class _LargeConferenceScreenState
     final room = _room;
 
     if (room == null) {
-      return _remoteParticipants.length +
-          1;
+      return _remoteParticipants.length + 1;
     }
 
-    return room.remoteParticipants
-            .length +
-        1;
+    return room.remoteParticipants.length + 1;
   }
 
   // ===========================================================================
@@ -1895,32 +1718,22 @@ class _LargeConferenceScreenState
       bottom: 115,
       child: ClipRRect(
         borderRadius:
-            BorderRadius.circular(
-          16,
-        ),
+            BorderRadius.circular(16),
         child: BackdropFilter(
-          filter:
-              ImageFilter.blur(
+          filter: ImageFilter.blur(
             sigmaX: 12,
             sigmaY: 12,
           ),
           child: Container(
-            padding:
-                const EdgeInsets.all(
-              14,
-            ),
-            color:
-                Colors.black.withValues(
+            padding: const EdgeInsets.all(14),
+            color: Colors.black.withValues(
               alpha: 0.65,
             ),
             child: Text(
               _currentTranscription,
-              textAlign:
-                  TextAlign.center,
-              style:
-                  GoogleFonts.poppins(
-                color:
-                    Colors.white,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                color: Colors.white,
                 fontSize: 13,
               ),
             ),
@@ -1941,56 +1754,43 @@ class _LargeConferenceScreenState
       bottom: 12,
       child: SafeArea(
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(
+          padding: const EdgeInsets.symmetric(
             horizontal: 12,
             vertical: 10,
           ),
-          decoration:
-              BoxDecoration(
-            color:
-                AppColors.surface
-                    .withValues(
+          decoration: BoxDecoration(
+            color: AppColors.surface.withValues(
               alpha: 0.96,
             ),
             borderRadius:
-                BorderRadius.circular(
-              24,
-            ),
-            border:
-                Border.all(
-              color:
-                  Colors.white10,
+                BorderRadius.circular(24),
+            border: Border.all(
+              color: Colors.white10,
             ),
           ),
           child: Row(
             mainAxisAlignment:
-                MainAxisAlignment
-                    .spaceEvenly,
+                MainAxisAlignment.spaceEvenly,
             children: [
               _ControlButton(
                 icon: _micOn
                     ? Icons.mic
                     : Icons.mic_off,
                 active: _micOn,
-                onTap:
-                    _toggleMic,
+                onTap: _toggleMic,
               ),
               _ControlButton(
                 icon: _camOn
                     ? Icons.videocam
                     : Icons.videocam_off,
                 active: _camOn,
-                onTap:
-                    _toggleCamera,
+                onTap: _toggleCamera,
               ),
               _ControlButton(
                 icon:
                     Icons.screen_share_outlined,
-                active:
-                    _screenSharing,
-                onTap:
-                    _toggleScreenShare,
+                active: _screenSharing,
+                onTap: _toggleScreenShare,
               ),
               _ControlButton(
                 icon:
@@ -2002,34 +1802,27 @@ class _LargeConferenceScreenState
                 },
               ),
               _ControlButton(
-                icon:
-                    Icons.people_outline,
+                icon: Icons.people_outline,
                 onTap: () {
                   setState(() {
-                    _showParticipants =
-                        true;
+                    _showParticipants = true;
                   });
                 },
               ),
               _ControlButton(
                 icon:
                     Icons.back_hand_outlined,
-                active:
-                    _handRaised,
-                onTap:
-                    _toggleRaiseHand,
+                active: _handRaised,
+                onTap: _toggleRaiseHand,
               ),
               _ControlButton(
                 icon:
                     Icons.closed_caption_outlined,
-                active:
-                    _liveCaptions,
-                onTap:
-                    _toggleCaptions,
+                active: _liveCaptions,
+                onTap: _toggleCaptions,
               ),
               _ControlButton(
-                icon:
-                    Icons.note_alt_outlined,
+                icon: Icons.note_alt_outlined,
                 onTap: () {
                   setState(() {
                     _showNotes = true;
@@ -2037,10 +1830,8 @@ class _LargeConferenceScreenState
                 },
               ),
               _ControlButton(
-                icon:
-                    Icons.more_horiz,
-                onTap:
-                    _showMoreOptions,
+                icon: Icons.more_horiz,
+                onTap: _showMoreOptions,
               ),
             ],
           ),
@@ -2064,42 +1855,32 @@ class _LargeConferenceScreenState
       child: Column(
         children: [
           Expanded(
-            child:
-                _chatMessages.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'Aucun message',
-                          style:
-                              TextStyle(
-                            color:
-                                Colors.white38,
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        padding:
-                            const EdgeInsets
-                                .all(
-                          16,
-                        ),
-                        itemCount:
-                            _chatMessages
-                                .length,
-                        itemBuilder:
-                            (_, index) {
-                          final message =
-                              _chatMessages[
-                                  index];
-
-                          return _ChatBubble(
-                            message:
-                                message,
-                            isMe:
-                                message.senderId ==
-                                    widget.userId,
-                          );
-                        },
+            child: _chatMessages.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Aucun message',
+                      style: TextStyle(
+                        color: Colors.white38,
                       ),
+                    ),
+                  )
+                : ListView.builder(
+                    padding:
+                        const EdgeInsets.all(16),
+                    itemCount:
+                        _chatMessages.length,
+                    itemBuilder: (_, index) {
+                      final message =
+                          _chatMessages[index];
+
+                      return _ChatBubble(
+                        message: message,
+                        isMe:
+                            message.senderId ==
+                                widget.userId,
+                      );
+                    },
+                  ),
           ),
           Container(
             padding:
@@ -2115,10 +1896,8 @@ class _LargeConferenceScreenState
                   child: TextField(
                     controller:
                         _chatController,
-                    style:
-                        const TextStyle(
-                      color:
-                          Colors.white,
+                    style: const TextStyle(
+                      color: Colors.white,
                     ),
                     decoration:
                         InputDecoration(
@@ -2126,22 +1905,18 @@ class _LargeConferenceScreenState
                           'Écrire un message...',
                       hintStyle:
                           const TextStyle(
-                        color:
-                            Colors.white38,
+                        color: Colors.white38,
                       ),
-                      filled:
-                          true,
+                      filled: true,
                       fillColor:
                           Colors.white
                               .withValues(
-                        alpha:
-                            0.06,
+                        alpha: 0.06,
                       ),
                       border:
                           OutlineInputBorder(
                         borderRadius:
-                            BorderRadius
-                                .circular(
+                            BorderRadius.circular(
                           24,
                         ),
                         borderSide:
@@ -2149,18 +1924,14 @@ class _LargeConferenceScreenState
                       ),
                     ),
                     onSubmitted:
-                        (_) =>
-                            _sendChat(),
+                        (_) => _sendChat(),
                   ),
                 ),
                 IconButton(
-                  onPressed:
-                      _sendChat,
-                  icon:
-                      const Icon(
+                  onPressed: _sendChat,
+                  icon: const Icon(
                     Icons.send,
-                    color:
-                        AppColors.primary,
+                    color: AppColors.primary,
                   ),
                 ),
               ],
@@ -2186,109 +1957,84 @@ class _LargeConferenceScreenState
           'Participants ($_participantCount)',
       onClose: () {
         setState(() {
-          _showParticipants =
-              false;
+          _showParticipants = false;
         });
       },
       child: Column(
         children: [
           if (widget.isHost ||
-              widget.userId ==
-                  _organizerId)
+              widget.userId == _organizerId)
             Padding(
               padding:
-                  const EdgeInsets.all(
-                16,
-              ),
-              child:
-                  SizedBox(
-                width:
-                    double.infinity,
+                  const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
                 child:
                     ElevatedButton.icon(
                   onPressed:
                       _muteAllOthers,
                   icon:
-                      const Icon(
-                    Icons.mic_off,
-                  ),
-                  label:
-                      const Text(
+                      const Icon(Icons.mic_off),
+                  label: const Text(
                     'Muter tous les autres',
                   ),
                 ),
               ),
             ),
           Expanded(
-            child:
-                participants.isEmpty
-                    ? const Center(
-                        child:
-                            Text(
-                          'Aucun participant distant',
+            child: participants.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Aucun participant distant',
+                      style: TextStyle(
+                        color: Colors.white38,
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount:
+                        participants.length,
+                    itemBuilder: (_, index) {
+                      final p =
+                          participants[index];
+
+                      final raised =
+                          _raisedHands.contains(
+                        p.identity,
+                      );
+
+                      return ListTile(
+                        leading: _Avatar(
+                          name: p.name,
+                        ),
+                        title: Text(
+                          p.name.isNotEmpty
+                              ? p.name
+                              : 'Participant',
                           style:
-                              TextStyle(
-                            color:
-                                Colors.white38,
+                              const TextStyle(
+                            color: Colors.white,
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount:
-                            participants
-                                .length,
-                        itemBuilder:
-                            (_, index) {
-                          final p =
-                              participants[
-                                  index];
-
-                          final raised =
-                              _raisedHands
-                                  .contains(
-                            p.identity,
-                          );
-
-                          return ListTile(
-                            leading:
-                                _Avatar(
-                              name:
-                                  p.name,
-                            ),
-                            title:
-                                Text(
-                              p.name.isNotEmpty
-                                  ? p.name
-                                  : 'Participant',
-                              style:
-                                  const TextStyle(
+                        subtitle: Text(
+                          p.identity,
+                          style:
+                              const TextStyle(
+                            color:
+                                Colors.white38,
+                            fontSize: 10,
+                          ),
+                        ),
+                        trailing: raised
+                            ? const Icon(
+                                Icons.back_hand,
                                 color:
-                                    Colors.white,
-                              ),
-                            ),
-                            subtitle:
-                                Text(
-                              p.identity,
-                              style:
-                                  const TextStyle(
-                                color:
-                                    Colors.white38,
-                                fontSize:
-                                    10,
-                              ),
-                            ),
-                            trailing:
-                                raised
-                                    ? const Icon(
-                                        Icons
-                                            .back_hand,
-                                        color:
-                                            Colors.orange,
-                                      )
-                                    : null,
-                          );
-                        },
-                      ),
+                                    Colors.orange,
+                              )
+                            : null,
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -2301,19 +2047,14 @@ class _LargeConferenceScreenState
 
   Widget _buildNotesPanel() {
     return _Panel(
-      title:
-          'Notes de réunion',
+      title: 'Notes de réunion',
       onClose: () async {
         await NoteService.instance
             .saveMeetingNote(
-          userId:
-              widget.userId,
-          meetingId:
-              widget.meetingId,
-          meetingName:
-              widget.meetingName,
-          content:
-              _noteController.text,
+          userId: widget.userId,
+          meetingId: widget.meetingId,
+          meetingName: widget.meetingName,
+          content: _noteController.text,
         );
 
         if (!mounted) return;
@@ -2323,35 +2064,25 @@ class _LargeConferenceScreenState
         });
       },
       child: Padding(
-        padding:
-            const EdgeInsets.all(
-          20,
-        ),
+        padding: const EdgeInsets.all(20),
         child: TextField(
-          controller:
-              _noteController,
+          controller: _noteController,
           maxLines: null,
           expands: true,
           textAlignVertical:
               TextAlignVertical.top,
-          style:
-              const TextStyle(
-            color:
-                Colors.white,
-            height:
-                1.5,
+          style: const TextStyle(
+            color: Colors.white,
+            height: 1.5,
           ),
           decoration:
               const InputDecoration(
             hintText:
                 'Écrivez vos notes...',
-            hintStyle:
-                TextStyle(
-              color:
-                  Colors.white24,
+            hintStyle: TextStyle(
+              color: Colors.white24,
             ),
-            border:
-                InputBorder.none,
+            border: InputBorder.none,
           ),
         ),
       ),
@@ -2365,8 +2096,7 @@ class _LargeConferenceScreenState
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor:
-          Colors.transparent,
+      backgroundColor: Colors.transparent,
       builder: (context) {
         return Container(
           padding:
@@ -2375,92 +2105,67 @@ class _LargeConferenceScreenState
           ),
           decoration:
               const BoxDecoration(
-            color:
-                AppColors.surface,
+            color: AppColors.surface,
             borderRadius:
                 BorderRadius.vertical(
-              top: Radius.circular(
-                28,
-              ),
+              top: Radius.circular(28),
             ),
           ),
           child: SafeArea(
             child: Column(
-              mainAxisSize:
-                  MainAxisSize.min,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading:
-                      const Icon(
+                  leading: const Icon(
                     Icons.closed_caption_outlined,
-                    color:
-                        Colors.white,
+                    color: Colors.white,
                   ),
-                  title:
-                      const Text(
+                  title: const Text(
                     'Sous-titres en direct',
-                    style:
-                        TextStyle(
-                      color:
-                          Colors.white,
+                    style: TextStyle(
+                      color: Colors.white,
                     ),
                   ),
                   onTap: () {
-                    Navigator.pop(
-                      context,
-                    );
+                    Navigator.pop(context);
 
                     _toggleCaptions();
                   },
                 ),
                 ListTile(
-                  leading:
-                      const Icon(
+                  leading: const Icon(
                     Icons.screen_share_outlined,
-                    color:
-                        Colors.white,
+                    color: Colors.white,
                   ),
-                  title:
-                      Text(
+                  title: Text(
                     _screenSharing
                         ? 'Arrêter le partage'
                         : 'Partager l’écran',
-                        style:
-                            const TextStyle(
-                          color:
-                              Colors.white,
-                        ),
-                      ),
+                    style: const TextStyle(
+                      color: Colors.white,
+                    ),
+                  ),
                   onTap: () {
-                    Navigator.pop(
-                      context,
-                    );
+                    Navigator.pop(context);
 
                     _toggleScreenShare();
                   },
                 ),
                 ListTile(
-                  leading:
-                      const Icon(
+                  leading: const Icon(
                     Icons.volume_up_outlined,
-                    color:
-                        Colors.white,
+                    color: Colors.white,
                   ),
-                  title:
-                      Text(
+                  title: Text(
                     _voiceAssistant
                         ? 'Désactiver l’assistant vocal'
                         : 'Activer l’assistant vocal',
-                    style:
-                        const TextStyle(
-                      color:
-                          Colors.white,
+                    style: const TextStyle(
+                      color: Colors.white,
                     ),
                   ),
                   onTap: () {
-                    Navigator.pop(
-                      context,
-                    );
+                    Navigator.pop(context);
 
                     setState(() {
                       _voiceAssistant =
@@ -2469,25 +2174,18 @@ class _LargeConferenceScreenState
                   },
                 ),
                 ListTile(
-                  leading:
-                      const Icon(
+                  leading: const Icon(
                     Icons.copy_outlined,
-                    color:
-                        Colors.white,
+                    color: Colors.white,
                   ),
-                  title:
-                      const Text(
+                  title: const Text(
                     'Copier le lien',
-                    style:
-                        TextStyle(
-                      color:
-                          Colors.white,
+                    style: TextStyle(
+                      color: Colors.white,
                     ),
                   ),
                   onTap: () {
-                    Navigator.pop(
-                      context,
-                    );
+                    Navigator.pop(context);
 
                     _copyMeetingLink();
                   },
@@ -2504,28 +2202,20 @@ class _LargeConferenceScreenState
   // LINK
   // ===========================================================================
 
-  Future<void>
-      _copyMeetingLink() async {
-    final link =
-        AppConfig.webJoinLink(
+  Future<void> _copyMeetingLink() async {
+    final link = AppConfig.webJoinLink(
       widget.meetingId,
     );
 
     await Clipboard.setData(
-      ClipboardData(
-        text: link,
-      ),
+      ClipboardData(text: link),
     );
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content:
-            Text(
-          'Lien copié.',
-        ),
+        content: Text('Lien copié.'),
       ),
     );
   }
@@ -2547,40 +2237,31 @@ class _LargeConferenceScreenState
         ),
         decoration:
             BoxDecoration(
-          color:
-              Colors.orange.withValues(
+          color: Colors.orange.withValues(
             alpha: 0.92,
           ),
           borderRadius:
-              BorderRadius.circular(
-            12,
-          ),
+              BorderRadius.circular(12),
         ),
         child: Row(
           children: [
             const SizedBox(
               width: 16,
               height: 16,
-              child:
-                  CircularProgressIndicator(
+              child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color:
-                    Colors.white,
+                color: Colors.white,
               ),
             ),
             const SizedBox(
               width: 10,
             ),
             const Expanded(
-              child:
-                  Text(
+              child: Text(
                 'Reconnexion à la conférence...',
-                style:
-                    TextStyle(
-                  color:
-                      Colors.white,
-                  fontWeight:
-                      FontWeight.w600,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -2595,10 +2276,8 @@ class _LargeConferenceScreenState
 // VIDEO TILE
 // =============================================================================
 
-class _VideoTile
-    extends StatelessWidget {
-  final Participant?
-      participant;
+class _VideoTile extends StatelessWidget {
+  final Participant? participant;
 
   final bool isLocal;
 
@@ -2623,8 +2302,7 @@ class _VideoTile
     if (p is LocalParticipant) {
       for (final publication
           in p.videoTrackPublications) {
-        final track =
-            publication.track;
+        final track = publication.track;
 
         if (track is VideoTrack &&
             !publication.muted) {
@@ -2643,8 +2321,7 @@ class _VideoTile
           continue;
         }
 
-        final track =
-            publication.track;
+        final track = publication.track;
 
         if (track is VideoTrack) {
           return track;
@@ -2656,112 +2333,76 @@ class _VideoTile
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final track =
-        _findVideoTrack();
+  Widget build(BuildContext context) {
+    final track = _findVideoTrack();
 
     return AnimatedContainer(
       duration:
-          const Duration(
-        milliseconds: 250,
-      ),
-      decoration:
-          BoxDecoration(
-        color:
-            AppColors.surface,
+          const Duration(milliseconds: 250),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
         borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
-        border:
-            Border.all(
+            BorderRadius.circular(20),
+        border: Border.all(
           color: active
               ? AppColors.primary
               : Colors.white10,
-          width:
-              active ? 2 : 1,
+          width: active ? 2 : 1,
         ),
       ),
-      clipBehavior:
-          Clip.antiAlias,
+      clipBehavior: Clip.antiAlias,
       child: Stack(
-        fit:
-            StackFit.expand,
+        fit: StackFit.expand,
         children: [
           if (track != null)
             VideoTrackRenderer(
               track,
-              fit:
-                  VideoViewFit.cover,
-              mirrorMode:
-                  isLocal
-                      ? VideoViewMirrorMode
-                          .mirror
-                      : VideoViewMirrorMode
-                          .auto,
+              fit: VideoViewFit.cover,
+              mirrorMode: isLocal
+                  ? VideoViewMirrorMode.mirror
+                  : VideoViewMirrorMode.auto,
             )
           else
             Container(
-              color:
-                  AppColors.surface,
-              alignment:
-                  Alignment.center,
-              child:
-                  _Avatar(
-                name:
-                    userName,
-                large:
-                    true,
+              color: AppColors.surface,
+              alignment: Alignment.center,
+              child: _Avatar(
+                name: userName,
+                large: true,
               ),
             ),
           Positioned(
             left: 10,
             right: 10,
             bottom: 10,
-            child:
-                Row(
+            child: Row(
               children: [
                 Expanded(
-                  child:
-                      Container(
+                  child: Container(
                     padding:
-                        const EdgeInsets
-                            .symmetric(
+                        const EdgeInsets.symmetric(
                       horizontal: 9,
                       vertical: 6,
                     ),
-                    decoration:
-                        BoxDecoration(
-                      color:
-                          Colors.black
-                              .withValues(
-                        alpha:
-                            0.55,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(
+                        alpha: 0.55,
                       ),
                       borderRadius:
-                          BorderRadius.circular(
-                        9,
-                      ),
+                          BorderRadius.circular(9),
                     ),
-                    child:
-                        Text(
+                    child: Text(
                       isLocal
                           ? '$userName (vous)'
                           : (userName.isEmpty
                               ? 'Participant'
                               : userName),
-                      maxLines:
-                          1,
+                      maxLines: 1,
                       overflow:
                           TextOverflow.ellipsis,
-                      style:
-                          const TextStyle(
-                        color:
-                            Colors.white,
-                        fontSize:
-                            11,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
                         fontWeight:
                             FontWeight.w600,
                       ),
@@ -2769,29 +2410,19 @@ class _VideoTile
                   ),
                 ),
                 if (active) ...[
-                  const SizedBox(
-                    width:
-                        6,
-                  ),
+                  const SizedBox(width: 6),
                   Container(
                     padding:
-                        const EdgeInsets.all(
-                      6,
-                    ),
+                        const EdgeInsets.all(6),
                     decoration:
                         const BoxDecoration(
-                      color:
-                          AppColors.primary,
-                      shape:
-                          BoxShape.circle,
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
                     ),
-                    child:
-                        const Icon(
+                    child: const Icon(
                       Icons.graphic_eq,
-                      size:
-                          13,
-                      color:
-                          Colors.white,
+                      size: 13,
+                      color: Colors.white,
                     ),
                   ),
                 ],
@@ -2802,10 +2433,7 @@ class _VideoTile
       ),
     )
         .animate()
-        .fadeIn(
-          duration:
-              250.ms,
-        );
+        .fadeIn(duration: 250.ms);
   }
 }
 
@@ -2813,8 +2441,7 @@ class _VideoTile
 // PANEL
 // =============================================================================
 
-class _Panel
-    extends StatelessWidget {
+class _Panel extends StatelessWidget {
   final String title;
 
   final Widget child;
@@ -2828,54 +2455,40 @@ class _Panel
   });
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Positioned.fill(
       child: ClipRect(
         child: BackdropFilter(
-          filter:
-              ImageFilter.blur(
+          filter: ImageFilter.blur(
             sigmaX: 18,
             sigmaY: 18,
           ),
           child: Container(
-            color:
-                Colors.black.withValues(
-              alpha:
-                  0.90,
+            color: Colors.black.withValues(
+              alpha: 0.90,
             ),
-            child:
-                Column(
+            child: Column(
               children: [
                 SafeArea(
-                  bottom:
-                      false,
-                  child:
-                      Row(
+                  bottom: false,
+                  child: Row(
                     children: [
                       IconButton(
-                        onPressed:
-                            onClose,
-                        icon:
-                            const Icon(
+                        onPressed: onClose,
+                        icon: const Icon(
                           Icons.close,
-                          color:
-                              Colors.white,
+                          color: Colors.white,
                         ),
                       ),
                       Expanded(
-                        child:
-                            Text(
+                        child: Text(
                           title,
                           style:
                               GoogleFonts.poppins(
-                            color:
-                                Colors.white,
+                            color: Colors.white,
                             fontWeight:
                                 FontWeight.w700,
-                            fontSize:
-                                17,
+                            fontSize: 17,
                           ),
                         ),
                       ),
@@ -2883,8 +2496,7 @@ class _Panel
                   ),
                 ),
                 Expanded(
-                  child:
-                      child,
+                  child: child,
                 ),
               ],
             ),
@@ -2923,8 +2535,7 @@ class _ChatMessage {
 // CHAT BUBBLE
 // =============================================================================
 
-class _ChatBubble
-    extends StatelessWidget {
+class _ChatBubble extends StatelessWidget {
   final _ChatMessage message;
 
   final bool isMe;
@@ -2935,88 +2546,63 @@ class _ChatBubble
   });
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final time =
-        message.timestamp == null
-            ? ''
-            : '${message.timestamp!.hour.toString().padLeft(2, '0')}:'
-                '${message.timestamp!.minute.toString().padLeft(2, '0')}';
+  Widget build(BuildContext context) {
+    final time = message.timestamp == null
+        ? ''
+        : '${message.timestamp!.hour.toString().padLeft(2, '0')}:'
+            '${message.timestamp!.minute.toString().padLeft(2, '0')}';
 
     return Align(
-      alignment:
-          isMe
-              ? Alignment.centerRight
-              : Alignment.centerLeft,
-      child:
-          Container(
+      alignment: isMe
+          ? Alignment.centerRight
+          : Alignment.centerLeft,
+      child: Container(
         constraints:
             const BoxConstraints(
-          maxWidth:
-              340,
+          maxWidth: 340,
         ),
         margin:
             const EdgeInsets.symmetric(
-          vertical:
-              4,
+          vertical: 4,
         ),
-        padding:
-            const EdgeInsets.all(
-          12,
-        ),
-        decoration:
-            BoxDecoration(
-          color:
-              isMe
-                  ? AppColors.primary
-                  : Colors.white10,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isMe
+              ? AppColors.primary
+              : Colors.white10,
           borderRadius:
-              BorderRadius.circular(
-            16,
-          ),
+              BorderRadius.circular(16),
         ),
-        child:
-            Column(
+        child: Column(
           crossAxisAlignment:
               CrossAxisAlignment.start,
           children: [
             if (!isMe)
               Text(
                 message.sender,
-                style:
-                    const TextStyle(
-                  color:
-                      Colors.white54,
-                  fontSize:
-                      10,
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 10,
                   fontWeight:
                       FontWeight.w700,
                 ),
               ),
             Text(
               message.message,
-              style:
-                  const TextStyle(
-                color:
-                    Colors.white,
-                fontSize:
-                    13,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
               ),
             ),
             if (time.isNotEmpty)
               Align(
                 alignment:
                     Alignment.centerRight,
-                child:
-                    Text(
+                child: Text(
                   time,
-                  style:
-                      const TextStyle(
-                    color:
-                        Colors.white38,
-                    fontSize:
-                        9,
+                  style: const TextStyle(
+                    color: Colors.white38,
+                    fontSize: 9,
                   ),
                 ),
               ),
@@ -3031,8 +2617,7 @@ class _ChatBubble
 // TOP PILL
 // =============================================================================
 
-class _TopPill
-    extends StatelessWidget {
+class _TopPill extends StatelessWidget {
   final IconData icon;
 
   final String text;
@@ -3043,57 +2628,38 @@ class _TopPill
   });
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Container(
       padding:
           const EdgeInsets.symmetric(
-        horizontal:
-            10,
-        vertical:
-            7,
+        horizontal: 10,
+        vertical: 7,
       ),
-      decoration:
-          BoxDecoration(
-        color:
-            Colors.black45,
+      decoration: BoxDecoration(
+        color: Colors.black45,
         borderRadius:
-            BorderRadius.circular(
-          999,
-        ),
-        border:
-            Border.all(
-          color:
-              Colors.white10,
+            BorderRadius.circular(999),
+        border: Border.all(
+          color: Colors.white10,
         ),
       ),
-      child:
-          Row(
-        mainAxisSize:
-            MainAxisSize.min,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             icon,
-            size:
-                14,
-            color:
-                Colors.white70,
+            size: 14,
+            color: Colors.white70,
           ),
           const SizedBox(
-            width:
-                5,
+            width: 5,
           ),
           Text(
             text,
-            style:
-                const TextStyle(
-              color:
-                  Colors.white70,
-              fontSize:
-                  10,
-              fontWeight:
-                  FontWeight.w700,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -3106,8 +2672,7 @@ class _TopPill
 // CONTROL BUTTON
 // =============================================================================
 
-class _ControlButton
-    extends StatelessWidget {
+class _ControlButton extends StatelessWidget {
   final IconData icon;
 
   final bool active;
@@ -3121,37 +2686,23 @@ class _ControlButton
   });
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Material(
-      color:
-          active
-              ? Colors.white10
-              : Colors.transparent,
-      shape:
-          const CircleBorder(),
-      child:
-          InkWell(
-        customBorder:
-            const CircleBorder(),
-        onTap:
-            onTap,
-        child:
-            Padding(
-          padding:
-              const EdgeInsets.all(
-            10,
-          ),
-          child:
-              Icon(
+      color: active
+          ? Colors.white10
+          : Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Icon(
             icon,
-            color:
-                active
-                    ? Colors.white
-                    : Colors.white60,
-            size:
-                22,
+            color: active
+                ? Colors.white
+                : Colors.white60,
+            size: 22,
           ),
         ),
       ),
@@ -3163,8 +2714,7 @@ class _ControlButton
 // AVATAR
 // =============================================================================
 
-class _Avatar
-    extends StatelessWidget {
+class _Avatar extends StatelessWidget {
   final String name;
 
   final bool large;
@@ -3175,46 +2725,33 @@ class _Avatar
   });
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final size =
-        large ? 72.0 : 42.0;
+  Widget build(BuildContext context) {
+    final size = large ? 72.0 : 42.0;
 
-    final initial =
-        name.trim().isEmpty
-            ? '?'
-            : name
-                .trim()
-                .characters
-                .first
-                .toUpperCase();
+    final initial = name.trim().isEmpty
+        ? '?'
+        : name
+            .trim()
+            .characters
+            .first
+            .toUpperCase();
 
     return Container(
-      width:
-          size,
-      height:
-          size,
+      width: size,
+      height: size,
       decoration:
           const BoxDecoration(
         gradient:
             AppColors.primaryGradient,
-        shape:
-            BoxShape.circle,
+        shape: BoxShape.circle,
       ),
-      alignment:
-          Alignment.center,
-      child:
-          Text(
+      alignment: Alignment.center,
+      child: Text(
         initial,
-        style:
-            TextStyle(
-          color:
-              Colors.white,
-          fontWeight:
-              FontWeight.w800,
-          fontSize:
-              large ? 28 : 17,
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: large ? 28 : 17,
         ),
       ),
     );
