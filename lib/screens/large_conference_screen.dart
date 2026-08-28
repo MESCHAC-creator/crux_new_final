@@ -9,16 +9,19 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../config/app_config.dart';
+import '../providers/meeting_state_provider.dart';
 import '../services/livekit_service.dart';
 import '../services/meeting_service.dart';
 import '../services/note_service.dart';
 import '../services/pro_service.dart';
 import '../theme/colors.dart';
 import '../utils/logger.dart' as crux;
+import '../meeting/crux_conference_view.dart';
 
 class LargeConferenceScreen extends StatefulWidget {
   final String meetingId;
@@ -181,6 +184,13 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     _noteController = TextEditingController();
 
     WidgetsBinding.instance.addObserver(this);
+
+    // Initialize meeting state provider
+    final meetingProvider = context.read<MeetingStateProvider>();
+    meetingProvider.initializeMeeting(
+      meetingId: widget.meetingId,
+      meetingName: widget.meetingName,
+    );
 
     _initialize();
   }
@@ -582,9 +592,16 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   void _setupRoomEvents(
     EventsListener<RoomEvent> listener,
   ) {
+    final meetingProvider = context.read<MeetingStateProvider>();
+    
     listener
       ..on<RoomConnectedEvent>((_) {
         _refreshParticipants();
+        meetingProvider.initializeMeeting(
+          meetingId: widget.meetingId,
+          meetingName: widget.meetingName,
+          room: _room,
+        );
       })
       ..on<RoomReconnectingEvent>((_) {
         if (!mounted) return;
@@ -612,6 +629,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       ..on<ParticipantConnectedEvent>(
         (event) {
           _refreshParticipants();
+          
+          // Update meeting state provider
+          meetingProvider.updateParticipant(event.participant);
 
           if (_voiceAssistant) {
             final name =
@@ -626,6 +646,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       ..on<ParticipantDisconnectedEvent>(
         (event) {
           _refreshParticipants();
+          
+          // Update meeting state provider
+          meetingProvider.removeParticipant(event.participant.sid);
 
           if (_voiceAssistant) {
             final name =
@@ -645,39 +668,51 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
             setState(() {
               _activeSpeakerId = null;
             });
-
+            
+            // Update meeting state provider
+            meetingProvider.setSpeakerMode(SpeakerMode.gallery);
             return;
           }
 
+          final activeSpeaker = event.speakers.first;
           setState(() {
-            _activeSpeakerId =
-                event.speakers.first.identity;
+            _activeSpeakerId = activeSpeaker.identity;
           });
+          
+          // Update meeting state provider with audio levels
+          for (final speaker in event.speakers) {
+            meetingProvider.updateAudioLevel(speaker.sid, speaker.audioLevel);
+          }
         },
       )
       ..on<ParticipantMetadataUpdatedEvent>(
-        (_) {
+        (event) {
           _refreshParticipants();
+          meetingProvider.updateParticipant(event.participant);
         },
       )
       ..on<TrackSubscribedEvent>(
-        (_) {
+        (event) {
           _refreshParticipants();
+          meetingProvider.updateParticipant(event.participant);
         },
       )
       ..on<TrackUnsubscribedEvent>(
-        (_) {
+        (event) {
           _refreshParticipants();
+          meetingProvider.updateParticipant(event.participant);
         },
       )
       ..on<TrackPublishedEvent>(
-        (_) {
+        (event) {
           _refreshParticipants();
+          meetingProvider.updateParticipant(event.participant);
         },
       )
       ..on<TrackUnpublishedEvent>(
-        (_) {
+        (event) {
           _refreshParticipants();
+          meetingProvider.updateParticipant(event.participant);
         },
       )
       ..on<DataReceivedEvent>(
@@ -702,6 +737,19 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     setState(() {
       _remoteParticipants = participants;
     });
+    
+    // Update meeting state provider with all participants
+    final meetingProvider = context.read<MeetingStateProvider>();
+    
+    // Add local participant
+    if (room.localParticipant != null) {
+      meetingProvider.updateParticipant(room.localParticipant!);
+    }
+    
+    // Add all remote participants
+    for (final participant in participants) {
+      meetingProvider.updateParticipant(participant);
+    }
   }
 
   /// Retourne uniquement les participants affichés.
@@ -934,23 +982,67 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   Future<void> _toggleScreenShare() async {
     final local = _room?.localParticipant;
 
-    if (local == null) return;
+    if (local == null) {
+      crux.logger.w('Cannot toggle screen share: no local participant');
+      return;
+    }
 
     final next = !_screenSharing;
 
     try {
-      await local.setScreenShareEnabled(next);
+      crux.logger.i('Toggling screen share: $next');
+      
+      // Check if screen share track exists
+      final screenTrack = local.getTrack(TrackType.SCREEN_SHARE);
+      
+      if (next) {
+        // Start screen share
+        if (screenTrack != null) {
+          await screenTrack.enable();
+        } else {
+          // Create new screen share track
+          final track = await local.createScreenShareTrack();
+          if (track != null) {
+            await track.enable();
+          } else {
+            throw Exception('Failed to create screen share track');
+          }
+        }
+      } else {
+        // Stop screen share
+        if (screenTrack != null) {
+          await screenTrack.disable();
+          await screenTrack.stop();
+        }
+      }
 
       if (!mounted) return;
 
       setState(() {
         _screenSharing = next;
       });
+      
+      // Update meeting state provider
+      final meetingProvider = context.read<MeetingStateProvider>();
+      meetingProvider.setScreenSharing(next);
+      
+      crux.logger.i('Screen share toggled successfully: $next');
     } catch (e) {
-      crux.logger.w(
-        'Screen share failed',
-        error: e,
-      );
+      crux.logger.e('Screen share failed', error: e);
+      
+      if (mounted) {
+        setState(() {
+          _screenSharing = false;
+        });
+        
+        // Show error to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Échec du partage d\'écran: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -1110,7 +1202,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
       await _speech.listen(
         listenOptions:
-            const stt.SpeechListenOptions(
+            stt.SpeechListenOptions(
           localeId: 'fr_FR',
           partialResults: true,
           cancelOnError: false,
@@ -1415,8 +1507,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          Positioned.fill(
-            child: _buildConference(),
+          // Use new conference view
+          const Positioned.fill(
+            child: CruxConferenceView(),
           ),
 
           _buildTopBar(),
@@ -2243,9 +2336,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           borderRadius:
               BorderRadius.circular(12),
         ),
-        child: Row(
+        child: const Row(
           children: [
-            const SizedBox(
+            SizedBox(
               width: 16,
               height: 16,
               child: CircularProgressIndicator(
@@ -2253,10 +2346,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                 color: Colors.white,
               ),
             ),
-            const SizedBox(
+            SizedBox(
               width: 10,
             ),
-            const Expanded(
+            Expanded(
               child: Text(
                 'Reconnexion à la conférence...',
                 style: TextStyle(

@@ -18,7 +18,6 @@ class AppColors {
   static const Color _lightGray = Color(0xFFD8DCE3);
   static const Color _mediumGray = Color(0xFF8B929E);
   static const Color _gray = Color(0xFF6B7280);
-  static const Color _dimGray = Color(0xFF3A414C);
 
   // ── Accents fonctionnels (information uniquement) ─────────────────────
   static const Color _cyan = Color(0xFF0099BB);

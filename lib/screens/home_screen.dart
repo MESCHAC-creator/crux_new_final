@@ -4,16 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 
-import '../models/meeting_model.dart';
 import '../models/user_model.dart';
+import '../services/meeting_service.dart';
 import '../wallpaper/wallpaper_provider.dart';
 import '../routes/app_routes.dart';
 import '../services/schedule_service.dart';
 import '../services/user_service.dart';
-import '../services/meeting_service.dart';
 import '../services/backend_api_service.dart';
 import '../theme/colors.dart';
 import '../wallpaper/app_background.dart';
+import '../utils/logger.dart' as crux;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.user});
@@ -89,28 +89,41 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _joinByCode() async {
     final code = _codeCtrl.text.trim().toUpperCase();
-    if (code.isEmpty) return;
+    if (code.isEmpty) {
+      _snack('Veuillez entrer un code de réunion');
+      return;
+    }
+    
     FocusScope.of(context).unfocus();
+    
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _buildJoinLoadingDialog(code),
+    );
+    
     try {
-      print('🔍 Tentative de rejoindre réunion avec code: $code');
+      crux.log.d('Tentative de rejoindre réunion avec code: $code');
       
       // Try to find meeting by meetingCode via backend API
       final backendService = BackendApiService();
       final meetingData = await backendService.getMeetingByCode(code);
       
       if (!mounted) return;
+      Navigator.of(context).pop(); // Close loading dialog
       
       if (meetingData == null) {
-        print('⚠️ Backend n\'a pas trouvé la réunion, tentative via Firestore direct');
+        crux.log.d('Backend n\'a pas trouvé la réunion, tentative via Firestore direct');
         // Fallback to direct Firestore lookup by code
         final meeting = await MeetingService().getMeetingByCode(code);
         if (!mounted) return;
         if (meeting == null) {
-          print('❌ Réunion introuvable via Firestore pour le code: $code');
-          _snack('Aucune réunion pour ce code.');
+          crux.log.d('Réunion introuvable via Firestore pour le code: $code');
+          _showJoinErrorDialog(code, 'Aucune réunion trouvée pour ce code');
           return;
         }
-        print('✅ Réunion trouvée via Firestore: ${meeting.id}');
+        crux.log.d('Réunion trouvée via Firestore: ${meeting.id}');
         _codeCtrl.clear();
         _joinMeeting(meeting);
         return;
@@ -118,28 +131,187 @@ class _HomeScreenState extends State<HomeScreen> {
       
       final meeting = backendService.parseMeetingData(meetingData);
       if (meeting != null) {
-        print('✅ Réunion trouvée via backend: ${meeting.id}');
-        // Add participant to meeting via backend
-        try {
-          await backendService.addParticipant(meeting.id);
-          print('✅ Participant ajouté via backend');
-        } catch (e) {
-          print('⚠️ Échec ajout participant via backend, tentative direct');
-          // Fallback to direct Firestore if backend fails
-          await MeetingService().addParticipant(meeting.id, _uid);
-          print('✅ Participant ajouté via Firestore direct');
-        }
+        crux.log.d('Réunion trouvée via backend: ${meeting.id}');
         
-        _codeCtrl.clear();
-        _joinMeeting(meeting);
+        // Show meeting details dialog like Zoom
+        final shouldJoin = await _showMeetingDetailsDialog(meeting);
+        if (!mounted) return;
+        
+        if (shouldJoin) {
+          // Add participant to meeting via backend
+          try {
+            await backendService.addParticipant(meeting.id);
+            crux.log.d('Participant ajouté via backend');
+          } catch (e) {
+            crux.log.d('Échec ajout participant via backend, tentative direct');
+            // Fallback to direct Firestore if backend fails
+            await MeetingService().addParticipant(meeting.id, _uid);
+            crux.log.d('Participant ajouté via Firestore direct');
+          }
+          
+          _codeCtrl.clear();
+          _joinMeeting(meeting);
+        }
       } else {
-        print('❌ Erreur parsing meeting data du backend');
-        _snack('Erreur lors de la lecture des données de la réunion.');
+        crux.log.d('Erreur parsing meeting data du backend');
+        _showJoinErrorDialog(code, 'Erreur lors de la lecture des données de la réunion');
       }
     } catch (e) {
-      print('❌ Erreur lors de la jonction: $e');
-      if (mounted) _snack('Connexion impossible, réessayez.');
+      crux.log.e('Erreur lors de la jonction: $e');
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog if open
+        _showJoinErrorDialog(code, 'Connexion impossible: ${e.toString()}');
+      }
     }
+  }
+
+  Widget _buildJoinLoadingDialog(String code) {
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(color: AppColors.primary),
+          const SizedBox(height: 20),
+          Text(
+            'Recherche de la réunion...',
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Code: $code',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _showMeetingDetailsDialog(dynamic meeting) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.video_call, color: AppColors.primary, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Détails de la réunion',
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDetailRow('Titre', meeting.title ?? 'Réunion'),
+            _buildDetailRow('Code', meeting.meetingCode ?? 'N/A'),
+            _buildDetailRow('Organisateur', meeting.organizer ?? 'Inconnu'),
+            _buildDetailRow('Participants', '${meeting.participants?.length ?? 0}'),
+            if (meeting.description != null && meeting.description!.isNotEmpty)
+              _buildDetailRow('Description', meeting.description!),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Annuler', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.textOnPrimary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Rejoindre'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showJoinErrorDialog(String code, String errorMessage) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: AppColors.error, size: 28),
+            const SizedBox(width: 12),
+            Text(
+              'Échec de la jonction',
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              errorMessage,
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Code: $code',
+              style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Fermer', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _codeCtrl.clear();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.textOnPrimary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Réessayer'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _snack(String message) {

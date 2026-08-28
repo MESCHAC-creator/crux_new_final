@@ -313,8 +313,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                       child: Stack(
                         children: [
                           Positioned.fill(
-                            child: DecoratedBox(
-                              decoration: const BoxDecoration(
+                            child: const DecoratedBox(
+                              decoration: BoxDecoration(
                                 gradient: AppColors.logoHalo,
                               ),
                             ),
@@ -893,12 +893,14 @@ class _SettingsScreenState extends State<SettingsScreen>
                                     '';
 
                             if (_isPro) {
-                              _errorHandler
-                                  .showInfoSnackBar(
-                                context,
-                                'CRUX PRO actif — '
-                                '${_proExpiryText()}',
-                              );
+                              if (context.mounted) {
+                                _errorHandler
+                                    .showInfoSnackBar(
+                                  context,
+                                  'CRUX PRO actif — '
+                                  '${_proExpiryText()}',
+                                );
+                              }
                               return;
                             }
 
@@ -916,12 +918,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                                     ?.email,
                               );
                             } catch (error) {
-                              if (!mounted) return;
-
-                              _errorHandler.showError(
-                                context,
-                                error.toString(),
-                              );
+                              if (context.mounted) {
+                                _errorHandler.showError(
+                                  context,
+                                  error.toString(),
+                                );
+                              }
                             }
                           },
                           child: Container(

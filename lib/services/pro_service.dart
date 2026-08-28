@@ -98,15 +98,5 @@ class ProService {
     }
   }
 
-  Future<void> _activateProLegacy(String userId) async {
-    final proExpiresAt = DateTime.now().add(const Duration(days: 30));
-    await _db.collection('users').doc(userId).set({
-      'isPro': true,
-      'proExpiresAt': Timestamp.fromDate(proExpiresAt),
-      'proActivatedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-  }
-
   int get priceXof => _priceXof;
 }

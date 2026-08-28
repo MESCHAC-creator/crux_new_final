@@ -8,6 +8,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_timezone
   flutter_webrtc
   gtk
+  livekit_client
   url_launcher_linux
 )
 

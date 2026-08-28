@@ -49,7 +49,7 @@ class AuthService {
       );
     } on FirebaseAuthException catch (e) {
       _logger.e('❌ Auth error: ${e.code} — ${e.message}');
-      throw e;
+      rethrow;
     } catch (e) {
       _logger.e('❌ Sign up failed: $e');
       rethrow;
@@ -80,7 +80,7 @@ class AuthService {
       );
     } on FirebaseAuthException catch (e) {
       _logger.e('❌ Auth error: ${e.code} — ${e.message}');
-      throw e;
+      rethrow;
     } catch (e) {
       _logger.e('❌ Sign in failed: $e');
       rethrow;
@@ -117,7 +117,7 @@ class AuthService {
       );
     } on FirebaseAuthException catch (e) {
       _logger.e('❌ Google auth error: ${e.code} — ${e.message}');
-      throw e;
+      rethrow;
     } catch (e) {
       _logger.e('❌ Google sign in failed: $e');
       rethrow;
@@ -131,7 +131,7 @@ class AuthService {
       _logger.i('✅ Password reset email sent');
     } on FirebaseAuthException catch (e) {
       _logger.e('❌ Reset error: ${e.code}');
-      throw e;
+      rethrow;
     } catch (e) {
       _logger.e('❌ Password reset failed: $e');
       rethrow;

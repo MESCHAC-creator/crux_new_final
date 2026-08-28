@@ -107,7 +107,7 @@ class DeviceVerificationService {
       final webInfo = await deviceInfo.webBrowserInfo;
 
       _log.d(
-        'Web browser: ${webInfo.browser.name}',
+        'Web browser: ${webInfo.browserName}',
       );
 
       _log.d(
@@ -155,7 +155,7 @@ class DeviceVerificationService {
 
       // Android 8.0 minimum.
       if (sdk < 26) {
-        throw DeviceVerificationException(
+        throw const DeviceVerificationException(
           'Android 8.0 ou version ultérieure est requis.',
         );
       }
@@ -196,7 +196,7 @@ class DeviceVerificationService {
       );
 
       if (!_isIOSVersionValid(version)) {
-        throw DeviceVerificationException(
+        throw const DeviceVerificationException(
           'iOS 14.0 ou version ultérieure est requis.',
         );
       }
