@@ -98,6 +98,17 @@ class MeetingStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setScreenSharing(bool sharing) {
+    if (_isScreenSharing == sharing) return;
+    _isScreenSharing = sharing;
+    if (_isScreenSharing) {
+      _layoutController.setSpeakerMode(SpeakerMode.screenshare);
+    } else {
+      _layoutController.autoAdjustLayout();
+    }
+    notifyListeners();
+  }
+
   void toggleHandRaise() {
     _isHandRaised = !_isHandRaised;
     if (_room != null) {

@@ -104,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     
     try {
-      crux.log.d('Tentative de rejoindre réunion avec code: $code');
+      crux.logger.d('Tentative de rejoindre réunion avec code: $code');
       
       // Try to find meeting by meetingCode via backend API
       final backendService = BackendApiService();
@@ -114,16 +114,16 @@ class _HomeScreenState extends State<HomeScreen> {
       Navigator.of(context).pop(); // Close loading dialog
       
       if (meetingData == null) {
-        crux.log.d('Backend n\'a pas trouvé la réunion, tentative via Firestore direct');
+        crux.logger.d('Backend n\'a pas trouvé la réunion, tentative via Firestore direct');
         // Fallback to direct Firestore lookup by code
         final meeting = await MeetingService().getMeetingByCode(code);
         if (!mounted) return;
         if (meeting == null) {
-          crux.log.d('Réunion introuvable via Firestore pour le code: $code');
+          crux.logger.d('Réunion introuvable via Firestore pour le code: $code');
           _showJoinErrorDialog(code, 'Aucune réunion trouvée pour ce code');
           return;
         }
-        crux.log.d('Réunion trouvée via Firestore: ${meeting.id}');
+        crux.logger.d('Réunion trouvée via Firestore: ${meeting.id}');
         _codeCtrl.clear();
         _joinMeeting(meeting);
         return;
@@ -131,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       final meeting = backendService.parseMeetingData(meetingData);
       if (meeting != null) {
-        crux.log.d('Réunion trouvée via backend: ${meeting.id}');
+        crux.logger.d('Réunion trouvée via backend: ${meeting.id}');
         
         // Show meeting details dialog like Zoom
         final shouldJoin = await _showMeetingDetailsDialog(meeting);
@@ -141,23 +141,23 @@ class _HomeScreenState extends State<HomeScreen> {
           // Add participant to meeting via backend
           try {
             await backendService.addParticipant(meeting.id);
-            crux.log.d('Participant ajouté via backend');
+            crux.logger.d('Participant ajouté via backend');
           } catch (e) {
-            crux.log.d('Échec ajout participant via backend, tentative direct');
+            crux.logger.d('Échec ajout participant via backend, tentative direct');
             // Fallback to direct Firestore if backend fails
             await MeetingService().addParticipant(meeting.id, _uid);
-            crux.log.d('Participant ajouté via Firestore direct');
+            crux.logger.d('Participant ajouté via Firestore direct');
           }
           
           _codeCtrl.clear();
           _joinMeeting(meeting);
         }
       } else {
-        crux.log.d('Erreur parsing meeting data du backend');
+        crux.logger.d('Erreur parsing meeting data du backend');
         _showJoinErrorDialog(code, 'Erreur lors de la lecture des données de la réunion');
       }
     } catch (e) {
-      crux.log.e('Erreur lors de la jonction: $e');
+      crux.logger.e('Erreur lors de la jonction: $e');
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog if open
         _showJoinErrorDialog(code, 'Connexion impossible: ${e.toString()}');
