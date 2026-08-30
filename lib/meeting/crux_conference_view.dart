@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/meeting_state_provider.dart';
 import 'entities/speaker_state.dart';
+import 'entities/participant_display.dart';
 import 'layout/conference_layout_engine.dart';
 import 'widgets/speaker_card.dart';
 import 'widgets/live_feed_item.dart';
 import 'widgets/network_stats_overlay.dart';
 import 'controls/contextual_controls_bar.dart';
 import 'widgets/reactions_overlay.dart';
+import '../theme/animations/conference_animations.dart';
 import '../theme/colors.dart';
 import '../theme/conference_theme.dart';
 
@@ -80,11 +82,11 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
       final particle = ReactionParticle(
         emoji: emoji.emoji,
         startPosition: Offset(
-          size.width * 0.3 + (size.width * 0.4 / 8) * _reactionParticles.length % 8,
+          size.width * 0.3 + (size.width * 0.4 / 8) * (_reactionParticles.length % 8),
           size.height * 0.7,
         ),
         velocity: Offset(
-          (size.width * 0.4 / 8) * (_reactionParticles.length % 8 - 4),
+          (size.width * 0.4 / 8) * ((_reactionParticles.length % 8) - 4),
           -200 - (_reactionParticles.length % 3) * 50,
         ),
         scale: 0.8 + (_reactionParticles.length % 5) * 0.1,

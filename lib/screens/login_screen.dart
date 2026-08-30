@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/colors.dart';
 import '../services/auth_service.dart';
-import '../utils/logger.dart' as crux;
+import '../utils/logger.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -65,7 +65,7 @@ class _LoginScreenState extends State<LoginScreen>
     } on FirebaseAuthException catch (e) {
       if (mounted) _shakeError(_friendlyAuthError(e.code));
     } catch (e) {
-      crux.logger.e('Login error: $e');
+      logger.e('Login error: $e');
       if (mounted) _shakeError('Erreur de connexion. Vérifiez votre connexion internet.');
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -79,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen>
     } on FirebaseAuthException catch (e) {
       if (mounted) _shakeError(_friendlyAuthError(e.code));
     } catch (e) {
-      crux.logger.e('Google sign-in error: $e');
+      logger.e('Google sign-in error: $e');
       if (mounted) _shakeError('Connexion Google annulée ou échouée');
     } finally {
       if (mounted) setState(() => _loading = false);

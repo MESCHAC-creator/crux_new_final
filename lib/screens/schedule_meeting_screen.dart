@@ -19,7 +19,7 @@ import 'package:flutter/services.dart';
 
 import '../services/schedule_service.dart';
 import '../theme/colors.dart';
-import '../utils/logger.dart' as crux;
+import '../utils/logger.dart';
 
 class ScheduleMeetingScreen extends StatefulWidget {
   const ScheduleMeetingScreen({super.key, this.initialStart});
@@ -177,7 +177,7 @@ class _ScheduleMeetingScreenState extends State<ScheduleMeetingScreen> {
       if (!mounted) return;
       _snack(e.message, isError: true);
     } catch (e, st) {
-      crux.logger.e('ScheduleMeetingScreen._submit', error: e, stackTrace: st);
+      logger.e('ScheduleMeetingScreen._submit', error: e, stackTrace: st);
       if (!mounted) return;
       _snack('Impossible de planifier la réunion.', isError: true);
     } finally {

@@ -49,7 +49,7 @@ class ConferenceTheme {
   static const double statsRadius = 12.0;
 
   // Shadows
-  static List<BoxShadow> get speakerShadow => [
+  static List<BoxShadow> get speakerShadow => const [
         BoxShadow(
           color: activeSpeakerGlow,
           blurRadius: 20,
@@ -57,19 +57,19 @@ class ConferenceTheme {
         ),
       ];
 
-  static List<BoxShadow> get feedShadow => [
+  static List<BoxShadow> get feedShadow => const [
         BoxShadow(
-          color: AppColors.surface.withValues(alpha: 0.3),
+          color: AppColors.surface,
           blurRadius: 10,
-          offset: const Offset(0, 4),
+          offset: Offset(0, 4),
         ),
       ];
 
-  static List<BoxShadow> get controlShadow => [
+  static List<BoxShadow> get controlShadow => const [
         BoxShadow(
-          color: AppColors.surface.withValues(alpha: 0.5),
+          color: AppColors.surface,
           blurRadius: 15,
-          offset: const Offset(0, 5),
+          offset: Offset(0, 5),
         ),
       ];
 
@@ -141,7 +141,6 @@ class ConferenceTheme {
         primary: AppColors.primary,
         secondary: AppColors.secondary,
         surface: AppColors.surface,
-        background: AppColors.background,
         error: AppColors.error,
       ),
     );

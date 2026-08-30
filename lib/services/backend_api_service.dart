@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/meeting_model.dart';
-import '../utils/logger.dart' as crux;
+import '../utils/logger.dart';
 
 /// Service pour communiquer avec le backend API CRUX
 /// Gère la création et la récupération des réunions via le serveur Node.js
@@ -60,14 +60,14 @@ Future<String> _getAuthToken() async {
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        crux.logger.i('✅ Réunion créée via backend: ${data['id']}');
+        logger.i('✅ Réunion créée via backend: ${data['id']}');
         return data;
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? 'Erreur création réunion');
       }
     } catch (e) {
-      crux.logger.e('❌ BackendApiService.createMeeting error', error: e);
+      logger.e('❌ BackendApiService.createMeeting error', error: e);
       rethrow;
     }
   }
@@ -75,7 +75,7 @@ Future<String> _getAuthToken() async {
   /// Récupère une réunion par son code via le backend
   Future<Map<String, dynamic>?> getMeetingByCode(String code) async {
     try {
-      crux.logger.i('🔍 Recherche réunion par code via backend: $code');
+      logger.i('🔍 Recherche réunion par code via backend: $code');
       final token = await _getAuthToken();
       
       final response = await http.get(
@@ -87,18 +87,18 @@ Future<String> _getAuthToken() async {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        crux.logger.i('✅ Réunion trouvée par code via backend: $code');
+        logger.i('✅ Réunion trouvée par code via backend: $code');
         return data;
       } else if (response.statusCode == 404) {
-        crux.logger.w('⚠️ Réunion non trouvée pour le code via backend: $code');
+        logger.w('⚠️ Réunion non trouvée pour le code via backend: $code');
         return null;
       } else {
         final error = jsonDecode(response.body);
-        crux.logger.e('❌ Erreur backend recherche réunion: ${error['error']}');
+        logger.e('❌ Erreur backend recherche réunion: ${error['error']}');
         throw Exception(error['error'] ?? 'Erreur récupération réunion');
       }
     } catch (e) {
-      crux.logger.e('❌ BackendApiService.getMeetingByCode error', error: e);
+      logger.e('❌ BackendApiService.getMeetingByCode error', error: e);
       rethrow;
     }
   }
@@ -117,17 +117,17 @@ Future<String> _getAuthToken() async {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        crux.logger.i('✅ Réunion trouvée par ID: $id');
+        logger.i('✅ Réunion trouvée par ID: $id');
         return data;
       } else if (response.statusCode == 404) {
-        crux.logger.w('⚠️ Réunion non trouvée pour l\'ID: $id');
+        logger.w('⚠️ Réunion non trouvée pour l\'ID: $id');
         return null;
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? 'Erreur récupération réunion');
       }
     } catch (e) {
-      crux.logger.e('❌ BackendApiService.getMeetingById error', error: e);
+      logger.e('❌ BackendApiService.getMeetingById error', error: e);
       rethrow;
     }
   }
@@ -145,13 +145,13 @@ Future<String> _getAuthToken() async {
       );
 
       if (response.statusCode == 200) {
-        crux.logger.i('✅ Participant ajouté à la réunion: $meetingId');
+        logger.i('✅ Participant ajouté à la réunion: $meetingId');
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? 'Erreur ajout participant');
       }
     } catch (e) {
-      crux.logger.e('❌ BackendApiService.addParticipant error', error: e);
+      logger.e('❌ BackendApiService.addParticipant error', error: e);
       rethrow;
     }
   }
@@ -184,14 +184,14 @@ Future<String> _getAuthToken() async {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        crux.logger.i('✅ Token LiveKit obtenu pour la room: $room');
+        logger.i('✅ Token LiveKit obtenu pour la room: $room');
         return data;
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? 'Erreur génération token');
       }
     } catch (e) {
-      crux.logger.e('❌ BackendApiService.getLiveKitToken error', error: e);
+      logger.e('❌ BackendApiService.getLiveKitToken error', error: e);
       rethrow;
     }
   }
@@ -203,7 +203,7 @@ Future<String> _getAuthToken() async {
     try {
       return MeetingModel.fromJson(data);
     } catch (e) {
-      crux.logger.e('❌ Erreur parsing meeting data', error: e);
+      logger.e('❌ Erreur parsing meeting data', error: e);
       return null;
     }
   }

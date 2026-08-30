@@ -13,7 +13,7 @@ import '../services/user_service.dart';
 import '../services/backend_api_service.dart';
 import '../theme/colors.dart';
 import '../wallpaper/app_background.dart';
-import '../utils/logger.dart' as crux;
+import '../utils/logger.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.user});
@@ -104,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     
     try {
-      crux.logger.d('Tentative de rejoindre réunion avec code: $code');
+      logger.d('Tentative de rejoindre réunion avec code: $code');
       
       // Try to find meeting by meetingCode via backend API
       final backendService = BackendApiService();
@@ -114,16 +114,16 @@ class _HomeScreenState extends State<HomeScreen> {
       Navigator.of(context).pop(); // Close loading dialog
       
       if (meetingData == null) {
-        crux.logger.d('Backend n\'a pas trouvé la réunion, tentative via Firestore direct');
+        logger.d('Backend n\'a pas trouvé la réunion, tentative via Firestore direct');
         // Fallback to direct Firestore lookup by code
         final meeting = await MeetingService().getMeetingByCode(code);
         if (!mounted) return;
         if (meeting == null) {
-          crux.logger.d('Réunion introuvable via Firestore pour le code: $code');
+          logger.d('Réunion introuvable via Firestore pour le code: $code');
           _showJoinErrorDialog(code, 'Aucune réunion trouvée pour ce code');
           return;
         }
-        crux.logger.d('Réunion trouvée via Firestore: ${meeting.id}');
+        logger.d('Réunion trouvée via Firestore: ${meeting.id}');
         _codeCtrl.clear();
         _joinMeeting(meeting);
         return;
@@ -131,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       final meeting = backendService.parseMeetingData(meetingData);
       if (meeting != null) {
-        crux.logger.d('Réunion trouvée via backend: ${meeting.id}');
+        logger.d('Réunion trouvée via backend: ${meeting.id}');
         
         // Show meeting details dialog like Zoom
         final shouldJoin = await _showMeetingDetailsDialog(meeting);
@@ -141,23 +141,23 @@ class _HomeScreenState extends State<HomeScreen> {
           // Add participant to meeting via backend
           try {
             await backendService.addParticipant(meeting.id);
-            crux.logger.d('Participant ajouté via backend');
+            logger.d('Participant ajouté via backend');
           } catch (e) {
-            crux.logger.d('Échec ajout participant via backend, tentative direct');
+            logger.d('Échec ajout participant via backend, tentative direct');
             // Fallback to direct Firestore if backend fails
             await MeetingService().addParticipant(meeting.id, _uid);
-            crux.logger.d('Participant ajouté via Firestore direct');
+            logger.d('Participant ajouté via Firestore direct');
           }
           
           _codeCtrl.clear();
           _joinMeeting(meeting);
         }
       } else {
-        crux.logger.d('Erreur parsing meeting data du backend');
+        logger.d('Erreur parsing meeting data du backend');
         _showJoinErrorDialog(code, 'Erreur lors de la lecture des données de la réunion');
       }
     } catch (e) {
-      crux.logger.e('Erreur lors de la jonction: $e');
+      logger.e('Erreur lors de la jonction: $e');
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog if open
         _showJoinErrorDialog(code, 'Connexion impossible: ${e.toString()}');
@@ -196,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.video_call, color: AppColors.primary, size: 28),
+            const Icon(Icons.video_call, color: AppColors.primary, size: 28),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -221,7 +221,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Annuler', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text('Annuler', style: TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -247,13 +247,13 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 100,
             child: Text(
               label,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -269,11 +269,11 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.error_outline, color: AppColors.error, size: 28),
+            const Icon(Icons.error_outline, color: AppColors.error, size: 28),
             const SizedBox(width: 12),
             Text(
               'Échec de la jonction',
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -283,19 +283,19 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text(
               errorMessage,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
             ),
             const SizedBox(height: 16),
             Text(
               'Code: $code',
-              style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
+              style: const TextStyle(color: AppColors.textTertiary, fontSize: 12),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text('Fermer', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text('Fermer', style: TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () {

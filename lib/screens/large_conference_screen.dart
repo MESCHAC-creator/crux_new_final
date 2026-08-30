@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:livekit_client/livekit_client.dart';
+import 'package:livekit_client/livekit_client.dart' hide logger;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -20,7 +20,7 @@ import '../services/meeting_service.dart';
 import '../services/note_service.dart';
 import '../services/pro_service.dart';
 import '../theme/colors.dart';
-import '../utils/logger.dart' as crux;
+import '../utils/logger.dart';
 import '../meeting/crux_conference_view.dart';
 
 class LargeConferenceScreen extends StatefulWidget {
@@ -248,7 +248,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         _loading = false;
       });
     } catch (e, stackTrace) {
-      crux.logger.e(
+      logger.e(
         'Large conference initialization failed',
         error: e,
         stackTrace: stackTrace,
@@ -281,7 +281,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
             prefs.getBool('crux_cam_default') ?? true;
       });
     } catch (e) {
-      crux.logger.w(
+      logger.w(
         'Could not load conference preferences',
         error: e,
       );
@@ -304,7 +304,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         _isPro = value;
       });
     } catch (e) {
-      crux.logger.w(
+      logger.w(
         'Pro check failed',
         error: e,
       );
@@ -331,7 +331,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       _organizerId =
           data['organizerId']?.toString();
     } catch (e) {
-      crux.logger.w(
+      logger.w(
         'Could not load organizer',
         error: e,
       );
@@ -469,7 +469,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         'message': text,
       });
     } catch (e) {
-      crux.logger.w(
+      logger.w(
         'Chat send failed',
         error: e,
       );
@@ -577,7 +577,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       try {
         await oldRoom.disconnect();
       } catch (e) {
-        crux.logger.w(
+        logger.w(
           'LiveKit disconnect failed',
           error: e,
         );
@@ -886,7 +886,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         return;
       }
     } catch (e) {
-      crux.logger.w(
+      logger.w(
         'LiveKit data decoding failed',
         error: e,
       );
@@ -914,7 +914,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         reliable: true,
       );
     } catch (e) {
-      crux.logger.w(
+      logger.w(
         'LiveKit data send failed',
         error: e,
       );
@@ -941,7 +941,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         _micOn = next;
       });
     } catch (e) {
-      crux.logger.w(
+      logger.w(
         'Microphone toggle failed',
         error: e,
       );
@@ -968,7 +968,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         _camOn = next;
       });
     } catch (e) {
-      crux.logger.w(
+      logger.w(
         'Camera toggle failed',
         error: e,
       );
@@ -983,14 +983,14 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     final local = _room?.localParticipant;
 
     if (local == null) {
-      crux.logger.w('Cannot toggle screen share: no local participant');
+      logger.w('Cannot toggle screen share: no local participant');
       return;
     }
 
     final next = !_screenSharing;
 
     try {
-      crux.logger.i('Toggling screen share: $next');
+      logger.i('Toggling screen share: $next');
       
       // Check if screen share track exists
       final screenTrack = local.getTrack(TrackType.SCREEN_SHARE);
@@ -1026,9 +1026,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       final meetingProvider = context.read<MeetingStateProvider>();
       meetingProvider.setScreenSharing(next);
       
-      crux.logger.i('Screen share toggled successfully: $next');
+      logger.i('Screen share toggled successfully: $next');
     } catch (e) {
-      crux.logger.e('Screen share failed', error: e);
+      logger.e('Screen share failed', error: e);
       
       if (mounted) {
         setState(() {
@@ -1087,7 +1087,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         );
       }
     } catch (e) {
-      crux.logger.w(
+      logger.w(
         'Raise hand failed',
         error: e,
       );
@@ -1160,7 +1160,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       try {
         await _speech.stop();
       } catch (e) {
-        crux.logger.w(
+        logger.w(
           'Speech recognition stop failed',
           error: e,
         );
@@ -1217,7 +1217,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         },
       );
     } catch (e, stackTrace) {
-      crux.logger.w(
+      logger.w(
         'Speech recognition failed',
         error: e,
         stackTrace: stackTrace,
@@ -1248,7 +1248,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
       await _tts.speak(text);
     } catch (e) {
-      crux.logger.w(
+      logger.w(
         'TTS failed',
         error: e,
       );
@@ -1400,7 +1400,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         _isReconnecting = false;
       });
     } catch (e) {
-      crux.logger.w(
+      logger.w(
         'Reconnect attempt failed',
         error: e,
       );
@@ -1476,7 +1476,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         widget.userId,
       );
     } catch (e) {
-      crux.logger.w(
+      logger.w(
         'Meeting cleanup failed',
         error: e,
       );

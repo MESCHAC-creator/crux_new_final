@@ -35,7 +35,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/meeting_model.dart';
 import '../utils/date_flex.dart';
-import '../utils/logger.dart' as crux;
+import '../utils/logger.dart';
 import '../utils/meeting_notification_manager.dart';
 
 /// Liens de partage. (Évite de dupliquer des URLs en dur dans les écrans.)
@@ -265,7 +265,7 @@ class ScheduleService {
         atStart: notifyAtStart,
       );
 
-      crux.logger.i('📅 Réunion planifiée $meetingId à $startTime ($code)');
+      logger.i('📅 Réunion planifiée $meetingId à $startTime ($code)');
 
       return ScheduleResult(
         meeting: meeting,
@@ -274,7 +274,7 @@ class ScheduleService {
         remindersScheduled: reminders,
       );
     } on FirebaseException catch (e) {
-      crux.logger.e('scheduleMeeting Firebase → ${e.code} ${e.message}');
+      logger.e('scheduleMeeting Firebase → ${e.code} ${e.message}');
       throw ScheduleException(
         e.code == 'permission-denied'
             ? 'Permissions insuffisantes pour planifier cette réunion.'
@@ -282,7 +282,7 @@ class ScheduleService {
         code: e.code,
       );
     } catch (e, st) {
-      crux.logger.e('scheduleMeeting', error: e, stackTrace: st);
+      logger.e('scheduleMeeting', error: e, stackTrace: st);
       throw const ScheduleException(
         'Une erreur est survenue. Vérifiez votre connexion et réessayez.',
         code: 'unknown',
@@ -414,9 +414,9 @@ class ScheduleService {
           );
         }
       }
-      crux.logger.i('🔁 Rappels resynchronisés (${snap.docs.length})');
+      logger.i('🔁 Rappels resynchronisés (${snap.docs.length})');
     } catch (e) {
-      crux.logger.w('resyncReminders → $e');
+      logger.w('resyncReminders → $e');
     }
   }
 

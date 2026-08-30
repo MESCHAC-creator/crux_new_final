@@ -207,9 +207,9 @@ class _NetworkStatsOverlayState extends State<NetworkStatsOverlay>
 
   IconData _getNetworkQualityIcon() {
     if (widget.latency < 50) return Icons.signal_cellular_alt;
-    if (widget.latency < 100) return Icons.signal_cellular_3_bar;
+    if (widget.latency < 100) return Icons.signal_cellular_4_bar;
     if (widget.latency < 150) return Icons.signal_cellular_2_bar;
-    return Icons.signal_cellular_1_bar;
+    return Icons.signal_cellular_0_bar;
   }
 
   Color _getLatencyColor() {

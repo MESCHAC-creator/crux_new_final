@@ -1,5 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:livekit_client/livekit_client.dart';
+
+extension ParticipantExtension on Participant {
+  Track? getScreenShareTrack() {
+    return videoTrackPublications
+        .where((p) => p.source.name == 'screenShare')
+        .firstOrNull?.track;
+  }
+  
+  Track? getVideoTrack() {
+    return videoTrackPublications
+        .where((p) => p.source.name != 'screenShare')
+        .firstOrNull?.track;
+  }
+  
+  Track? getAudioTrack() {
+    return audioTrackPublications.isNotEmpty
+        ? audioTrackPublications.first.track
+        : null;
+  }
+}
+
+extension LocalParticipantExtension on LocalParticipant {
+  Future<LocalVideoTrack?> createScreenShareTrack() async {
+    try {
+      await setScreenShareEnabled(true);
+      return videoTrackPublications
+          .where((p) => p.source.name == 'screenShare')
+          .firstOrNull?.track as LocalVideoTrack;
+    } catch (e) {
+      debugPrint('Error creating screen share track: $e');
+    }
+    return null;
+  }
+}
 
 // String Extensions
 extension StringExtensions on String {

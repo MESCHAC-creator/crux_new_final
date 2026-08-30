@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
-import 'meeting/entities/speaker_state.dart';
-import 'meeting/entities/live_feed_config.dart';
-import 'meeting/entities/participant_display.dart';
-import 'meeting/conference_layout_controller.dart';
+import '../meeting/entities/speaker_state.dart';
+import '../meeting/entities/live_feed_config.dart';
+import '../meeting/entities/participant_display.dart';
+import '../meeting/conference_layout_controller.dart';
+
+// Note: MeetingStateProvider is in providers/ folder, so ../meeting/ is correct
 
 class MeetingStateProvider extends ChangeNotifier {
   final ConferenceLayoutController _layoutController;
@@ -179,6 +181,7 @@ class MeetingStateProvider extends ChangeNotifier {
   }
 
   // Cleanup
+  @override
   void dispose() {
     _layoutController.dispose();
     super.dispose();

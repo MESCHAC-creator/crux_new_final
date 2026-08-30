@@ -9,14 +9,13 @@ import 'layout/conference_layout_engine.dart';
 class ConferenceLayoutController extends ChangeNotifier {
   SpeakerState _speakerState = const SpeakerState();
   LiveFeedConfig _feedConfig = const LiveFeedConfig();
-  SpeakerQueue _speakerQueue = SpeakerQueue();
+  final SpeakerQueue _speakerQueue = SpeakerQueue();
   final Map<String, ParticipantDisplayState> _participantStates = {};
   Timer? _speakerDetectionTimer;
   Timer? _audioLevelTimer;
   
   static const double _dominantSpeakerThreshold = -40.0;
   static const Duration _speakerHoldDuration = Duration(milliseconds: 500);
-  static const Duration _speakerHoldTimeout = Duration(seconds: 3);
   
   ConferenceLayoutController();
 
@@ -35,6 +34,7 @@ class ConferenceLayoutController extends ChangeNotifier {
     _startAudioLevelMonitoring();
   }
 
+  @override
   void dispose() {
     _speakerDetectionTimer?.cancel();
     _audioLevelTimer?.cancel();
@@ -47,8 +47,8 @@ class ConferenceLayoutController extends ChangeNotifier {
       participant: participant,
       mode: existingState?.mode ?? ParticipantDisplayMode.tile,
       isAudioActive: participant.isMuted == false,
-      isVideoEnabled: participant.cameraTrack != null,
-      isScreenSharing: participant.getTrack(TrackType.SCREEN_SHARE) != null,
+      isVideoEnabled: participant.videoTrackPublications.isNotEmpty,
+      isScreenSharing: false,
       hasHandRaised: participant.metadata?.contains('hand_raised') ?? false,
       audioLevel: existingState?.audioLevel ?? 0.0,
       lastActiveTime: existingState?.lastActiveTime ?? DateTime.now(),
@@ -153,8 +153,8 @@ class ConferenceLayoutController extends ChangeNotifier {
       if (state.isAudioActive && state.audioLevel > 0.1) {
         final participant = state.participant;
         if (participant is LocalParticipant) {
-          final audioTrack = participant.getTrack(TrackType.AUDIO);
-          if (audioTrack != null) {
+          final audioPub = participant.getTrackPublicationBySource(TrackSource.microphone);
+          if (audioPub != null) {
             // Simulate audio level for local participant
             updateAudioLevel(state.participantId, 0.5);
           }

@@ -4,7 +4,7 @@ import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 
-import 'logger.dart' as crux;
+import 'logger.dart';
 
 /// Décalages de rappel supportés, dans l'ordre d'affichage.
 enum MeetingReminder { oneHour, fifteenMin, fiveMin, atStart }
@@ -55,7 +55,7 @@ class MeetingNotificationManager {
         tz.setLocalLocation(tz.getLocation(localName));
       } catch (e) {
         // Fuseau système illisible : on reste sur UTC plutôt que de crasher.
-        crux.logger.w('Fuseau local introuvable ($e) → UTC');
+        logger.w('Fuseau local introuvable ($e) → UTC');
         tz.setLocalLocation(tz.UTC);
       }
 
@@ -85,16 +85,16 @@ class MeetingNotificationManager {
         _exactAlarmAllowed =
             await android?.canScheduleExactNotifications() ?? true;
         if (!_exactAlarmAllowed) {
-          crux.logger.w(
+          logger.w(
             'Alarmes exactes refusées → rappels programmés en mode inexact',
           );
         }
       }
 
       _ready = true;
-      crux.logger.i('✅ MeetingNotificationManager prêt (${tz.local.name})');
+      logger.i('✅ MeetingNotificationManager prêt (${tz.local.name})');
     } catch (e, st) {
-      crux.logger.e('MeetingNotificationManager.initialize',
+      logger.e('MeetingNotificationManager.initialize',
           error: e, stackTrace: st);
     }
   }
@@ -167,11 +167,11 @@ class MeetingNotificationManager {
         );
         scheduled++;
       } catch (e) {
-        crux.logger.e('zonedSchedule($meetingId/${reminder.name}) → $e');
+        logger.e('zonedSchedule($meetingId/${reminder.name}) → $e');
       }
     }
 
-    crux.logger.i('🔔 $scheduled rappel(s) programmé(s) pour $meetingId');
+    logger.i('🔔 $scheduled rappel(s) programmé(s) pour $meetingId');
     return scheduled;
   }
 

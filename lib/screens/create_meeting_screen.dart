@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
 import '../services/backend_api_service.dart';
-import '../utils/logger.dart' as crux;
+import '../utils/logger.dart';
 import '../widgets/custom_button.dart';
 import 'meeting_screen.dart';
 import 'large_conference_screen.dart';
@@ -86,9 +86,9 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
           isLargeConference: widget.largeConference,
         );
         meetingId = meetingData['id'];
-        crux.logger.i('✅ Réunion créée via backend: $meetingId');
+        logger.i('✅ Réunion créée via backend: $meetingId');
       } catch (e) {
-        crux.logger.w('Backend creation failed, falling back to direct Firestore', error: e);
+        logger.w('Backend creation failed, falling back to direct Firestore', error: e);
         // Fallback to direct Firestore if backend fails
         meetingId = await MeetingService().createMeeting(
           title: title,
@@ -98,7 +98,7 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
           passcode: passcode.isNotEmpty ? passcode : null,
           isLargeConference: widget.largeConference,
         );
-        crux.logger.i('✅ Réunion créée via direct Firestore: $meetingId');
+        logger.i('✅ Réunion créée via direct Firestore: $meetingId');
       }
 
       if (!mounted) return;
@@ -133,7 +133,7 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
         );
       }
     } catch (e) {
-      crux.logger.e('CreateMeetingScreen._create error', error: e);
+      logger.e('CreateMeetingScreen._create error', error: e);
       if (mounted) {
         setState(() {
           _loading = false;

@@ -250,7 +250,7 @@ class _ContextualControlsBarState extends State<ContextualControlsBar>
         child: Container(
           width: 48,
           height: 48,
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: AppColors.error,
             shape: BoxShape.circle,
           ),

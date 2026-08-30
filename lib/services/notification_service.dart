@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import '../utils/logger.dart' as crux;
+import '../utils/logger.dart';
 
 /// Centralise toutes les notifications locales de l'app (rappels, alertes Pro,
 /// appels manqués). Utilisée par [main.dart] (initialize) et par
@@ -41,9 +41,9 @@ class NotificationService {
       }
 
       _initialized = true;
-      crux.logger.i('✅ NotificationService initialized');
+      logger.i('✅ NotificationService initialized');
     } catch (e, st) {
-      crux.logger.e('NotificationService.initialize error', error: e, stackTrace: st);
+      logger.e('NotificationService.initialize error', error: e, stackTrace: st);
     }
   }
 
@@ -62,7 +62,7 @@ class NotificationService {
       );
       await _ln.show(id, title, body, details);
     } catch (e) {
-      crux.logger.e('NotificationService._show error', error: e);
+      logger.e('NotificationService._show error', error: e);
     }
   }
 
@@ -103,7 +103,7 @@ class NotificationService {
         if (androidInfo.version.sdkInt >= 31) {
           final hasExactAlarm = await _checkExactAlarmPermission();
           if (!hasExactAlarm) {
-            crux.logger.w('Exact alarm permission not granted, using inexact scheduling');
+            logger.w('Exact alarm permission not granted, using inexact scheduling');
           }
         }
       }
@@ -112,7 +112,7 @@ class NotificationService {
         await _ln.cancel(i);
       }
     } catch (e) {
-      crux.logger.e('Error scheduling reminders: $e');
+      logger.e('Error scheduling reminders: $e');
     }
   }
 

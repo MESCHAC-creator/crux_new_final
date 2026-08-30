@@ -62,12 +62,14 @@ class SpeakerCard extends StatelessWidget {
 
   Widget _buildVideoContent() {
     if (participantState.isVideoEnabled) {
-      final videoTrack = participantState.participant.getTrack(TrackType.VIDEO);
-      if (videoTrack != null && videoTrack is VideoTrack) {
-        return VideoTrackRenderer(videoTrack as VideoTrack);
-      } else {
-        return _buildAvatarPlaceholder();
+      final videoPublications = participantState.participant.videoTrackPublications;
+      if (videoPublications.isNotEmpty) {
+        final videoTrack = videoPublications.first.track;
+        if (videoTrack != null && videoTrack is VideoTrack) {
+          return VideoTrackRenderer(videoTrack);
+        }
       }
+      return _buildAvatarPlaceholder();
     } else {
       return _buildAvatarPlaceholder();
     }
@@ -119,7 +121,7 @@ class SpeakerCard extends StatelessWidget {
               ),
             ),
             if (participantState.isScreenSharing)
-              Text(
+              const Text(
                 'Partage d\'écran',
                 style: TextStyle(
                   color: AppColors.textSecondary,
@@ -154,7 +156,7 @@ class SpeakerCard extends StatelessWidget {
         color: AppColors.error,
         shape: BoxShape.circle,
       ),
-      child: Icon(
+      child: const Icon(
         Icons.mic_off,
         size: 16,
         color: AppColors.textPrimary,
@@ -169,7 +171,7 @@ class SpeakerCard extends StatelessWidget {
         color: AppColors.success,
         shape: BoxShape.circle,
       ),
-      child: Icon(
+      child: const Icon(
         Icons.videocam,
         size: 16,
         color: AppColors.textPrimary,
@@ -190,13 +192,13 @@ class SpeakerCard extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            const Icon(
               Icons.back_hand,
               size: 16,
               color: AppColors.textPrimary,
             ),
             const SizedBox(width: 4),
-            Text(
+            const Text(
               'Main levée',
               style: TextStyle(
                 color: AppColors.textPrimary,
@@ -220,7 +222,7 @@ class SpeakerCard extends StatelessWidget {
           color: AppColors.primary,
           shape: BoxShape.circle,
         ),
-        child: Icon(
+        child: const Icon(
           Icons.push_pin,
           size: 16,
           color: AppColors.textOnPrimary,

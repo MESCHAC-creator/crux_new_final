@@ -72,6 +72,10 @@ class SpeakerQueue {
     queue.remove(participant);
   }
 
+  void removeWhere(bool Function(Participant) test) {
+    queue.removeWhere(test);
+  }
+
   Participant? get nextSpeaker {
     if (queue.isEmpty) return null;
     return queue.first;

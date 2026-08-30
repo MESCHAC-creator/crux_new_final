@@ -1,8 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'entities/speaker_state.dart';
-import 'entities/live_feed_config.dart';
-import 'entities/participant_display.dart';
+import '../entities/speaker_state.dart';
+import '../entities/live_feed_config.dart';
+import '../entities/participant_display.dart';
 
 class ConferenceLayoutEngine {
   final Size screenSize;

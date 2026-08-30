@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'conference_theme.dart';
+import '../conference_theme.dart';
+import '../colors.dart';
 
 class ConferenceAnimations {
   ConferenceAnimations._();

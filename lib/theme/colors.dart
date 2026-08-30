@@ -26,6 +26,12 @@ class AppColors {
   static const Color _orange = Color(0xFFDD7722);
   static const Color _amber = Color(0xFFCCAA33);
 
+  static const Color cyan = _cyan;
+  static const Color green = _green;
+  static const Color red = _red;
+  static const Color orange = _orange;
+  static const Color amber = _amber;
+
   static const Color primary = _white;
   static const Color primaryLight = Color(0xFFFFFFFF);
   static const Color primaryDark = _lightGray;

@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
 import '../services/pro_service.dart';
-import '../utils/logger.dart' as crux;
+import '../utils/logger.dart';
 import '../widgets/elegant_toast.dart';
 import '../widgets/custom_button.dart';
 
@@ -48,7 +48,7 @@ class _ProScreenState extends State<ProScreen> {
         userEmail: current.email,
       );
     } catch (e) {
-      crux.logger.e('ProScreen._subscribe error', error: e);
+      logger.e('ProScreen._subscribe error', error: e);
       if (mounted) {
         ElegantToast.show(
           context,
