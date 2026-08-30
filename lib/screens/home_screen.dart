@@ -174,14 +174,14 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           const CircularProgressIndicator(color: AppColors.primary),
           const SizedBox(height: 20),
-          Text(
+          const Text(
             'Recherche de la réunion...',
             style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
           ),
           const SizedBox(height: 8),
           Text(
             'Code: $code',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
           ),
         ],
       ),
@@ -194,10 +194,10 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.video_call, color: AppColors.primary, size: 28),
-            const SizedBox(width: 12),
+            Icon(Icons.video_call, color: AppColors.primary, size: 28),
+            SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Détails de la réunion',
@@ -267,13 +267,13 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.error_outline, color: AppColors.error, size: 28),
-            const SizedBox(width: 12),
+            Icon(Icons.error_outline, color: AppColors.error, size: 28),
+            SizedBox(width: 12),
             Text(
               'Échec de la jonction',
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ],
         ),

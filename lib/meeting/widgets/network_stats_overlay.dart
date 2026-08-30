@@ -98,7 +98,7 @@ class _NetworkStatsOverlayState extends State<NetworkStatsOverlay>
             const SizedBox(width: 8),
             Text(
               '${widget.fps.toInt()} FPS',
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
@@ -125,7 +125,7 @@ class _NetworkStatsOverlayState extends State<NetworkStatsOverlay>
               color: _getNetworkQualityColor(),
             ),
             const SizedBox(width: 4),
-            Text(
+            const Text(
               'Réseau',
               style: TextStyle(
                 color: AppColors.textPrimary,
@@ -154,14 +154,14 @@ class _NetworkStatsOverlayState extends State<NetworkStatsOverlay>
         children: [
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 11,
             ),
           ),
           Text(
             value,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColors.textPrimary,
               fontSize: 11,
               fontWeight: FontWeight.w500,
@@ -208,7 +208,7 @@ class _NetworkStatsOverlayState extends State<NetworkStatsOverlay>
   IconData _getNetworkQualityIcon() {
     if (widget.latency < 50) return Icons.signal_cellular_alt;
     if (widget.latency < 100) return Icons.signal_cellular_4_bar;
-    if (widget.latency < 150) return Icons.signal_cellular_2_bar;
+    if (widget.latency < 150) return Icons.signal_cellular_alt_2_bar;
     return Icons.signal_cellular_0_bar;
   }
 

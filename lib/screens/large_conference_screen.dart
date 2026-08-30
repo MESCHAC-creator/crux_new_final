@@ -5,7 +5,6 @@ import 'dart:ui' show ImageFilter;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:livekit_client/livekit_client.dart' hide logger;
@@ -22,6 +21,7 @@ import '../services/pro_service.dart';
 import '../theme/colors.dart';
 import '../utils/logger.dart';
 import '../meeting/crux_conference_view.dart';
+import '../meeting/entities/speaker_state.dart';
 
 class LargeConferenceScreen extends StatefulWidget {
   final String meetingId;
@@ -51,13 +51,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
   // LARGE WEBINAR CONFIGURATION
   // ===========================================================================
-
-  /// Nombre maximum de vidéos rendues simultanément.
-  ///
-  /// IMPORTANT :
-  /// La room peut contenir des milliers de participants.
-  /// L'interface ne doit jamais essayer de construire des milliers de vidéos.
-  static const int _maxVisibleVideos = 10;
 
   /// Capacité cible de ce mode webinaire.
   ///
@@ -95,8 +88,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
   List<RemoteParticipant> _remoteParticipants =
       <RemoteParticipant>[];
-
-  String? _activeSpeakerId;
 
   String? _organizerId;
 
@@ -665,21 +656,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           if (!mounted) return;
 
           if (event.speakers.isEmpty) {
-            setState(() {
-              _activeSpeakerId = null;
-            });
-            
-            // Update meeting state provider
             meetingProvider.setSpeakerMode(SpeakerMode.gallery);
             return;
           }
 
-          final activeSpeaker = event.speakers.first;
-          setState(() {
-            _activeSpeakerId = activeSpeaker.identity;
-          });
-          
-          // Update meeting state provider with audio levels
           for (final speaker in event.speakers) {
             meetingProvider.updateAudioLevel(speaker.sid, speaker.audioLevel);
           }
@@ -750,73 +730,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     for (final participant in participants) {
       meetingProvider.updateParticipant(participant);
     }
-  }
-
-  /// Retourne uniquement les participants affichés.
-  ///
-  /// Même avec 5 000 participants dans la room,
-  /// l'interface ne construit que 10 tuiles vidéo.
-  List<RemoteParticipant> get _visibleParticipants {
-    final participants =
-        List<RemoteParticipant>.from(
-      _remoteParticipants,
-    );
-
-    participants.sort(
-      (a, b) {
-        final aActive =
-            a.identity == _activeSpeakerId;
-
-        final bActive =
-            b.identity == _activeSpeakerId;
-
-        if (aActive && !bActive) {
-          return -1;
-        }
-
-        if (!aActive && bActive) {
-          return 1;
-        }
-
-        final aVideo = _hasVideo(a);
-
-        final bVideo = _hasVideo(b);
-
-        if (aVideo && !bVideo) {
-          return -1;
-        }
-
-        if (!aVideo && bVideo) {
-          return 1;
-        }
-
-        return a.name
-            .toLowerCase()
-            .compareTo(
-              b.name.toLowerCase(),
-            );
-      },
-    );
-
-    // 1 vidéo locale + 9 vidéos distantes = 10 maximum.
-    return participants
-        .take(_maxVisibleVideos - 1)
-        .toList();
-  }
-
-  bool _hasVideo(
-    RemoteParticipant participant,
-  ) {
-    for (final publication
-        in participant.videoTrackPublications) {
-      if (publication.subscribed &&
-          !publication.muted &&
-          publication.track != null) {
-        return true;
-      }
-    }
-
-    return false;
   }
 
   // ===========================================================================
@@ -991,30 +904,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
     try {
       logger.i('Toggling screen share: $next');
-      
-      // Check if screen share track exists
-      final screenTrack = local.getTrack(TrackType.SCREEN_SHARE);
-      
-      if (next) {
-        // Start screen share
-        if (screenTrack != null) {
-          await screenTrack.enable();
-        } else {
-          // Create new screen share track
-          final track = await local.createScreenShareTrack();
-          if (track != null) {
-            await track.enable();
-          } else {
-            throw Exception('Failed to create screen share track');
-          }
-        }
-      } else {
-        // Stop screen share
-        if (screenTrack != null) {
-          await screenTrack.disable();
-          await screenTrack.stop();
-        }
-      }
+
+      await local.setScreenShareEnabled(next);
 
       if (!mounted) return;
 
@@ -1623,68 +1514,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // CONFERENCE
-  // ===========================================================================
-
-  Widget _buildConference() {
-    final visible = _visibleParticipants;
-
-    final tiles = <Widget>[
-      _VideoTile(
-        participant: _room?.localParticipant,
-        isLocal: true,
-        userName: widget.userName,
-        active:
-            widget.userId == _activeSpeakerId,
-      ),
-      ...visible.map(
-        (participant) {
-          return _VideoTile(
-            participant: participant,
-            isLocal: false,
-            userName: participant.name,
-            active:
-                participant.identity ==
-                    _activeSpeakerId,
-          );
-        },
-      ),
-    ];
-
-    final count = tiles.length;
-
-    final columns = switch (count) {
-      0 || 1 => 1,
-      2 || 3 || 4 => 2,
-      _ => 3,
-    };
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        12,
-        90,
-        12,
-        110,
-      ),
-      child: GridView.builder(
-        physics:
-            const BouncingScrollPhysics(),
-        gridDelegate:
-            SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: columns,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 16 / 10,
-        ),
-        itemCount: tiles.length,
-        itemBuilder: (_, index) {
-          return tiles[index];
-        },
       ),
     );
   }
@@ -2366,171 +2195,6 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 }
 
 // =============================================================================
-// VIDEO TILE
-// =============================================================================
-
-class _VideoTile extends StatelessWidget {
-  final Participant? participant;
-
-  final bool isLocal;
-
-  final String userName;
-
-  final bool active;
-
-  const _VideoTile({
-    required this.participant,
-    required this.isLocal,
-    required this.userName,
-    required this.active,
-  });
-
-  VideoTrack? _findVideoTrack() {
-    final p = participant;
-
-    if (p == null) {
-      return null;
-    }
-
-    if (p is LocalParticipant) {
-      for (final publication
-          in p.videoTrackPublications) {
-        final track = publication.track;
-
-        if (track is VideoTrack &&
-            !publication.muted) {
-          return track;
-        }
-      }
-
-      return null;
-    }
-
-    if (p is RemoteParticipant) {
-      for (final publication
-          in p.videoTrackPublications) {
-        if (!publication.subscribed ||
-            publication.muted) {
-          continue;
-        }
-
-        final track = publication.track;
-
-        if (track is VideoTrack) {
-          return track;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final track = _findVideoTrack();
-
-    return AnimatedContainer(
-      duration:
-          const Duration(milliseconds: 250),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius:
-            BorderRadius.circular(20),
-        border: Border.all(
-          color: active
-              ? AppColors.primary
-              : Colors.white10,
-          width: active ? 2 : 1,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (track != null)
-            VideoTrackRenderer(
-              track,
-              fit: VideoViewFit.cover,
-              mirrorMode: isLocal
-                  ? VideoViewMirrorMode.mirror
-                  : VideoViewMirrorMode.auto,
-            )
-          else
-            Container(
-              color: AppColors.surface,
-              alignment: Alignment.center,
-              child: _Avatar(
-                name: userName,
-                large: true,
-              ),
-            ),
-          Positioned(
-            left: 10,
-            right: 10,
-            bottom: 10,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(
-                        alpha: 0.55,
-                      ),
-                      borderRadius:
-                          BorderRadius.circular(9),
-                    ),
-                    child: Text(
-                      isLocal
-                          ? '$userName (vous)'
-                          : (userName.isEmpty
-                              ? 'Participant'
-                              : userName),
-                      maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight:
-                            FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                if (active) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding:
-                        const EdgeInsets.all(6),
-                    decoration:
-                        const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.graphic_eq,
-                      size: 13,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    )
-        .animate()
-        .fadeIn(duration: 250.ms);
-  }
-}
-
-// =============================================================================
 // PANEL
 // =============================================================================
 
@@ -2814,8 +2478,7 @@ class _Avatar extends StatelessWidget {
 
   const _Avatar({
     required this.name,
-    this.large = false,
-  });
+  }) : large = false;
 
   @override
   Widget build(BuildContext context) {

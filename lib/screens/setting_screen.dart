@@ -312,8 +312,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ),
                       child: Stack(
                         children: [
-                          Positioned.fill(
-                            child: const DecoratedBox(
+                          const Positioned.fill(
+                            child: DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: AppColors.logoHalo,
                               ),
@@ -1091,7 +1091,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                         const SizedBox(height: 28),
 
                         if (!_loadingPro && _isPro) ...[
-                          _SectionLabel('PRO'),
+                          const _SectionLabel('PRO'),
                           _Card(
                             child: Padding(
                               padding:
