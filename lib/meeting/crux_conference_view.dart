@@ -259,7 +259,6 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
   }
 
   Widget _buildScreenshareLayout(MeetingStateProvider provider, LayoutMetrics layoutMetrics) {
-    final speakerState = provider.speakerState;
     final screenSharingParticipant = provider.activeParticipants.firstWhere(
       (p) => p.isScreenSharing,
       orElse: () => provider.activeParticipants.first,
@@ -279,7 +278,7 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.screen_share,
                     size: 64,
                     color: AppColors.primary,
@@ -290,7 +289,7 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
                     style: ConferenceTheme.speakerNameStyle,
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  const Text(
                     'Partage d\'écran',
                     style: ConferenceTheme.feedNameStyle,
                   ),
@@ -366,7 +365,7 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
   }
 
   Widget _buildWaitingRoom() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -375,7 +374,7 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
             size: 64,
             color: AppColors.textSecondary,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             'En attente de participants...',
             style: ConferenceTheme.speakerNameStyle,

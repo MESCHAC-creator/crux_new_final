@@ -115,8 +115,8 @@ class ParticipantGridWidget extends StatelessWidget {
       right: 0,
       child: Container(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
@@ -170,9 +170,9 @@ class ParticipantGridWidget extends StatelessWidget {
           color: AppColors.handRaised,
           borderRadius: BorderRadius.all(Radius.circular(8)),
         ),
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
-          children: const [
+          children: [
             Icon(
               Icons.back_hand,
               size: 10,
@@ -194,10 +194,10 @@ class ParticipantGridWidget extends StatelessWidget {
   }
 
   Widget _buildEmptyState() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
+        children: [
           Icon(
             Icons.people_outline,
             size: 48,

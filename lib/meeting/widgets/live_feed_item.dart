@@ -73,7 +73,7 @@ class LiveFeedItem extends StatelessWidget {
                         color: AppColors.handRaised,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(
+                      child: const Text(
                         'Main levée',
                         style: TextStyle(
                           color: AppColors.textPrimary,
@@ -111,7 +111,7 @@ class LiveFeedItem extends StatelessWidget {
           Center(
             child: Text(
               participantState.initials,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,

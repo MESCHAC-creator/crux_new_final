@@ -81,7 +81,7 @@ class SpeakerCard extends StatelessWidget {
       child: Center(
         child: Text(
           participantState.initials,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 48,
             fontWeight: FontWeight.bold,
             color: AppColors.textPrimary,
@@ -114,7 +114,7 @@ class SpeakerCard extends StatelessWidget {
           children: [
             Text(
               participantState.displayName,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -152,7 +152,7 @@ class SpeakerCard extends StatelessWidget {
   Widget _buildAudioBadge() {
     return Container(
       padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.error,
         shape: BoxShape.circle,
       ),
@@ -167,7 +167,7 @@ class SpeakerCard extends StatelessWidget {
   Widget _buildVideoBadge() {
     return Container(
       padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.success,
         shape: BoxShape.circle,
       ),
@@ -189,16 +189,16 @@ class SpeakerCard extends StatelessWidget {
           color: AppColors.handRaised,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.back_hand,
               size: 16,
               color: AppColors.textPrimary,
             ),
-            const SizedBox(width: 4),
-            const Text(
+            SizedBox(width: 4),
+            Text(
               'Main levée',
               style: TextStyle(
                 color: AppColors.textPrimary,
@@ -218,7 +218,7 @@ class SpeakerCard extends StatelessWidget {
       right: 12,
       child: Container(
         padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: AppColors.primary,
           shape: BoxShape.circle,
         ),

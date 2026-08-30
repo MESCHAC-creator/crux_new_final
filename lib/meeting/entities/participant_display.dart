@@ -51,7 +51,8 @@ class ParticipantDisplayState {
   }
 
   String get participantId => participant.sid;
-  String get displayName => participant.name ?? 'Anonymous';
+  String get displayName =>
+      participant.name.isEmpty ? 'Anonymous' : participant.name;
   String get initials {
     final name = displayName;
     if (name.isEmpty) return '?';

@@ -194,7 +194,7 @@ class _ReactionsOverlayState extends State<ReactionsOverlay>
         margin: const EdgeInsets.symmetric(horizontal: 4),
         width: 40,
         height: 40,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: AppColors.surfaceVariant,
           shape: BoxShape.circle,
         ),

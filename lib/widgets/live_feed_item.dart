@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
-import '../../theme/colors.dart';
+import '../theme/colors.dart';
 
 /// Item du flux vidéo en direct (TikTok-style) - 48px avatar + scrollable
 class LiveFeedItem extends StatefulWidget {
@@ -11,6 +11,7 @@ class LiveFeedItem extends StatefulWidget {
   final VoidCallback? onDismiss;
 
   const LiveFeedItem({
+    super.key,
     required this.participant,
     this.isHandRaised = false,
     this.isActive = false,
@@ -159,17 +160,17 @@ class _LiveFeedItemState extends State<LiveFeedItem>
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (widget.participant.audioTracks.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 4),
+                            if (widget.participant.audioTrackPublications.isNotEmpty)
+                              const Padding(
+                                padding: EdgeInsets.only(right: 4),
                                 child: Icon(
                                   Icons.mic,
                                   size: 10,
                                   color: AppColors.micActive,
                                 ),
                               ),
-                            if (widget.participant.videoTracks.isNotEmpty)
-                              Icon(
+                            if (widget.participant.videoTrackPublications.isNotEmpty)
+                              const Icon(
                                 Icons.videocam,
                                 size: 10,
                                 color: AppColors.cameraActive,
@@ -186,6 +187,7 @@ class _LiveFeedItemState extends State<LiveFeedItem>
                   PopupMenuButton(
                     itemBuilder: (context) => [
                       PopupMenuItem(
+                        onTap: widget.onTap,
                         child: const Row(
                           children: [
                             Icon(Icons.push_pin, size: 16),
@@ -193,9 +195,9 @@ class _LiveFeedItemState extends State<LiveFeedItem>
                             Text('Épingler'),
                           ],
                         ),
-                        onTap: widget.onTap,
                       ),
                       PopupMenuItem(
+                        onTap: _handleDismiss,
                         child: const Row(
                           children: [
                             Icon(Icons.visibility_off, size: 16),
@@ -203,7 +205,6 @@ class _LiveFeedItemState extends State<LiveFeedItem>
                             Text('Masquer'),
                           ],
                         ),
-                        onTap: _handleDismiss,
                       ),
                     ],
                   ),
