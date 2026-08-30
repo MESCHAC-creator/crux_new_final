@@ -8,17 +8,22 @@ CRUX supports web deployment via GitHub Pages, allowing users to join meetings d
 ### Automatic Deployment
 The project includes a GitHub Actions workflow (`.github/workflows/deploy-web.yml`) that automatically builds and deploys the Flutter web app to GitHub Pages when you push to the `main`, `master`, or `schac` branch.
 
+The workflow uses the `peaceiris/actions-gh-pages@v3` action for reliable deployment to the `gh-pages` branch.
+
 ### Manual Setup
-1. Go to your GitHub repository settings
-2. Navigate to "Pages" section
-3. Set "Source" to "GitHub Actions"
-4. The workflow will automatically handle the deployment
+1. Create a new branch named `gh-pages` in your repository
+2. Go to your GitHub repository settings
+3. Navigate to "Pages" section
+4. Set "Source" to "Deploy from a branch"
+5. Select "gh-pages" branch and "/ (root)" folder
+6. The workflow will automatically handle the deployment
 
 ### Configuration
 The workflow uses the following configuration:
 - **Flutter Version**: 3.24.0 (stable channel)
 - **Base URL**: `/crux_new_final/` (adjust based on your repository name)
 - **Build Command**: `flutter build web --release --base-href /crux_new_final/`
+- **Deployment**: peaceiris/actions-gh-pages@v3 to gh-pages branch
 
 ## Environment Variables
 Configure these secrets in your GitHub repository settings:
@@ -33,6 +38,11 @@ Configure these secrets in your GitHub repository settings:
 Users can join meetings directly via:
 - Main web app: `https://[username].github.io/crux_new_final/`
 - Join page: `https://[username].github.io/crux_new_final/join.html`
+
+### Repository URL Structure
+- Repository: `https://github.com/schac-hub/crux_new_final`
+- GitHub Pages: `https://schac-hub.github.io/crux_new_final/`
+- Join page: `https://schac-hub.github.io/crux_new_final/join.html`
 
 ### Meeting Code Format
 Meeting codes are 8-character alphanumeric strings (e.g., `ABCDEF12`).
