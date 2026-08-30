@@ -12,6 +12,7 @@ class AppColors {
   static const Color _darkGray2 = Color(0xFF1C212A);
   static const Color _darkGray3 = Color(0xFF222833);
   static const Color _darkGray4 = Color(0xFF272C36);
+  static const Color _darkGray5 = Color(0xFF2D3340);
 
   // ── Argent / blanc ────────────────────────────────────────────────────
   static const Color _white = Color(0xFFF7F8FA);
@@ -40,10 +41,10 @@ class AppColors {
 
   static const Color background = _black;
   static const Color surface = _charcoal;
-  static const Color surfaceVariant = _darkGray;
-  static const Color surfaceElevated = _darkGray2;
-  static const Color cardBackground = _darkGray3;
-  static const Color cardBackgroundAlt = _darkGray4;
+  static const Color surfaceVariant = _darkGray2;
+  static const Color surfaceElevated = _darkGray3;
+  static const Color cardBackground = _darkGray4;
+  static const Color cardBackgroundAlt = _darkGray5;
 
   static const Color textPrimary = _white;
   static const Color textSecondary = _mediumGray;
@@ -51,10 +52,10 @@ class AppColors {
   static const Color textDisabled = Color(0xFF3A414C);
   static const Color textOnPrimary = _black;
 
-  static const Color border = Color(0xFF2A303A);
-  static const Color borderSubtle = Color(0xFF1E232B);
-  static const Color borderFocused = Color(0xFF3A4048);
-  static const Color divider = Color(0xFF1E232B);
+  static const Color border = Color(0xFF1E232B);
+  static const Color borderSubtle = Color(0xFF14181F);
+  static const Color borderFocused = Color(0xFF4A5058);
+  static const Color divider = Color(0xFF14181F);
 
   static const Color success = _green;
   static const Color successSurface = Color(0xFF0A1A0F);
@@ -106,7 +107,7 @@ class AppColors {
   static const LinearGradient cardGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [_darkGray2, _darkGray],
+    colors: [_darkGray4, _darkGray3],
   );
 
   static const LinearGradient glassGradient = LinearGradient(
