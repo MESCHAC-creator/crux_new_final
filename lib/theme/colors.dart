@@ -52,9 +52,9 @@ class AppColors {
   static const Color textOnPrimary = _black;
 
   static const Color border = Color(0xFF2A303A);
-  static const Color borderSubtle = Color(0xFF1A1F28);
-  static const Color borderFocused = _lightGray;
-  static const Color divider = Color(0xFF1A1F28);
+  static const Color borderSubtle = Color(0xFF1E232B);
+  static const Color borderFocused = Color(0xFF3A4048);
+  static const Color divider = Color(0xFF1E232B);
 
   static const Color success = _green;
   static const Color successSurface = Color(0xFF0A1A0F);

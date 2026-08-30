@@ -95,9 +95,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-web:
-    name: Build and Deploy Web
+    name: Build and Deploy Web to GitHub Pages
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/schac')
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
 
     steps:
       - name: Checkout repository
@@ -119,16 +124,17 @@ jobs:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
         run: |
-          flutter build web --release \
+          flutter build web --release --base-href /crux_new_final/ \
             --dart-define=LIVEKIT_WSS_URL="${LIVEKIT_WSS_URL}" \
             --dart-define=LIVEKIT_TOKEN_SERVER_URL="${LIVEKIT_TOKEN_SERVER_URL}" \
             --dart-define=FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID}" \
             --dart-define=APP_BASE_URL="${APP_BASE_URL}"
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: crux-3c6be
-          channelId: live
+          path: build/web
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
