@@ -14,27 +14,28 @@
 
     /* ── Lobby ── */
     #lobby { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
-    .card { background: #12121E; border-radius: 20px; padding: 40px 32px; max-width: 440px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
-    .logo { width: 64px; height: 64px; border-radius: 18px; background: linear-gradient(135deg,#B71C1C,#6A1B9A); display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 18px; }
-    h1 { font-size: 22px; font-weight: 700; text-align: center; }
-    .meeting-id { color: rgba(255,255,255,0.35); font-size: 13px; text-align: center; letter-spacing: 1px; margin-bottom: 28px; }
-    label { display: block; font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 8px; }
+    .card { background: #12121E; border-radius: 24px; padding: 48px 36px; max-width: 480px; width: 100%; box-shadow: 0 12px 50px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.05); }
+    .logo { width: 72px; height: 72px; border-radius: 20px; background: linear-gradient(135deg,#B71C1C,#6A1B9A); display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 24px; box-shadow: 0 8px 25px rgba(183,28,28,0.3); }
+    h1 { font-size: 24px; font-weight: 700; text-align: center; margin-bottom: 8px; }
+    .meeting-id { color: rgba(255,255,255,0.4); font-size: 14px; text-align: center; letter-spacing: 1.5px; margin-bottom: 32px; font-weight: 500; }
+    label { display: block; font-size: 14px; color: rgba(255,255,255,0.7); margin-bottom: 10px; font-weight: 500; }
     input[type="text"], input[type="password"] {
       width: 100%; background: rgba(255,255,255,0.06); border: 1.5px solid rgba(255,255,255,0.1);
-      border-radius: 12px; padding: 13px 16px; font-family: 'Poppins',sans-serif; font-size: 15px;
-      color: #fff; outline: none; margin-bottom: 16px; transition: border-color .2s;
+      border-radius: 14px; padding: 15px 18px; font-family: 'Poppins',sans-serif; font-size: 16px;
+      color: #fff; outline: none; margin-bottom: 20px; transition: all .2s;
     }
-    input:focus { border-color: #E74C3C; }
-    input::placeholder { color: rgba(255,255,255,0.3); }
-    .btn { display:block; width:100%; padding:15px; background:#E74C3C; border:none; border-radius:12px; color:#fff; font-family:'Poppins',sans-serif; font-size:16px; font-weight:600; cursor:pointer; transition:opacity .2s; }
+    input:focus { border-color: #E74C3C; box-shadow: 0 0 0 3px rgba(231,76,60,0.1); }
+    input::placeholder { color: rgba(255,255,255,0.35); }
+    .btn { display:block; width:100%; padding:16px; background:#E74C3C; border:none; border-radius:14px; color:#fff; font-family:'Poppins',sans-serif; font-size:16px; font-weight:600; cursor:pointer; transition:all .2s; box-shadow: 0 4px 15px rgba(231,76,60,0.3); }
     .btn:disabled { opacity:.5; cursor:not-allowed; }
-    .btn:not(:disabled):hover { opacity:.88; }
-    .app-hint { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:18px; padding:13px; border:1px solid rgba(255,255,255,0.1); border-radius:10px; font-size:13px; color:rgba(255,255,255,0.5); text-decoration:none; }
-    .app-hint:hover { border-color:rgba(255,255,255,0.25); }
-    .error { color:#E74C3C; font-size:13px; margin:-8px 0 12px; }
+    .btn:not(:disabled):hover { background:#c0392b; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(231,76,60,0.4); }
+    .btn:not(:disabled):active { transform: translateY(0); }
+    .app-hint { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:24px; padding:14px; border:1px solid rgba(255,255,255,0.1); border-radius:12px; font-size:14px; color:rgba(255,255,255,0.6); text-decoration:none; transition:all .2s; }
+    .app-hint:hover { border-color:rgba(255,255,255,0.25); background: rgba(255,255,255,0.03); }
+    .error { color:#E74C3C; font-size:14px; margin:-12px 0 16px; padding:12px; background: rgba(231,76,60,0.1); border-radius:10px; border: 1px solid rgba(231,76,60,0.2); }
     .spinner { display:inline-block; width:20px; height:20px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:8px; }
     @keyframes spin { to { transform:rotate(360deg); } }
-    .badge { display:inline-flex; align-items:center; gap:6px; background:rgba(46,204,113,0.15); border:1px solid rgba(46,204,113,0.3); color:#2ecc71; border-radius:20px; padding:4px 12px; font-size:12px; margin-bottom:16px; }
+    .badge { display:inline-flex; align-items:center; gap:6px; background:rgba(46,204,113,0.15); border:1px solid rgba(46,204,113,0.3); color:#2ecc71; border-radius:20px; padding:6px 14px; font-size:13px; margin-bottom:20px; font-weight:500; }
 
     /* ── Call UI ── */
     #callUI { display:none; flex-direction:column; height:100vh; }
@@ -43,20 +44,33 @@
     video { width:100%; height:100%; object-fit:cover; background:#0d0d1a; display:block; }
     #localVideo { transform:scaleX(-1); }
     .video-wrap { position:relative; }
-    .video-label { position:absolute; bottom:8px; left:10px; font-size:12px; background:rgba(0,0,0,0.55); padding:2px 8px; border-radius:6px; }
-    .controls { background:#12121E; display:flex; align-items:center; justify-content:center; gap:12px; padding:16px; flex-shrink:0; }
-    .ctrl-btn { width:52px; height:52px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#fff; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .2s; }
-    .ctrl-btn:hover { background:rgba(255,255,255,0.18); }
+    .video-label { position:absolute; bottom:10px; left:12px; font-size:13px; background:rgba(0,0,0,0.6); padding:4px 10px; border-radius:8px; font-weight:500; }
+    .controls { background:#12121E; display:flex; align-items:center; justify-content:center; gap:12px; padding:18px; flex-shrink:0; border-top: 1px solid rgba(255,255,255,0.05); }
+    .ctrl-btn { width:54px; height:54px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#fff; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .2s; position: relative; }
+    .ctrl-btn:hover { background:rgba(255,255,255,0.18); transform: scale(1.05); }
     .ctrl-btn.off { background:#E74C3C; }
-    .ctrl-btn.end { background:#c0392b; width:60px; height:60px; font-size:22px; }
-    .status-bar { background:rgba(0,0,0,0.6); text-align:center; padding:6px; font-size:12px; color:rgba(255,255,255,0.55); }
+    .ctrl-btn.end { background:#c0392b; width:62px; height:62px; font-size:22px; }
+    .ctrl-btn .badge { position: absolute; top: -4px; right: -4px; background: #E74C3C; color: white; font-size: 10px; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+    .ctrl-btn .badge.hidden { display: none; }
+    .status-bar { background:rgba(0,0,0,0.7); text-align:center; padding:8px; font-size:13px; color:rgba(255,255,255,0.6); border-bottom: 1px solid rgba(255,255,255,0.05); }
     #connStatus { font-weight:600; }
 
     /* ── Not found ── */
     #notFound { display:none; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
 
     /* ── Chat ── */
-    #chatPanel { display:none; position:fixed; bottom:90px; right:12px; width:280px; background:#1a1a2e; border-radius:14px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.5); z-index:100; }
+    #chatPanel { display:none; position:fixed; bottom:100px; right:16px; width:300px; background:#1a1a2e; border-radius:16px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.5); z-index:101; border: 1px solid rgba(255,255,255,0.08); }
+    
+    @media (max-width: 640px) {
+      .card { padding: 32px 24px; border-radius: 20px; }
+      .logo { width: 60px; height: 60px; font-size: 28px; }
+      h1 { font-size: 20px; }
+      .controls { padding: 14px; gap: 8px; }
+      .ctrl-btn { width: 48px; height: 48px; font-size: 18px; }
+      .ctrl-btn.end { width: 56px; height: 56px; }
+      #chatPanel { width: calc(100% - 32px); right: 16px; left: 16px; bottom: 90px; }
+      #participantsPanel { width: calc(100% - 32px); right: 16px; left: 16px; bottom: 90px; }
+    }
   </style>
 </head>
 <body>
@@ -72,8 +86,8 @@
       <span class="badge">🌐 Connexion directe depuis votre navigateur</span>
     </div>
 
-    <label for="nameInput">Votre prénom ou surnom</label>
-    <input type="text" id="nameInput" placeholder="Ex: Marie Dupont" maxlength="40" />
+    <label for="nameInput">Votre nom complet</label>
+    <input type="text" id="nameInput" placeholder="Ex: Marie Dupont" maxlength="50" />
 
     <div id="passcodeRow" style="display:none">
       <label for="passcodeInput">Code d'accès</label>
@@ -123,46 +137,63 @@
     <button class="ctrl-btn" id="camBtn" onclick="toggleCam()" title="Caméra">📷</button>
     <button class="ctrl-btn" id="screenBtn" onclick="toggleScreenShare()" title="Partager l'écran">🖥️</button>
     <button class="ctrl-btn" id="canvasBtn" onclick="toggleCanvas()" title="Tableau blanc">🎨</button>
+    <button class="ctrl-btn" id="handBtn" onclick="toggleHand()" title="Lever la main">✋<span class="badge hidden" id="handBadge">1</span></button>
+    <button class="ctrl-btn" id="reactionsBtn" onclick="toggleReactions()" title="Réactions">😊</button>
     <button class="ctrl-btn" id="lockBtn" style="display:none" onclick="toggleLock()" title="Verrouiller la réunion (Salle d'attente)">🔓</button>
     <button class="ctrl-btn" id="participantsBtn" onclick="toggleParticipants()" title="Participants">👥</button>
     <button class="ctrl-btn" id="chatBtn" onclick="toggleChat()" title="Chat">💬</button>
     <button class="ctrl-btn end" onclick="endCall()" title="Quitter">📵</button>
   </div>
   <div id="chatPanel">
-    <div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:14px">💬 Chat</div>
-    <div id="chatMessages" style="height:200px;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:6px;font-size:13px"></div>
-    <div style="display:flex;gap:8px;padding:8px 10px;border-top:1px solid rgba(255,255,255,0.08)">
-      <input type="text" id="chatInput" placeholder="Message…" style="flex:1;font-size:13px;padding:8px;margin-bottom:0" onkeydown="chatKey(event)" />
-      <button onclick="sendChat()" style="background:#E74C3C;border:none;border-radius:8px;padding:8px 12px;color:#fff;cursor:pointer;font-size:13px">↑</button>
+    <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:15px">💬 Chat</div>
+    <div id="chatMessages" style="height:220px;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px;font-size:14px"></div>
+    <div style="display:flex;gap:10px;padding:12px 14px;border-top:1px solid rgba(255,255,255,0.08)">
+      <input type="text" id="chatInput" placeholder="Message…" style="flex:1;font-size:14px;padding:10px 14px;margin-bottom:0;border-radius:10px" onkeydown="chatKey(event)" />
+      <button onclick="sendChat()" style="background:#E74C3C;border:none;border-radius:10px;padding:10px 16px;color:#fff;cursor:pointer;font-size:14px">↑</button>
     </div>
   </div>
 
-  <div id="participantsPanel" style="display:none; position:fixed; bottom:90px; right:304px; width:280px; background:#1a1a2e; border-radius:14px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.5); z-index:100; flex-direction:column">
-    <div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center">
+  <div id="participantsPanel" style="display:none; position:fixed; bottom:100px; right:324px; width:300px; background:#1a1a2e; border-radius:16px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.5); z-index:100; flex-direction:column; border: 1px solid rgba(255,255,255,0.08)">
+    <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:15px;display:flex;justify-content:space-between;align-items:center">
       <span>👥 Participants</span>
-      <span id="participantCount" style="font-size:12px;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:10px">1</span>
+      <span id="participantCount" style="font-size:12px;background:rgba(255,255,255,0.1);padding:4px 10px;border-radius:12px">1</span>
     </div>
     <!-- Organisateur controls -->
-    <div id="organizerControls" style="display:none; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.08); background:rgba(231,76,60,0.05)">
-      <button class="btn" id="muteAllBtn" onclick="toggleMuteAll()" style="font-size:12px; padding:8px 10px; width:100%; background:#E74C3C; border:none; border-radius:8px; font-weight:600">🔇 Muter tous les autres</button>
+    <div id="organizerControls" style="display:none; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.08); background:rgba(231,76,60,0.05)">
+      <button class="btn" id="muteAllBtn" onclick="toggleMuteAll()" style="font-size:13px; padding:10px 12px; width:100%; background:#E74C3C; border:none; border-radius:10px; font-weight:600">🔇 Muter tous les autres</button>
     </div>
-    <div id="participantsList" style="height:200px;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;font-size:13px">
+    <div id="participantsList" style="height:220px;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px;font-size:14px">
       <!-- List of participants dynamically generated -->
     </div>
   </div>
 
   <!-- Canvas/Whiteboard Overlay -->
-  <div id="canvasPanel" style="display:none; position:fixed; inset:24px; background:#12121E; border:1px solid rgba(255,255,255,0.15); border-radius:20px; z-index:150; box-shadow:0 12px 50px rgba(0,0,0,0.6); flex-direction:column; overflow:hidden">
-    <div style="padding:16px 24px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center">
-      <div style="font-weight:600; font-size:16px; display:flex; align-items:center; gap:8px">🎨 Tableau Blanc Collaboratif</div>
-      <div style="display:flex; gap:12px; align-items:center">
-        <input type="color" id="canvasColor" value="#E74C3C" style="border:none; background:none; width:32px; height:32px; cursor:pointer" />
-        <button class="btn" style="padding:6px 12px; font-size:13px; width:auto; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.15); color:white; border-radius:8px; cursor:pointer" onclick="clearCanvas()">Effacer</button>
-        <button class="btn" style="padding:6px 12px; font-size:13px; width:auto; background:#c0392b; border:none; color:white; border-radius:8px; cursor:pointer" onclick="toggleCanvas()">Fermer</button>
+  <div id="canvasPanel" style="display:none; position:fixed; inset:24px; background:#12121E; border:1px solid rgba(255,255,255,0.15); border-radius:24px; z-index:200; box-shadow:0 16px 60px rgba(0,0,0,0.6); flex-direction:column; overflow:hidden">
+    <div style="padding:18px 24px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center">
+      <div style="font-weight:600; font-size:17px; display:flex; align-items:center; gap:10px">🎨 Tableau Blanc Collaboratif</div>
+      <div style="display:flex; gap:14px; align-items:center">
+        <input type="color" id="canvasColor" value="#E74C3C" style="border:none; background:none; width:36px; height:36px; cursor:pointer; border-radius:8px" />
+        <button class="btn" style="padding:8px 14px; font-size:14px; width:auto; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.15); color:white; border-radius:10px; cursor:pointer" onclick="clearCanvas()">Effacer</button>
+        <button class="btn" style="padding:8px 14px; font-size:14px; width:auto; background:#c0392b; border:none; color:white; border-radius:10px; cursor:pointer" onclick="toggleCanvas()">Fermer</button>
       </div>
     </div>
     <div style="flex:1; position:relative; background:#161625">
       <canvas id="sharedCanvas" style="position:absolute; inset:0; width:100%; height:100%; cursor:crosshair"></canvas>
+    </div>
+  </div>
+
+  <!-- Reactions Panel -->
+  <div id="reactionsPanel" style="display:none; position:fixed; bottom:100px; right:16px; width:280px; background:#1a1a2e; border-radius:16px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.5); z-index:102; border: 1px solid rgba(255,255,255,0.08)">
+    <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:15px">😊 Réactions</div>
+    <div style="padding:12px 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      <button onclick="sendReaction('👍')" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;font-size:24px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">👍</button>
+      <button onclick="sendReaction('👏')" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;font-size:24px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">👏</button>
+      <button onclick="sendReaction('❤️')" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;font-size:24px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">❤️</button>
+      <button onclick="sendReaction('😂')" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;font-size:24px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">😂</button>
+      <button onclick="sendReaction('😮')" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;font-size:24px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">😮</button>
+      <button onclick="sendReaction('😢')" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;font-size:24px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">😢</button>
+      <button onclick="sendReaction('🎉')" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;font-size:24px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">🎉</button>
+      <button onclick="sendReaction('🔥')" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;font-size:24px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">🔥</button>
     </div>
   </div>
 </div>
@@ -212,6 +243,8 @@ let camOn     = true;
 let chatUnsub = null;
 let meetingUnsub = null;
 let meetingOrganizerId = '';
+let handRaised = false;
+let reactionsUnsub = null;
 
 // ── Helpers ──────────────────────────────────────────────────────
 function getMeetingIdFromPath() {
@@ -518,6 +551,32 @@ async function startCall() {
     })
     .on(LiveKit.RoomEvent.ParticipantDisconnected, (participant) => {
       removeParticipantTile(participant);
+      if (typeof updateParticipantsList === 'function') updateParticipantsList();
+    })
+    .on(LiveKit.RoomEvent.DataReceived, (dataPayload, participant) => {
+      try {
+        const decoder = new TextDecoder();
+        const jsonString = decoder.decode(dataPayload);
+        const data = JSON.parse(jsonString);
+        
+        if (data.type === 'reaction') {
+          showReactionFeedback(data.emoji);
+        } else if (data.type === 'mute_all') {
+          if (participant !== room.localParticipant) {
+            // Handle mute all request (show notification)
+            const feedback = document.createElement('div');
+            feedback.textContent = '🔇 Demande de coupure micro reçue';
+            feedback.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(231,76,60,0.9);color:white;padding:12px 20px;border-radius:10px;z-index:999;font-size:14px';
+            document.body.appendChild(feedback);
+            setTimeout(() => feedback.remove(), 3000);
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing data:', e);
+      }
+    })
+    .on(LiveKit.RoomEvent.ParticipantDisconnected, (participant) => {
+      removeParticipantTile(participant);
       const screenTile = document.getElementById('tile_screenshare_' + participant.identity);
       if (screenTile) {
         screenTile.remove();
@@ -611,6 +670,10 @@ async function startCall() {
     }
   }
 
+  // Start listening to chat and reactions
+  listenChat();
+  listenReactions();
+
   await setDoc(
     doc(db, 'meetings', meetingId, 'presence', myUid),
     { userId: myUid, name: myName, micOn: micOn, cameraOn: camOn,
@@ -618,7 +681,6 @@ async function startCall() {
     { merge: true }
   ).catch(() => {});
 
-  listenChat();
   listenCanvas();
 
   // Show Organizer controls in participants panel if creator
@@ -637,8 +699,16 @@ window.toggleMic = async function() {
   }
   document.getElementById('micBtn').classList.toggle('off', !micOn);
   document.getElementById('micBtn').textContent = micOn ? '🎤' : '🔇';
+  
+  // Update presence
+  await updateDoc(doc(db, 'meetings', meetingId, 'presence', myUid), {
+    micOn: micOn,
+    timestamp: serverTimestamp()
+  }, { merge: true }).catch(() => {});
+  
   if (typeof updateParticipantsList === 'function') updateParticipantsList();
 };
+
 window.toggleCam = async function() {
   camOn = !camOn;
   if (room) {
@@ -646,13 +716,22 @@ window.toggleCam = async function() {
     updateParticipantTile(room.localParticipant);
   }
   document.getElementById('camBtn').classList.toggle('off', !camOn);
-  document.getElementById('camBtn').textContent = camOn ? '📷' : '🚫';
+  document.getElementById('camBtn').textContent = camOn ? '📷' : '📵';
+  
+  // Update presence
+  await updateDoc(doc(db, 'meetings', meetingId, 'presence', myUid), {
+    cameraOn: camOn,
+    timestamp: serverTimestamp()
+  }, { merge: true }).catch(() => {});
+  
   if (typeof updateParticipantsList === 'function') updateParticipantsList();
 };
+
 window.toggleChat = function() {
   const p = document.getElementById('chatPanel');
   p.style.display = p.style.display === 'none' ? 'block' : 'none';
 };
+
 window.endCall = function() { cleanup(); window.location.href = '/'; };
 
 // ── Screen Sharing ───────────────────────────────────────────────
@@ -674,6 +753,48 @@ window.toggleScreenShare = async function() {
     alert("Impossible d'activer le partage d'écran ou action annulée.");
   }
 };
+
+// ── Mobile-specific Controls ─────────────────────────────────────
+window.toggleCameraFacing = async function() {
+  if (!room) return;
+  try {
+    const videoTrack = room.localParticipant.getTrackPublication(LiveKit.Track.Source.Camera)?.track;
+    if (videoTrack) {
+      // Restart video with facing mode toggle
+      await room.localParticipant.setCameraEnabled(false);
+      await new Promise(resolve => setTimeout(resolve, 200));
+      await room.localParticipant.setCameraEnabled(true);
+      updateParticipantTile(room.localParticipant);
+    }
+  } catch (err) {
+    console.error("Error switching camera:", err);
+    alert("Impossible de basculer la caméra sur ce navigateur");
+  }
+};
+
+window.toggleFullscreen = function() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(err => {
+      console.error("Error entering fullscreen:", err);
+    });
+  } else {
+    document.exitFullscreen();
+  }
+};
+
+// Add mobile camera switch button if on mobile
+if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+  const controls = document.querySelector('.controls');
+  if (controls) {
+    const camBtn = document.getElementById('camBtn');
+    if (camBtn) {
+      camBtn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        window.toggleCameraFacing();
+      });
+    }
+  }
+}
 
 function updateParticipantScreenTile(participant) {
   const screenId = 'screenshare_' + participant.identity;
@@ -908,6 +1029,14 @@ function cleanup() {
   chatUnsub?.();
   meetingUnsub?.();
   canvasUnsub?.();
+  reactionsUnsub?.();
+  
+  // Remove hand raised state
+  if (handRaised && meetingId) {
+    updateDoc(doc(db, 'meetings', meetingId), {
+      ['raisedHands.' + myUid]: null
+    }).catch(() => {});
+  }
 }
 window.addEventListener('beforeunload', cleanup);
 
@@ -1051,6 +1180,115 @@ window.updateParticipantsList = function() {
     listEl.appendChild(div);
   });
 };
+
+// ── Hand Raising ───────────────────────────────────────────────────
+window.toggleHand = async function() {
+  handRaised = !handRaised;
+  const btn = document.getElementById('handBtn');
+  const badge = document.getElementById('handBadge');
+  
+  if (handRaised) {
+    btn.classList.add('off');
+    badge.classList.remove('hidden');
+    // Sync to Firestore
+    await updateDoc(doc(db, 'meetings', meetingId), {
+      ['raisedHands.' + myUid]: myName
+    });
+  } else {
+    btn.classList.remove('off');
+    badge.classList.add('hidden');
+    // Remove from Firestore
+    await updateDoc(doc(db, 'meetings', meetingId), {
+      ['raisedHands.' + myUid]: null
+    });
+  }
+};
+
+function listenRaisedHands() {
+  if (!meetingUnsub) return;
+  
+  // Reuse the existing meeting snapshot listener
+  // We'll add logic to handle raised hands in the existing listener
+}
+
+// ── Reactions ───────────────────────────────────────────────────────
+window.toggleReactions = function() {
+  const p = document.getElementById('reactionsPanel');
+  if (p) {
+    const isHidden = p.style.display === 'none';
+    p.style.display = isHidden ? 'block' : 'none';
+  }
+};
+
+window.sendReaction = async function(emoji) {
+  // Send reaction via LiveKit data channel
+  if (room) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(JSON.stringify({ 
+      type: 'reaction', 
+      emoji: emoji, 
+      senderId: myUid,
+      senderName: myName 
+    }));
+    try {
+      await room.localParticipant.publishData(data, { reliable: false });
+    } catch (err) {
+      console.error('Failed to send reaction:', err);
+    }
+  }
+  
+  // Also sync to Firestore for persistence
+  await addDoc(collection(db, 'meetings', meetingId, 'reactions'), {
+    emoji: emoji,
+    senderId: myUid,
+    senderName: myName,
+    timestamp: serverTimestamp()
+  }).catch(() => {});
+  
+  // Close panel after sending
+  document.getElementById('reactionsPanel').style.display = 'none';
+  
+  // Show local reaction feedback
+  showReactionFeedback(emoji);
+};
+
+function showReactionFeedback(emoji) {
+  const feedback = document.createElement('div');
+  feedback.textContent = emoji;
+  feedback.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:80px;animation:floatUp 2s ease-out forwards;z-index:999;pointer-events:none';
+  document.body.appendChild(feedback);
+  
+  setTimeout(() => feedback.remove(), 2000);
+}
+
+function listenReactions() {
+  const q = query(
+    collection(db, 'meetings', meetingId, 'reactions'),
+    orderBy('timestamp', 'desc'),
+    limit(20)
+  );
+  reactionsUnsub = onSnapshot(q, snap => {
+    snap.docChanges().forEach(ch => {
+      if (ch.type === 'added') {
+        const d = ch.doc.data();
+        if (d.senderId !== myUid) {
+          showReactionFeedback(d.emoji);
+        }
+      }
+    });
+  });
+}
+
+// Add CSS animation for reactions
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); }
+    50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+    100% { opacity: 0; transform: translate(-50%, -150%) scale(1); }
+  }
+`;
+document.head.appendChild(style);
 
 // ── Boot ─────────────────────────────────────────────────────────
 init();

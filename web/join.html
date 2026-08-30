@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRUX - Rejoindre une réunion</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0A0E1A 0%, #1a1f2e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 480px;
+            width: 90%;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: #ffffff;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #6366f1;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border: none;
+            border-radius: 12px;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .divider {
+            margin: 30px 0;
+            display: flex;
+            align-items: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .divider span {
+            padding: 0 15px;
+        }
+
+        .info {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .info h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #6366f1;
+        }
+
+        .info p {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.5;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 20px;
+            color: #ef4444;
+            font-size: 14px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            .logo {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">CRUX</div>
+        <div class="subtitle">Rejoignez votre réunion en un clic</div>
+
+        <div id="joinForm">
+            <div class="input-group">
+                <label for="meetingCode">Code de la réunion</label>
+                <input 
+                    type="text" 
+                    id="meetingCode" 
+                    placeholder="Ex: ABCDEFGH" 
+                    maxlength="8"
+                    pattern="[A-Z0-9]{8}"
+                    uppercase
+                >
+            </div>
+
+            <div class="input-group">
+                <label for="userName">Votre nom</label>
+                <input 
+                    type="text" 
+                    id="userName" 
+                    placeholder="Entrez votre nom"
+                >
+            </div>
+
+            <button onclick="joinMeeting()">Rejoindre la réunion</button>
+
+            <div class="divider">
+                <span>ou</span>
+            </div>
+
+            <button onclick="createMeeting()" style="background: rgba(255, 255, 255, 0.1);">
+                Créer une nouvelle réunion
+            </button>
+
+            <div class="info">
+                <h3>💡 Comment ça marche ?</h3>
+                <p>Entrez simplement le code à 8 caractères fourni par l'organisateur de la réunion. Vous n'avez pas besoin de télécharger l'application !</p>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <div>Connexion à la réunion...</div>
+        </div>
+
+        <div id="error" class="error"></div>
+    </div>
+
+    <script>
+        // Auto-uppercase meeting code
+        document.getElementById('meetingCode').addEventListener('input', function(e) {
+            this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        });
+
+        function showLoading() {
+            document.getElementById('joinForm').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('joinForm').style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function joinMeeting() {
+            const meetingCode = document.getElementById('meetingCode').value.trim();
+            const userName = document.getElementById('userName').value.trim();
+
+            if (!meetingCode) {
+                showError('Veuillez entrer un code de réunion');
+                return;
+            }
+
+            if (meetingCode.length !== 8) {
+                showError('Le code doit contenir 8 caractères');
+                return;
+            }
+
+            if (!userName) {
+                showError('Veuillez entrer votre nom');
+                return;
+            }
+
+            showLoading();
+
+            // Store data for Flutter app
+            localStorage.setItem('crux_meeting_code', meetingCode);
+            localStorage.setItem('crux_user_name', userName);
+
+            // Redirect to Flutter web app
+            setTimeout(() => {
+                window.location.href = './?code=' + meetingCode + '&name=' + encodeURIComponent(userName);
+            }, 1000);
+        }
+
+        function createMeeting() {
+            const userName = document.getElementById('userName').value.trim();
+
+            if (!userName) {
+                showError('Veuillez entrer votre nom');
+                return;
+            }
+
+            showLoading();
+
+            // Redirect to Flutter app to create meeting
+            setTimeout(() => {
+                window.location.href = './?create=true&name=' + encodeURIComponent(userName);
+            }, 1000);
+        }
+
+        // Check if meeting code is in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const codeParam = urlParams.get('code');
+        if (codeParam) {
+            document.getElementById('meetingCode').value = codeParam;
+        }
+    </script>
+</body>
+</html>

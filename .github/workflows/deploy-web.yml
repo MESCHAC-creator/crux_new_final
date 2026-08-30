@@ -1,0 +1,55 @@
+name: Deploy Flutter Web to GitHub Pages
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        cache: true
+
+    - name: Get dependencies
+      run: flutter pub get
+
+    - name: Build web app
+      env:
+        LIVEKIT_WSS_URL: ${{ secrets.LIVEKIT_WSS_URL }}
+        LIVEKIT_TOKEN_SERVER_URL: ${{ secrets.LIVEKIT_TOKEN_SERVER_URL }}
+        FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+      run: |
+        flutter build web --release --base-href /crux_new_final/ \
+          --dart-define=LIVEKIT_WSS_URL="${LIVEKIT_WSS_URL}" \
+          --dart-define=LIVEKIT_TOKEN_SERVER_URL="${LIVEKIT_TOKEN_SERVER_URL}" \
+          --dart-define=FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID}" \
+          --dart-define=APP_BASE_URL="${APP_BASE_URL}"
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: build/web
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4

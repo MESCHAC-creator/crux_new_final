@@ -6,6 +6,9 @@ const axios = require('axios');
 admin.initializeApp();
 const db = admin.firestore();
 
+// Security: Disable detailed error messages in production
+const isProduction = process.env.NODE_ENV === 'production';
+
 // Secrets déclarés — noms des paramètres dans le Secret Manager Firebase
 // Les valeurs sont stockées dans les secrets Cloud Functions, jamais ici
 const PAYDUNYA_MASTER_KEY = defineSecret('PAYDUNYA_MASTER_KEY');
@@ -116,7 +119,6 @@ exports.createPayment = onCall(
 
         return {
           success: true,
-          token: response.data.token,
           invoice_url: response.data.invoice_url,
         };
       } else {
@@ -128,8 +130,11 @@ exports.createPayment = onCall(
       }
     } catch (error) {
       if (error instanceof HttpsError) throw error;
-      console.error('PayDunya network error:', error.response?.data ?? error.message);
-      throw new HttpsError('unavailable', 'Service de paiement temporairement indisponible');
+      console.error('PayDunya network error:', error.message);
+      const errorMsg = isProduction 
+        ? 'Service de paiement temporairement indisponible' 
+        : error.message;
+      throw new HttpsError('unavailable', errorMsg);
     }
   }
 );
@@ -215,8 +220,9 @@ exports.paydunyaWebhook = onRequest(async (req, res) => {
 
     return res.status(200).json({ received: true, status });
   } catch (error) {
-    console.error('Webhook processing error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Webhook processing error:', error.message);
+    const errorMsg = isProduction ? 'Internal server error' : error.message;
+    return res.status(500).json({ error: errorMsg });
   }
 });
 

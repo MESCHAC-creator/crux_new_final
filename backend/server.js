@@ -31,6 +31,15 @@ const db = admin.firestore();
 const app = express();
 app.use(express.json({ limit: '10kb' }));
 
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
+
 // ============================================================
 // CORS
 // ============================================================
@@ -63,6 +72,7 @@ app.use(
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
 const PORT = process.env.PORT || 3000;
+const NODE_ENV = process.env.NODE_ENV || 'production';
 // 🔒 SÉCURITÉ : TTL 1h par défaut (pas 24h). Minimum 5 minutes.
 const TOKEN_TTL_SECONDS = Math.max(
   300,
@@ -114,6 +124,112 @@ async function verifyFirebaseToken(req, res, next) {
 }
 
 // ============================================================
+// Input Validation Helpers
+// ============================================================
+function validateMeetingInput(data) {
+  const errors = [];
+  
+  if (!data.title || typeof data.title !== 'string' || data.title.trim().length === 0) {
+    errors.push('Title is required and must be a non-empty string');
+  }
+  if (data.title && data.title.length > 200) {
+    errors.push('Title must be less than 200 characters');
+  }
+  
+  if (data.description && typeof data.description !== 'string') {
+    errors.push('Description must be a string');
+  }
+  if (data.description && data.description.length > 1000) {
+    errors.push('Description must be less than 1000 characters');
+  }
+  
+  if (!data.organizerName || typeof data.organizerName !== 'string' || data.organizerName.trim().length === 0) {
+    errors.push('Organizer name is required and must be a non-empty string');
+  }
+  if (data.organizerName && data.organizerName.length > 100) {
+    errors.push('Organizer name must be less than 100 characters');
+  }
+  
+  if (data.passcode !== undefined && data.passcode !== null) {
+    if (typeof data.passcode !== 'string') {
+      errors.push('Passcode must be a string');
+    } else if (data.passcode.length > 0) {
+      if (data.passcode.length < 4 || data.passcode.length > 6) {
+        errors.push('Passcode must be 4-6 characters');
+      }
+      if (!/^\d+$/.test(data.passcode)) {
+        errors.push('Passcode must contain only digits');
+      }
+    }
+  }
+  
+  if (data.isLargeConference !== undefined && typeof data.isLargeConference !== 'boolean') {
+    errors.push('isLargeConference must be a boolean');
+  }
+  
+  return errors;
+}
+
+function validateMeetingCode(code) {
+  const errors = [];
+  
+  if (!code || typeof code !== 'string') {
+    errors.push('Meeting code is required and must be a string');
+    return errors;
+  }
+  
+  const upperCode = code.toUpperCase();
+  if (!/^[A-Z0-9]{8}$/.test(upperCode)) {
+    errors.push('Meeting code must be 8 alphanumeric characters');
+  }
+  
+  return errors;
+}
+
+function validateMeetingId(id) {
+  const errors = [];
+  
+  if (!id || typeof id !== 'string') {
+    errors.push('Meeting ID is required and must be a string');
+    return errors;
+  }
+  
+  if (!/^[A-Z0-9]{12}$/.test(id)) {
+    errors.push('Meeting ID must be 12 alphanumeric characters');
+  }
+  
+  return errors;
+}
+
+function validateTokenParams(params) {
+  const errors = [];
+  
+  if (!params.room || typeof params.room !== 'string') {
+    errors.push('Room is required and must be a string');
+  } else if (params.room.length > 100) {
+    errors.push('Room must be less than 100 characters');
+  }
+  
+  if (!params.identity || typeof params.identity !== 'string') {
+    errors.push('Identity is required and must be a string');
+  } else if (params.identity.length > 100) {
+    errors.push('Identity must be less than 100 characters');
+  }
+  
+  if (!params.name || typeof params.name !== 'string') {
+    errors.push('Name is required and must be a string');
+  } else if (params.name.length > 100) {
+    errors.push('Name must be less than 100 characters');
+  }
+  
+  if (params.isHost !== undefined && params.isHost !== 'true' && params.isHost !== 'false') {
+    errors.push('isHost must be "true" or "false"');
+  }
+  
+  return errors;
+}
+
+// ============================================================
 // Helpers
 // ============================================================
 async function isMeetingOrganizerOrCohost(meetingId, uid) {
@@ -142,6 +258,19 @@ async function isScheduledMeetingOrganizerOrCohost(meetingId, uid) {
     return false;
   }
 }
+
+// ============================================================
+// Error Handler
+// ============================================================
+app.use((err, req, res, next) => {
+  console.error('Error:', err.message);
+  
+  if (NODE_ENV === 'production') {
+    res.status(500).json({ error: 'Internal server error' });
+  } else {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
 
 // ============================================================
 // Health
@@ -203,16 +332,10 @@ app.post('/api/meetings', verifyFirebaseToken, async (req, res) => {
     const { title, description, organizerName, passcode, isLargeConference } = req.body;
     const userId = req.user.uid;
 
-    if (!title || !organizerName) {
-      return res.status(400).json({ error: 'Titre et nom de l\'organisateur requis' });
-    }
-
-    // Validate passcode if provided
-    if (passcode && (passcode.length < 4 || passcode.length > 6)) {
-      return res.status(400).json({ error: 'Le code d\'accès doit faire 4 à 6 chiffres' });
-    }
-    if (passcode && !/^\d+$/.test(passcode)) {
-      return res.status(400).json({ error: 'Le code d\'accès ne doit contenir que des chiffres' });
+    // Validate input
+    const validationErrors = validateMeetingInput(req.body);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: 'Validation failed', details: validationErrors });
     }
 
     const meetingId = generateMeetingId();
@@ -250,7 +373,7 @@ app.post('/api/meetings', verifyFirebaseToken, async (req, res) => {
       ...meetingData,
     });
   } catch (error) {
-    console.error('Create meeting error:', error);
+    console.error('Create meeting error:', error.message);
     return res.status(500).json({ error: 'Erreur création réunion' });
   }
 });
@@ -259,6 +382,13 @@ app.post('/api/meetings', verifyFirebaseToken, async (req, res) => {
 app.get('/api/meetings/code/:code', verifyFirebaseToken, async (req, res) => {
   try {
     const { code } = req.params;
+    
+    // Validate meeting code
+    const validationErrors = validateMeetingCode(code);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: 'Validation failed', details: validationErrors });
+    }
+    
     const upperCode = code.toUpperCase();
 
     const snap = await db
@@ -279,7 +409,7 @@ app.get('/api/meetings/code/:code', verifyFirebaseToken, async (req, res) => {
       ...meetingData,
     });
   } catch (error) {
-    console.error('Get meeting by code error:', error);
+    console.error('Get meeting by code error:', error.message);
     return res.status(500).json({ error: 'Erreur récupération réunion' });
   }
 });
@@ -288,6 +418,12 @@ app.get('/api/meetings/code/:code', verifyFirebaseToken, async (req, res) => {
 app.get('/api/meetings/:id', verifyFirebaseToken, async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Validate meeting ID
+    const validationErrors = validateMeetingId(id);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: 'Validation failed', details: validationErrors });
+    }
 
     const doc = await db.collection('meetings').doc(id).get();
 
@@ -302,7 +438,7 @@ app.get('/api/meetings/:id', verifyFirebaseToken, async (req, res) => {
       ...meetingData,
     });
   } catch (error) {
-    console.error('Get meeting by ID error:', error);
+    console.error('Get meeting by ID error:', error.message);
     return res.status(500).json({ error: 'Erreur récupération réunion' });
   }
 });
@@ -312,6 +448,12 @@ app.put('/api/meetings/:id/participants', verifyFirebaseToken, async (req, res) 
   try {
     const { id } = req.params;
     const userId = req.user.uid;
+    
+    // Validate meeting ID
+    const validationErrors = validateMeetingId(id);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: 'Validation failed', details: validationErrors });
+    }
 
     await db.collection('meetings').doc(id).update({
       participants: admin.firestore.FieldValue.arrayUnion(userId),
@@ -321,7 +463,7 @@ app.put('/api/meetings/:id/participants', verifyFirebaseToken, async (req, res) 
 
     return res.json({ success: true });
   } catch (error) {
-    console.error('Add participant error:', error);
+    console.error('Add participant error:', error.message);
     return res.status(500).json({ error: 'Erreur ajout participant' });
   }
 });
@@ -333,15 +475,10 @@ async function handleTokenRequest(req, res) {
   try {
     const { room, identity, name, isHost } = req.query;
 
-    if (!room || !identity || !name) {
-      return res.status(400).json({
-        error: 'Paramètres manquants',
-        required: ['room', 'identity', 'name'],
-      });
-    }
-
-    if (room.length > 100 || identity.length > 100 || name.length > 100) {
-      return res.status(400).json({ error: 'Paramètres trop longs' });
+    // Validate token parameters
+    const validationErrors = validateTokenParams(req.query);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: 'Validation failed', details: validationErrors });
     }
 
     // 🔒 Contrôle d'identité strict : identity === uid Firebase
