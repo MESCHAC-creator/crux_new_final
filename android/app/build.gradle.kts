@@ -42,9 +42,12 @@ android {
         applicationId = "com.schac_crux.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 5
-        versionName = "2.38.2"
+        versionCode = 6
+        versionName = "2.38.3"
         multiDexEnabled = true
+        
+        // Resolve package conflicts during installation
+        setProperty("archivesBaseName", "crux-$versionName")
     }
 
     compileOptions {
@@ -74,11 +77,17 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            
+            // Ensure unique authorities to avoid conflicts
+            manifestPlaceholders["crux_provider_authority"] = "com.schac_crux.app.provider"
         }
 
         getByName("debug") {
             isDebuggable = true
             signingConfig = signingConfigs.getByName("debug")
+            
+            // Ensure unique authorities to avoid conflicts
+            manifestPlaceholders["crux_provider_authority"] = "com.schac_crux.app.debug.provider"
         }
     }
 

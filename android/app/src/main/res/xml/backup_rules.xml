@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Exclude sensitive data from backup -->
+    <exclude domain="sharedpref" path="crux_auth_token.xml"/>
+    <exclude domain="sharedpref" path="crux_secure_storage.xml"/>
+    <exclude domain="database" path="crux_meetings.db"/>
+    <exclude domain="file" path="cache/"/>
+    <exclude domain="file" path="temp/"/>
+</full-backup-content>
