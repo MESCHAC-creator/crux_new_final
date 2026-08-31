@@ -1,7 +1,16 @@
-# CRUX Web Deployment Guide
+# CRUX Web Deployment Guide - Version 2.39.0
 
 ## Overview
 CRUX supports web deployment via GitHub Pages, allowing users to join meetings directly from their browser without installing the app. The web version is generated from the same Flutter codebase as the mobile app, ensuring identical functionality and design.
+
+## What's New in Version 2.39.0
+
+### Enhanced Web Features
+- **Keyboard Shortcuts**: Full keyboard shortcut support for desktop users
+- **Accessibility**: Screen reader optimization and high contrast mode
+- **Performance**: Optimized loading with progressive media streaming
+- **File Sharing**: Share images and documents directly in web chat
+- **Advanced Controls**: Breakout rooms, polls, and Q&A in web interface
 
 ## GitHub Pages Setup
 
@@ -64,6 +73,17 @@ Meeting codes are 8-character alphanumeric strings (e.g., `ABCDEF12`).
 - ✅ Chat functionality
 - ✅ Host controls (mute all, etc.)
 
+### New Advanced Features (v2.39.0)
+- ✅ **Keyboard Shortcuts**: Full desktop keyboard support
+- ✅ **File Sharing**: Share images and documents in chat
+- ✅ **Breakout Rooms**: Create and manage breakout rooms
+- ✅ **Polls & Q&A**: Interactive polls and Q&A sessions
+- ✅ **Accessibility**: Screen reader support and high contrast mode
+- ✅ **Bandwidth Optimization**: Data saver mode and quality adjustment
+- ✅ **Virtual Backgrounds**: Blur, colors, gradients, and images
+- ✅ **Recording**: Meeting recording with transcription
+- ✅ **Noise Reduction**: AI-powered audio enhancement
+
 ### Browser Compatibility
 - ✅ Chrome (Android & Desktop) - Full support
 - ✅ Safari (iOS & Desktop) - Full support
@@ -95,16 +115,19 @@ flutter run -d chrome --release
 - The web build is optimized for performance
 - Uses code splitting and lazy loading
 - Assets are compressed automatically
+- Font tree-shaking reduces icon assets by 98%
 
 ### Loading Time
 - Target: < 5 seconds on 4G
 - Progressive loading for media streams
 - Optimized asset delivery
+- Font tree-shaking reduces initial load time
 
 ### Memory Usage
 - Target: < 8MB additional vs mobile
 - Efficient participant rendering (max 10 visible)
 - Smart caching and garbage collection
+- Optimized JavaScript compilation
 
 ## Security Considerations
 
@@ -181,17 +204,51 @@ The web version is built from the exact same Flutter codebase as the mobile app:
 - Feature usage statistics
 - Error reporting
 
+## Keyboard Shortcuts (Web)
+
+The web version includes comprehensive keyboard shortcuts:
+
+| Shortcut | Action |
+|----------|--------|
+| Ctrl/Cmd + D | Toggle microphone |
+| Ctrl/Cmd + E | Toggle camera |
+| Ctrl/Cmd + S | Toggle screen share |
+| Ctrl/Cmd + H | Raise/lower hand |
+| Ctrl/Cmd + C | Toggle chat |
+| Ctrl/Cmd + P | Toggle participants |
+| Ctrl/Cmd + R | Toggle reactions |
+| Ctrl/Cmd + F | Toggle fullscreen |
+| Alt + Q | Leave meeting |
+| Ctrl/Cmd + Shift + M | Mute all (host) |
+
+## Accessibility Features
+
+### Screen Reader Support
+- Semantic labels for all interactive elements
+- Live announcements for important changes
+- Error and notification announcements
+- Structured navigation patterns
+
+### Visual Accessibility
+- High contrast mode support
+- Text scale factor adjustment (1.0x to 2.0x)
+- Reduced motion mode for animations
+- Large touch targets (minimum 48x48px)
+
+### Audio Accessibility
+- TTS integration for visual content
+- Audio descriptions for key events
+- Volume and speech rate controls
+
 ## Future Enhancements
 
 ### Planned Features
 - [ ] PWA support for offline access
 - [ ] Enhanced mobile browser experience
 - [ ] Advanced screen sharing options
-- [ ] In-meeting file sharing
 - [ ] Collaborative whiteboard
-- [ ] Polls and Q&A
-- [ ] Cloud recording
 - [ ] Live captions in multiple languages
+- [ ] WebAssembly optimization
 
 ### Browser APIs
 - WebRTC for real-time communication

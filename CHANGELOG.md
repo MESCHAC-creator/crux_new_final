@@ -1,5 +1,167 @@
 # CRUX - Changelog
 
+## Version 2.39.0 (2026-08-31)
+
+### 🚀 Major Feature Update - Zoom/Google Meet Parity
+
+This update brings CRUX to feature parity with Zoom and Google Meet, with several enhancements that surpass the competition.
+
+#### ✨ New Features Implemented
+
+**Advanced Virtual Backgrounds**
+- Multiple blur levels (light, medium, strong)
+- Solid color backgrounds with preset colors
+- Gradient backgrounds with predefined combinations
+- Image backgrounds with opacity control
+- Enhanced background panel UI with pickers
+
+**Smart Reconnection System**
+- Automatic reconnection with exponential backoff
+- State restoration (mic, camera, screen share, hand raise)
+- Network monitoring and status detection
+- Maximum 8 reconnection attempts with smart retry logic
+- Meeting state persistence across disconnections
+
+**Bandwidth Optimization**
+- Data saver mode for low-bandwidth environments
+- Dynamic quality adjustment (360p to 1080p)
+- Automatic bandwidth monitoring every 10 seconds
+- Adaptive video quality based on network conditions
+- Data usage statistics and reporting
+
+**Web Keyboard Shortcuts**
+- Ctrl/Cmd + D: Toggle microphone
+- Ctrl/Cmd + E: Toggle camera
+- Ctrl/Cmd + S: Toggle screen share
+- Ctrl/Cmd + H: Raise/lower hand
+- Ctrl/Cmd + C: Toggle chat
+- Ctrl/Cmd + P: Toggle participants
+- Ctrl/Cmd + R: Toggle reactions
+- Ctrl/Cmd + F: Toggle fullscreen
+- Alt + Q: Leave meeting
+- Ctrl/Cmd + Shift + M: Mute all (host)
+
+**Enhanced Accessibility**
+- Screen reader optimization with semantic labels
+- High contrast mode support
+- Text scale factor adjustment (1.0x to 2.0x)
+- Reduced motion mode for animations
+- Audio descriptions for visual elements
+- TTS integration for announcements
+- Comprehensive accessibility widgets
+
+**Breakout Rooms**
+- Create up to 10 breakout rooms
+- Auto-assign participants to rooms
+- Manual participant movement between rooms
+- Timer with countdown broadcast
+- Main meeting return functionality
+- Room capacity management
+
+**Polls and Q&A**
+- Create polls with multiple options
+- Single or multiple answer support
+- Anonymous voting option
+- Real-time results with percentages
+- Q&A with upvoting system
+- Question archiving and management
+- Live poll status tracking
+
+**File Sharing in Chat**
+- Share images and documents
+- 50MB file size limit
+- Firebase Storage integration
+- File type validation
+- Download and delete functionality
+- Meeting-specific file organization
+
+**AI-Powered Noise Reduction**
+- Real-time audio noise filtering
+- Configurable noise reduction levels
+- Echo cancellation
+- Automatic gain control
+- Noise level monitoring
+- Processing statistics
+
+**Recording and Transcription**
+- Audio/video meeting recording
+- Live captions with speech-to-text
+- Real-time transcription display
+- Transcription export
+- Recording management
+- Firebase Storage for recordings
+
+#### 🔧 Technical Improvements
+
+**Build and Deployment**
+- Updated version to 2.39.0 (build 241)
+- Android build configuration updated
+- Web build enabled and optimized
+- GitHub Pages deployment workflow configured
+- Base href set to `/crux_new_final/`
+- Flutter 3.44.9 compatibility
+
+**Dependencies**
+- Added `file_picker: ^8.1.6` for file sharing
+- Updated existing dependencies for compatibility
+- Resolved package conflicts
+
+**Code Quality**
+- Fixed Flutter material imports for web compatibility
+- Enhanced error handling across all services
+- Improved logging and debugging
+- Consistent singleton pattern implementation
+- Firestore integration for data persistence
+
+#### 📱 Platform Support
+
+**Android**
+- API 24+ (Android 7.0+) support maintained
+- Enhanced build configuration
+- Improved package conflict resolution
+- Backup rules for sensitive data
+
+**Web**
+- Full browser compatibility (Chrome, Safari, Firefox, Edge)
+- Responsive design for mobile/desktop
+- Keyboard shortcuts support
+- Accessibility optimizations
+- Progressive loading for media streams
+
+#### 🎯 Architecture
+
+**New Services**
+- `ReconnectionService`: Smart reconnection with state restoration
+- `BandwidthService`: Bandwidth optimization and data saver
+- `KeyboardShortcutsService`: Web keyboard shortcuts
+- `AccessibilityService`: Screen reader and accessibility features
+- `BreakoutRoomsService`: Breakout rooms management
+- `PollsService`: Polls and Q&A functionality
+- `FileSharingService`: File sharing in chat
+- `NoiseReductionService`: AI-powered noise reduction
+- `RecordingService`: Recording and transcription
+
+**Enhanced Components**
+- `VirtualBackgroundMode`: Added color and gradient modes
+- `BackgroundPanel`: Enhanced UI with color/gradient pickers
+- `VideoBackgroundController`: Improved background management
+
+#### 🌐 Deployment
+
+**GitHub Pages**
+- Automatic deployment on push to main/master/schac branches
+- Environment variable configuration for LiveKit and Firebase
+- Optimized web build with base href
+- Secure token management
+
+**Android APK**
+- Release build configuration updated
+- Version code 7, version name 2.39.0
+- ProGuard rules for code obfuscation
+- Signing configuration maintained
+
+---
+
 ## Version 2.38.3 (2026-08-30)
 
 ### 🎨 Améliorations UI/UX
