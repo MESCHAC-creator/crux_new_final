@@ -42,8 +42,8 @@ android {
         applicationId = "com.schac_crux.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "2.38.3"
+        versionCode = 7
+        versionName = "2.39.0"
         multiDexEnabled = true
         
         // Resolve package conflicts during installation
