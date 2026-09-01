@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "if [ ! -d \"HOME/flutter\" ]; then git clone https://github.com/flutter/flutter.git -b stable --depth 1HOME/flutter; fi && export PATH=\"HOME/flutter/bin:HOME/flutter/bin:HOME/flutter/bin:PATH\" && flutter config --no-analytics && flutter build web --release --dart-define=LIVEKIT_WSS_URL=\"wss://crux-88fihb12.livekit.cloud\" --dart-define=LIVEKIT_TOKEN_SERVER_URL=\"https://crux-6l6num.sandbox.livekit.io\" --dart-define=FIREBASE_PROJECT_ID=\"crux-3c6be\"",
-  "outputDirectory": "build/web",
+  "buildCommand": "bash build.sh  "outputDirectory": "build/web",
   "cleanUrls": true
 }
