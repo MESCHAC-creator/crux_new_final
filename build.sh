@@ -15,7 +15,7 @@ fi
 export PATH="HOME/flutter/bin:HOME/flutter/bin:HOME/flutter/bin:PATH"
 
 echo "=== Vérification ==="
-which flutter
+command -v flutter
 flutter --version
 
 flutter config --no-analytics
