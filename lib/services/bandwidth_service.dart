@@ -63,7 +63,7 @@ class BandwidthService {
 
   // Seuils de bande passante (Mbps)
   static const double _lowBandwidthThreshold = 0.5;    // < 0.5 Mbps
-  static const double _mediumBandwidthThreshold = 1.5 // < 1.5 Mbps
+  static const double _mediumBandwidthThreshold = 1.5; // < 1.5 Mbps
   static const double _highBandwidthThreshold = 3.0;   // >= 3.0 Mbps
 
   // Callbacks
