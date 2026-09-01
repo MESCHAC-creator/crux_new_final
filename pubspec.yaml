@@ -77,7 +77,6 @@ dependencies:
   # Device / application information
   device_info_plus: ^12.4.0
   package_info_plus: ^8.3.0
-  path: ^1.9.0
   uuid: ^4.5.1
 
 dev_dependencies:
