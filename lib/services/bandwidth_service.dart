@@ -1,95 +1,49 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
-import 'package:livekit_client/livekit_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/logger.dart' as crux;
+import 'package:logger/logger.dart';
 
-/// Service d'optimisation de la bande passante avec mode économie de données.
+/// Service de gestion de la bande passante pour optimiser la qualité vidéo.
 ///
-/// Ce service adapte dynamiquement la qualité vidéo en fonction des conditions
-/// réseau et des préférences utilisateur pour réduire la consommation de données.
+/// Ce service surveille l'utilisation de la bande passante et ajuste
+/// automatiquement la qualité vidéo pour garantir une expérience fluide.
 class BandwidthService {
   BandwidthService._();
 
   static final BandwidthService instance = BandwidthService._();
 
-  final crux.Logger _logger = crux.logger;
-
-  // Mode économie de données
+  final _logger = Logger();
+  
+  // État de la bande passante
+  double _currentBandwidth = 0.0; // en Mbps
+  int _totalBytesTransferred = 0;
+  DateTime? _sessionStartTime;
+  
+  // Configuration
   bool _dataSaverMode = false;
   bool _autoQualityAdjustment = true;
-
-  // Surveillance de la bande passante
-  double _currentBandwidth = 0.0; // en Mbps
-  Timer? _bandwidthMonitor;
-  static const Duration _bandwidthCheckInterval = Duration(seconds: 10);
-
-  // Qualité vidéo actuelle
-  VideoQuality _currentVideoQuality = VideoQuality.high;
-  VideoQuality _targetVideoQuality = VideoQuality.high;
-
-  // Statistiques
-  int _totalBytesTransferred = 0;
-  DateTime _sessionStartTime = DateTime.now();
-
-  // Seuils de bande passante (Mbps)
-  static const double _lowBandwidthThreshold = 0.5;  // < 0.5 Mbps
-  static const double _mediumBandwidthThreshold = 1.5; // < 1.5 Mbps
-  static const double _highBandwidthThreshold = 3.0;  // >= 3.0 Mbps
-
-  // Callbacks
-  Function(VideoQuality)? _onQualityChanged;
+  VideoQuality _currentVideoQuality = VideoQuality.hd;
+  
+  // Callback pour les mises à jour de bande passante
   Function(double)? _onBandwidthUpdate;
 
+  // Préférences utilisateur
+  static const String _dataSaverKey = 'crux_data_saver';
+  static const String _autoQualityKey = 'crux_auto_quality';
+
   // Getters
-  bool get dataSaverMode => _dataSaverMode;
-  bool get autoQualityAdjustment => _autoQualityAdjustment;
   double get currentBandwidth => _currentBandwidth;
   VideoQuality get currentVideoQuality => _currentVideoQuality;
-  int get totalBytesTransferred => _totalBytesTransferred;
-  Duration get sessionDuration => DateTime.now().difference(_sessionStartTime);
+  bool get dataSaverMode => _dataSaverMode;
+  bool get autoQualityAdjustment => _autoQualityAdjustment;
 
-  /// Niveaux de qualité vidéo
-  enum VideoQuality {
-    low(360, 15, 0.3),    // 360p @ 15fps, ~0.3 Mbps
-    medium(480, 24, 0.5), // 480p @ 24fps, ~0.5 Mbps
-    high(720, 30, 1.5),   // 720p @ 30fps, ~1.5 Mbps
-    hd(1080, 30, 3.0),    // 1080p @ 30fps, ~3.0 Mbps
-    fullHd(1080, 60, 5.0); // 1080p @ 60fps, ~5.0 Mbps
-
-    final int resolution;
-    final int frameRate;
-    final double estimatedBandwidth;
-
-    const VideoQuality(this.resolution, this.frameRate, this.estimatedBandwidth);
-
-    String get name {
-      switch (this) {
-        case VideoQuality.low:
-          return 'Basse (360p)';
-        case VideoQuality.medium:
-          return 'Moyenne (480p)';
-        case VideoQuality.high:
-          return 'Haute (720p)';
-        case VideoQuality.hd:
-          return 'HD (1080p)';
-        case VideoQuality.fullHd:
-          return 'Full HD (1080p 60fps)';
-      }
-    }
+  BandwidthService({Function(double)? onBandwidthUpdate}) {
+    _onBandwidthUpdate = onBandwidthUpdate;
   }
 
-  /// Initialise le service
-  Future<void> initialize({
-    Function(VideoQuality)? onQualityChanged,
-    Function(double)? onBandwidthUpdate,
-  }) async {
-    _onQualityChanged = onQualityChanged;
-    _onBandwidthUpdate = onBandwidthUpdate;
-
+  /// Initialise le service de bande passante
+  Future<void> initialize() async {
     await _loadPreferences();
-    _startBandwidthMonitoring();
-
+    _sessionStartTime = DateTime.now();
     _logger.i('BandwidthService initialized - Data Saver: $_dataSaverMode, Auto Quality: $_autoQualityAdjustment');
   }
 
@@ -97,13 +51,8 @@ class BandwidthService {
   Future<void> _loadPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _dataSaverMode = prefs.getBool('crux_data_saver') ?? false;
-      _autoQualityAdjustment = prefs.getBool('crux_auto_quality') ?? true;
-      
-      // Appliquer le mode économie de données
-      if (_dataSaverMode) {
-        _targetVideoQuality = VideoQuality.low;
-      }
+      _dataSaverMode = prefs.getBool(_dataSaverKey) ?? false;
+      _autoQualityAdjustment = prefs.getBool(_autoQualityKey) ?? true;
     } catch (e) {
       _logger.e('Failed to load bandwidth preferences', error: e);
     }
@@ -113,8 +62,8 @@ class BandwidthService {
   Future<void> _savePreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('crux_data_saver', _dataSaverMode);
-      await prefs.setBool('crux_auto_quality', _autoQualityAdjustment);
+      await prefs.setBool(_dataSaverKey, _dataSaverMode);
+      await prefs.setBool(_autoQualityKey, _autoQualityAdjustment);
     } catch (e) {
       _logger.e('Failed to save bandwidth preferences', error: e);
     }
@@ -128,7 +77,7 @@ class BandwidthService {
     await _savePreferences();
 
     if (enabled) {
-      _targetVideoQuality = VideoQuality.low;
+      _currentVideoQuality = VideoQuality.low;
       _logger.i('Data saver mode enabled');
     } else {
       _adjustQualityBasedOnBandwidth();
@@ -140,102 +89,61 @@ class BandwidthService {
 
   /// Active/désactive l'ajustement automatique de qualité
   Future<void> setAutoQualityAdjustment(bool enabled) async {
-    if (_autoQualityAdjustment == enabled) return;
-
     _autoQualityAdjustment = enabled;
     await _savePreferences();
-
-    if (enabled) {
-      _adjustQualityBasedOnBandwidth();
-      _logger.i('Auto quality adjustment enabled');
-    } else {
-      _logger.i('Auto quality adjustment disabled');
-    }
+    _logger.i('Auto quality adjustment: $_autoQualityAdjustment');
   }
 
-  /// Définit manuellement la qualité vidéo
-  void setVideoQuality(VideoQuality quality) {
-    if (_dataSaverMode && quality != VideoQuality.low) {
-      _logger.w('Cannot set high quality in data saver mode');
-      return;
-    }
-
-    _targetVideoQuality = quality;
-    _autoQualityAdjustment = false;
-    _applyQualityChange();
-  }
-
-  /// Démarre la surveillance de la bande passante
-  void _startBandwidthMonitoring() {
-    _bandwidthMonitor = Timer.periodic(_bandwidthCheckInterval, (_) {
-      _updateBandwidthEstimate();
-    });
-  }
-
-  /// Met à jour l'estimation de la bande passante
-  void _updateBandwidthEstimate() {
-    // En production, utiliser les statistiques réelles de LiveKit
-    // Ici, nous simulons une estimation basée sur les bytes transférés
-    
-    final bytesSinceLastCheck = _totalBytesTransferred;
-    final estimatedBandwidth = (bytesSinceLastCheck * 8) / 
-                              (_bandwidthCheckInterval.inSeconds * 1_000_000);
-    
-    _currentBandwidth = estimatedBandwidth;
+  /// Met à jour la bande passante actuelle
+  void updateBandwidth(double bandwidthMbps) {
+    _currentBandwidth = bandwidthMbps;
     _onBandwidthUpdate?.call(_currentBandwidth);
-
+    
     if (_autoQualityAdjustment && !_dataSaverMode) {
       _adjustQualityBasedOnBandwidth();
     }
-
-    _logger.d('Bandwidth estimate: ${_currentBandwidth.toStringAsFixed(2)} Mbps');
   }
 
-  /// Ajuste la qualité en fonction de la bande passante
+  /// Ajuste la qualité vidéo en fonction de la bande passante
   void _adjustQualityBasedOnBandwidth() {
     VideoQuality newQuality;
-
-    if (_currentBandwidth < _lowBandwidthThreshold) {
+    
+    if (_currentBandwidth < 1.0) {
       newQuality = VideoQuality.low;
-    } else if (_currentBandwidth < _mediumBandwidthThreshold) {
+    } else if (_currentBandwidth < 3.0) {
       newQuality = VideoQuality.medium;
-    } else if (_currentBandwidth < _highBandwidthThreshold) {
-      newQuality = VideoQuality.high;
-    } else {
+    } else if (_currentBandwidth < 5.0) {
       newQuality = VideoQuality.hd;
+    } else {
+      newQuality = VideoQuality.fullHd;
     }
 
-    if (newQuality != _targetVideoQuality) {
-      _targetVideoQuality = newQuality;
+    if (newQuality != _currentVideoQuality) {
+      _currentVideoQuality = newQuality;
+      _logger.i('Quality adjusted to ${_currentVideoQuality.name} (bandwidth: ${_currentBandwidth.toStringAsFixed(2)} Mbps)');
       _applyQualityChange();
-      _logger.i('Quality adjusted to ${newQuality.name} based on bandwidth');
     }
   }
 
   /// Applique le changement de qualité
   void _applyQualityChange() {
-    if (_currentVideoQuality == _targetVideoQuality) return;
-
-    _currentVideoQuality = _targetVideoQuality;
-    _onQualityChanged?.call(_currentVideoQuality);
-    _logger.i('Video quality changed to ${_currentVideoQuality.name}');
+    // Ici, vous pouvez émettre un événement ou notifier les autres services
+    // que la qualité vidéo a changé
   }
 
-  /// Met à jour les statistiques de transfert de données
-  void updateTransferStats(int bytesTransferred) {
-    _totalBytesTransferred += bytesTransferred;
+  /// Enregistre le transfert de données
+  void recordDataTransfer(int bytes) {
+    _totalBytesTransferred += bytes;
   }
 
-  /// Réinitialise les statistiques de session
-  void resetSessionStats() {
-    _totalBytesTransferred = 0;
-    _sessionStartTime = DateTime.now();
-    _logger.d('Session stats reset');
-  }
+  /// Obtient les statistiques d'utilisation
+  Map<String, dynamic> getUsageStatistics() {
+    if (_sessionStartTime == null) {
+      return {};
+    }
 
-  /// Obtient des statistiques détaillées sur la consommation de données
-  Map<String, dynamic> getDataUsageStats() {
-    final durationInMinutes = sessionDuration.inMinutes.toDouble();
+    final duration = DateTime.now().difference(_sessionStartTime!);
+    final durationInMinutes = duration.inMinutes + duration.inSeconds / 60.0;
     final dataUsedMB = _totalBytesTransferred / (1024 * 1024);
     final averageMbps = durationInMinutes > 0 
         ? (dataUsedMB * 8) / (durationInMinutes * 60) 
@@ -269,49 +177,38 @@ class BandwidthService {
           'maxBitrate': 500_000,
           'maxFramerate': 24,
         };
-      case VideoQuality.high:
+      case VideoQuality.hd:
         return {
           'width': 1280,
           'height': 720,
           'maxBitrate': 1_500_000,
           'maxFramerate': 30,
         };
-      case VideoQuality.hd:
+      case VideoQuality.fullHd:
         return {
           'width': 1920,
           'height': 1080,
           'maxBitrate': 3_000_000,
           'maxFramerate': 30,
         };
-      case VideoQuality.fullHd:
-        return {
-          'width': 1920,
-          'height': 1080,
-          'maxBitrate': 5_000_000,
-          'maxFramerate': 60,
-        };
     }
   }
 
-  /// Obtient la qualité recommandée pour l'abonnement distant
-  VideoQuality getSubscriptionQuality() {
-    if (_dataSaverMode) return VideoQuality.low;
-    
-    // Pour l'abonnement, on peut utiliser une qualité légèrement inférieure
-    // pour économiser la bande passante entrante
-    switch (_currentVideoQuality) {
-      case VideoQuality.fullHd:
-        return VideoQuality.hd;
-      case VideoQuality.hd:
-        return VideoQuality.high;
-      default:
-        return _currentVideoQuality;
-    }
+  /// Réinitialise les statistiques de session
+  void resetSessionStatistics() {
+    _totalBytesTransferred = 0;
+    _sessionStartTime = DateTime.now();
+    _logger.i('Session statistics reset');
   }
 
-  /// Nettoie les ressources
   void dispose() {
-    _bandwidthMonitor?.cancel();
-    _logger.i('BandwidthService disposed');
+    // Nettoyage si nécessaire
   }
+}
+
+enum VideoQuality {
+  low,
+  medium,
+  hd,
+  fullHd,
 }

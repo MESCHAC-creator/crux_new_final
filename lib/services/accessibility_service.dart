@@ -13,7 +13,7 @@ class AccessibilityService {
 
   static final AccessibilityService instance = AccessibilityService._();
 
-  final crux.Logger _logger = crux.logger;
+  final _logger = crux.logger;
   final FlutterTts _tts = FlutterTts();
 
   // État de l'accessibilité
@@ -198,9 +198,6 @@ class AccessibilityService {
     bool? toggled,
     VoidCallback? onTap,
     VoidCallback? onLongPress,
-    SemanticsActionCallback? onIncrease,
-    SemanticsActionCallback? onDecrease,
-    SemanticsSortKey? sortKey,
   }) {
     return Semantics(
       label: label,
@@ -214,9 +211,6 @@ class AccessibilityService {
       link: onTap != null,
       onTap: onTap,
       onLongPress: onLongPress,
-      onIncrease: onIncrease,
-      onDecrease: onDecrease,
-      sortKey: sortKey,
     );
   }
 

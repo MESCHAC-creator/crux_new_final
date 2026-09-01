@@ -16,7 +16,7 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.24.0'
+        flutter-version: '3.27.0'
         channel: 'stable'
         cache: true
 
@@ -30,7 +30,7 @@ jobs:
         FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
         APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
       run: |
-        flutter build web --release --base-href /crux_new_final \
+        flutter build web --release --base-href /crux_new_final/ \
           --dart-define=LIVEKIT_WSS_URL="${LIVEKIT_WSS_URL}" \
           --dart-define=LIVEKIT_TOKEN_SERVER_URL="${LIVEKIT_TOKEN_SERVER_URL}" \
           --dart-define=FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID}" \
