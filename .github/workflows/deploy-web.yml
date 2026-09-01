@@ -25,10 +25,11 @@ jobs:
 
     - name: Build web app
       run: |
-        flutter build web --release --base-href /crux_new_final/ \
-          --dart-define=LIVEKIT_WSS_URL="wss://crux-88fihb12.livekit.cloud" \
+        flutter build web -- --base-href /crux_new_final/ \
+          --dart-define=LKIT_WSS_URL="wsscrux-88fihb12.livekit.cloud" \
           --dart-define=LIVEKIT_TOKEN_SERVER_URL="https://crux-6l6num.sandbox.livekit.io" \
           --dart-define=FIREBASE_PROJECT_ID="crux-3c6be"
+
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
