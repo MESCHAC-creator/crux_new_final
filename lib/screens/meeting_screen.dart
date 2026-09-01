@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../services/meeting_service.dart';
 import '../theme/colors.dart';
@@ -42,10 +44,8 @@ class _MeetingScreenState extends State<MeetingScreen> {
 
   Future<void> _prepare() async {
     try {
-      await _meetingService.addParticipant(
-        widget.meetingId,
-        widget.userId,
-      );
+      // Utiliser le backend server pour ajouter le participant
+      await _addParticipantViaBackend(widget.meetingId);
 
       if (widget.isHost) {
         await _meetingService.updateMeetingStatus(
@@ -66,6 +66,40 @@ class _MeetingScreenState extends State<MeetingScreen> {
           _error = e.toString();
         });
       }
+    }
+  }
+
+  Future<void> _addParticipantViaBackend(String meetingId) async {
+    try {
+      const tokenServerUrl = String.fromEnvironment(
+        'LIVEKIT_TOKEN_SERVER_URL',
+        defaultValue: 'https://crux-token-server.vercel.app',
+      );
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('Authentification requise');
+      }
+
+      final idToken = await user.getIdToken();
+
+      final response = await http.put(
+        Uri.parse('$tokenServerUrl/api/meetings/$meetingId/participants'),
+        headers: {
+          'Authorization': 'Bearer $idToken',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Erreur ajout participant: ${response.body}');
+      }
+    } catch (e) {
+      // Fallback to direct Firestore if backend fails
+      await _meetingService.addParticipant(
+        meetingId,
+        widget.userId,
+      );
     }
   }
 
