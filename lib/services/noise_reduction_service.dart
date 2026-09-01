@@ -13,7 +13,7 @@ class NoiseReductionService {
 
   static final NoiseReductionService instance = NoiseReductionService._();
 
-  final crux.Logger _logger = crux.logger;
+  final _logger = crux.logger;
 
   // État
   bool _isEnabled = false;

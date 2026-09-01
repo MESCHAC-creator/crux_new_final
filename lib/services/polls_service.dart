@@ -15,7 +15,7 @@ class PollsService {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final crux.Logger _logger = crux.logger;
+  final _logger = crux.logger;
   final Uuid _uuid = const Uuid();
 
   // État des sondages actifs
@@ -99,6 +99,7 @@ class PollsService {
         endsAt: duration != null ? now.add(duration) : null,
         isActive: true,
         totalResponses: 0,
+        responses: {},
       );
 
       await _savePoll(poll);
@@ -216,7 +217,7 @@ class PollsService {
       orElse: () => throw Exception('Poll not found'),
     );
 
-    final totalVotes = poll.options.fold<int>(0, (sum, option) => sum + option.votes);
+    final totalVotes = poll.options.fold<int>(0, (total, option) => total + option.votes);
     
     final optionResults = poll.options.map((option) {
       final percentage = totalVotes > 0 

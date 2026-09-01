@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
@@ -21,7 +19,7 @@ class RecordingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
-  final crux.Logger _logger = crux.logger;
+  final _logger = crux.logger;
   final Uuid _uuid = const Uuid();
 
   // Speech-to-Text et Text-to-Speech
@@ -183,17 +181,11 @@ class RecordingService {
       _isTranscribing = true;
       await _speechToText.listen(
         onResult: (result) {
-          final recognizedWords = result.recognizedWords;
           if (result.finalResult) {
-            final transcription = recognizedWords.join(' ');
-            _addTranscriptionSegment(transcription);
-            _transcriptionController.add(transcription);
+            _addTranscriptionSegment(result.recognizedWords);
+            _transcriptionController.add(result.recognizedWords);
           }
         },
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 3),
-        partialResults: true,
-        localeId: 'fr_FR',
       );
 
       _logger.i('Started live transcription');
@@ -316,9 +308,9 @@ class RecordingService {
       }
 
       // Supprimer la transcription
-      if (recording.transcriptionUrl.isNotEmpty) {
+      if (recording.transcriptionUrl != null && recording.transcriptionUrl!.isNotEmpty) {
         try {
-          final ref = _storage.refFromURL(recording.transcriptionUrl);
+          final ref = _storage.refFromURL(recording.transcriptionUrl!);
           await ref.delete();
         } catch (e) {
           _logger.w('Failed to delete transcription file', error: e);

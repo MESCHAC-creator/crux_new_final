@@ -8,7 +8,6 @@ class AppColors {
   // ── Obsidienne ────────────────────────────────────────────────────────
   static const Color _black = Color(0xFF05070A);
   static const Color _charcoal = Color(0xFF0C1016);
-  static const Color _darkGray = Color(0xFF161A22);
   static const Color _darkGray2 = Color(0xFF1C212A);
   static const Color _darkGray3 = Color(0xFF222833);
   static const Color _darkGray4 = Color(0xFF272C36);

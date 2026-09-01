@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
-import 'package:livekit_client/livekit_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../utils/logger.dart' as crux;
@@ -14,7 +12,7 @@ class ReconnectionService {
 
   static final ReconnectionService instance = ReconnectionService._();
 
-  final crux.Logger _logger = crux.logger;
+  final _logger = crux.logger;
 
   // État de la reconnexion
   bool _isReconnecting = false;
@@ -45,67 +43,6 @@ class ReconnectionService {
   bool get isReconnecting => _isReconnecting;
   int get reconnectAttempts => _reconnectAttempts;
   bool get isNetworkAvailable => _isNetworkAvailable;
-
-  /// État de la réunion à sauvegarder
-  static class MeetingState {
-    final String meetingId;
-    final String meetingName;
-    final String userId;
-    final String userName;
-    final String? userEmail;
-    final bool isHost;
-    final bool micEnabled;
-    final bool cameraEnabled;
-    final bool screenSharing;
-    final bool handRaised;
-    final DateTime timestamp;
-
-    MeetingState({
-      required this.meetingId,
-      required this.meetingName,
-      required this.userId,
-      required this.userName,
-      this.userEmail,
-      required this.isHost,
-      required this.micEnabled,
-      required this.cameraEnabled,
-      required this.screenSharing,
-      required this.handRaised,
-      required this.timestamp,
-    });
-
-    Map<String, dynamic> toJson() {
-      return {
-        'meetingId': meetingId,
-        'meetingName': meetingName,
-        'userId': userId,
-        'userName': userName,
-        'userEmail': userEmail,
-        'isHost': isHost,
-        'micEnabled': micEnabled,
-        'cameraEnabled': cameraEnabled,
-        'screenSharing': screenSharing,
-        'handRaised': handRaised,
-        'timestamp': timestamp.toIso8601String(),
-      };
-    }
-
-    static MeetingState fromJson(Map<String, dynamic> json) {
-      return MeetingState(
-        meetingId: json['meetingId'] as String,
-        meetingName: json['meetingName'] as String,
-        userId: json['userId'] as String,
-        userName: json['userName'] as String,
-        userEmail: json['userEmail'] as String?,
-        isHost: json['isHost'] as bool,
-        micEnabled: json['micEnabled'] as bool,
-        cameraEnabled: json['cameraEnabled'] as bool,
-        screenSharing: json['screenSharing'] as bool,
-        handRaised: json['handRaised'] as bool,
-        timestamp: DateTime.parse(json['timestamp'] as String),
-      );
-    }
-  }
 
   /// Initialise le service de reconnexion
   Future<void> initialize({
@@ -203,9 +140,9 @@ class ReconnectionService {
     _reconnectAttempts++;
 
     final delay = _calculateReconnectDelay();
-    _logger.i('Starting reconnection attempt $_reconnectAttempts/$maxReconnectAttempts with delay ${delay.inSeconds}s');
+    _logger.i('Starting reconnection attempt $_reconnectAttempts/${AppConfig.maxReconnectAttempts} with delay ${delay.inSeconds}s');
 
-    _onReconnecting?.call('Tentative de reconnexion $_reconnectAttempts/$maxReconnectAttempts...');
+    _onReconnecting?.call('Tentative de reconnexion $_reconnectAttempts/${AppConfig.maxReconnectAttempts}...');
 
     await Future.delayed(delay);
 
@@ -293,5 +230,66 @@ class ReconnectionService {
     _networkCheckTimer?.cancel();
     _networkSubscription?.cancel();
     _logger.i('ReconnectionService disposed');
+  }
+}
+
+/// État de la réunion à sauvegarder
+class MeetingState {
+  final String meetingId;
+  final String meetingName;
+  final String userId;
+  final String userName;
+  final String? userEmail;
+  final bool isHost;
+  final bool micEnabled;
+  final bool cameraEnabled;
+  final bool screenSharing;
+  final bool handRaised;
+  final DateTime timestamp;
+
+  MeetingState({
+    required this.meetingId,
+    required this.meetingName,
+    required this.userId,
+    required this.userName,
+    this.userEmail,
+    required this.isHost,
+    required this.micEnabled,
+    required this.cameraEnabled,
+    required this.screenSharing,
+    required this.handRaised,
+    required this.timestamp,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'meetingId': meetingId,
+      'meetingName': meetingName,
+      'userId': userId,
+      'userName': userName,
+      'userEmail': userEmail,
+      'isHost': isHost,
+      'micEnabled': micEnabled,
+      'cameraEnabled': cameraEnabled,
+      'screenSharing': screenSharing,
+      'handRaised': handRaised,
+      'timestamp': timestamp.toIso8601String(),
+    };
+  }
+
+  static MeetingState fromJson(Map<String, dynamic> json) {
+    return MeetingState(
+      meetingId: json['meetingId'] as String,
+      meetingName: json['meetingName'] as String,
+      userId: json['userId'] as String,
+      userName: json['userName'] as String,
+      userEmail: json['userEmail'] as String?,
+      isHost: json['isHost'] as bool,
+      micEnabled: json['micEnabled'] as bool,
+      cameraEnabled: json['cameraEnabled'] as bool,
+      screenSharing: json['screenSharing'] as bool,
+      handRaised: json['handRaised'] as bool,
+      timestamp: DateTime.parse(json['timestamp'] as String),
+    );
   }
 }

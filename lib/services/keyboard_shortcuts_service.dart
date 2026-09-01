@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../utils/logger.dart' as crux;
@@ -12,7 +11,7 @@ class KeyboardShortcutsService {
 
   static final KeyboardShortcutsService instance = KeyboardShortcutsService._();
 
-  final crux.Logger _logger = crux.logger;
+  final _logger = crux.logger;
 
   // État
   bool _isEnabled = true;
@@ -66,40 +65,40 @@ class KeyboardShortcutsService {
   /// Enregistre les raccourcis par défaut
   void _registerDefaultShortcuts() {
     // Raccourcis principaux (inspirés de Zoom/Google Meet)
-    
+
     // Micro : Ctrl/Cmd + D
-    _shortcuts[SingleActivator(LogicalKeyboardKey.keyD, control: true)] = _onToggleMic;
-    
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyD, control: true)] = _onToggleMic ?? () {};
+
     // Caméra : Ctrl/Cmd + E
-    _shortcuts[SingleActivator(LogicalKeyboardKey.keyE, control: true)] = _onToggleCamera;
-    
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyE, control: true)] = _onToggleCamera ?? () {};
+
     // Partage d'écran : Ctrl/Cmd + S
-    _shortcuts[SingleActivator(LogicalKeyboardKey.keyS, control: true)] = _onToggleScreenShare;
-    
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyS, control: true)] = _onToggleScreenShare ?? () {};
+
     // Lever la main : Ctrl/Cmd + H
-    _shortcuts[SingleActivator(LogicalKeyboardKey.keyH, control: true)] = _onToggleHandRaise;
-    
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyH, control: true)] = _onToggleHandRaise ?? () {};
+
     // Chat : Ctrl/Cmd + C
-    _shortcuts[SingleActivator(LogicalKeyboardKey.keyC, control: true)] = _onToggleChat;
-    
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyC, control: true)] = _onToggleChat ?? () {};
+
     // Participants : Ctrl/Cmd + P
-    _shortcuts[SingleActivator(LogicalKeyboardKey.keyP, control: true)] = _onToggleParticipants;
-    
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyP, control: true)] = _onToggleParticipants ?? () {};
+
     // Réactions : Ctrl/Cmd + R
-    _shortcuts[SingleActivator(LogicalKeyboardKey.keyR, control: true)] = _onToggleReactions;
-    
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyR, control: true)] = _onToggleReactions ?? () {};
+
     // Plein écran : Ctrl/Cmd + F
-    _shortcuts[SingleActivator(LogicalKeyboardKey.keyF, control: true)] = _onToggleFullscreen;
-    
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyF, control: true)] = _onToggleFullscreen ?? () {};
+
     // Quitter : Alt + Q
-    _shortcuts[SingleActivator(LogicalKeyboardKey.keyQ, alt: true)] = _onLeaveMeeting;
-    
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyQ, alt: true)] = _onLeaveMeeting ?? () {};
+
     // Couper le micro de tous (hôte uniquement) : Ctrl/Cmd + Shift + M
-    _shortcuts[SingleActivator(
-      LogicalKeyboardKey.keyM, 
-      control: true, 
+    _shortcuts[const SingleActivator(
+      LogicalKeyboardKey.keyM,
+      control: true,
       shift: true
-    )] = _onMuteAll;
+    )] = _onMuteAll ?? () {};
   }
 
   /// Active/désactive les raccourcis clavier
@@ -124,7 +123,7 @@ class KeyboardShortcutsService {
 
     final callback = _shortcuts[activator];
     if (callback != null) {
-      callback?.call();
+      callback();
       return true;
     }
 
@@ -255,13 +254,11 @@ class SingleActivator extends ShortcutActivator {
   });
 
   @override
-  bool accepts(KeyEvent event, RawKeyEvent? rawEvent) {
+  bool accepts(KeyEvent event, HardwareKeyboard keyboard) {
     if (event is! KeyDownEvent) return false;
 
     if (event.logicalKey != key) return false;
 
-    final keyboard = HardwareKeyboard.instance;
-    
     if (control && !keyboard.isControlPressed) return false;
     if (shift && !keyboard.isShiftPressed) return false;
     if (alt && !keyboard.isAltPressed) return false;
@@ -273,6 +270,11 @@ class SingleActivator extends ShortcutActivator {
     if (!meta && keyboard.isMetaPressed) return false;
 
     return true;
+  }
+
+  @override
+  String debugDescribeKeys() {
+    return toString();
   }
 
   @override
