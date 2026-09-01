@@ -1,5 +1,5 @@
 name: crux_new_final
-description: "CRUX — Vidéoconférence Flutter avec LiveKit."
+description: "CRUX — Vidéoconférence avec LiveKit."
 publish_to: "none"
 
 version: 2.39.0+241
@@ -16,7 +16,7 @@ dependencies:
 
   # Firebase
   firebase_core: ^3.13.0
-  firebase_auth: ^5.5.2
+  firebase_auth: ^5.5.0 
   firebase_messaging: ^15.2.5
   cloud_firestore: ^5.0.0
   cloud_functions: ^5.6.2
@@ -55,7 +55,8 @@ dependencies:
   # Images
   image_picker: ^1.1.2
   camera: ^0.11.1
-  file_picker: ^8.1.6 
+  file_picker: ^8.1.6
+
   # State management
   provider: ^6.1.5
 
@@ -72,11 +73,13 @@ dependencies:
 
   # Crypto (hash passcode réunions)
   crypto: ^3.0.6
-  
+
   # Device / application information
   device_info_plus: ^12.4.0
   package_info_plus: ^8.3.0
+  path: ^1.9.0
   uuid: ^4.5.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

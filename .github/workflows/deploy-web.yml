@@ -2,7 +2,7 @@ name: Deploy Flutter Web to GitHub Pages
 
 on:
   push:
-    branches: [ main, master, schac ]
+    branches: [ schac ]
   workflow_dispatch:
 
 jobs:
@@ -16,7 +16,7 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.27.0'
+        flutter-version: '3.32.8'
         channel: 'stable'
         cache: true
 
@@ -42,7 +42,6 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./build/web
         publish_branch: gh-pages
-        cname: 
         user_name: 'github-actions[bot]'
         user_email: 'github-actions[bot]@users.noreply.github.com'
         commit_message: 'Deploy Flutter web to GitHub Pages'
