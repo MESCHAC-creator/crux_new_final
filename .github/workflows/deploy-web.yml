@@ -1,8 +1,8 @@
 name: Deploy Flutter Web to GitHub Pages
 
 on:
-  push:
-    branches: [ main, master, schac ]
+ :
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -24,14 +24,14 @@ jobs:
       run: flutter pub get
 
     - name: Build web app
-      run: flutter build web --release --dart-define=LIVEKIT_WSS_URL="wss://crux-88fihb12.livekit.cloud" --dart-define=LIVEKIT_TOKEN_SERVER_URL="https://crux-6l6num.sandbox.livekit.io" --dart-define=FIREBASE_PROJECT_ID="crux-3c6be"
+      run: flutter build web --release --dart-define=LIVEKIT_WSS_URL="wss://crux-88fihb12.livekit.cloud" --dart-=LIVEKIT_TOKEN_SERVER_URL="https://crux-6l6num.sandbox.livekit.io" --dart-define=FIREBASE_PROJECT_ID="crux-3c6be"
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./build/web
-        publish_branch: schac
-        user_name: 'schac-hub'
-        user_email: 'kouakouchristevann@gmail.com'
+        publish_branch: gh-pages
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
         commit_message: 'Deploy Flutter web to GitHub Pages'
