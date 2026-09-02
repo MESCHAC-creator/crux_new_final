@@ -39,9 +39,10 @@ service cloud.firestore {
       allow create: if isSignedIn()
                     && request.resource.data.organizerId == request.auth.uid
                     && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
                     && request.resource.data.title.size() <= 100
-                    && request.resource.data.participants.hasAll([request.auth.uid])
-                    && request.resource.data.participants.size() == 1;
+                    && request.resource.data.participants is list
+                    && request.resource.data.participants.hasAny([request.auth.uid]);
                     
       // Host and co-hosts can update meeting settings; non-hosts can ONLY modify their own membership in participants list
       allow update: if isSignedIn()
@@ -61,7 +62,7 @@ service cloud.firestore {
                          ||
                          // User removes themselves
                          (resource.data.participants.hasAll(request.resource.data.participants)
-                          && resource.data.participants.size() == resource.data.participants.size() - 1
+                          && resource.data.participants.size() == request.resource.data.participants.size() + 1
                           && resource.data.participants.hasAny([request.auth.uid]))
                        ))
                     );
@@ -152,11 +153,12 @@ service cloud.firestore {
       allow create: if isSignedIn()
                     && request.resource.data.organizerId == request.auth.uid
                     && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
                     && request.resource.data.title.size() <= 100
                     && request.resource.data.scheduledStart is timestamp
                     && request.resource.data.scheduledEnd is timestamp
-                    && request.resource.data.participants.hasAll([request.auth.uid])
-                    && request.resource.data.participants.size() == 1;
+                    && request.resource.data.participants is list
+                    && request.resource.data.participants.hasAny([request.auth.uid]);
                     
       // Organizer and co-hosts can update settings; participants can only join/leave
       allow update: if isSignedIn()
@@ -209,8 +211,6 @@ service cloud.firestore {
       // Any authenticated user can read profiles (needed for names/photos in calls)
       allow read: if isSignedIn();
       // Users can only update their own profile, with "isPro" promotion strictly locked
-      // Note: parens around `'key' in map` are required — negation has higher
-      // precedence than `in` operator in Firestore Rules.
       allow write: if isSignedIn() && request.auth.uid == userId
                    && (!('isPro' in request.resource.data) || request.resource.data.isPro == resource.data.get('isPro', false));
     }
