@@ -1,12 +1,6 @@
 {
   "buildCommand": "bash build-web.sh",
   "outputDirectory": "build/web",
-  "env": {
-    "LIVEKIT_WSS_URL": "@livekit_wss_url",
-    "LIVEKIT_TOKEN_SERVER_URL": "@livekit_token_server_url",
-    "FIREBASE_PROJECT_ID": "@firebase_project_id",
-    "APP_BASE_URL": "@app_base_url"
-  },
   "rewrites": [
     {
       "source": "/(.*)",
