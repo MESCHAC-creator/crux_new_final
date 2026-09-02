@@ -1,6 +1,11 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "bash build.sh",
+  "buildCommand": "bash build-web.sh",
   "outputDirectory": "build/web",
-  "cleanUrls": true
+  "nodeVersion": "20.x",
+  "env": {
+    "LIVEKIT_WSS_URL": "wss://crux-88fihb12.livekit.cloud",
+    "LIVEKIT_TOKEN_SERVER_URL": "https://crux-6l6num.sandbox.livekit.io",
+    "FIREBASE_PROJECT_ID": "crux-3c6be",
+    "APP_BASE_URL": "@app_base_url"
+  }
 }
