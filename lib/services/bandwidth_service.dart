@@ -1,10 +1,25 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
-import '../config/logger.dart';
-import '../models/video_quality.dart';
+import 'package:logger/logger.dart';
+
+/// Niveaux de qualité vidéo pour CRUX
+enum CruxVideoQuality {
+  low(360, 15, 0.3),
+  medium(480, 24, 0.5),
+  high(720, 30, 1.5),
+  hd(1080, 30, 3.0),
+  fullHd(1080, 60, 5.0);
+
+  final int resolution;
+  final int frameRate;
+  final double estimatedBandwidth;
+
+  const CruxVideoQuality(this.resolution, this.frameRate, this.estimatedBandwidth);
+}
 
 class BandwidthService {
   static final BandwidthService _instance = BandwidthService._internal();
+
+  final Logger _logger = Logger();
 
   factory BandwidthService() => _instance;
   BandwidthService._internal();
@@ -16,11 +31,6 @@ class BandwidthService {
   double _estimatedBandwidth = 5.0;
   Timer? _bandwidthMonitor;
   final Duration _bandwidthCheckInterval = const Duration(seconds: 5);
-
-  int? _prevBytesReceived;
-  DateTime? _prevMeasureTime;
-  int? _prevPacketsReceived;
-  int? _prevPacketsLost;
 
   Function(CruxVideoQuality)? _onQualityChanged;
   Function(double)? _onBandwidthUpdate;
@@ -41,7 +51,7 @@ class BandwidthService {
     await _loadPreferences();
     _startBandwidthMonitoring();
 
-    crux.logger.i('BandwidthService initialized - Data Saver: $_dataSaverMode, '
+    _logger.i('BandwidthService initialized - Data Saver: $_dataSaverMode, '
         'Auto Quality: $_autoQualityAdjustment');
   }
 
@@ -52,7 +62,7 @@ class BandwidthService {
 
     if (enabled) {
       setVideoQuality(CruxVideoQuality.low);
-      crux.logger.i('Data Saver mode enabled');
+      _logger.i('Data Saver mode enabled');
     }
   }
 
@@ -63,16 +73,16 @@ class BandwidthService {
 
     if (enabled) {
       _adjustQualityBasedOnBandwidth();
-      crux.logger.i('Auto quality adjustment enabled');
+      _logger.i('Auto quality adjustment enabled');
     } else {
-      crux.logger.i('Auto quality adjustment disabled');
+      _logger.i('Auto quality adjustment disabled');
     }
   }
 
   /// Définit manuellement la qualité vidéo
   void setVideoQuality(CruxVideoQuality quality) {
     if (_dataSaverMode && quality != CruxVideoQuality.low) {
-      crux.logger.w('Cannot set high quality in data saver mode');
+      _logger.w('Cannot set high quality in data saver mode');
       return;
     }
 
@@ -102,8 +112,6 @@ class BandwidthService {
     // ── Estimation simulée basée sur le temps écoulé ──
     // (Remplacement du WebRTC PeerConnection qui n'est plus accessible)
     try {
-      final now = DateTime.now();
-
       // Simulation d'une variation de bande passante réaliste
       // Entre 1 Mbps et 10 Mbps avec légères fluctuations
       measured = 3.0 + (DateTime.now().millisecondsSinceEpoch % 5000) / 1000;
@@ -118,7 +126,7 @@ class BandwidthService {
       _estimatedBandwidth = measured;
       _onBandwidthUpdate?.call(_estimatedBandwidth);
 
-      crux.logger.i(
+      _logger.i(
           'Bandwidth: ${_estimatedBandwidth.toStringAsFixed(2)} Mbps | '
           'Loss: ${packetLoss.toStringAsFixed(2)}% | RTT: ${rttMs.toStringAsFixed(0)}ms');
 
@@ -126,7 +134,7 @@ class BandwidthService {
         _adjustQualityBasedOnBandwidth();
       }
     } catch (e) {
-      crux.logger.e('Bandwidth estimation error: $e');
+      _logger.e('Bandwidth estimation error: $e');
     }
   }
 
@@ -148,7 +156,7 @@ class BandwidthService {
   /// Applique le changement de qualité
   void _applyQualityChange() {
     _onQualityChanged?.call(_targetVideoQuality);
-    crux.logger.i('Video quality changed to: $_targetVideoQuality');
+    _logger.i('Video quality changed to: $_targetVideoQuality');
   }
 
   /// Charge les préférences

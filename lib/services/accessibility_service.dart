@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
-import '../config/logger.dart';
+import 'package:logger/logger.dart';
 
 /// Service de gestion de l'accessibilité
 class AccessibilityService {
   static final AccessibilityService _instance = AccessibilityService._internal();
+
+  final Logger _logger = Logger();
 
   factory AccessibilityService() => _instance;
   AccessibilityService._internal();
@@ -24,28 +26,28 @@ class AccessibilityService {
       _reducedMotion = false;
       _screenReaderEnabled = false;
 
-      crux.logger.i('AccessibilityService initialized');
+      _logger.i('AccessibilityService initialized');
     } catch (e) {
-      crux.logger.e('Failed to initialize accessibility: $e');
+      _logger.e('Failed to initialize accessibility: $e');
     }
   }
 
   /// Active/désactive le mode contraste élevé
   void setHighContrastMode(bool enabled) {
     _highContrastMode = enabled;
-    crux.logger.i('High contrast mode: $_highContrastMode');
+    _logger.i('High contrast mode: $_highContrastMode');
   }
 
   /// Active/désactive le mouvement réduit
   void setReducedMotion(bool enabled) {
     _reducedMotion = enabled;
-    crux.logger.i('Reduced motion: $_reducedMotion');
+    _logger.i('Reduced motion: $_reducedMotion');
   }
 
   /// Active/désactive le lecteur d'écran
   void setScreenReaderEnabled(bool enabled) {
     _screenReaderEnabled = enabled;
-    crux.logger.i('Screen reader enabled: $_screenReaderEnabled');
+    _logger.i('Screen reader enabled: $_screenReaderEnabled');
   }
 
   /// Obtient les paramètres d'accessibilité du système
