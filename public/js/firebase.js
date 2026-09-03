@@ -57,7 +57,7 @@ export function requireAuth(auth, onUser) {
     const unsub = auth.onAuthStateChanged(user => {
       unsub();
       if (!user || user.isAnonymous) {
-        window.location.href = '../login/?next=' + encodeURIComponent(location.pathname + location.search);
+        window.location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search);
       } else {
         if (onUser) onUser(user);
         resolve(user);
