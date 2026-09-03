@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/error_handler_service.dart';
 import '../providers/locale_provider.dart';
+import '../providers/auth_provider.dart';
 import '../l10n/app_translations.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -75,13 +76,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final user = await _authService.signUp(
+      final success = await Provider.of<CruxAuthProvider>(context, listen: false).signUp(
         email: email,
         password: pass,
         name: name,
       );
-      if (mounted && user != null) {
-        Navigator.of(context).pushReplacementNamed('/home', arguments: user);
+      if (mounted && success) {
+        // Navigation handled by AuthWrapper in main.dart
       }
     } catch (e) {
       if (!mounted) return;

@@ -66,6 +66,11 @@ class AuthService {
       final userCredential = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Délai de connexion dépassé. Vérifiez votre connexion internet.');
+        },
       );
 
       final user = userCredential.user;
@@ -91,7 +96,12 @@ class AuthService {
     try {
       _logger.i('🔑 Google Sign In...');
 
-      final googleUser = await _googleSignIn.signIn();
+      final googleUser = await _googleSignIn.signIn().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Délai Google Sign-In dépassé. Vérifiez votre connexion internet.');
+        },
+      );
       if (googleUser == null) {
         _logger.w('⚠️ Google sign in cancelled');
         return null;
@@ -103,7 +113,12 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _auth.signInWithCredential(credential);
+      final userCredential = await _auth.signInWithCredential(credential).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Délai authentification dépassé. Vérifiez votre connexion internet.');
+        },
+      );
       final user = userCredential.user;
 
       if (user == null) throw Exception('Google sign in failed');

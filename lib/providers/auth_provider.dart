@@ -83,8 +83,10 @@ class CruxAuthProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       }
+      _setError('Utilisateur non trouvé');
       return false;
     } catch (e) {
+      _logger.e('❌ Erreur connexion: $e');
       _setError('Erreur connexion: $e');
       return false;
     } finally {
@@ -117,6 +119,27 @@ class CruxAuthProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _setError('Erreur réinitialisation: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> signInWithGoogle() async {
+    try {
+      _setLoading(true);
+      _clearError();
+      final user = await _authService.signInWithGoogle();
+      if (user != null) {
+        _currentUser = user;
+        _isLoggedIn = true;
+        _logger.i('✅ Connexion Google réussie');
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _setError('Erreur connexion Google: $e');
       return false;
     } finally {
       _setLoading(false);

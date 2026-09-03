@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,7 +12,7 @@ import 'package:app_links/app_links.dart';
 import 'utils/logger.dart' as crux;
 import 'services/notification_service.dart';
 import 'firebase_options.dart';
-import 'screens/splash_screen.dart';
+import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/consent_screen.dart';
 import 'screens/guest_join_screen.dart';
@@ -157,9 +156,8 @@ class _ErrorApp extends StatelessWidget {
                   children: [
                     ElevatedButton.icon(
                       onPressed: () {
-                        if (Platform.isAndroid) {
-                          SystemNavigator.pop();
-                        }
+                        // SystemNavigator.pop() not supported on web
+                        // On web, this button is hidden or does nothing
                       },
                       icon: const Icon(Icons.close, size: 18),
                       label: const Text('Quitter'),
@@ -387,7 +385,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
 
         final user = snapshot.data;
-        if (user == null) return const SplashScreen();
+        if (user == null) return const LoginScreen();
 
         final userModel = UserModel(
           uid: user.uid,

@@ -73,33 +73,16 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
     });
 
     try {
-      // Try to create meeting via backend API first
-      final backendService = BackendApiService();
-      String meetingId;
-      
-      try {
-        final meetingData = await backendService.createMeeting(
-          title: title,
-          description: '',
-          organizerName: _displayName(),
-          passcode: passcode.isNotEmpty ? passcode : null,
-          isLargeConference: widget.largeConference,
-        );
-        meetingId = meetingData['id'];
-        logger.i('✅ Réunion créée via backend: $meetingId');
-      } catch (e) {
-        logger.w('Backend creation failed, falling back to direct Firestore', error: e);
-        // Fallback to direct Firestore if backend fails
-        meetingId = await MeetingService().createMeeting(
-          title: title,
-          description: '',
-          organizerName: _displayName(),
-          organizerId: current.uid,
-          passcode: passcode.isNotEmpty ? passcode : null,
-          isLargeConference: widget.largeConference,
-        );
-        logger.i('✅ Réunion créée via direct Firestore: $meetingId');
-      }
+      // Create meeting directly via Firestore (backend removed to avoid failures)
+      final meetingId = await MeetingService().createMeeting(
+        title: title,
+        description: '',
+        organizerName: _displayName(),
+        organizerId: current.uid,
+        passcode: passcode.isNotEmpty ? passcode : null,
+        isLargeConference: widget.largeConference,
+      );
+      logger.i('✅ Réunion créée via direct Firestore: $meetingId');
 
       if (!mounted) return;
 

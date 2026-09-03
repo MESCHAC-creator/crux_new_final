@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../theme/colors.dart';
 import '../services/auth_service.dart';
 import '../utils/logger.dart';
+import '../providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -57,10 +59,13 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() { _loading = true; _error = null; });
 
     try {
-      await AuthService().signIn(
+      final success = await Provider.of<CruxAuthProvider>(context, listen: false).signIn(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
       );
+      if (!success && mounted) {
+        _shakeError('Erreur de connexion. Vérifiez vos identifiants.');
+      }
       // Navigation managed by AuthWrapper in main.dart
     } on FirebaseAuthException catch (e) {
       if (mounted) _shakeError(_friendlyAuthError(e.code));
@@ -75,12 +80,17 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _signInWithGoogle() async {
     setState(() { _loading = true; _error = null; });
     try {
-      await AuthService().signInWithGoogle();
+      final success = await Provider.of<CruxAuthProvider>(context, listen: false).signInWithGoogle();
+      if (!success && mounted) {
+        _shakeError('Connexion Google annulée');
+        return;
+      }
+      // Navigation managed by AuthWrapper in main.dart
     } on FirebaseAuthException catch (e) {
       if (mounted) _shakeError(_friendlyAuthError(e.code));
     } catch (e) {
       logger.e('Google sign-in error: $e');
-      if (mounted) _shakeError('Connexion Google annulée ou échouée');
+      if (mounted) _shakeError('Connexion Google échouée: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -112,13 +122,26 @@ class _LoginScreenState extends State<LoginScreen>
       case 'user-not-found':
         return 'Utilisateur non trouvé';
       case 'wrong-password':
+      case 'invalid-credential':
+      case 'INVALID_LOGIN_CREDENTIALS':
         return 'Mot de passe incorrect';
       case 'user-disabled':
         return 'Compte désactivé';
       case 'too-many-requests':
         return 'Trop de tentatives. Réessayez plus tard';
+      case 'network-request-failed':
+        return 'Erreur réseau. Vérifiez votre connexion';
+      case 'popup-closed-by-user':
+      case 'cancelled-popup-request':
+        return 'Connexion annulée';
+      case 'account-exists-with-different-credential':
+        return 'Compte existe déjà avec une autre méthode';
+      case 'invalid-email':
+        return 'Email invalide';
+      case 'operation-not-allowed':
+        return 'Méthode de connexion non activée';
       default:
-        return 'Erreur d\'authentification';
+        return 'Erreur d\'authentification: $code';
     }
   }
 
