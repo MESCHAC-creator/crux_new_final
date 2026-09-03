@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
 import '../services/meeting_service.dart';
-import '../services/backend_api_service.dart';
 import '../utils/logger.dart';
 import '../widgets/custom_button.dart';
 import 'meeting_screen.dart';
