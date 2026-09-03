@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 
 import '../models/user_model.dart';
@@ -91,6 +92,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final code = _codeCtrl.text.trim().toUpperCase();
     if (code.isEmpty) {
       _snack('Veuillez entrer un code de réunion');
+      return;
+    }
+
+    // Validate XXX-XXX-XXX format
+    if (!RegExp(r'^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}$').hasMatch(code)) {
+      _snack('Format invalide. Utilisez XXX-XXX-XXX');
       return;
     }
     
@@ -465,27 +472,30 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              gradient: AppColors.primaryGradient,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.video_call_rounded,
-                              color: Colors.white,
-                              size: 16,
+                          // Open App Button
+                          InkWell(
+                            onTap: _openNativeApp,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                gradient: AppColors.primaryGradient,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.launch_rounded,
+                                color: Colors.white,
+                                size: 16,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           const Text(
-                            'CRUX',
+                            'Ouvrir app',
                             style: TextStyle(
                               color: AppColors.textTertiary,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.6,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
@@ -516,37 +526,63 @@ class _HomeScreenState extends State<HomeScreen> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-          child: NavigationBar(
-            selectedIndex: _selectedNav,
-            onDestinationSelected: _handleNavigation,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            height: 64,
-            indicatorColor: AppColors.primary.withValues(alpha: 0.15),
-            indicatorShape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined, size: 24),
-                selectedIcon: Icon(Icons.home_rounded, size: 26),
-                label: 'Accueil',
+          child: Row(
+            children: [
+              Expanded(
+                child: NavigationBar(
+                  selectedIndex: _selectedNav,
+                  onDestinationSelected: _handleNavigation,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  height: 64,
+                  indicatorColor: AppColors.primary.withValues(alpha: 0.15),
+                  indicatorShape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.home_outlined, size: 24),
+                      selectedIcon: Icon(Icons.home_rounded, size: 26),
+                      label: 'Accueil',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.event_outlined, size: 24),
+                      selectedIcon: Icon(Icons.event_rounded, size: 26),
+                      label: 'Réunions',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.settings_outlined, size: 24),
+                      selectedIcon: Icon(Icons.settings_rounded, size: 26),
+                      label: 'Paramètres',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.person_outline, size: 24),
+                      selectedIcon: Icon(Icons.person_rounded, size: 26),
+                      label: 'Profil',
+                    ),
+                  ],
+                ),
               ),
-              NavigationDestination(
-                icon: Icon(Icons.event_outlined, size: 24),
-                selectedIcon: Icon(Icons.event_rounded, size: 26),
-                label: 'Réunions',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.settings_outlined, size: 24),
-                selectedIcon: Icon(Icons.settings_rounded, size: 26),
-                label: 'Paramètres',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline, size: 24),
-                selectedIcon: Icon(Icons.person_rounded, size: 26),
-                label: 'Profil',
+              // Open App Button in bottom nav
+              Padding(
+                padding: const EdgeInsets.only(right: 8, bottom: 8),
+                child: InkWell(
+                  onTap: _openNativeApp,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.launch_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -697,6 +733,55 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
+      child: Row(
+        children: [
+          const Icon(Icons.video_call_rounded, color: AppColors.textTertiary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: _codeCtrl,
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+              decoration: const InputDecoration(
+                hintText: 'Code de réunion',
+                hintStyle: TextStyle(color: AppColors.textTertiary, fontSize: 14),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 12),
+              ),
+              textCapitalization: TextCapitalization.characters,
+              onSubmitted: (_) => _joinByCode(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: _joinByCode,
+            icon: const Icon(Icons.arrow_forward_rounded, color: AppColors.primary),
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+              padding: const EdgeInsets.all(8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openNativeApp() async {
+    // Deep link to open the native app
+    // This uses a custom URL scheme that the native app should handle
+    const appScheme = 'crux://';
+    
+    try {
+      final uri = Uri.parse(appScheme);
+      
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        _snack('Application CRUX non installée sur cet appareil');
+      }
+    } catch (e) {
+      _snack('Impossible d\'ouvrir l\'application');
+    }
+  }
       child: Row(
         children: [
           Expanded(

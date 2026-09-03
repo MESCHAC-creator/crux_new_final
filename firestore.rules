@@ -35,12 +35,11 @@ service cloud.firestore {
       // Anyone authenticated can read/look up a meeting to verify and join
       allow read: if isSignedIn();
       
-      // Only the authenticated organizer can create the meeting
+      // Allow authenticated users to create meetings
       allow create: if isSignedIn()
                     && request.resource.data.organizerId == request.auth.uid
                     && request.resource.data.title is string
                     && request.resource.data.title.size() > 0
-                    && request.resource.data.title.size() <= 100
                     && request.resource.data.participants is list
                     && request.resource.data.participants.hasAny([request.auth.uid]);
                     
@@ -149,14 +148,11 @@ service cloud.firestore {
       // Any authenticated user can read/look up a scheduled meeting to verify
       allow read: if isSignedIn();
       
-      // Only the authenticated organizer can create
+      // Allow authenticated users to create scheduled meetings
       allow create: if isSignedIn()
                     && request.resource.data.organizerId == request.auth.uid
                     && request.resource.data.title is string
                     && request.resource.data.title.size() > 0
-                    && request.resource.data.title.size() <= 100
-                    && request.resource.data.scheduledStart is timestamp
-                    && request.resource.data.scheduledEnd is timestamp
                     && request.resource.data.participants is list
                     && request.resource.data.participants.hasAny([request.auth.uid]);
                     

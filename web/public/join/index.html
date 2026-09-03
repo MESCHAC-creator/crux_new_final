@@ -252,6 +252,11 @@ function getMeetingIdFromPath() {
   if (segs.length >= 2 && segs[0] === 'join') return segs[1].toUpperCase();
   return (new URLSearchParams(location.search).get('id') || '').toUpperCase();
 }
+
+function validateMeetingCode(code) {
+  // Validate XXX-XXX-XXX format
+  return /^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}$/.test(code);
+}
 function showErr(msg) {
   const el = document.getElementById('lobbyErr');
   el.textContent = msg; el.style.display = 'block';
@@ -263,6 +268,12 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 async function init() {
   meetingId = getMeetingIdFromPath();
   if (!meetingId) { showNotFound(); return; }
+  
+  // Validate meeting code format
+  if (!validateMeetingCode(meetingId)) {
+    showErr('Format de code invalide. Utilisez le format XXX-XXX-XXX');
+    return;
+  }
 
   document.getElementById('meetingCode').textContent = 'Code : ' + meetingId;
   document.getElementById('appLink').dataset.meetingId = meetingId;

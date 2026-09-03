@@ -179,8 +179,8 @@ function validateMeetingCode(code) {
   }
   
   const upperCode = code.toUpperCase();
-  if (!/^[A-Z0-9]{8}$/.test(upperCode)) {
-    errors.push('Meeting code must be 8 alphanumeric characters');
+  if (!/^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}$/.test(upperCode)) {
+    errors.push('Meeting code must be in format XXX-XXX-XXX');
   }
   
   return errors;
@@ -306,14 +306,20 @@ app.get('/ping', (req, res) => {
 // Meeting Management Endpoints
 // ============================================================
 
-// Generate a random meeting code (8 characters, uppercase)
+// Generate a random meeting code (XXX-XXX-XXX format)
 function generateMeetingCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = '';
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  const timestamp = Date.now();
+  
+  function generateSegment(offset) {
+    let segment = '';
+    for (let i = 0; i < 3; i++) {
+      segment += chars.charAt(((timestamp + offset + i * 17) * (i + 1)) % chars.length);
+    }
+    return segment;
   }
-  return code;
+  
+  return `${generateSegment(0)}-${generateSegment(100)}-${generateSegment(200)}`;
 }
 
 // Generate a random meeting ID (12 characters, uppercase)

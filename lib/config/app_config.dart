@@ -42,7 +42,7 @@ class AppConfig {
     'LIVEKIT_TOKEN_SERVER_URL',
     defaultValue: String.fromEnvironment(
       'LIVEKIT_TOKEN_ENDPOINT',
-      defaultValue: '',
+      defaultValue: 'https://crux-new-final.onrender.com',
     ),
   );
 

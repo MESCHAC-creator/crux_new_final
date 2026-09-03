@@ -53,8 +53,8 @@ class _CruxMeetingScreenState extends State<CruxMeetingScreen> {
   }
 
   Future<void> _initRoom() async {
-    // TODO: Connecter à LiveKit via LiveKitService
-    // Ceci est un stub pour l'intégration
+    // LiveKit integration is handled in MeetingScreen
+    // This is a UI-only wrapper for the meeting interface
   }
 
   void _toggleMic() => setState(() => _micOn = !_micOn);

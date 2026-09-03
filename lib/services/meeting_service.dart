@@ -47,11 +47,19 @@ class MeetingService {
   }
 
   String _generateMeetingCode() {
-    return const Uuid()
-        .v4()
-        .replaceAll('-', '')
-        .substring(0, 8)
-        .toUpperCase();
+    // Generate XXX-XXX-XXX format (9 characters with dashes)
+    final chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final random = DateTime.now().millisecondsSinceEpoch;
+    
+    String generateSegment(int offset) {
+      String segment = '';
+      for (int i = 0; i < 3; i++) {
+        segment += chars[((random + offset + i * 17) * (i + 1)) % chars.length];
+      }
+      return segment;
+    }
+    
+    return '${generateSegment(0)}-${generateSegment(100)}-${generateSegment(200)}';
   }
 
   String _enumValue(Object value) {

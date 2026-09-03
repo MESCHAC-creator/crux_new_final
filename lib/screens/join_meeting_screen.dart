@@ -48,6 +48,12 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
       return;
     }
 
+    // Validate XXX-XXX-XXX format
+    if (!RegExp(r'^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}$').hasMatch(code)) {
+      setState(() => _error = 'Format invalide. Utilisez XXX-XXX-XXX');
+      return;
+    }
+
     final current = FirebaseAuth.instance.currentUser;
     if (current == null) {
       setState(() => _error = 'Session expirée, reconnecte-toi');
