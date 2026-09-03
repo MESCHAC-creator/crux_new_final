@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../services/auth_service.dart';
 import '../services/error_handler_service.dart';
 import '../providers/locale_provider.dart';
 import '../providers/auth_provider.dart';
@@ -19,7 +18,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _authService = AuthService();
   final _errorHandler = ErrorHandlerService();
 
   bool _isLoading = false;
