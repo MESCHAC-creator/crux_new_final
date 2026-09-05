@@ -1359,7 +1359,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         userId: widget.userId,
         title: widget.meetingName,
         durationSeconds: _secondsElapsed,
-        endMeeting: widget.isHost,
+        endMeeting: false,
       );
 
       await MeetingService().removePresence(
