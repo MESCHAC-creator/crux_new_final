@@ -28,6 +28,16 @@
     .join-quick button:hover{background:#c0392b;transform:translateY(-1px)}
     .join-quick button:active{transform:translateY(0)}
     
+    .app-open-section{margin-top:32px;padding:20px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;text-align:center}
+    .app-open-section h3{font-size:14px;font-weight:600;margin-bottom:8px;color:rgba(255,255,255,0.9)}
+    .app-open-section p{font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:12px}
+    .app-open-btn{background:linear-gradient(135deg,#9B59B6,#E74C3C);border:none;border-radius:12px;padding:12px 24px;color:#fff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;white-space:nowrap;transition:all 0.2s;display:inline-flex;align-items:center;gap:8px;font-size:14px}
+    .app-open-btn:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(155,89,182,0.3)}
+    .app-open-btn:active{transform:translateY(0)}
+    .app-open-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+    .app-open-btn .icon{font-size:16px}
+    .app-status{font-size:11px;color:rgba(255,255,255,0.4);margin-top:8px}
+    
     @media (max-width: 640px) {
       .hero h1{font-size:28px}
       .features{grid-template-columns:1fr}
@@ -58,7 +68,7 @@
       <a href="/login" class="btn btn-outline" style="text-decoration:none;width:auto;padding:14px 32px">Se connecter</a>
     </div>
     <div class="join-quick">
-      <input type="text" id="codeIn" placeholder="Code de réunion" maxlength="8" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')quickJoin()"/>
+      <input type="text" id="codeIn" placeholder="XXX-XXX-XXX" maxlength="11" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')quickJoin()"/>
       <button onclick="quickJoin()">Rejoindre</button>
     </div>
   </div>
@@ -70,6 +80,16 @@
     <div class="feature"><div class="icon">🔒</div><h3>Codes d'accès</h3><p>Salles sécurisées par PIN</p></div>
     <div class="feature"><div class="icon">📅</div><h3>Planification</h3><p>Programmez vos réunions à l'avance</p></div>
     <div class="feature"><div class="icon">📱</div><h3>Multiplateforme</h3><p>Web, Android et bientôt iOS</p></div>
+  </div>
+  
+  <div class="app-open-section">
+    <h3>📱 Ouvrir l'application</h3>
+    <p>Lancez l'application CRUX installée sur votre appareil</p>
+    <button id="openAppBtn" class="app-open-btn" onclick="openNativeApp()">
+      <span class="icon">🚀</span>
+      <span id="appBtnText">Ouvrir l'app</span>
+    </button>
+    <div id="appStatus" class="app-status"></div>
   </div>
 </div>
 
@@ -89,7 +109,11 @@
 
   window.quickJoin = function() {
     const code = document.getElementById('codeIn').value.trim().toUpperCase();
-    if (code.length < 6) { import('/js/firebase.js').then(m => m.toast('Entrez un code valide')); return; }
+    // Validate XXX-XXX-XXX format
+    if (!/^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}$/.test(code)) { 
+      import('/js/firebase.js').then(m => m.toast('Format: XXX-XXX-XXX')); 
+      return; 
+    }
     window.location.href = '/join/' + code;
   };
   
@@ -98,6 +122,69 @@
     if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
       e.preventDefault();
       document.getElementById('codeIn').focus();
+    }
+  });
+  
+  // Native app detection and deep linking
+  window.openNativeApp = function() {
+    const appBtn = document.getElementById('openAppBtn');
+    const appBtnText = document.getElementById('appBtnText');
+    const appStatus = document.getElementById('appStatus');
+    
+    // iOS deep link scheme
+    const iosScheme = 'crux://';
+    // Android intent
+    const androidIntent = 'intent://crux.app/#Intent;scheme=crux;package=com.crux.app;end';
+    // Fallback web URL
+    const fallbackUrl = window.location.href;
+    
+    // Detect mobile device
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isAndroid = /Android/.test(navigator.userAgent);
+    
+    if (isIOS) {
+      // Try to open iOS app
+      const start = Date.now();
+      window.location.href = iosScheme;
+      
+      // Check if app opened (with timeout)
+      setTimeout(function() {
+        if (Date.now() - start < 2000) {
+          // App didn't open, show message
+          appBtn.disabled = true;
+          appBtnText.textContent = 'App non installée';
+          appStatus.textContent = 'L\'application CRUX n\'est pas installée sur cet appareil';
+        }
+      }, 1000);
+      
+    } else if (isAndroid) {
+      // Try to open Android app
+      window.location.href = androidIntent;
+      
+      // Check if app opened
+      setTimeout(function() {
+        appBtn.disabled = true;
+        appBtnText.textContent = 'App non installée';
+        appStatus.textContent = 'L\'application CRUX n\'est pas installée sur cet appareil';
+      }, 1000);
+      
+    } else {
+      // Desktop - show message
+      appBtn.disabled = true;
+      appBtnText.textContent = 'Non disponible';
+      appStatus.textContent = 'Fonctionnalité disponible uniquement sur mobile';
+    }
+  };
+  
+  // Check app availability on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    const isMobile = /iPad|iPhone|iPod|Android/.test(navigator.userAgent) && !window.MSStream;
+    const appBtn = document.getElementById('openAppBtn');
+    
+    if (!isMobile) {
+      appBtn.disabled = true;
+      document.getElementById('appBtnText').textContent = 'Non disponible';
+      document.getElementById('appStatus').textContent = 'Fonctionnalité disponible uniquement sur mobile';
     }
   });
 </script>

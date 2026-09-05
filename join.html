@@ -200,9 +200,9 @@
                 <input 
                     type="text" 
                     id="meetingCode" 
-                    placeholder="Ex: ABCDEFGH" 
-                    maxlength="8"
-                    pattern="[A-Z0-9]{8}"
+                    placeholder="Ex: ABC-123-XYZ" 
+                    maxlength="11"
+                    pattern="[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}"
                     uppercase
                 >
             </div>
@@ -261,7 +261,7 @@
         }
 
         function joinMeeting() {
-            const meetingCode = document.getElementById('meetingCode').value.trim();
+            const meetingCode = document.getElementById('meetingCode').value.trim().toUpperCase();
             const userName = document.getElementById('userName').value.trim();
 
             if (!meetingCode) {
@@ -269,8 +269,9 @@
                 return;
             }
 
-            if (meetingCode.length !== 8) {
-                showError('Le code doit contenir 8 caractères');
+            // Validate XXX-XXX-XXX format
+            if (!/^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}$/.test(meetingCode)) {
+                showError('Format invalide. Utilisez XXX-XXX-XXX');
                 return;
             }
 
