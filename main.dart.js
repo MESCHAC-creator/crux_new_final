@@ -59731,21 +59731,23 @@ break
 case 6:case 1:return A.j(q,r)
 case 2:return A.i(o.at(-1),r)}})
 return A.k($async$wN,r)},
-oX(a){var s=0,r=A.l(t.H),q,p=2,o=[],n=[],m=this,l,k,j,i,h,g,f,e,d
+oX(a){var s=0,r=A.l(t.H),q,p=2,o=[],n=[],m=this,l,k,j,i,h,g,f,e
 var $async$oX=A.h(function(b,c){if(b===1){o.push(c)
 s=p}while(true)switch(s){case 0:if(m.x){s=1
-break}i=m.x=!0
+break}m.x=!0
 p=3
-if(!(B.c.ci("wss://crux-88fihb12.livekit.cloud","wss://")&&B.c.ci("https://crux-6l6num.sandbox.livekit.io","http"))){i=A.cs("LiveKit n\u2019est pas configur\xe9. V\xe9rifiez LIVEKIT_WSS_URL et LIVEKIT_TOKEN_SERVER_URL.")
-throw A.d(i)}h=$.bzv()
-g=m.a
-f=g.c
-e=g.e
-d=g.f
+if(B.c.ci("wss://crux-88fihb12.livekit.cloud","wss://"))i=B.c.ci("https://crux-6l6num.sandbox.livekit.io","http")
+else i=!1
+if(!i){i=A.cs("LiveKit n\u2019est pas configur\xe9. V\xe9rifiez LIVEKIT_WSS_URL et LIVEKIT_TOKEN_SERVER_URL.")
+throw A.d(i)}i=$.bzv()
+h=m.a
+g=h.c
+f=h.e
+e=h.f
 s=6
-return A.c(h.n9(e,g.w,d,f),$async$oX)
+return A.c(i.n9(f,h.w,e,g),$async$oX)
 case 6:l=c
-if(l!=null?l.length===0:i){i=A.cs("Le serveur LiveKit n\u2019a pas retourn\xe9 de token valide.")
+if(l==null||l.length===0){i=A.cs("Le serveur LiveKit n\u2019a pas retourn\xe9 de token valide.")
 throw A.d(i)}s=7
 return A.c(m.Aq(),$async$oX)
 case 7:k=A.bLW(B.akN)
