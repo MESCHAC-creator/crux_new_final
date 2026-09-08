@@ -67,38 +67,48 @@ class KeyboardShortcutsService {
     // Raccourcis principaux (inspirés de Zoom/Google Meet)
 
     // Micro : Ctrl/Cmd + D
-    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyD, control: true)] = _onToggleMic ?? () {};
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyD, control: true)] =
+        _onToggleMic ?? () {};
 
     // Caméra : Ctrl/Cmd + E
-    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyE, control: true)] = _onToggleCamera ?? () {};
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyE, control: true)] =
+        _onToggleCamera ?? () {};
 
     // Partage d'écran : Ctrl/Cmd + S
-    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyS, control: true)] = _onToggleScreenShare ?? () {};
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyS, control: true)] =
+        _onToggleScreenShare ?? () {};
 
     // Lever la main : Ctrl/Cmd + H
-    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyH, control: true)] = _onToggleHandRaise ?? () {};
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyH, control: true)] =
+        _onToggleHandRaise ?? () {};
 
     // Chat : Ctrl/Cmd + C
-    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyC, control: true)] = _onToggleChat ?? () {};
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyC, control: true)] =
+        _onToggleChat ?? () {};
 
     // Participants : Ctrl/Cmd + P
-    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyP, control: true)] = _onToggleParticipants ?? () {};
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyP, control: true)] =
+        _onToggleParticipants ?? () {};
 
     // Réactions : Ctrl/Cmd + R
-    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyR, control: true)] = _onToggleReactions ?? () {};
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyR, control: true)] =
+        _onToggleReactions ?? () {};
 
     // Plein écran : Ctrl/Cmd + F
-    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyF, control: true)] = _onToggleFullscreen ?? () {};
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyF, control: true)] =
+        _onToggleFullscreen ?? () {};
 
     // Quitter : Alt + Q
-    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyQ, alt: true)] = _onLeaveMeeting ?? () {};
+    _shortcuts[const SingleActivator(LogicalKeyboardKey.keyQ, alt: true)] =
+        _onLeaveMeeting ?? () {};
 
     // Couper le micro de tous (hôte uniquement) : Ctrl/Cmd + Shift + M
     _shortcuts[const SingleActivator(
-      LogicalKeyboardKey.keyM,
-      control: true,
-      shift: true
-    )] = _onMuteAll ?? () {};
+          LogicalKeyboardKey.keyM,
+          control: true,
+          shift: true,
+        )] =
+        _onMuteAll ?? () {};
   }
 
   /// Active/désactive les raccourcis clavier
@@ -209,10 +219,7 @@ class KeyboardShortcutsService {
         }
         return KeyEventResult.ignored;
       },
-      child: CallbackShortcuts(
-        bindings: _shortcuts,
-        child: child,
-      ),
+      child: CallbackShortcuts(bindings: _shortcuts, child: child),
     );
   }
 
@@ -322,7 +329,7 @@ class SingleActivator extends ShortcutActivator {
       LogicalKeyboardKey.escape: 'Échap',
       LogicalKeyboardKey.tab: 'Tab',
     };
-    
+
     return keyMap[key] ?? key.keyLabel;
   }
 }

@@ -64,33 +64,37 @@ class _CustomTextFieldState extends State<CustomTextField> {
         fontWeight: FontWeight.w500,
       ),
       decoration: InputDecoration(
-        label: widget.label != null
-            ? Text(
-                widget.label!,
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-              )
-            : null,
+        label:
+            widget.label != null
+                ? Text(
+                  widget.label!,
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+                )
+                : null,
         hintText: widget.hint,
         hintStyle: GoogleFonts.poppins(
           fontSize: 14,
           color: AppColors.textTertiary,
           fontWeight: FontWeight.w400,
         ),
-        prefixIcon: widget.prefixIcon != null
-            ? Icon(
-                widget.prefixIcon,
-                color: _isFocused ? AppColors.primary : AppColors.textSecondary,
-              )
-            : null,
-        suffixIcon: widget.obscureText
-            ? IconButton(
-                icon: Icon(
-                  _obscureText ? Icons.visibility_off : Icons.visibility,
-                  color: AppColors.textSecondary,
-                ),
-                onPressed: () => setState(() => _obscureText = !_obscureText),
-              )
-            : null,
+        prefixIcon:
+            widget.prefixIcon != null
+                ? Icon(
+                  widget.prefixIcon,
+                  color:
+                      _isFocused ? AppColors.primary : AppColors.textSecondary,
+                )
+                : null,
+        suffixIcon:
+            widget.obscureText
+                ? IconButton(
+                  icon: Icon(
+                    _obscureText ? Icons.visibility_off : Icons.visibility,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: () => setState(() => _obscureText = !_obscureText),
+                )
+                : null,
         filled: true,
         fillColor: AppColors.surfaceVariant,
         border: OutlineInputBorder(

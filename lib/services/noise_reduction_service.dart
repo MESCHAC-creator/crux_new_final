@@ -44,7 +44,9 @@ class NoiseReductionService {
   Future<void> initialize() async {
     await _loadPreferences();
     _startNoiseMonitoring();
-    _logger.i('NoiseReductionService initialized - Enabled: $_isEnabled, Level: $_level');
+    _logger.i(
+      'NoiseReductionService initialized - Enabled: $_isEnabled, Level: $_level',
+    );
   }
 
   /// Charge les préférences
@@ -54,14 +56,15 @@ class NoiseReductionService {
       _isEnabled = prefs.getBool(_enabledKey) ?? false;
       _echoCancellation = prefs.getBool(_echoCancellationKey) ?? true;
       _autoGainControl = prefs.getBool(_autoGainControlKey) ?? true;
-      
+
       final levelString = prefs.getString(_levelKey);
-      _level = levelString != null 
-          ? NoiseReductionLevel.values.firstWhere(
-              (e) => e.toString() == 'NoiseReductionLevel.$levelString',
-              orElse: () => NoiseReductionLevel.medium,
-            )
-          : NoiseReductionLevel.medium;
+      _level =
+          levelString != null
+              ? NoiseReductionLevel.values.firstWhere(
+                (e) => e.toString() == 'NoiseReductionLevel.$levelString',
+                orElse: () => NoiseReductionLevel.medium,
+              )
+              : NoiseReductionLevel.medium;
     } catch (e) {
       _logger.e('Failed to load noise reduction preferences', error: e);
     }
@@ -115,13 +118,13 @@ class NoiseReductionService {
     try {
       // Conversion des données audio
       final samples = _convertToSamples(audioData);
-      
+
       // Application des algorithmes de réduction de bruit
       final processedSamples = _applyNoiseReduction(samples);
-      
+
       // Conversion retour en bytes
       final processedData = _convertToBytes(processedSamples);
-      
+
       _processedSamples += samples.length;
       return processedData;
     } catch (e) {
@@ -146,29 +149,29 @@ class NoiseReductionService {
   List<double> _applyNoiseReduction(List<double> samples) {
     final processed = <double>[];
     final threshold = _getNoiseThreshold();
-    
+
     for (int i = 0; i < samples.length; i++) {
       final sample = samples[i];
-      
+
       // Gate noise (suppression des sons inférieurs au seuil)
       if (sample.abs() < threshold) {
         processed.add(sample * 0.1); // Atténuation forte
       } else {
         processed.add(sample);
       }
-      
+
       // Annulation d'écho (simplifiée)
       if (_echoCancellation && i > 10) {
         final echoSample = samples[i - 10] * 0.3;
         processed[i] -= echoSample;
       }
-      
+
       // Contrôle automatique du gain
       if (_autoGainControl) {
         processed[i] = _applyGainControl(processed[i]);
       }
     }
-    
+
     return processed;
   }
 
@@ -190,13 +193,13 @@ class NoiseReductionService {
   double _applyGainControl(double sample) {
     final targetLevel = 0.7;
     final currentLevel = sample.abs();
-    
+
     if (currentLevel < targetLevel * 0.5) {
       return sample * 1.2; // Amplification
     } else if (currentLevel > targetLevel * 1.5) {
       return sample * 0.8; // Atténuation
     }
-    
+
     return sample;
   }
 
@@ -252,9 +255,4 @@ class NoiseReductionService {
 }
 
 /// Niveaux de réduction de bruit
-enum NoiseReductionLevel {
-  low,
-  medium,
-  high,
-  aggressive,
-}
+enum NoiseReductionLevel { low, medium, high, aggressive }

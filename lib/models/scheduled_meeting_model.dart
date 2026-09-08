@@ -8,7 +8,7 @@ enum ScheduledMeetingStatus { scheduled, live, ended, cancelled }
 enum RecurrencePattern { none, daily, weekly, monthly, yearly, custom }
 
 /// **ScheduledMeetingModel** — Modèle professionnel complet pour réunions planifiées.
-/// 
+///
 /// Contient tous les champs demandés par la roadmap CRUX :
 /// - Identification & métadonnées
 /// - Dates/heures avec fuseau horaire
@@ -29,63 +29,65 @@ class ScheduledMeetingModel {
   final String organizerName;
   final String organizerEmail;
   final DateTime createdAt;
-  
+
   /// === PLANNING ===
   final DateTime scheduledStart;
   final DateTime scheduledEnd;
-  final String timezone; // IANA format: "Europe/Paris", "America/New_York", etc.
-  
+  final String
+  timezone; // IANA format: "Europe/Paris", "America/New_York", etc.
+
   /// === RÉCURRENCE (Phase 11) ===
   final RecurrencePattern recurrence;
-  final Map<String, dynamic> recurrenceConfig; // {"dayOfWeek": [1,3,5], "interval": 2, ...}
+  final Map<String, dynamic>
+  recurrenceConfig; // {"dayOfWeek": [1,3,5], "interval": 2, ...}
   final String? parentSeriesId; // Si c'est une occurrence d'une série
   final DateTime? recurrenceEndDate;
-  
+
   /// === STATUTS & TRANSITIONS ===
   final ScheduledMeetingStatus status; // scheduled, live, ended, cancelled
   DateTime? actualStart;
   DateTime? actualEnd;
   String? cancellationReason;
-  
+
   /// === SÉCURITÉ ===
   final String? passcode; // 4-6 digit PIN
   final bool waitingRoomEnabled;
   final bool allowBeforeHost; // Participants peuvent rejoindre avant l'hôte
   final bool disableGuests; // Interdire les invités non authentifiés
-  
+
   /// === PARAMÈTRES AUDIO/VIDÉO ===
   final bool cameraEnabled;
   final bool microphoneEnabled;
   final bool screenShareEnabled;
   final bool chatEnabled;
   final bool reactionsEnabled;
-  
+
   /// === ENREGISTREMENT (Phase 6) ===
   final bool recordAutomatically;
   final String recordingType; // "cloud", "local", "none"
   String? recordingUrl;
-  
+
   /// === PARTICIPANTS & INVITATIONS ===
   final List<String> participants; // UIDs des participants confirmés
   final List<String> invitedEmails; // Emails invités
   final List<String> coHosts; // UIDs des co-hôtes
-  
+
   /// === NOTIFICATIONS (Phase 6) ===
   final bool notifyAtOneHour;
   final bool notifyAtFifteenMin;
   final bool notifyAtFiveMin;
   final bool notifyAtStart;
-  
+
   /// === LIENS & PARTAGE ===
   final String meetingLink;
   final String meetingCode;
   String? qrCodeUrl;
-  
+
   /// === PARAMÈTRES AVANCÉS ===
   final MeetingType meetingType;
   final bool isLargeConference; // Détermine SFU (LiveKit) vs P2P
   final Map<String, dynamic> settings; // Flexible pour futures options
-  
+
   /// === DONNÉES ENTERPRISE (Phase 13) ===
   String? organizationId;
   String? workspaceId;
@@ -210,17 +212,31 @@ class ScheduledMeetingModel {
       organizerId: json['organizerId'] ?? '',
       organizerName: json['organizerName'] ?? '',
       organizerEmail: json['organizerEmail'] ?? '',
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
-      scheduledStart: DateTime.parse(json['scheduledStart'] ?? DateTime.now().toIso8601String()),
-      scheduledEnd: DateTime.parse(json['scheduledEnd'] ?? DateTime.now().add(const Duration(hours: 1)).toIso8601String()),
+      createdAt: DateTime.parse(
+        json['createdAt'] ?? DateTime.now().toIso8601String(),
+      ),
+      scheduledStart: DateTime.parse(
+        json['scheduledStart'] ?? DateTime.now().toIso8601String(),
+      ),
+      scheduledEnd: DateTime.parse(
+        json['scheduledEnd'] ??
+            DateTime.now().add(const Duration(hours: 1)).toIso8601String(),
+      ),
       timezone: json['timezone'] ?? 'UTC',
       recurrence: _parseRecurrence(json['recurrence']),
       recurrenceConfig: json['recurrenceConfig'] ?? {},
       parentSeriesId: json['parentSeriesId'],
-      recurrenceEndDate: json['recurrenceEndDate'] != null ? DateTime.parse(json['recurrenceEndDate']) : null,
+      recurrenceEndDate:
+          json['recurrenceEndDate'] != null
+              ? DateTime.parse(json['recurrenceEndDate'])
+              : null,
       status: _parseStatus(json['status']),
-      actualStart: json['actualStart'] != null ? DateTime.parse(json['actualStart']) : null,
-      actualEnd: json['actualEnd'] != null ? DateTime.parse(json['actualEnd']) : null,
+      actualStart:
+          json['actualStart'] != null
+              ? DateTime.parse(json['actualStart'])
+              : null,
+      actualEnd:
+          json['actualEnd'] != null ? DateTime.parse(json['actualEnd']) : null,
       cancellationReason: json['cancellationReason'],
       passcode: json['passcode'],
       waitingRoomEnabled: json['waitingRoomEnabled'] ?? false,
@@ -403,5 +419,6 @@ class ScheduledMeetingModel {
   }
 
   @override
-  String toString() => 'ScheduledMeetingModel(id: $id, title: $title, status: $status)';
+  String toString() =>
+      'ScheduledMeetingModel(id: $id, title: $title, status: $status)';
 }

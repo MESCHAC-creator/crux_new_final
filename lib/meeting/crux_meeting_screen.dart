@@ -62,15 +62,17 @@ class _CruxMeetingScreenState extends State<CruxMeetingScreen> {
 
   void _sendMessage(String body, String? recipientSid) {
     setState(() {
-      _messages.add(ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        senderSid: widget.userId,
-        senderName: widget.userName,
-        body: body,
-        timestampMs: DateTime.now().millisecondsSinceEpoch,
-        recipientSid: recipientSid,
-        fromMe: true,
-      ));
+      _messages.add(
+        ChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          senderSid: widget.userId,
+          senderName: widget.userName,
+          body: body,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+          recipientSid: recipientSid,
+          fromMe: true,
+        ),
+      );
     });
   }
 
@@ -95,12 +97,13 @@ class _CruxMeetingScreenState extends State<CruxMeetingScreen> {
                 ),
                 const SizedBox(height: 8),
                 Expanded(
-                  child: _screenShare != null
-                      ? _ScreenShareLayout(
-                          screenShare: _screenShare!,
-                          participants: _participants,
-                        )
-                      : _GridLayout(participants: _participants),
+                  child:
+                      _screenShare != null
+                          ? _ScreenShareLayout(
+                            screenShare: _screenShare!,
+                            participants: _participants,
+                          )
+                          : _GridLayout(participants: _participants),
                 ),
                 const SizedBox(height: 8),
                 BackgroundPanel(controller: bgController),
@@ -181,8 +184,8 @@ class _GridLayout extends StatelessWidget {
         mainAxisSpacing: 8,
       ),
       itemCount: participants.length,
-      itemBuilder: (context, index) =>
-          ParticipantTile(participant: participants[index]),
+      itemBuilder:
+          (context, index) => ParticipantTile(participant: participants[index]),
     );
   }
 }
@@ -212,13 +215,14 @@ class _ScreenShareLayout extends StatelessWidget {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: participants.length,
-              itemBuilder: (context, index) => Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: SizedBox(
-                  width: 120,
-                  child: ParticipantTile(participant: participants[index]),
-                ),
-              ),
+              itemBuilder:
+                  (context, index) => Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: SizedBox(
+                      width: 120,
+                      child: ParticipantTile(participant: participants[index]),
+                    ),
+                  ),
             ),
           ),
         ),

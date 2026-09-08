@@ -4,7 +4,8 @@ import 'package:logger/logger.dart';
 
 /// Service de gestion de l'accessibilité
 class AccessibilityService {
-  static final AccessibilityService _instance = AccessibilityService._internal();
+  static final AccessibilityService _instance =
+      AccessibilityService._internal();
 
   final Logger _logger = Logger();
 

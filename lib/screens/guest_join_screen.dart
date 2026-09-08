@@ -102,28 +102,30 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => LargeConferenceScreen(
-              meetingId: widget.meetingId,
-              meetingName: _meetingTitle,
-              userId: uid,
-              userName: name,
-              userEmail: null,
-              isHost: false,
-            ),
+            builder:
+                (_) => LargeConferenceScreen(
+                  meetingId: widget.meetingId,
+                  meetingName: _meetingTitle,
+                  userId: uid,
+                  userName: name,
+                  userEmail: null,
+                  isHost: false,
+                ),
           ),
         );
       } else {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => MeetingScreen(
-              meetingId: widget.meetingId,
-              meetingName: _meetingTitle,
-              userId: uid,
-              userName: name,
-              userEmail: null,
-              isHost: false,
-            ),
+            builder:
+                (_) => MeetingScreen(
+                  meetingId: widget.meetingId,
+                  meetingName: _meetingTitle,
+                  userId: uid,
+                  userName: name,
+                  userEmail: null,
+                  isHost: false,
+                ),
           ),
         );
       }
@@ -238,9 +240,8 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
           controller: _nameCtrl,
           label: 'Ton prénom ou surnom',
           icon: Icons.person_outline,
-          textInputAction: _needsPasscode
-              ? TextInputAction.next
-              : TextInputAction.done,
+          textInputAction:
+              _needsPasscode ? TextInputAction.next : TextInputAction.done,
           onSubmitted: _needsPasscode ? null : (_) => _join(),
         ),
 
@@ -279,23 +280,24 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
             ),
-            child: _loading
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.5,
+            child:
+                _loading
+                    ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                    : Text(
+                      'Rejoindre',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  )
-                : Text(
-                    'Rejoindre',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
           ),
         ),
 

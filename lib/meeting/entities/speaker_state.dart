@@ -1,11 +1,6 @@
 import 'package:livekit_client/livekit_client.dart';
 
-enum SpeakerMode {
-  single,
-  dual,
-  screenshare,
-  gallery,
-}
+enum SpeakerMode { single, dual, screenshare, gallery }
 
 class SpeakerState {
   final Participant? currentSpeaker;
@@ -43,9 +38,10 @@ class SpeakerState {
   }
 
   bool get hasSpeaker => currentSpeaker != null;
-  bool get isDualSpeaker => mode == SpeakerMode.dual && secondarySpeaker != null;
+  bool get isDualSpeaker =>
+      mode == SpeakerMode.dual && secondarySpeaker != null;
   bool get isScreenshareMode => mode == SpeakerMode.screenshare;
-  
+
   Duration get speakerAge {
     if (speakerTimestamp == null) return Duration.zero;
     return DateTime.now().difference(speakerTimestamp!);

@@ -80,47 +80,56 @@ const List<LocalizationsDelegate<dynamic>> _localizationsDelegates = [
 void main() {
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
-    crux.logger.e('Flutter Framework Error', error: details.exception, stackTrace: details.stack);
+    crux.logger.e(
+      'Flutter Framework Error',
+      error: details.exception,
+      stackTrace: details.stack,
+    );
   };
 
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
 
-    try {
-      await WallpaperManager().init();
-    } catch (e) {
-      crux.logger.e('WallpaperManager init error', error: e);
-    }
+      try {
+        await WallpaperManager().init();
+      } catch (e) {
+        crux.logger.e('WallpaperManager init error', error: e);
+      }
 
-    try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      FirebaseFirestore.instance.settings = const Settings(
-        persistenceEnabled: true,
-        cacheSizeBytes: 40 * 1024 * 1024,
-      );
-      crux.logger.i('Firebase initialized');
-    } catch (e) {
-      crux.logger.e('Firebase init error', error: e);
-      runApp(_ErrorApp(title: 'Firebase Error', message: e.toString()));
-      return;
-    }
+      try {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+        FirebaseFirestore.instance.settings = const Settings(
+          persistenceEnabled: true,
+          cacheSizeBytes: 40 * 1024 * 1024,
+        );
+        crux.logger.i('Firebase initialized');
+      } catch (e) {
+        crux.logger.e('Firebase init error', error: e);
+        runApp(_ErrorApp(title: 'Firebase Error', message: e.toString()));
+        return;
+      }
 
-    try {
-      NotificationService().initialize().catchError((e) => crux.logger.e('Notification init failed', error: e));
-      MeetingNotificationManager.instance
-          .initialize()
-          .catchError((e) => crux.logger.e('Meeting reminders init failed', error: e));
-    } catch (e) {
-      crux.logger.e('Notification Service crash', error: e);
-    }
+      try {
+        NotificationService().initialize().catchError(
+          (e) => crux.logger.e('Notification init failed', error: e),
+        );
+        MeetingNotificationManager.instance.initialize().catchError(
+          (e) => crux.logger.e('Meeting reminders init failed', error: e),
+        );
+      } catch (e) {
+        crux.logger.e('Notification Service crash', error: e);
+      }
 
-    runApp(const MyApp());
-  }, (error, stack) {
-    crux.logger.e('Global App Crash', error: error, stackTrace: stack);
-    runApp(_ErrorApp(title: 'Startup Error', message: error.toString()));
-  });
+      runApp(const MyApp());
+    },
+    (error, stack) {
+      crux.logger.e('Global App Crash', error: error, stackTrace: stack);
+      runApp(_ErrorApp(title: 'Startup Error', message: error.toString()));
+    },
+  );
 }
 
 class _ErrorApp extends StatelessWidget {
@@ -140,9 +149,20 @@ class _ErrorApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.bug_report_rounded, color: Colors.redAccent, size: 80),
+                const Icon(
+                  Icons.bug_report_rounded,
+                  color: Colors.redAccent,
+                  size: 80,
+                ),
                 const SizedBox(height: 24),
-                Text(title, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Text(
                   _getUXFriendlyMessage(message),
@@ -160,7 +180,10 @@ class _ErrorApp extends StatelessWidget {
                       },
                       icon: const Icon(Icons.close, size: 18),
                       label: const Text('Quitter'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white10, foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white10,
+                        foregroundColor: Colors.white,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     ElevatedButton.icon(
@@ -170,7 +193,10 @@ class _ErrorApp extends StatelessWidget {
                       },
                       icon: const Icon(Icons.refresh, size: 18),
                       label: const Text('Réessayer'),
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.black),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.black,
+                      ),
                     ),
                   ],
                 ),
@@ -183,10 +209,18 @@ class _ErrorApp extends StatelessWidget {
   }
 
   String _getUXFriendlyMessage(String msg) {
-    if (msg.contains('DefaultFirebaseOptions')) return 'Configuration serveur manquante. Veuillez réinstaller l\'application.';
-    if (msg.contains('network')) return 'Connexion impossible. Vérifiez votre accès Internet.';
-    if (msg.contains('api-key')) return 'Clé API invalide. Contactez le support.';
-    if (msg.contains('project-not-found')) return 'Projet Firebase introuvable.';
+    if (msg.contains('DefaultFirebaseOptions')) {
+      return 'Configuration serveur manquante. Veuillez réinstaller l\'application.';
+    }
+    if (msg.contains('network')) {
+      return 'Connexion impossible. Vérifiez votre accès Internet.';
+    }
+    if (msg.contains('api-key')) {
+      return 'Clé API invalide. Contactez le support.';
+    }
+    if (msg.contains('project-not-found')) {
+      return 'Projet Firebase introuvable.';
+    }
     return 'Une erreur inattendue empêche l\'application de démarrer.';
   }
 }
@@ -220,10 +254,11 @@ class MyApp extends StatelessWidget {
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
             onGenerateRoute: AppRoutes.generateRoute,
-            builder: (context, child) => AppBackground(
-              config: wallpaper.config,
-              child: child ?? const SizedBox.shrink(),
-            ),
+            builder:
+                (context, child) => AppBackground(
+                  config: wallpaper.config,
+                  child: child ?? const SizedBox.shrink(),
+                ),
             home: const AuthWrapper(),
           );
         },
@@ -261,7 +296,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _initDeepLinks() async {
     try {
-      _deepLinkSubscription = _appLinks.uriLinkStream.listen((uri) => _handleDeepLink(uri));
+      _deepLinkSubscription = _appLinks.uriLinkStream.listen(
+        (uri) => _handleDeepLink(uri),
+      );
       final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) _handleDeepLink(initialUri);
     } catch (e) {
@@ -292,45 +329,77 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (current != null && !current.isAnonymous) {
       _joinMeetingAsAuthenticatedUser(mid);
     } else {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: mid)));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: mid)),
+      );
     }
   }
 
   Future<void> _joinMeetingAsAuthenticatedUser(String meetingId) async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('meetings').doc(meetingId).get();
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('meetings')
+              .doc(meetingId)
+              .get();
       if (!mounted) return;
       if (!doc.exists) {
-        ElegantToast.show(context, title: 'Erreur', message: 'Réunion introuvable', type: ElegantToastType.error);
+        ElegantToast.show(
+          context,
+          title: 'Erreur',
+          message: 'Réunion introuvable',
+          type: ElegantToastType.error,
+        );
         return;
       }
       final data = doc.data();
       if (data == null) {
-        if (mounted) ElegantToast.show(context, title: 'Erreur', message: 'Données réunion corrompues', type: ElegantToastType.error);
+        if (mounted) {
+          ElegantToast.show(
+            context,
+            title: 'Erreur',
+            message: 'Données réunion corrompues',
+            type: ElegantToastType.error,
+          );
+        }
         return;
       }
       final current = FirebaseAuth.instance.currentUser;
       if (current == null) {
-        if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: meetingId)));
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => GuestJoinScreen(meetingId: meetingId),
+            ),
+          );
+        }
         return;
       }
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => MeetingScreen(
-            meetingId: meetingId,
-            meetingName: data['title'] as String? ?? 'Réunion',
-            userId: current.uid,
-            userName: current.displayName ?? current.email ?? 'Invité',
-            userEmail: current.email,
-            isHost: false,
-          ),
+          builder:
+              (_) => MeetingScreen(
+                meetingId: meetingId,
+                meetingName: data['title'] as String? ?? 'Réunion',
+                userId: current.uid,
+                userName: current.displayName ?? current.email ?? 'Invité',
+                userEmail: current.email,
+                isHost: false,
+              ),
         ),
       );
     } catch (e) {
       crux.logger.e('_joinMeetingAsAuthenticatedUser error', error: e);
       if (mounted) {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: meetingId)));
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => GuestJoinScreen(meetingId: meetingId),
+          ),
+        );
       }
     }
   }
@@ -339,7 +408,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
-      setState(() => _termsAccepted = prefs.getBool('crux_terms_accepted') ?? false);
+      setState(
+        () => _termsAccepted = prefs.getBool('crux_terms_accepted') ?? false,
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _termsAccepted = false);
@@ -351,7 +422,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (_termsAccepted == null) {
       return const Scaffold(
         backgroundColor: Color(0xFF0A0A0F),
-        body: Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3)),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primary,
+            strokeWidth: 3,
+          ),
+        ),
       );
     }
 
@@ -361,7 +437,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: Color(0xFF0A0A0F),
-            body: Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3)),
+            body: Center(
+              child: CircularProgressIndicator(
+                color: AppColors.primary,
+                strokeWidth: 3,
+              ),
+            ),
           );
         }
 
@@ -376,7 +457,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
               } else {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => GuestJoinScreen(meetingId: mid)),
+                  MaterialPageRoute(
+                    builder: (_) => GuestJoinScreen(meetingId: mid),
+                  ),
                 );
               }
             }

@@ -37,7 +37,9 @@ class _HomeScreenState extends State<HomeScreen> {
           : (FirebaseAuth.instance.currentUser?.uid ?? '');
 
   String get _displayName =>
-      widget.user.name.trim().isNotEmpty ? widget.user.name.trim() : 'Bienvenue';
+      widget.user.name.trim().isNotEmpty
+          ? widget.user.name.trim()
+          : 'Bienvenue';
 
   @override
   void initState() {
@@ -100,28 +102,30 @@ class _HomeScreenState extends State<HomeScreen> {
       _snack('Format invalide. Utilisez XXX-XXX-XXX');
       return;
     }
-    
+
     FocusScope.of(context).unfocus();
-    
+
     // Show loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => _buildJoinLoadingDialog(code),
     );
-    
+
     try {
       logger.d('Tentative de rejoindre réunion avec code: $code');
-      
+
       // Try to find meeting by meetingCode via backend API
       final backendService = BackendApiService();
       final meetingData = await backendService.getMeetingByCode(code);
-      
+
       if (!mounted) return;
       Navigator.of(context).pop(); // Close loading dialog
-      
+
       if (meetingData == null) {
-        logger.d('Backend n\'a pas trouvé la réunion, tentative via Firestore direct');
+        logger.d(
+          'Backend n\'a pas trouvé la réunion, tentative via Firestore direct',
+        );
         // Fallback to direct Firestore lookup by code
         final meeting = await MeetingService().getMeetingByCode(code);
         if (!mounted) return;
@@ -135,15 +139,15 @@ class _HomeScreenState extends State<HomeScreen> {
         _joinMeeting(meeting);
         return;
       }
-      
+
       final meeting = backendService.parseMeetingData(meetingData);
       if (meeting != null) {
         logger.d('Réunion trouvée via backend: ${meeting.id}');
-        
+
         // Show meeting details dialog like Zoom
         final shouldJoin = await _showMeetingDetailsDialog(meeting);
         if (!mounted) return;
-        
+
         if (shouldJoin) {
           // Add participant to meeting via backend
           try {
@@ -155,13 +159,16 @@ class _HomeScreenState extends State<HomeScreen> {
             await MeetingService().addParticipant(meeting.id, _uid);
             logger.d('Participant ajouté via Firestore direct');
           }
-          
+
           _codeCtrl.clear();
           _joinMeeting(meeting);
         }
       } else {
         logger.d('Erreur parsing meeting data du backend');
-        _showJoinErrorDialog(code, 'Erreur lors de la lecture des données de la réunion');
+        _showJoinErrorDialog(
+          code,
+          'Erreur lors de la lecture des données de la réunion',
+        );
       }
     } catch (e) {
       logger.e('Erreur lors de la jonction: $e');
@@ -188,7 +195,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           Text(
             'Code: $code',
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+            ),
           ),
         ],
       ),
@@ -197,51 +207,71 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<bool> _showMeetingDetailsDialog(dynamic meeting) async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.video_call, color: AppColors.primary, size: 28),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Détails de la réunion',
-                style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                backgroundColor: AppColors.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: const Row(
+                  children: [
+                    Icon(Icons.video_call, color: AppColors.primary, size: 28),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Détails de la réunion',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDetailRow('Titre', meeting.title ?? 'Réunion'),
+                    _buildDetailRow('Code', meeting.meetingCode ?? 'N/A'),
+                    _buildDetailRow(
+                      'Organisateur',
+                      meeting.organizer ?? 'Inconnu',
+                    ),
+                    _buildDetailRow(
+                      'Participants',
+                      '${meeting.participants?.length ?? 0}',
+                    ),
+                    if (meeting.description != null &&
+                        meeting.description!.isNotEmpty)
+                      _buildDetailRow('Description', meeting.description!),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text(
+                      'Annuler',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.textOnPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Rejoindre'),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDetailRow('Titre', meeting.title ?? 'Réunion'),
-            _buildDetailRow('Code', meeting.meetingCode ?? 'N/A'),
-            _buildDetailRow('Organisateur', meeting.organizer ?? 'Inconnu'),
-            _buildDetailRow('Participants', '${meeting.participants?.length ?? 0}'),
-            if (meeting.description != null && meeting.description!.isNotEmpty)
-              _buildDetailRow('Description', meeting.description!),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler', style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.textOnPrimary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Rejoindre'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   Widget _buildDetailRow(String label, String value) {
@@ -254,13 +284,20 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 100,
             child: Text(
               label,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -271,53 +308,71 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showJoinErrorDialog(String code, String errorMessage) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.error_outline, color: AppColors.error, size: 28),
-            SizedBox(width: 12),
-            Text(
-              'Échec de la jonction',
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              errorMessage,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+            title: const Row(
+              children: [
+                Icon(Icons.error_outline, color: AppColors.error, size: 28),
+                SizedBox(width: 12),
+                Text(
+                  'Échec de la jonction',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Code: $code',
-              style: const TextStyle(color: AppColors.textTertiary, fontSize: 12),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  errorMessage,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Code: $code',
+                  style: const TextStyle(
+                    color: AppColors.textTertiary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Fermer', style: TextStyle(color: AppColors.textSecondary)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text(
+                  'Fermer',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _codeCtrl.clear();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.textOnPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('Réessayer'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _codeCtrl.clear();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.textOnPrimary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Réessayer'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -326,8 +381,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message,
-              style: const TextStyle(color: AppColors.textPrimary)),
+          content: Text(
+            message,
+            style: const TextStyle(color: AppColors.textPrimary),
+          ),
           backgroundColor: AppColors.surfaceElevated,
           behavior: SnackBarBehavior.floating,
         ),
@@ -340,15 +397,21 @@ class _HomeScreenState extends State<HomeScreen> {
       case 0: // Home
         break;
       case 1: // Meetings
-        Navigator.of(context).pushNamed(AppRoutes.schedule).then((_) => _loadLocalPhoto());
+        Navigator.of(
+          context,
+        ).pushNamed(AppRoutes.schedule).then((_) => _loadLocalPhoto());
         setState(() => _selectedNav = 0);
         break;
       case 2: // Settings
-        Navigator.of(context).pushNamed(AppRoutes.settings).then((_) => _loadLocalPhoto());
+        Navigator.of(
+          context,
+        ).pushNamed(AppRoutes.settings).then((_) => _loadLocalPhoto());
         setState(() => _selectedNav = 0);
         break;
       case 3: // Profile
-        Navigator.of(context).pushNamed(AppRoutes.profile).then((_) => _loadLocalPhoto());
+        Navigator.of(
+          context,
+        ).pushNamed(AppRoutes.profile).then((_) => _loadLocalPhoto());
         setState(() => _selectedNav = 0);
         break;
     }
@@ -382,12 +445,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
-    final body = wallpaper.hasImage
-        ? AppBackground(config: wallpaper, child: content)
-        : Container(
-            decoration: const BoxDecoration(gradient: AppColors.heroGradient),
-            child: content,
-          );
+    final body =
+        wallpaper.hasImage
+            ? AppBackground(config: wallpaper, child: content)
+            : Container(
+              decoration: const BoxDecoration(gradient: AppColors.heroGradient),
+              child: content,
+            );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -592,10 +656,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _header() {
-    final initials = _displayName.trim().isEmpty
-        ? 'C'
-        : _displayName.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0]).join().toUpperCase();
-    
+    final initials =
+        _displayName.trim().isEmpty
+            ? 'C'
+            : _displayName
+                .trim()
+                .split(RegExp(r'\s+'))
+                .take(2)
+                .map((w) => w[0])
+                .join()
+                .toUpperCase();
+
     Widget avatar;
     if (_localPhotoPath != null && File(_localPhotoPath!).existsSync()) {
       avatar = CircleAvatar(
@@ -616,7 +687,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    
+
     return Row(
       children: [
         avatar,
@@ -691,18 +762,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Démarrer',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      )),
+                  child: const Text(
+                    'Démarrer',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () =>
-                      Navigator.of(context).pushNamed(AppRoutes.schedule),
+                  onPressed:
+                      () => Navigator.of(context).pushNamed(AppRoutes.schedule),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppColors.border),
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -710,12 +780,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Planifier',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      )),
+                  child: const Text(
+                    'Planifier',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -735,15 +807,25 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.video_call_rounded, color: AppColors.textTertiary, size: 20),
+          const Icon(
+            Icons.video_call_rounded,
+            color: AppColors.textTertiary,
+            size: 20,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: TextField(
               controller: _codeCtrl,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+              ),
               decoration: const InputDecoration(
                 hintText: 'Code de réunion',
-                hintStyle: TextStyle(color: AppColors.textTertiary, fontSize: 14),
+                hintStyle: TextStyle(
+                  color: AppColors.textTertiary,
+                  fontSize: 14,
+                ),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(vertical: 12),
               ),
@@ -754,7 +836,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 8),
           IconButton(
             onPressed: _joinByCode,
-            icon: const Icon(Icons.arrow_forward_rounded, color: AppColors.primary),
+            icon: const Icon(
+              Icons.arrow_forward_rounded,
+              color: AppColors.primary,
+            ),
             style: IconButton.styleFrom(
               backgroundColor: AppColors.primary.withValues(alpha: 0.1),
               padding: const EdgeInsets.all(8),
@@ -769,10 +854,10 @@ class _HomeScreenState extends State<HomeScreen> {
     // Deep link to open the native app
     // This uses a custom URL scheme that the native app should handle
     const appScheme = 'crux://';
-    
+
     try {
       final uri = Uri.parse(appScheme);
-      
+
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
       } else {
@@ -781,30 +866,6 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       _snack('Impossible d\'ouvrir l\'application');
     }
-  }
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _codeCtrl,
-              style: const TextStyle(color: AppColors.textPrimary),
-              decoration: const InputDecoration(
-                hintText: 'Entrer un code de réunion',
-                hintStyle: TextStyle(color: AppColors.textDisabled),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 12),
-              ),
-              onSubmitted: (_) => _joinByCode(),
-            ),
-          ),
-          IconButton(
-            onPressed: _joinByCode,
-            icon: const Icon(Icons.arrow_forward,
-                color: AppColors.textTertiary, size: 20),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _sectionHeader(String title) {
@@ -821,35 +882,45 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _upcoming() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('meetings')
-          .where('participants', arrayContains: _uid)
-          .where('endTime', isGreaterThan: Timestamp.now())
-          .orderBy('endTime')
-          .limit(5)
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('meetings')
+              .where('participants', arrayContains: _uid)
+              .where('endTime', isGreaterThan: Timestamp.now())
+              .orderBy('endTime')
+              .limit(5)
+              .snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(
-              child: CircularProgressIndicator(
-                  valueColor:
-                      AlwaysStoppedAnimation(AppColors.primary)));
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation(AppColors.primary),
+            ),
+          );
         }
         if (!snap.hasData || snap.data!.docs.isEmpty) {
           return _empty('Aucune réunion à venir.');
         }
         return Column(
-          children: snap.data!.docs
-              .map((doc) => _meetingCard(
-                  MeetingModel.fromDoc(doc.id, doc.data() as Map<String, dynamic>)))
-              .toList(),
+          children:
+              snap.data!.docs
+                  .map(
+                    (doc) => _meetingCard(
+                      MeetingModel.fromDoc(
+                        doc.id,
+                        doc.data() as Map<String, dynamic>,
+                      ),
+                    ),
+                  )
+                  .toList(),
         );
       },
     );
   }
 
   Widget _meetingCard(MeetingModel meeting) {
-    final live = meeting.endTime.isAfter(DateTime.now()) &&
+    final live =
+        meeting.endTime.isAfter(DateTime.now()) &&
         meeting.startTime.isBefore(DateTime.now());
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -883,7 +954,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.liveWithOpacity(0.14),
                           borderRadius: BorderRadius.circular(999),
@@ -906,7 +979,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   '${_time(meeting.startTime)} – ${_time(meeting.endTime)}'
                   '${meeting.participants.length > 1 ? ' · ${meeting.participants.length} participants' : ''}',
                   style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 12),
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -914,14 +989,16 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 10),
           TextButton(
             style: TextButton.styleFrom(
-              foregroundColor: meeting.isJoinable
-                  ? AppColors.textPrimary
-                  : AppColors.textDisabled,
+              foregroundColor:
+                  meeting.isJoinable
+                      ? AppColors.textPrimary
+                      : AppColors.textDisabled,
             ),
-            onPressed:
-                meeting.isJoinable ? () => _joinMeeting(meeting) : null,
-            child: const Text('Rejoindre',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            onPressed: meeting.isJoinable ? () => _joinMeeting(meeting) : null,
+            child: const Text(
+              'Rejoindre',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
           ),
         ],
       ),
@@ -929,27 +1006,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _empty(String message) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 20),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.borderSubtle),
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 20),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: AppColors.borderSubtle),
+    ),
+    child: Column(
+      children: [
+        const Icon(
+          Icons.event_note_outlined,
+          color: AppColors.textDisabled,
+          size: 26,
         ),
-        child: Column(
-          children: [
-            const Icon(Icons.event_note_outlined,
-                color: AppColors.textDisabled, size: 26),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  color: AppColors.textTertiary, fontSize: 13, height: 1.4),
-            ),
-          ],
+        const SizedBox(height: 12),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppColors.textTertiary,
+            fontSize: 13,
+            height: 1.4,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   String _greeting() {
     final h = DateTime.now().hour;

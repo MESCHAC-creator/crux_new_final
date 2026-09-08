@@ -71,13 +71,14 @@ class _MeetingChatState extends State<MeetingChat> {
           // Messages (live from Firestore)
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _db
-                  .collection('meetings')
-                  .doc(widget.meetingId)
-                  .collection('chat')
-                  .orderBy('timestamp', descending: true)
-                  .limit(100)
-                  .snapshots(),
+              stream:
+                  _db
+                      .collection('meetings')
+                      .doc(widget.meetingId)
+                      .collection('chat')
+                      .orderBy('timestamp', descending: true)
+                      .limit(100)
+                      .snapshots(),
               builder: (ctx, snap) {
                 final docs = snap.data?.docs ?? [];
                 if (docs.isEmpty) {
@@ -106,7 +107,8 @@ class _MeetingChatState extends State<MeetingChat> {
                             DateTime.now(),
                         isSystem: d['isSystem'] == true,
                       ),
-                      isMine: d['sender'] == _userName || d['senderId'] == 'You',
+                      isMine:
+                          d['sender'] == _userName || d['senderId'] == 'You',
                     );
                   },
                 );
@@ -217,9 +219,10 @@ class _ChatMessageWidget extends StatelessWidget {
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: isMine
-                ? PremiumColors.flamePrimary
-                : PremiumColors.textSecondary.withValues(alpha: 0.2),
+            color:
+                isMine
+                    ? PremiumColors.flamePrimary
+                    : PremiumColors.textSecondary.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
@@ -241,9 +244,10 @@ class _ChatMessageWidget extends StatelessWidget {
               Text(
                 message.message,
                 style: GoogleFonts.poppins(
-                  color: isMine
-                      ? PremiumColors.snowWhite
-                      : PremiumColors.textPrimary,
+                  color:
+                      isMine
+                          ? PremiumColors.snowWhite
+                          : PremiumColors.textPrimary,
                   fontSize: 12,
                 ),
               ),
@@ -253,9 +257,10 @@ class _ChatMessageWidget extends StatelessWidget {
                 child: Text(
                   timeStr,
                   style: GoogleFonts.poppins(
-                    color: isMine
-                        ? PremiumColors.snowWhite.withValues(alpha: 0.5)
-                        : PremiumColors.textTertiary.withValues(alpha: 0.7),
+                    color:
+                        isMine
+                            ? PremiumColors.snowWhite.withValues(alpha: 0.5)
+                            : PremiumColors.textTertiary.withValues(alpha: 0.7),
                     fontSize: 9,
                   ),
                 ),

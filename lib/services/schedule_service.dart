@@ -70,8 +70,8 @@ class ScheduleResult {
 
 class ScheduleService {
   ScheduleService({FirebaseFirestore? firestore, FirebaseAuth? auth})
-      : _db = firestore ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance;
+    : _db = firestore ?? FirebaseFirestore.instance,
+      _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
@@ -177,18 +177,20 @@ class ScheduleService {
 
       // L'organisateur DOIT figurer dans participants : l'accueil filtre avec
       // `arrayContains: currentUser.uid`.
-      final participants = <String>{
-        user.uid,
-        ...participantIds.where((e) => e.trim().isNotEmpty),
-      }.toList();
+      final participants =
+          <String>{
+            user.uid,
+            ...participantIds.where((e) => e.trim().isNotEmpty),
+          }.toList();
 
       final meeting = MeetingModel(
         id: meetingId,
         title: cleanTitle,
         description: description.trim(),
-        organizer: user.displayName?.trim().isNotEmpty == true
-            ? user.displayName!.trim()
-            : (user.email ?? 'Organisateur'),
+        organizer:
+            user.displayName?.trim().isNotEmpty == true
+                ? user.displayName!.trim()
+                : (user.email ?? 'Organisateur'),
         organizerId: user.uid,
         startTime: startTime,
         endTime: endTime,
@@ -254,16 +256,16 @@ class ScheduleService {
 
       await batch.commit();
 
-      final reminders =
-          await MeetingNotificationManager.instance.scheduleForMeeting(
-        meetingId: meetingId,
-        title: cleanTitle,
-        startTime: startTime,
-        oneHour: notifyAtOneHour,
-        fifteenMin: notifyAtFifteenMin,
-        fiveMin: notifyAtFiveMin,
-        atStart: notifyAtStart,
-      );
+      final reminders = await MeetingNotificationManager.instance
+          .scheduleForMeeting(
+            meetingId: meetingId,
+            title: cleanTitle,
+            startTime: startTime,
+            oneHour: notifyAtOneHour,
+            fifteenMin: notifyAtFifteenMin,
+            fiveMin: notifyAtFiveMin,
+            atStart: notifyAtStart,
+          );
 
       logger.i('📅 Réunion planifiée $meetingId à $startTime ($code)');
 
@@ -318,16 +320,12 @@ class ScheduleService {
         'status': MeetingStatus.scheduled.name,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      batch.set(
-        _scheduled.doc(meetingId),
-        {
-          'scheduledStart': flexIsoUtc(startTime),
-          'scheduledEnd': flexIsoUtc(endTime),
-          'startTimestamp': flexStamp(startTime),
-          if (title != null && title.trim().isNotEmpty) 'title': title.trim(),
-        },
-        SetOptions(merge: true),
-      );
+      batch.set(_scheduled.doc(meetingId), {
+        'scheduledStart': flexIsoUtc(startTime),
+        'scheduledEnd': flexIsoUtc(endTime),
+        'startTimestamp': flexStamp(startTime),
+        if (title != null && title.trim().isNotEmpty) 'title': title.trim(),
+      }, SetOptions(merge: true));
       await batch.commit();
 
       final snap = await _meetings.doc(meetingId).get();
@@ -338,8 +336,10 @@ class ScheduleService {
         startTime: startTime,
       );
     } on FirebaseException catch (e) {
-      throw ScheduleException('Modification impossible (${e.code}).',
-          code: e.code);
+      throw ScheduleException(
+        'Modification impossible (${e.code}).',
+        code: e.code,
+      );
     }
   }
 
@@ -347,28 +347,22 @@ class ScheduleService {
   Future<void> cancelScheduled(String meetingId, {String? reason}) async {
     try {
       final batch = _db.batch();
-      batch.set(
-        _meetings.doc(meetingId),
-        {
-          'status': MeetingStatus.ended.name,
-          'cancelledAt': FieldValue.serverTimestamp(),
-          if (reason != null) 'cancellationReason': reason,
-        },
-        SetOptions(merge: true),
-      );
-      batch.set(
-        _scheduled.doc(meetingId),
-        {
-          'status': 'cancelled',
-          if (reason != null) 'cancellationReason': reason,
-        },
-        SetOptions(merge: true),
-      );
+      batch.set(_meetings.doc(meetingId), {
+        'status': MeetingStatus.ended.name,
+        'cancelledAt': FieldValue.serverTimestamp(),
+        if (reason != null) 'cancellationReason': reason,
+      }, SetOptions(merge: true));
+      batch.set(_scheduled.doc(meetingId), {
+        'status': 'cancelled',
+        if (reason != null) 'cancellationReason': reason,
+      }, SetOptions(merge: true));
       await batch.commit();
       await MeetingNotificationManager.instance.cancelForMeeting(meetingId);
     } on FirebaseException catch (e) {
-      throw ScheduleException('Annulation impossible (${e.code}).',
-          code: e.code);
+      throw ScheduleException(
+        'Annulation impossible (${e.code}).',
+        code: e.code,
+      );
     }
   }
 
@@ -385,11 +379,17 @@ class ScheduleService {
         .orderBy('startTime')
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => MeetingModel.fromDoc(d.id, d.data()))
-            .where((m) => m.endTime
-                .isAfter(DateTime.now().subtract(const Duration(hours: 2))))
-            .toList());
+        .map(
+          (snap) =>
+              snap.docs
+                  .map((d) => MeetingModel.fromDoc(d.id, d.data()))
+                  .where(
+                    (m) => m.endTime.isAfter(
+                      DateTime.now().subtract(const Duration(hours: 2)),
+                    ),
+                  )
+                  .toList(),
+        );
   }
 
   /// Reprogramme tous les rappels au démarrage de l'app (les notifications
@@ -398,12 +398,13 @@ class ScheduleService {
     final uid = userId ?? _auth.currentUser?.uid;
     if (uid == null) return;
     try {
-      final snap = await _meetings
-          .where('participants', arrayContains: uid)
-          .where('status', isEqualTo: MeetingStatus.scheduled.name)
-          .orderBy('startTime')
-          .limit(30)
-          .get();
+      final snap =
+          await _meetings
+              .where('participants', arrayContains: uid)
+              .where('status', isEqualTo: MeetingStatus.scheduled.name)
+              .orderBy('startTime')
+              .limit(30)
+              .get();
       for (final doc in snap.docs) {
         final m = MeetingModel.fromDoc(doc.id, doc.data());
         if (m.startTime.isAfter(DateTime.now())) {
@@ -428,8 +429,10 @@ class ScheduleService {
   String _generateCode() {
     final rnd = Random.secure();
     String block(int n) =>
-        List.generate(n, (_) => _alphabet[rnd.nextInt(_alphabet.length)])
-            .join();
+        List.generate(
+          n,
+          (_) => _alphabet[rnd.nextInt(_alphabet.length)],
+        ).join();
     return '${block(3)}-${block(4)}-${block(3)}';
   }
 }

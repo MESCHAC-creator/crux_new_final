@@ -1,11 +1,6 @@
 import 'package:livekit_client/livekit_client.dart';
 
-enum ParticipantDisplayMode {
-  speaker,
-  tile,
-  hidden,
-  minimized,
-}
+enum ParticipantDisplayMode { speaker, tile, hidden, minimized }
 
 class ParticipantDisplayState {
   final Participant participant;
@@ -67,7 +62,8 @@ class ParticipantDisplayState {
   bool get isSpeaking => audioLevel > 0.3;
   bool get isInactive {
     if (lastActiveTime == null) return false;
-    return DateTime.now().difference(lastActiveTime!) > const Duration(minutes: 5);
+    return DateTime.now().difference(lastActiveTime!) >
+        const Duration(minutes: 5);
   }
 
   Duration get activeDuration {

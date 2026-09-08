@@ -16,10 +16,7 @@ class ConferenceAnimations {
         final scale = ConferenceTheme.speakerAppearanceAnimation(controller);
         return Transform.scale(
           scale: scale.value,
-          child: FadeTransition(
-            opacity: controller,
-            child: child,
-          ),
+          child: FadeTransition(opacity: controller, child: child),
         );
       },
       child: child,
@@ -57,20 +54,20 @@ class ConferenceAnimations {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, child) {
-        final pulse = Tween<double>(begin: 1.0, end: 1.0 + audioLevel * 0.3).animate(
-          CurvedAnimation(
-            parent: controller,
-            curve: Curves.easeInOut,
-          ),
-        );
-        
+        final pulse = Tween<double>(
+          begin: 1.0,
+          end: 1.0 + audioLevel * 0.3,
+        ).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut));
+
         return Transform.scale(
           scale: pulse.value,
           child: Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: ConferenceTheme.audioWave.withValues(alpha: audioLevel * 0.5),
+                color: ConferenceTheme.audioWave.withValues(
+                  alpha: audioLevel * 0.5,
+                ),
                 width: 2,
               ),
             ),
@@ -93,13 +90,11 @@ class ConferenceAnimations {
       animation: controller,
       builder: (context, child) {
         final progress = (value / maxValue).clamp(0.0, 1.0);
-        final animatedProgress = Tween<double>(begin: 0.0, end: progress).animate(
-          CurvedAnimation(
-            parent: controller,
-            curve: Curves.easeOut,
-          ),
-        );
-        
+        final animatedProgress = Tween<double>(
+          begin: 0.0,
+          end: progress,
+        ).animate(CurvedAnimation(parent: controller, curve: Curves.easeOut));
+
         return CustomPaint(
           painter: _StatsGaugePainter(
             progress: animatedProgress.value,
@@ -128,10 +123,7 @@ class ConferenceAnimations {
   }) {
     return SlideTransition(
       position: _getSlideAnimation(direction, controller),
-      child: FadeTransition(
-        opacity: controller,
-        child: child,
-      ),
+      child: FadeTransition(opacity: controller, child: child),
     );
   }
 
@@ -154,12 +146,9 @@ class ConferenceAnimations {
         begin = const Offset(0, -1.0);
         break;
     }
-    
+
     return Tween<Offset>(begin: begin, end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: controller,
-        curve: ConferenceTheme.layoutCurve,
-      ),
+      CurvedAnimation(parent: controller, curve: ConferenceTheme.layoutCurve),
     );
   }
 
@@ -205,16 +194,10 @@ class ConferenceAnimations {
       animation: controller,
       builder: (context, child) {
         final scale = Tween<double>(begin: 1.0, end: 1.1).animate(
-          CurvedAnimation(
-            parent: controller,
-            curve: Curves.elasticOut,
-          ),
+          CurvedAnimation(parent: controller, curve: Curves.elasticOut),
         );
-        
-        return Transform.scale(
-          scale: scale.value,
-          child: child,
-        );
+
+        return Transform.scale(scale: scale.value, child: child);
       },
       child: child,
     );
@@ -238,46 +221,40 @@ class ConferenceAnimations {
   }
 }
 
-enum SlideDirection {
-  left,
-  right,
-  up,
-  down,
-}
+enum SlideDirection { left, right, up, down }
 
 class _StatsGaugePainter extends CustomPainter {
   final double progress;
   final Color color;
 
-  _StatsGaugePainter({
-    required this.progress,
-    required this.color,
-  });
+  _StatsGaugePainter({required this.progress, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 2;
-    
+
     // Background
-    final backgroundPaint = Paint()
-      ..color = AppColors.borderSubtle
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
-    
+    final backgroundPaint =
+        Paint()
+          ..color = AppColors.borderSubtle
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4;
+
     canvas.drawCircle(center, radius, backgroundPaint);
-    
+
     // Progress arc
     if (progress > 0) {
-      final progressPaint = Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4
-        ..strokeCap = StrokeCap.round;
-      
+      final progressPaint =
+          Paint()
+            ..color = color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 4
+            ..strokeCap = StrokeCap.round;
+
       final startAngle = -3.14159 / 2; // Start from top
       final sweepAngle = progress * 6.28319; // 2 * PI
-      
+
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
         startAngle,

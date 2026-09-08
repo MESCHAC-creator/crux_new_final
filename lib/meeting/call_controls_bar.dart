@@ -57,13 +57,17 @@ class _CallControlsBarState extends State<CallControlsBar> {
           children: [
             _ControlButton(
               icon: widget.micEnabled ? Icons.mic : Icons.mic_off,
-              description: widget.micEnabled ? 'Couper le micro' : 'Activer le micro',
+              description:
+                  widget.micEnabled ? 'Couper le micro' : 'Activer le micro',
               active: !widget.micEnabled,
               onTap: widget.onToggleMic,
             ),
             _ControlButton(
               icon: widget.cameraEnabled ? Icons.videocam : Icons.videocam_off,
-              description: widget.cameraEnabled ? 'Couper la caméra' : 'Activer la caméra',
+              description:
+                  widget.cameraEnabled
+                      ? 'Couper la caméra'
+                      : 'Activer la caméra',
               active: !widget.cameraEnabled,
               onTap: widget.onToggleCamera,
             ),
@@ -123,7 +127,9 @@ class _ControlButton extends StatelessWidget {
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
           backgroundColor:
-              active ? AppColors.error : AppColors.surface.withValues(alpha: 0.8),
+              active
+                  ? AppColors.error
+                  : AppColors.surface.withValues(alpha: 0.8),
           foregroundColor: active ? Colors.white : AppColors.textSecondary,
           minimumSize: const Size(48, 48),
           shape: const CircleBorder(),

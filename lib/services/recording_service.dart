@@ -35,14 +35,14 @@ class RecordingService {
   // État de la transcription
   bool _liveCaptionsEnabled = false;
   String _currentTranscription = '';
-  final StreamController<String> _transcriptionController = 
+  final StreamController<String> _transcriptionController =
       StreamController<String>.broadcast();
 
   // Getters
   bool get isRecording => _isRecording;
   bool get isTranscribing => _isTranscribing;
   MeetingRecording? get currentRecording => _currentRecording;
-  List<TranscriptionSegment> get transcriptionSegments => 
+  List<TranscriptionSegment> get transcriptionSegments =>
       List.unmodifiable(_transcriptionSegments);
   bool get liveCaptionsEnabled => _liveCaptionsEnabled;
   String get currentTranscription => _currentTranscription;
@@ -133,7 +133,7 @@ class RecordingService {
       }
 
       final duration = DateTime.now().difference(_currentRecording!.startedAt);
-      
+
       final updatedRecording = _currentRecording!.copyWith(
         status: RecordingStatus.processing,
         endedAt: DateTime.now(),
@@ -159,13 +159,13 @@ class RecordingService {
   /// Active/désactive les sous-titres en direct
   Future<void> setLiveCaptionsEnabled(bool enabled) async {
     _liveCaptionsEnabled = enabled;
-    
+
     if (enabled && _isRecording && !_isTranscribing) {
       await _startLiveTranscription();
     } else if (!enabled && _isTranscribing) {
       await _stopLiveTranscription();
     }
-    
+
     _logger.i('Live captions ${enabled ? "enabled" : "disabled"}');
   }
 
@@ -221,7 +221,10 @@ class RecordingService {
   /// Génère la transcription complète
   String generateFullTranscription() {
     return _transcriptionSegments
-        .map((segment) => '[${segment.timestamp.toIso8601String()}] ${segment.speaker}: ${segment.text}')
+        .map(
+          (segment) =>
+              '[${segment.timestamp.toIso8601String()}] ${segment.speaker}: ${segment.text}',
+        )
         .join('\n');
   }
 
@@ -233,8 +236,9 @@ class RecordingService {
       }
 
       final transcription = generateFullTranscription();
-      final transcriptionRef = _storage.ref()
-          .child('recordings/$recordingId/transcription.txt');
+      final transcriptionRef = _storage.ref().child(
+        'recordings/$recordingId/transcription.txt',
+      );
 
       await transcriptionRef.putString(transcription);
 
@@ -258,10 +262,8 @@ class RecordingService {
   /// Télécharge un fichier d'enregistrement
   Future<String> downloadRecording(String recordingId) async {
     try {
-      final recordingDoc = await _firestore
-          .collection('recordings')
-          .doc(recordingId)
-          .get();
+      final recordingDoc =
+          await _firestore.collection('recordings').doc(recordingId).get();
 
       if (!recordingDoc.exists) {
         throw Exception('Recording not found');
@@ -281,10 +283,8 @@ class RecordingService {
       final userId = _auth.currentUser?.uid;
       if (userId == null) throw Exception('User not authenticated');
 
-      final recordingDoc = await _firestore
-          .collection('recordings')
-          .doc(recordingId)
-          .get();
+      final recordingDoc =
+          await _firestore.collection('recordings').doc(recordingId).get();
 
       if (!recordingDoc.exists) {
         throw Exception('Recording not found');
@@ -308,7 +308,8 @@ class RecordingService {
       }
 
       // Supprimer la transcription
-      if (recording.transcriptionUrl != null && recording.transcriptionUrl!.isNotEmpty) {
+      if (recording.transcriptionUrl != null &&
+          recording.transcriptionUrl!.isNotEmpty) {
         try {
           final ref = _storage.refFromURL(recording.transcriptionUrl!);
           await ref.delete();
@@ -330,10 +331,11 @@ class RecordingService {
   /// Obtient les enregistrements d'une réunion
   Future<List<MeetingRecording>> getMeetingRecordings(String meetingId) async {
     try {
-      final snapshot = await _firestore
-          .collection('recordings')
-          .where('meetingId', isEqualTo: meetingId)
-          .get();
+      final snapshot =
+          await _firestore
+              .collection('recordings')
+              .where('meetingId', isEqualTo: meetingId)
+              .get();
 
       return snapshot.docs
           .map((doc) => MeetingRecording.fromJson(doc.data()))
@@ -459,9 +461,10 @@ class MeetingRecording {
         orElse: () => RecordingType.audioVideo,
       ),
       startedAt: DateTime.parse(json['startedAt'] as String),
-      endedAt: json['endedAt'] != null 
-          ? DateTime.parse(json['endedAt'] as String) 
-          : null,
+      endedAt:
+          json['endedAt'] != null
+              ? DateTime.parse(json['endedAt'] as String)
+              : null,
       status: RecordingStatus.values.firstWhere(
         (e) => e.toString() == 'RecordingStatus.${json['status']}',
         orElse: () => RecordingStatus.recording,
@@ -476,19 +479,10 @@ class MeetingRecording {
 }
 
 /// Type d'enregistrement
-enum RecordingType {
-  audio,
-  video,
-  audioVideo,
-}
+enum RecordingType { audio, video, audioVideo }
 
 /// Statut d'enregistrement
-enum RecordingStatus {
-  recording,
-  processing,
-  completed,
-  failed,
-}
+enum RecordingStatus { recording, processing, completed, failed }
 
 /// Segment de transcription
 class TranscriptionSegment {

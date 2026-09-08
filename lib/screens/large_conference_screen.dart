@@ -42,8 +42,7 @@ class LargeConferenceScreen extends StatefulWidget {
   });
 
   @override
-  State<LargeConferenceScreen> createState() =>
-      _LargeConferenceScreenState();
+  State<LargeConferenceScreen> createState() => _LargeConferenceScreenState();
 }
 
 class _LargeConferenceScreenState extends State<LargeConferenceScreen>
@@ -86,8 +85,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // PARTICIPANTS
   // ===========================================================================
 
-  List<RemoteParticipant> _remoteParticipants =
-      <RemoteParticipant>[];
+  List<RemoteParticipant> _remoteParticipants = <RemoteParticipant>[];
 
   String? _organizerId;
 
@@ -145,11 +143,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // FIRESTORE
   // ===========================================================================
 
-  StreamSubscription<QuerySnapshot>?
-      _presenceSubscription;
+  StreamSubscription<QuerySnapshot>? _presenceSubscription;
 
-  StreamSubscription<QuerySnapshot>?
-      _chatSubscription;
+  StreamSubscription<QuerySnapshot>? _chatSubscription;
 
   // ===========================================================================
   // CONTROLLERS
@@ -159,8 +155,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
   late final TextEditingController _noteController;
 
-  final List<_ChatMessage> _chatMessages =
-      <_ChatMessage>[];
+  final List<_ChatMessage> _chatMessages = <_ChatMessage>[];
 
   // ===========================================================================
   // LIFECYCLE
@@ -265,17 +260,12 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       if (!mounted) return;
 
       setState(() {
-        _micOn =
-            prefs.getBool('crux_mic_default') ?? true;
+        _micOn = prefs.getBool('crux_mic_default') ?? true;
 
-        _camOn =
-            prefs.getBool('crux_cam_default') ?? true;
+        _camOn = prefs.getBool('crux_cam_default') ?? true;
       });
     } catch (e) {
-      logger.w(
-        'Could not load conference preferences',
-        error: e,
-      );
+      logger.w('Could not load conference preferences', error: e);
     }
   }
 
@@ -285,9 +275,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
   Future<void> _checkPro() async {
     try {
-      final value = await ProService().checkProStatus(
-        widget.userId,
-      );
+      final value = await ProService().checkProStatus(widget.userId);
 
       if (!mounted) return;
 
@@ -295,10 +283,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         _isPro = value;
       });
     } catch (e) {
-      logger.w(
-        'Pro check failed',
-        error: e,
-      );
+      logger.w('Pro check failed', error: e);
     }
   }
 
@@ -308,10 +293,11 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
   Future<void> _loadOrganizer() async {
     try {
-      final doc = await _db
-          .collection(AppConfig.meetingsCollection)
-          .doc(widget.meetingId)
-          .get();
+      final doc =
+          await _db
+              .collection(AppConfig.meetingsCollection)
+              .doc(widget.meetingId)
+              .get();
 
       if (!doc.exists) return;
 
@@ -319,13 +305,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
       if (data == null) return;
 
-      _organizerId =
-          data['organizerId']?.toString();
+      _organizerId = data['organizerId']?.toString();
     } catch (e) {
-      logger.w(
-        'Could not load organizer',
-        error: e,
-      );
+      logger.w('Could not load organizer', error: e);
     }
   }
 
@@ -354,27 +336,25 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         .doc(widget.meetingId)
         .collection('presence')
         .snapshots()
-        .listen(
-      (snapshot) {
-        if (!mounted) return;
+        .listen((snapshot) {
+          if (!mounted) return;
 
-        final hands = <String>{};
+          final hands = <String>{};
 
-        for (final doc in snapshot.docs) {
-          final data = doc.data();
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
 
-          if (data['handRaised'] == true) {
-            hands.add(doc.id);
+            if (data['handRaised'] == true) {
+              hands.add(doc.id);
+            }
           }
-        }
 
-        setState(() {
-          _raisedHands
-            ..clear()
-            ..addAll(hands);
+          setState(() {
+            _raisedHands
+              ..clear()
+              ..addAll(hands);
+          });
         });
-      },
-    );
   }
 
   // ===========================================================================
@@ -386,50 +366,40 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         .collection(AppConfig.meetingsCollection)
         .doc(widget.meetingId)
         .collection('chat')
-        .orderBy(
-          'timestamp',
-          descending: false,
-        )
+        .orderBy('timestamp', descending: false)
         .limit(AppConfig.maxLocalChatMessages)
         .snapshots()
-        .listen(
-      (snapshot) {
-        if (!mounted) return;
+        .listen((snapshot) {
+          if (!mounted) return;
 
-        final messages = <_ChatMessage>[];
+          final messages = <_ChatMessage>[];
 
-        for (final doc in snapshot.docs) {
-          final data = doc.data();
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
 
-          messages.add(
-            _ChatMessage(
-              senderId:
-                  data['senderId']?.toString() ?? '',
-              sender:
-                  data['sender']?.toString() ??
-                      'Anonyme',
-              message:
-                  data['message']?.toString() ??
-                      data['text']?.toString() ??
-                      '',
-              timestamp:
-                  data['timestamp'] is Timestamp
-                      ? (data['timestamp'] as Timestamp)
-                          .toDate()
-                      : null,
-              isPrivate:
-                  data['isPrivate'] == true,
-            ),
-          );
-        }
+            messages.add(
+              _ChatMessage(
+                senderId: data['senderId']?.toString() ?? '',
+                sender: data['sender']?.toString() ?? 'Anonyme',
+                message:
+                    data['message']?.toString() ??
+                    data['text']?.toString() ??
+                    '',
+                timestamp:
+                    data['timestamp'] is Timestamp
+                        ? (data['timestamp'] as Timestamp).toDate()
+                        : null,
+                isPrivate: data['isPrivate'] == true,
+              ),
+            );
+          }
 
-        setState(() {
-          _chatMessages
-            ..clear()
-            ..addAll(messages);
+          setState(() {
+            _chatMessages
+              ..clear()
+              ..addAll(messages);
+          });
         });
-      },
-    );
   }
 
   Future<void> _sendChat() async {
@@ -445,13 +415,13 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           .doc(widget.meetingId)
           .collection('chat')
           .add({
-        'senderId': widget.userId,
-        'sender': widget.userName,
-        'message': text,
-        'text': text,
-        'timestamp': FieldValue.serverTimestamp(),
-        'isPrivate': false,
-      });
+            'senderId': widget.userId,
+            'sender': widget.userName,
+            'message': text,
+            'text': text,
+            'timestamp': FieldValue.serverTimestamp(),
+            'isPrivate': false,
+          });
 
       await _sendData({
         'type': 'chat',
@@ -460,10 +430,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         'message': text,
       });
     } catch (e) {
-      logger.w(
-        'Chat send failed',
-        error: e,
-      );
+      logger.w('Chat send failed', error: e);
     }
   }
 
@@ -477,28 +444,32 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     _isConnecting = true;
 
     try {
-      if (!AppConfig.isLiveKitConfigured) {
+      // Utiliser Firebase UID comme identité LiveKit
+      final firebaseUid = LiveKitService.instance.getFirebaseIdentity();
+      if (firebaseUid == null || firebaseUid.isEmpty) {
+        throw Exception('Utilisateur Firebase non authentifié');
+      }
+
+      logger.i('🔐 Connecting to LiveKit with Firebase UID: $firebaseUid');
+
+      // Obtenir les détails de connexion depuis l'API Sandbox
+      final connectionDetails = await LiveKitService.instance
+          .fetchConnectionDetails(
+            room: widget.meetingId,
+            identity: firebaseUid,
+            name: widget.userName,
+          );
+
+      if (connectionDetails == null) {
         throw Exception(
-          'LiveKit n’est pas configuré. '
-          'Vérifiez LIVEKIT_WSS_URL et '
-          'LIVEKIT_TOKEN_SERVER_URL.',
+          'Le serveur LiveKit Sandbox n’a pas retourné '
+          'de détails de connexion valides.',
         );
       }
 
-      final token =
-          await LiveKitService.instance.fetchToken(
-        room: widget.meetingId,
-        identity: widget.userId,
-        name: widget.userName,
-        isHost: widget.isHost,
-      );
-
-      if (token == null || token.isEmpty) {
-        throw Exception(
-          'Le serveur LiveKit n’a pas retourné '
-          'de token valide.',
-        );
-      }
+      logger.i('✅ LiveKit connection details received');
+      logger.i('📡 Server URL: ${connectionDetails.serverUrl}');
+      logger.i('🎫 Room Name: ${connectionDetails.roomName}');
 
       await _disposeRoom();
 
@@ -506,10 +477,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         roomOptions: const RoomOptions(
           adaptiveStream: true,
           dynacast: true,
-          defaultVideoPublishOptions:
-              VideoPublishOptions(
-            simulcast: true,
-          ),
+          defaultVideoPublishOptions: VideoPublishOptions(simulcast: true),
         ),
       );
 
@@ -519,19 +487,18 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
       _setupRoomEvents(_roomListener!);
 
+      // Utiliser serverUrl et participantToken depuis la réponse Sandbox
       await room
           .connect(
-            AppConfig.livekitWssUrl,
-            token,
+            connectionDetails.serverUrl,
+            connectionDetails.participantToken,
           )
           .timeout(
-        AppConfig.roomConnectionTimeout,
-        onTimeout: () {
-          throw TimeoutException(
-            'Connexion LiveKit expirée.',
+            AppConfig.roomConnectionTimeout,
+            onTimeout: () {
+              throw TimeoutException('Connexion LiveKit expirée.');
+            },
           );
-        },
-      );
 
       final local = room.localParticipant;
 
@@ -550,6 +517,11 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           _isReconnecting = false;
         });
       }
+    } catch (error) {
+      // A failed connect must not leave a half-connected room around. The
+      // next attempt fetches a fresh sandbox token and creates a new room.
+      await _disposeRoom();
+      rethrow;
     } finally {
       _isConnecting = false;
     }
@@ -568,10 +540,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       try {
         await oldRoom.disconnect();
       } catch (e) {
-        logger.w(
-          'LiveKit disconnect failed',
-          error: e,
-        );
+        logger.w('LiveKit disconnect failed', error: e);
       }
     }
   }
@@ -580,11 +549,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ROOM EVENTS
   // ===========================================================================
 
-  void _setupRoomEvents(
-    EventsListener<RoomEvent> listener,
-  ) {
+  void _setupRoomEvents(EventsListener<RoomEvent> listener) {
     final meetingProvider = context.read<MeetingStateProvider>();
-    
+
     listener
       ..on<RoomConnectedEvent>((_) {
         _refreshParticipants();
@@ -617,87 +584,69 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
         unawaited(_attemptReconnect());
       })
-      ..on<ParticipantConnectedEvent>(
-        (event) {
-          _refreshParticipants();
-          
-          // Update meeting state provider
-          meetingProvider.updateParticipant(event.participant);
+      ..on<ParticipantConnectedEvent>((event) {
+        _refreshParticipants();
 
-          if (_voiceAssistant) {
-            final name =
-                event.participant.name.trim().isNotEmpty
-                    ? event.participant.name
-                    : 'Un participant';
+        // Update meeting state provider
+        meetingProvider.updateParticipant(event.participant);
 
-            _announce('$name a rejoint.');
-          }
-        },
-      )
-      ..on<ParticipantDisconnectedEvent>(
-        (event) {
-          _refreshParticipants();
-          
-          // Update meeting state provider
-          meetingProvider.removeParticipant(event.participant.sid);
+        if (_voiceAssistant) {
+          final name =
+              event.participant.name.trim().isNotEmpty
+                  ? event.participant.name
+                  : 'Un participant';
 
-          if (_voiceAssistant) {
-            final name =
-                event.participant.name.trim().isNotEmpty
-                    ? event.participant.name
-                    : 'Un participant';
+          _announce('$name a rejoint.');
+        }
+      })
+      ..on<ParticipantDisconnectedEvent>((event) {
+        _refreshParticipants();
 
-            _announce('$name a quitté.');
-          }
-        },
-      )
-      ..on<ActiveSpeakersChangedEvent>(
-        (event) {
-          if (!mounted) return;
+        // Update meeting state provider
+        meetingProvider.removeParticipant(event.participant.sid);
 
-          if (event.speakers.isEmpty) {
-            meetingProvider.setSpeakerMode(SpeakerMode.gallery);
-            return;
-          }
+        if (_voiceAssistant) {
+          final name =
+              event.participant.name.trim().isNotEmpty
+                  ? event.participant.name
+                  : 'Un participant';
 
-          for (final speaker in event.speakers) {
-            meetingProvider.updateAudioLevel(speaker.sid, speaker.audioLevel);
-          }
-        },
-      )
-      ..on<ParticipantMetadataUpdatedEvent>(
-        (event) {
-          _refreshParticipants();
-          meetingProvider.updateParticipant(event.participant);
-        },
-      )
-      ..on<TrackSubscribedEvent>(
-        (event) {
-          _refreshParticipants();
-          meetingProvider.updateParticipant(event.participant);
-        },
-      )
-      ..on<TrackUnsubscribedEvent>(
-        (event) {
-          _refreshParticipants();
-          meetingProvider.updateParticipant(event.participant);
-        },
-      )
-      ..on<TrackPublishedEvent>(
-        (event) {
-          _refreshParticipants();
-          meetingProvider.updateParticipant(event.participant);
-        },
-      )
-      ..on<TrackUnpublishedEvent>(
-        (event) {
-          _refreshParticipants();
-          meetingProvider.updateParticipant(event.participant);
-        },
-      )
-      ..on<DataReceivedEvent>(
-        _handleDataReceived,
-      );
+          _announce('$name a quitté.');
+        }
+      })
+      ..on<ActiveSpeakersChangedEvent>((event) {
+        if (!mounted) return;
+
+        if (event.speakers.isEmpty) {
+          meetingProvider.setSpeakerMode(SpeakerMode.gallery);
+          return;
+        }
+
+        for (final speaker in event.speakers) {
+          meetingProvider.updateAudioLevel(speaker.sid, speaker.audioLevel);
+        }
+      })
+      ..on<ParticipantMetadataUpdatedEvent>((event) {
+        _refreshParticipants();
+        meetingProvider.updateParticipant(event.participant);
+      })
+      ..on<TrackSubscribedEvent>((event) {
+        _refreshParticipants();
+        meetingProvider.updateParticipant(event.participant);
+      })
+      ..on<TrackUnsubscribedEvent>((event) {
+        _refreshParticipants();
+        meetingProvider.updateParticipant(event.participant);
+      })
+      ..on<TrackPublishedEvent>((event) {
+        _refreshParticipants();
+        meetingProvider.updateParticipant(event.participant);
+      })
+      ..on<TrackUnpublishedEvent>((event) {
+        _refreshParticipants();
+        meetingProvider.updateParticipant(event.participant);
+      })
+      ..on<DataReceivedEvent>(_handleDataReceived);
   }
 
   // ===========================================================================
@@ -711,21 +660,20 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       return;
     }
 
-    final participants =
-        room.remoteParticipants.values.toList();
+    final participants = room.remoteParticipants.values.toList();
 
     setState(() {
       _remoteParticipants = participants;
     });
-    
+
     // Update meeting state provider with all participants
     final meetingProvider = context.read<MeetingStateProvider>();
-    
+
     // Add local participant
     if (room.localParticipant != null) {
       meetingProvider.updateParticipant(room.localParticipant!);
     }
-    
+
     // Add all remote participants
     for (final participant in participants) {
       meetingProvider.updateParticipant(participant);
@@ -736,9 +684,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // LIVEKIT DATA
   // ===========================================================================
 
-  void _handleDataReceived(
-    DataReceivedEvent event,
-  ) {
+  void _handleDataReceived(DataReceivedEvent event) {
     try {
       final text = utf8.decode(event.data);
 
@@ -751,23 +697,19 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       final type = decoded['type']?.toString();
 
       if (type == 'mute_all') {
-        final sender =
-            event.participant?.identity;
+        final sender = event.participant?.identity;
 
         if (sender == _organizerId && _micOn) {
           _toggleMic();
 
-          _announce(
-            'L’organisateur a coupé votre microphone.',
-          );
+          _announce('L’organisateur a coupé votre microphone.');
         }
 
         return;
       }
 
       if (type == 'raise_hand') {
-        final identity =
-            decoded['identity']?.toString();
+        final identity = decoded['identity']?.toString();
 
         if (identity == null) {
           return;
@@ -783,8 +725,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       }
 
       if (type == 'lower_hand') {
-        final identity =
-            decoded['identity']?.toString();
+        final identity = decoded['identity']?.toString();
 
         if (identity == null) {
           return;
@@ -799,16 +740,11 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         return;
       }
     } catch (e) {
-      logger.w(
-        'LiveKit data decoding failed',
-        error: e,
-      );
+      logger.w('LiveKit data decoding failed', error: e);
     }
   }
 
-  Future<void> _sendData(
-    Map<String, dynamic> payload,
-  ) async {
+  Future<void> _sendData(Map<String, dynamic> payload) async {
     final room = _room;
 
     if (room == null) return;
@@ -818,19 +754,11 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     if (local == null) return;
 
     try {
-      final data = utf8.encode(
-        jsonEncode(payload),
-      );
+      final data = utf8.encode(jsonEncode(payload));
 
-      await local.publishData(
-        data,
-        reliable: true,
-      );
+      await local.publishData(data, reliable: true);
     } catch (e) {
-      logger.w(
-        'LiveKit data send failed',
-        error: e,
-      );
+      logger.w('LiveKit data send failed', error: e);
     }
   }
 
@@ -854,10 +782,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         _micOn = next;
       });
     } catch (e) {
-      logger.w(
-        'Microphone toggle failed',
-        error: e,
-      );
+      logger.w('Microphone toggle failed', error: e);
     }
   }
 
@@ -881,10 +806,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         _camOn = next;
       });
     } catch (e) {
-      logger.w(
-        'Camera toggle failed',
-        error: e,
-      );
+      logger.w('Camera toggle failed', error: e);
     }
   }
 
@@ -912,20 +834,20 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       setState(() {
         _screenSharing = next;
       });
-      
+
       // Update meeting state provider
       final meetingProvider = context.read<MeetingStateProvider>();
       meetingProvider.setScreenSharing(next);
-      
+
       logger.i('Screen share toggled successfully: $next');
     } catch (e) {
       logger.e('Screen share failed', error: e);
-      
+
       if (mounted) {
         setState(() {
           _screenSharing = false;
         });
-        
+
         // Show error to user
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -950,19 +872,14 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           .doc(widget.meetingId)
           .collection('presence')
           .doc(widget.userId)
-          .set(
-        {
-          'handRaised': next,
-          'userId': widget.userId,
-          'userName': widget.userName,
-        },
-        SetOptions(merge: true),
-      );
+          .set({
+            'handRaised': next,
+            'userId': widget.userId,
+            'userName': widget.userName,
+          }, SetOptions(merge: true));
 
       await _sendData({
-        'type': next
-            ? 'raise_hand'
-            : 'lower_hand',
+        'type': next ? 'raise_hand' : 'lower_hand',
         'identity': widget.userId,
       });
 
@@ -973,15 +890,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       });
 
       if (next) {
-        _announce(
-          'Vous avez levé la main.',
-        );
+        _announce('Vous avez levé la main.');
       }
     } catch (e) {
-      logger.w(
-        'Raise hand failed',
-        error: e,
-      );
+      logger.w('Raise hand failed', error: e);
     }
   }
 
@@ -990,8 +902,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   Future<void> _muteAllOthers() async {
-    if (!widget.isHost &&
-        widget.userId != _organizerId) {
+    if (!widget.isHost && widget.userId != _organizerId) {
       return;
     }
 
@@ -1002,30 +913,20 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           backgroundColor: AppColors.surface,
           title: const Text(
             'Muter tout le monde ?',
-            style: TextStyle(
-              color: Colors.white,
-            ),
+            style: TextStyle(color: Colors.white),
           ),
           content: const Text(
             'Cette action demandera aux autres participants de couper leur microphone.',
-            style: TextStyle(
-              color: Colors.white70,
-            ),
+            style: TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
-              onPressed: () =>
-                  Navigator.pop(context, false),
-              child: const Text(
-                'Annuler',
-              ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler'),
             ),
             ElevatedButton(
-              onPressed: () =>
-                  Navigator.pop(context, true),
-              child: const Text(
-                'Muter',
-              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Muter'),
             ),
           ],
         );
@@ -1036,10 +937,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       return;
     }
 
-    await _sendData({
-      'type': 'mute_all',
-      'identity': widget.userId,
-    });
+    await _sendData({'type': 'mute_all', 'identity': widget.userId});
   }
 
   // ===========================================================================
@@ -1051,10 +949,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       try {
         await _speech.stop();
       } catch (e) {
-        logger.w(
-          'Speech recognition stop failed',
-          error: e,
-        );
+        logger.w('Speech recognition stop failed', error: e);
       }
 
       if (!mounted) return;
@@ -1068,8 +963,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     }
 
     try {
-      final available =
-          await _speech.initialize();
+      final available = await _speech.initialize();
 
       if (!available) {
         if (mounted) {
@@ -1092,8 +986,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       });
 
       await _speech.listen(
-        listenOptions:
-            stt.SpeechListenOptions(
+        listenOptions: stt.SpeechListenOptions(
           localeId: 'fr_FR',
           partialResults: true,
           cancelOnError: false,
@@ -1102,17 +995,12 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           if (!mounted) return;
 
           setState(() {
-            _currentTranscription =
-                result.recognizedWords;
+            _currentTranscription = result.recognizedWords;
           });
         },
       );
     } catch (e, stackTrace) {
-      logger.w(
-        'Speech recognition failed',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      logger.w('Speech recognition failed', error: e, stackTrace: stackTrace);
 
       if (mounted) {
         setState(() {
@@ -1139,10 +1027,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
       await _tts.speak(text);
     } catch (e) {
-      logger.w(
-        'TTS failed',
-        error: e,
-      );
+      logger.w('TTS failed', error: e);
     }
   }
 
@@ -1153,41 +1038,35 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   void _startTimer() {
     _callTimer?.cancel();
 
-    _callTimer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) {
-        if (!mounted) return;
+    _callTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
 
-        setState(() {
-          _secondsElapsed++;
-        });
+      setState(() {
+        _secondsElapsed++;
+      });
 
-        if (_isPro) return;
+      if (_isPro) return;
 
-        final limit =
-            AppConfig.freeMeetingDurationMinutes * 60;
+      final limit = AppConfig.freeMeetingDurationMinutes * 60;
 
-        if (_secondsElapsed == limit - 300) {
-          _announce(
-            'Attention, votre appel gratuit se terminera dans 5 minutes.',
-          );
-        }
+      if (_secondsElapsed == limit - 300) {
+        _announce(
+          'Attention, votre appel gratuit se terminera dans 5 minutes.',
+        );
+      }
 
-        if (_secondsElapsed >= limit &&
-            !_paywallShown) {
-          _paywallShown = true;
+      if (_secondsElapsed >= limit && !_paywallShown) {
+        _paywallShown = true;
 
-          _showPaywall();
-        }
-      },
-    );
+        _showPaywall();
+      }
+    });
   }
 
   String _formatElapsedDuration() {
     final hours = _secondsElapsed ~/ 3600;
 
-    final minutes =
-        (_secondsElapsed % 3600) ~/ 60;
+    final minutes = (_secondsElapsed % 3600) ~/ 60;
 
     final seconds = _secondsElapsed % 60;
 
@@ -1216,23 +1095,14 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           backgroundColor: AppColors.surface,
           title: const Text(
             'Temps écoulé',
-            style: TextStyle(
-              color: Colors.white,
-            ),
+            style: TextStyle(color: Colors.white),
           ),
           content: const Text(
             'La limite de la réunion gratuite est atteinte.',
-            style: TextStyle(
-              color: Colors.white70,
-            ),
+            style: TextStyle(color: Colors.white70),
           ),
           actions: [
-            TextButton(
-              onPressed: _leave,
-              child: const Text(
-                'Quitter',
-              ),
-            ),
+            TextButton(onPressed: _leave, child: const Text('Quitter')),
             ElevatedButton(
               onPressed: () {
                 ProService().startPayment(
@@ -1240,9 +1110,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                   userName: widget.userName,
                 );
               },
-              child: const Text(
-                'Devenir Pro',
-              ),
+              child: const Text('Devenir Pro'),
             ),
           ],
         );
@@ -1259,12 +1127,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       return;
     }
 
-    if (_reconnectAttempts >=
-        AppConfig.maxReconnectAttempts) {
+    if (_reconnectAttempts >= AppConfig.maxReconnectAttempts) {
       setState(() {
         _isReconnecting = false;
-        _error =
-            'La connexion à la conférence a été interrompue.';
+        _error = 'La connexion à la conférence a été interrompue.';
       });
 
       return;
@@ -1276,9 +1142,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       _isReconnecting = true;
     });
 
-    await Future<void>.delayed(
-      AppConfig.reconnectDelay,
-    );
+    await Future<void>.delayed(AppConfig.reconnectDelay);
 
     if (!mounted) return;
 
@@ -1291,15 +1155,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         _isReconnecting = false;
       });
     } catch (e) {
-      logger.w(
-        'Reconnect attempt failed',
-        error: e,
-      );
+      logger.w('Reconnect attempt failed', error: e);
 
       if (mounted) {
-        unawaited(
-          _attemptReconnect(),
-        );
+        unawaited(_attemptReconnect());
       }
     }
   }
@@ -1316,30 +1175,20 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           backgroundColor: AppColors.surface,
           title: const Text(
             'Quitter la réunion ?',
-            style: TextStyle(
-              color: Colors.white,
-            ),
+            style: TextStyle(color: Colors.white),
           ),
           content: const Text(
             'Voulez-vous quitter cette conférence ?',
-            style: TextStyle(
-              color: Colors.white70,
-            ),
+            style: TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
-              onPressed: () =>
-                  Navigator.pop(context, false),
-              child: const Text(
-                'Rester',
-              ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Rester'),
             ),
             ElevatedButton(
-              onPressed: () =>
-                  Navigator.pop(context, true),
-              child: const Text(
-                'Quitter',
-              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Quitter'),
             ),
           ],
         );
@@ -1353,8 +1202,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
   Future<void> _leave() async {
     try {
-      await MeetingService()
-          .saveMeetingHistoryForUser(
+      await MeetingService().saveMeetingHistoryForUser(
         meetingId: widget.meetingId,
         userId: widget.userId,
         title: widget.meetingName,
@@ -1362,15 +1210,9 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
         endMeeting: false,
       );
 
-      await MeetingService().removePresence(
-        widget.meetingId,
-        widget.userId,
-      );
+      await MeetingService().removePresence(widget.meetingId, widget.userId);
     } catch (e) {
-      logger.w(
-        'Meeting cleanup failed',
-        error: e,
-      );
+      logger.w('Meeting cleanup failed', error: e);
     }
 
     await _disposeRoom();
@@ -1399,28 +1241,21 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       body: Stack(
         children: [
           // Use new conference view
-          const Positioned.fill(
-            child: CruxConferenceView(),
-          ),
+          const Positioned.fill(child: CruxConferenceView()),
 
           _buildTopBar(),
 
-          if (_currentTranscription.isNotEmpty)
-            _buildCaptions(),
+          if (_currentTranscription.isNotEmpty) _buildCaptions(),
 
           _buildBottomBar(),
 
-          if (_showChat)
-            _buildChatPanel(),
+          if (_showChat) _buildChatPanel(),
 
-          if (_showParticipants)
-            _buildParticipantsPanel(),
+          if (_showParticipants) _buildParticipantsPanel(),
 
-          if (_showNotes)
-            _buildNotesPanel(),
+          if (_showNotes) _buildNotesPanel(),
 
-          if (_isReconnecting)
-            _buildReconnectBanner(),
+          if (_isReconnecting) _buildReconnectBanner(),
         ],
       ),
     );
@@ -1441,25 +1276,15 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
               color: AppColors.primary,
               strokeWidth: 2,
             ),
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 20),
             Text(
               'Connexion au webinaire...',
-              style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontSize: 14,
-              ),
+              style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
             ),
-            const SizedBox(
-              height: 8,
-            ),
+            const SizedBox(height: 8),
             Text(
               'Jusqu’à $_targetParticipants participants',
-              style: GoogleFonts.poppins(
-                color: Colors.white38,
-                fontSize: 11,
-              ),
+              style: GoogleFonts.poppins(color: Colors.white38, fontSize: 11),
             ),
           ],
         ),
@@ -1480,24 +1305,14 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.error_outline,
-                color: AppColors.error,
-                size: 64,
-              ),
-              const SizedBox(
-                height: 20,
-              ),
+              const Icon(Icons.error_outline, color: AppColors.error, size: 64),
+              const SizedBox(height: 20),
               Text(
                 _error ?? 'Erreur inconnue',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white70,
-                ),
+                style: const TextStyle(color: Colors.white70),
               ),
-              const SizedBox(
-                height: 24,
-              ),
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () {
                   setState(() {
@@ -1507,9 +1322,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
                   _initialize();
                 },
-                child: const Text(
-                  'Réessayer',
-                ),
+                child: const Text('Réessayer'),
               ),
             ],
           ),
@@ -1528,20 +1341,12 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       left: 0,
       right: 0,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(
-          16,
-          12,
-          16,
-          16,
-        ),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Colors.black87,
-              Colors.transparent,
-            ],
+            colors: [Colors.black87, Colors.transparent],
           ),
         ),
         child: SafeArea(
@@ -1549,24 +1354,19 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
             children: [
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       widget.meetingName,
                       maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
+                      overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
                         color: Colors.white,
-                        fontWeight:
-                            FontWeight.w800,
+                        fontWeight: FontWeight.w800,
                         fontSize: 16,
                       ),
                     ),
-                    const SizedBox(
-                      height: 2,
-                    ),
+                    const SizedBox(height: 2),
                     Text(
                       'Webinaire • '
                       '$_participantCountLabel',
@@ -1582,24 +1382,16 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                 icon: Icons.timer_outlined,
                 text: _formatElapsedDuration(),
               ),
-              const SizedBox(
-                width: 8,
-              ),
+              const SizedBox(width: 8),
               _TopPill(
                 icon: Icons.people_outline,
-                text: _participantCount
-                    .toString(),
+                text: _participantCount.toString(),
               ),
-              const SizedBox(
-                width: 8,
-              ),
+              const SizedBox(width: 8),
               IconButton(
                 tooltip: 'Quitter',
                 onPressed: _confirmLeave,
-                icon: const Icon(
-                  Icons.close,
-                  color: Colors.white,
-                ),
+                icon: const Icon(Icons.close, color: Colors.white),
               ),
             ],
           ),
@@ -1610,8 +1402,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
 
   String get _participantCountLabel {
     if (_participantCount >= 1000) {
-      final value =
-          _participantCount / 1000;
+      final value = _participantCount / 1000;
 
       return '${value.toStringAsFixed(1)}K participants';
     }
@@ -1639,25 +1430,16 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       right: 24,
       bottom: 115,
       child: ClipRRect(
-        borderRadius:
-            BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: 12,
-            sigmaY: 12,
-          ),
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
           child: Container(
             padding: const EdgeInsets.all(14),
-            color: Colors.black.withValues(
-              alpha: 0.65,
-            ),
+            color: Colors.black.withValues(alpha: 0.65),
             child: Text(
               _currentTranscription,
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontSize: 13,
-              ),
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
             ),
           ),
         ),
@@ -1676,47 +1458,32 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       bottom: 12,
       child: SafeArea(
         child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 10,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.surface.withValues(
-              alpha: 0.96,
-            ),
-            borderRadius:
-                BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white10,
-            ),
+            color: AppColors.surface.withValues(alpha: 0.96),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white10),
           ),
           child: Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceEvenly,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _ControlButton(
-                icon: _micOn
-                    ? Icons.mic
-                    : Icons.mic_off,
+                icon: _micOn ? Icons.mic : Icons.mic_off,
                 active: _micOn,
                 onTap: _toggleMic,
               ),
               _ControlButton(
-                icon: _camOn
-                    ? Icons.videocam
-                    : Icons.videocam_off,
+                icon: _camOn ? Icons.videocam : Icons.videocam_off,
                 active: _camOn,
                 onTap: _toggleCamera,
               ),
               _ControlButton(
-                icon:
-                    Icons.screen_share_outlined,
+                icon: Icons.screen_share_outlined,
                 active: _screenSharing,
                 onTap: _toggleScreenShare,
               ),
               _ControlButton(
-                icon:
-                    Icons.chat_bubble_outline,
+                icon: Icons.chat_bubble_outline,
                 onTap: () {
                   setState(() {
                     _showChat = true;
@@ -1732,14 +1499,12 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                 },
               ),
               _ControlButton(
-                icon:
-                    Icons.back_hand_outlined,
+                icon: Icons.back_hand_outlined,
                 active: _handRaised,
                 onTap: _toggleRaiseHand,
               ),
               _ControlButton(
-                icon:
-                    Icons.closed_caption_outlined,
+                icon: Icons.closed_caption_outlined,
                 active: _liveCaptions,
                 onTap: _toggleCaptions,
               ),
@@ -1751,10 +1516,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                   });
                 },
               ),
-              _ControlButton(
-                icon: Icons.more_horiz,
-                onTap: _showMoreOptions,
-              ),
+              _ControlButton(icon: Icons.more_horiz, onTap: _showMoreOptions),
             ],
           ),
         ),
@@ -1777,84 +1539,51 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       child: Column(
         children: [
           Expanded(
-            child: _chatMessages.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Aucun message',
-                      style: TextStyle(
-                        color: Colors.white38,
+            child:
+                _chatMessages.isEmpty
+                    ? const Center(
+                      child: Text(
+                        'Aucun message',
+                        style: TextStyle(color: Colors.white38),
                       ),
-                    ),
-                  )
-                : ListView.builder(
-                    padding:
-                        const EdgeInsets.all(16),
-                    itemCount:
-                        _chatMessages.length,
-                    itemBuilder: (_, index) {
-                      final message =
-                          _chatMessages[index];
+                    )
+                    : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _chatMessages.length,
+                      itemBuilder: (_, index) {
+                        final message = _chatMessages[index];
 
-                      return _ChatBubble(
-                        message: message,
-                        isMe:
-                            message.senderId ==
-                                widget.userId,
-                      );
-                    },
-                  ),
+                        return _ChatBubble(
+                          message: message,
+                          isMe: message.senderId == widget.userId,
+                        );
+                      },
+                    ),
           ),
           Container(
-            padding:
-                const EdgeInsets.fromLTRB(
-              12,
-              8,
-              12,
-              20,
-            ),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
-                    controller:
-                        _chatController,
-                    style: const TextStyle(
-                      color: Colors.white,
-                    ),
-                    decoration:
-                        InputDecoration(
-                      hintText:
-                          'Écrire un message...',
-                      hintStyle:
-                          const TextStyle(
-                        color: Colors.white38,
-                      ),
+                    controller: _chatController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Écrire un message...',
+                      hintStyle: const TextStyle(color: Colors.white38),
                       filled: true,
-                      fillColor:
-                          Colors.white
-                              .withValues(
-                        alpha: 0.06,
-                      ),
-                      border:
-                          OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(
-                          24,
-                        ),
-                        borderSide:
-                            BorderSide.none,
+                      fillColor: Colors.white.withValues(alpha: 0.06),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
                       ),
                     ),
-                    onSubmitted:
-                        (_) => _sendChat(),
+                    onSubmitted: (_) => _sendChat(),
                   ),
                 ),
                 IconButton(
                   onPressed: _sendChat,
-                  icon: const Icon(
-                    Icons.send,
-                    color: AppColors.primary,
-                  ),
+                  icon: const Icon(Icons.send, color: AppColors.primary),
                 ),
               ],
             ),
@@ -1869,14 +1598,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   Widget _buildParticipantsPanel() {
-    final participants =
-        <RemoteParticipant>[
-      ..._remoteParticipants,
-    ];
+    final participants = <RemoteParticipant>[..._remoteParticipants];
 
     return _Panel(
-      title:
-          'Participants ($_participantCount)',
+      title: 'Participants ($_participantCount)',
       onClose: () {
         setState(() {
           _showParticipants = false;
@@ -1884,79 +1609,57 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       },
       child: Column(
         children: [
-          if (widget.isHost ||
-              widget.userId == _organizerId)
+          if (widget.isHost || widget.userId == _organizerId)
             Padding(
-              padding:
-                  const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: SizedBox(
                 width: double.infinity,
-                child:
-                    ElevatedButton.icon(
-                  onPressed:
-                      _muteAllOthers,
-                  icon:
-                      const Icon(Icons.mic_off),
-                  label: const Text(
-                    'Muter tous les autres',
-                  ),
+                child: ElevatedButton.icon(
+                  onPressed: _muteAllOthers,
+                  icon: const Icon(Icons.mic_off),
+                  label: const Text('Muter tous les autres'),
                 ),
               ),
             ),
           Expanded(
-            child: participants.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Aucun participant distant',
-                      style: TextStyle(
-                        color: Colors.white38,
+            child:
+                participants.isEmpty
+                    ? const Center(
+                      child: Text(
+                        'Aucun participant distant',
+                        style: TextStyle(color: Colors.white38),
                       ),
+                    )
+                    : ListView.builder(
+                      itemCount: participants.length,
+                      itemBuilder: (_, index) {
+                        final p = participants[index];
+
+                        final raised = _raisedHands.contains(p.identity);
+
+                        return ListTile(
+                          leading: _Avatar(name: p.name),
+                          title: Text(
+                            p.name.isNotEmpty ? p.name : 'Participant',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          subtitle: Text(
+                            p.identity,
+                            style: const TextStyle(
+                              color: Colors.white38,
+                              fontSize: 10,
+                            ),
+                          ),
+                          trailing:
+                              raised
+                                  ? const Icon(
+                                    Icons.back_hand,
+                                    color: Colors.orange,
+                                  )
+                                  : null,
+                        );
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    itemCount:
-                        participants.length,
-                    itemBuilder: (_, index) {
-                      final p =
-                          participants[index];
-
-                      final raised =
-                          _raisedHands.contains(
-                        p.identity,
-                      );
-
-                      return ListTile(
-                        leading: _Avatar(
-                          name: p.name,
-                        ),
-                        title: Text(
-                          p.name.isNotEmpty
-                              ? p.name
-                              : 'Participant',
-                          style:
-                              const TextStyle(
-                            color: Colors.white,
-                          ),
-                        ),
-                        subtitle: Text(
-                          p.identity,
-                          style:
-                              const TextStyle(
-                            color:
-                                Colors.white38,
-                            fontSize: 10,
-                          ),
-                        ),
-                        trailing: raised
-                            ? const Icon(
-                                Icons.back_hand,
-                                color:
-                                    Colors.orange,
-                              )
-                            : null,
-                      );
-                    },
-                  ),
           ),
         ],
       ),
@@ -1971,8 +1674,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
     return _Panel(
       title: 'Notes de réunion',
       onClose: () async {
-        await NoteService.instance
-            .saveMeetingNote(
+        await NoteService.instance.saveMeetingNote(
           userId: widget.userId,
           meetingId: widget.meetingId,
           meetingName: widget.meetingName,
@@ -1991,19 +1693,11 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           controller: _noteController,
           maxLines: null,
           expands: true,
-          textAlignVertical:
-              TextAlignVertical.top,
-          style: const TextStyle(
-            color: Colors.white,
-            height: 1.5,
-          ),
-          decoration:
-              const InputDecoration(
-            hintText:
-                'Écrivez vos notes...',
-            hintStyle: TextStyle(
-              color: Colors.white24,
-            ),
+          textAlignVertical: TextAlignVertical.top,
+          style: const TextStyle(color: Colors.white, height: 1.5),
+          decoration: const InputDecoration(
+            hintText: 'Écrivez vos notes...',
+            hintStyle: TextStyle(color: Colors.white24),
             border: InputBorder.none,
           ),
         ),
@@ -2021,17 +1715,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       backgroundColor: Colors.transparent,
       builder: (context) {
         return Container(
-          padding:
-              const EdgeInsets.symmetric(
-            vertical: 16,
-          ),
-          decoration:
-              const BoxDecoration(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: const BoxDecoration(
             color: AppColors.surface,
-            borderRadius:
-                BorderRadius.vertical(
-              top: Radius.circular(28),
-            ),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: SafeArea(
             child: Column(
@@ -2044,9 +1731,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                   ),
                   title: const Text(
                     'Sous-titres en direct',
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
+                    style: TextStyle(color: Colors.white),
                   ),
                   onTap: () {
                     Navigator.pop(context);
@@ -2060,12 +1745,8 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                     color: Colors.white,
                   ),
                   title: Text(
-                    _screenSharing
-                        ? 'Arrêter le partage'
-                        : 'Partager l’écran',
-                    style: const TextStyle(
-                      color: Colors.white,
-                    ),
+                    _screenSharing ? 'Arrêter le partage' : 'Partager l’écran',
+                    style: const TextStyle(color: Colors.white),
                   ),
                   onTap: () {
                     Navigator.pop(context);
@@ -2082,29 +1763,21 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                     _voiceAssistant
                         ? 'Désactiver l’assistant vocal'
                         : 'Activer l’assistant vocal',
-                    style: const TextStyle(
-                      color: Colors.white,
-                    ),
+                    style: const TextStyle(color: Colors.white),
                   ),
                   onTap: () {
                     Navigator.pop(context);
 
                     setState(() {
-                      _voiceAssistant =
-                          !_voiceAssistant;
+                      _voiceAssistant = !_voiceAssistant;
                     });
                   },
                 ),
                 ListTile(
-                  leading: const Icon(
-                    Icons.copy_outlined,
-                    color: Colors.white,
-                  ),
+                  leading: const Icon(Icons.copy_outlined, color: Colors.white),
                   title: const Text(
                     'Copier le lien',
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
+                    style: TextStyle(color: Colors.white),
                   ),
                   onTap: () {
                     Navigator.pop(context);
@@ -2125,21 +1798,15 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
   // ===========================================================================
 
   Future<void> _copyMeetingLink() async {
-    final link = AppConfig.webJoinLink(
-      widget.meetingId,
-    );
+    final link = AppConfig.webJoinLink(widget.meetingId);
 
-    await Clipboard.setData(
-      ClipboardData(text: link),
-    );
+    await Clipboard.setData(ClipboardData(text: link));
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Lien copié.'),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Lien copié.')));
   }
 
   // ===========================================================================
@@ -2152,18 +1819,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       left: 20,
       right: 20,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 10,
-        ),
-        decoration:
-            BoxDecoration(
-          color: Colors.orange.withValues(
-            alpha: 0.92,
-          ),
-          borderRadius:
-              BorderRadius.circular(12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.orange.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: const Row(
           children: [
@@ -2175,9 +1834,7 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
                 color: Colors.white,
               ),
             ),
-            SizedBox(
-              width: 10,
-            ),
+            SizedBox(width: 10),
             Expanded(
               child: Text(
                 'Reconnexion à la conférence...',
@@ -2216,14 +1873,9 @@ class _Panel extends StatelessWidget {
     return Positioned.fill(
       child: ClipRect(
         child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: 18,
-            sigmaY: 18,
-          ),
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            color: Colors.black.withValues(
-              alpha: 0.90,
-            ),
+            color: Colors.black.withValues(alpha: 0.90),
             child: Column(
               children: [
                 SafeArea(
@@ -2232,19 +1884,14 @@ class _Panel extends StatelessWidget {
                     children: [
                       IconButton(
                         onPressed: onClose,
-                        icon: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                        ),
+                        icon: const Icon(Icons.close, color: Colors.white),
                       ),
                       Expanded(
                         child: Text(
                           title,
-                          style:
-                              GoogleFonts.poppins(
+                          style: GoogleFonts.poppins(
                             color: Colors.white,
-                            fontWeight:
-                                FontWeight.w700,
+                            fontWeight: FontWeight.w700,
                             fontSize: 17,
                           ),
                         ),
@@ -2252,9 +1899,7 @@ class _Panel extends StatelessWidget {
                     ],
                   ),
                 ),
-                Expanded(
-                  child: child,
-                ),
+                Expanded(child: child),
               ],
             ),
           ),
@@ -2297,42 +1942,28 @@ class _ChatBubble extends StatelessWidget {
 
   final bool isMe;
 
-  const _ChatBubble({
-    required this.message,
-    required this.isMe,
-  });
+  const _ChatBubble({required this.message, required this.isMe});
 
   @override
   Widget build(BuildContext context) {
-    final time = message.timestamp == null
-        ? ''
-        : '${message.timestamp!.hour.toString().padLeft(2, '0')}:'
-            '${message.timestamp!.minute.toString().padLeft(2, '0')}';
+    final time =
+        message.timestamp == null
+            ? ''
+            : '${message.timestamp!.hour.toString().padLeft(2, '0')}:'
+                '${message.timestamp!.minute.toString().padLeft(2, '0')}';
 
     return Align(
-      alignment: isMe
-          ? Alignment.centerRight
-          : Alignment.centerLeft,
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        constraints:
-            const BoxConstraints(
-          maxWidth: 340,
-        ),
-        margin:
-            const EdgeInsets.symmetric(
-          vertical: 4,
-        ),
+        constraints: const BoxConstraints(maxWidth: 340),
+        margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isMe
-              ? AppColors.primary
-              : Colors.white10,
-          borderRadius:
-              BorderRadius.circular(16),
+          color: isMe ? AppColors.primary : Colors.white10,
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (!isMe)
               Text(
@@ -2340,27 +1971,19 @@ class _ChatBubble extends StatelessWidget {
                 style: const TextStyle(
                   color: Colors.white54,
                   fontSize: 10,
-                  fontWeight:
-                      FontWeight.w700,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             Text(
               message.message,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 13),
             ),
             if (time.isNotEmpty)
               Align(
-                alignment:
-                    Alignment.centerRight,
+                alignment: Alignment.centerRight,
                 child: Text(
                   time,
-                  style: const TextStyle(
-                    color: Colors.white38,
-                    fontSize: 9,
-                  ),
+                  style: const TextStyle(color: Colors.white38, fontSize: 9),
                 ),
               ),
           ],
@@ -2379,38 +2002,22 @@ class _TopPill extends StatelessWidget {
 
   final String text;
 
-  const _TopPill({
-    required this.icon,
-    required this.text,
-  });
+  const _TopPill({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 7,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: Colors.black45,
-        borderRadius:
-            BorderRadius.circular(999),
-        border: Border.all(
-          color: Colors.white10,
-        ),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 14,
-            color: Colors.white70,
-          ),
-          const SizedBox(
-            width: 5,
-          ),
+          Icon(icon, size: 14, color: Colors.white70),
+          const SizedBox(width: 5),
           Text(
             text,
             style: const TextStyle(
@@ -2445,9 +2052,7 @@ class _ControlButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: active
-          ? Colors.white10
-          : Colors.transparent,
+      color: active ? Colors.white10 : Colors.transparent,
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
@@ -2456,9 +2061,7 @@ class _ControlButton extends StatelessWidget {
           padding: const EdgeInsets.all(10),
           child: Icon(
             icon,
-            color: active
-                ? Colors.white
-                : Colors.white60,
+            color: active ? Colors.white : Colors.white60,
             size: 22,
           ),
         ),
@@ -2476,29 +2079,20 @@ class _Avatar extends StatelessWidget {
 
   final bool large;
 
-  const _Avatar({
-    required this.name,
-  }) : large = false;
+  const _Avatar({required this.name}) : large = false;
 
   @override
   Widget build(BuildContext context) {
     final size = large ? 72.0 : 42.0;
 
-    final initial = name.trim().isEmpty
-        ? '?'
-        : name
-            .trim()
-            .characters
-            .first
-            .toUpperCase();
+    final initial =
+        name.trim().isEmpty ? '?' : name.trim().characters.first.toUpperCase();
 
     return Container(
       width: size,
       height: size,
-      decoration:
-          const BoxDecoration(
-        gradient:
-            AppColors.primaryGradient,
+      decoration: const BoxDecoration(
+        gradient: AppColors.primaryGradient,
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,

@@ -23,110 +23,136 @@ class BackgroundPanel extends StatelessWidget {
   void _showColorPicker(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choisir une couleur de fond'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _ColorOption(
-                color: Colors.blue,
-                onTap: () {
-                  controller.setMode(const VirtualBackgroundColor(Colors.blue));
-                  Navigator.pop(context);
-                },
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Choisir une couleur de fond'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ColorOption(
+                    color: Colors.blue,
+                    onTap: () {
+                      controller.setMode(
+                        const VirtualBackgroundColor(Colors.blue),
+                      );
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _ColorOption(
+                    color: Colors.green,
+                    onTap: () {
+                      controller.setMode(
+                        const VirtualBackgroundColor(Colors.green),
+                      );
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _ColorOption(
+                    color: Colors.purple,
+                    onTap: () {
+                      controller.setMode(
+                        const VirtualBackgroundColor(Colors.purple),
+                      );
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _ColorOption(
+                    color: Colors.orange,
+                    onTap: () {
+                      controller.setMode(
+                        const VirtualBackgroundColor(Colors.orange),
+                      );
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _ColorOption(
+                    color: Colors.teal,
+                    onTap: () {
+                      controller.setMode(
+                        const VirtualBackgroundColor(Colors.teal),
+                      );
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _ColorOption(
+                    color: Colors.red,
+                    onTap: () {
+                      controller.setMode(
+                        const VirtualBackgroundColor(Colors.red),
+                      );
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
               ),
-              _ColorOption(
-                color: Colors.green,
-                onTap: () {
-                  controller.setMode(const VirtualBackgroundColor(Colors.green));
-                  Navigator.pop(context);
-                },
-              ),
-              _ColorOption(
-                color: Colors.purple,
-                onTap: () {
-                  controller.setMode(const VirtualBackgroundColor(Colors.purple));
-                  Navigator.pop(context);
-                },
-              ),
-              _ColorOption(
-                color: Colors.orange,
-                onTap: () {
-                  controller.setMode(const VirtualBackgroundColor(Colors.orange));
-                  Navigator.pop(context);
-                },
-              ),
-              _ColorOption(
-                color: Colors.teal,
-                onTap: () {
-                  controller.setMode(const VirtualBackgroundColor(Colors.teal));
-                  Navigator.pop(context);
-                },
-              ),
-              _ColorOption(
-                color: Colors.red,
-                onTap: () {
-                  controller.setMode(const VirtualBackgroundColor(Colors.red));
-                  Navigator.pop(context);
-                },
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
   void _showGradientPicker(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choisir un dégradé'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _GradientOption(
-                colors: [Colors.blue, Colors.purple],
-                onTap: () {
-                  controller.setMode(const VirtualBackgroundGradient(
-                    [Colors.blue, Colors.purple],
-                  ));
-                  Navigator.pop(context);
-                },
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Choisir un dégradé'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _GradientOption(
+                    colors: [Colors.blue, Colors.purple],
+                    onTap: () {
+                      controller.setMode(
+                        const VirtualBackgroundGradient([
+                          Colors.blue,
+                          Colors.purple,
+                        ]),
+                      );
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _GradientOption(
+                    colors: [Colors.green, Colors.teal],
+                    onTap: () {
+                      controller.setMode(
+                        const VirtualBackgroundGradient([
+                          Colors.green,
+                          Colors.teal,
+                        ]),
+                      );
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _GradientOption(
+                    colors: [Colors.orange, Colors.red],
+                    onTap: () {
+                      controller.setMode(
+                        const VirtualBackgroundGradient([
+                          Colors.orange,
+                          Colors.red,
+                        ]),
+                      );
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _GradientOption(
+                    colors: [Colors.pink, Colors.purple],
+                    onTap: () {
+                      controller.setMode(
+                        const VirtualBackgroundGradient([
+                          Colors.pink,
+                          Colors.purple,
+                        ]),
+                      );
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
               ),
-              _GradientOption(
-                colors: [Colors.green, Colors.teal],
-                onTap: () {
-                  controller.setMode(const VirtualBackgroundGradient(
-                    [Colors.green, Colors.teal],
-                  ));
-                  Navigator.pop(context);
-                },
-              ),
-              _GradientOption(
-                colors: [Colors.orange, Colors.red],
-                onTap: () {
-                  controller.setMode(const VirtualBackgroundGradient(
-                    [Colors.orange, Colors.red],
-                  ));
-                  Navigator.pop(context);
-                },
-              ),
-              _GradientOption(
-                colors: [Colors.pink, Colors.purple],
-                onTap: () {
-                  controller.setMode(const VirtualBackgroundGradient(
-                    [Colors.pink, Colors.purple],
-                  ));
-                  Navigator.pop(context);
-                },
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -153,24 +179,24 @@ class BackgroundPanel extends StatelessWidget {
               label: 'Flou léger',
               icon: Icons.blur_on,
               selected: mode is VirtualBackgroundBlurLight,
-              onTap: () =>
-                  controller.setMode(const VirtualBackgroundBlurLight()),
+              onTap:
+                  () => controller.setMode(const VirtualBackgroundBlurLight()),
             ),
             const SizedBox(width: 8),
             _BgOption(
               label: 'Flou moyen',
               icon: Icons.blur_on,
               selected: mode is VirtualBackgroundBlurMedium,
-              onTap: () =>
-                  controller.setMode(const VirtualBackgroundBlurMedium()),
+              onTap:
+                  () => controller.setMode(const VirtualBackgroundBlurMedium()),
             ),
             const SizedBox(width: 8),
             _BgOption(
               label: 'Flou fort',
               icon: Icons.blur_circular,
               selected: mode is VirtualBackgroundBlurStrong,
-              onTap: () =>
-                  controller.setMode(const VirtualBackgroundBlurStrong()),
+              onTap:
+                  () => controller.setMode(const VirtualBackgroundBlurStrong()),
             ),
             const SizedBox(width: 8),
             _BgOption(
@@ -221,9 +247,10 @@ class _BgOption extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.primary.withValues(alpha: 0.2)
-              : Colors.transparent,
+          color:
+              selected
+                  ? AppColors.primary.withValues(alpha: 0.2)
+                  : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,
@@ -241,9 +268,8 @@ class _BgOption extends StatelessWidget {
             Text(
               label,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color:
-                        selected ? AppColors.primary : AppColors.textSecondary,
-                  ),
+                color: selected ? AppColors.primary : AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -256,10 +282,7 @@ class _ColorOption extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
 
-  const _ColorOption({
-    required this.color,
-    required this.onTap,
-  });
+  const _ColorOption({required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -283,10 +306,7 @@ class _GradientOption extends StatelessWidget {
   final List<Color> colors;
   final VoidCallback onTap;
 
-  const _GradientOption({
-    required this.colors,
-    required this.onTap,
-  });
+  const _GradientOption({required this.colors, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

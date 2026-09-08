@@ -22,8 +22,23 @@ class FileSharingService {
 
   // Configuration
   static const int maxFileSize = 50 * 1024 * 1024; // 50 MB
-  static const List<String> allowedImageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-  static const List<String> allowedDocumentExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt'];
+  static const List<String> allowedImageExtensions = [
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.gif',
+    '.webp',
+  ];
+  static const List<String> allowedDocumentExtensions = [
+    '.pdf',
+    '.doc',
+    '.docx',
+    '.xls',
+    '.xlsx',
+    '.ppt',
+    '.pptx',
+    '.txt',
+  ];
 
   Future<Map<String, dynamic>> shareFile({
     required String meetingId,
@@ -34,7 +49,7 @@ class FileSharingService {
     try {
       final fileExtension = path.extension(file.path).toLowerCase();
       final fileName = '${_uuid.v4()}$fileExtension';
-      
+
       // Validate file size
       final fileSize = await file.length();
       if (fileSize > maxFileSize) {
@@ -49,7 +64,7 @@ class FileSharingService {
       // Upload to Firebase Storage
       final ref = _storage.ref().child('meetings/$meetingId/files/$fileName');
       final uploadTask = ref.putFile(file);
-      
+
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
 
@@ -116,7 +131,7 @@ class FileSharingService {
 
   bool _isFileTypeAllowed(String extension) {
     return allowedImageExtensions.contains(extension) ||
-           allowedDocumentExtensions.contains(extension);
+        allowedDocumentExtensions.contains(extension);
   }
 
   String _getFileType(String extension) {

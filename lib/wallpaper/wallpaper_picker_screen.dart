@@ -70,8 +70,10 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message,
-              style: const TextStyle(color: AppColors.textPrimary)),
+          content: Text(
+            message,
+            style: const TextStyle(color: AppColors.textPrimary),
+          ),
           backgroundColor: AppColors.surfaceElevated,
           behavior: SnackBarBehavior.floating,
         ),
@@ -109,8 +111,10 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                         max: WallpaperConfig.maxBlur,
                         display: '${draft.blurRadius.round()} dp',
                         enabled: draft.hasImage,
-                        onChanged: (v) =>
-                            _provider.preview(draft.copyWith(blurRadius: v)),
+                        onChanged:
+                            (v) => _provider.preview(
+                              draft.copyWith(blurRadius: v),
+                            ),
                       ),
                       _LabeledSlider(
                         label: 'Assombrissement',
@@ -119,8 +123,8 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                         display:
                             '${(draft.scrim / WallpaperConfig.maxScrim * 100).round()} %',
                         enabled: draft.hasImage,
-                        onChanged: (v) =>
-                            _provider.preview(draft.copyWith(scrim: v)),
+                        onChanged:
+                            (v) => _provider.preview(draft.copyWith(scrim: v)),
                       ),
                       Row(
                         children: [
@@ -130,28 +134,28 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                               children: [
                                 Text(
                                   'Flou progressif',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyLarge
+                                  style: Theme.of(context).textTheme.bodyLarge
                                       ?.copyWith(color: AppColors.textPrimary),
                                 ),
                                 Text(
                                   'Flou en haut, net en bas — améliore la lisibilité',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                          color: AppColors.textSecondary),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                           Switch(
                             value: draft.progressiveBlur,
-                            onChanged: draft.hasImage
-                                ? (v) => _provider
-                                    .preview(draft.copyWith(progressiveBlur: v))
-                                : null,
+                            onChanged:
+                                draft.hasImage
+                                    ? (v) => _provider.preview(
+                                      draft.copyWith(progressiveBlur: v),
+                                    )
+                                    : null,
                           ),
                         ],
                       ),
@@ -165,16 +169,21 @@ class _WallpaperPickerScreenState extends State<WallpaperPickerScreen> {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: _busy ? null : _pickImage,
-                      icon: _busy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.image_outlined),
-                      label: Text(draft.hasImage
-                          ? 'Changer la photo'
-                          : 'Choisir une photo'),
+                      icon:
+                          _busy
+                              ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Icon(Icons.image_outlined),
+                      label: Text(
+                        draft.hasImage
+                            ? 'Changer la photo'
+                            : 'Choisir une photo',
+                      ),
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(0, 48),
                       ),
@@ -243,17 +252,15 @@ class _LabeledSlider extends StatelessWidget {
           children: [
             Text(
               label,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelLarge
-                  ?.copyWith(color: AppColors.textPrimary),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: AppColors.textPrimary),
             ),
             Text(
               display,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelLarge
-                  ?.copyWith(color: AppColors.textSecondary),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ),

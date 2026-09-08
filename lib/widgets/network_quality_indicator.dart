@@ -18,7 +18,9 @@ class NetworkStats {
   });
 
   NetworkQuality get quality {
-    if (latencyMs > 300 || packetLossPercent > 10) return NetworkQuality.critical;
+    if (latencyMs > 300 || packetLossPercent > 10) {
+      return NetworkQuality.critical;
+    }
     if (latencyMs > 150 || packetLossPercent > 5 || jitterMs > 30) {
       return NetworkQuality.poor;
     }
@@ -75,13 +77,12 @@ class NetworkQualityBars extends StatelessWidget {
     final color = stats?.color ?? AppColors.textTertiary;
 
     return GestureDetector(
-      onTap: onTap != null
-          ? () => _showNetworkDetails(context)
-          : null,
+      onTap: onTap != null ? () => _showNetworkDetails(context) : null,
       child: Tooltip(
-        message: stats != null
-            ? '${stats!.label} — ${stats!.summary}'
-            : 'Réseau inconnu',
+        message:
+            stats != null
+                ? '${stats!.label} — ${stats!.summary}'
+                : 'Réseau inconnu',
         child: Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -147,7 +148,10 @@ class _NetworkDetailsSheet extends StatelessWidget {
                   color: stats.color,
                   shape: BoxShape.circle,
                   boxShadow: [
-                    BoxShadow(color: stats.color.withValues(alpha: 0.4), blurRadius: 6),
+                    BoxShadow(
+                      color: stats.color.withValues(alpha: 0.4),
+                      blurRadius: 6,
+                    ),
                   ],
                 ),
               ),
@@ -198,12 +202,17 @@ class _NetworkDetailsSheet extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.warningSurface,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.tips_and_updates_outlined,
-                      color: AppColors.warning, size: 18),
+                  const Icon(
+                    Icons.tips_and_updates_outlined,
+                    color: AppColors.warning,
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -325,14 +334,23 @@ class _NetworkQualityDotState extends State<NetworkQualityDot>
     return Tooltip(
       message: stats != null ? 'Réseau : ${stats.label}' : 'Connexion active',
       child: FadeTransition(
-        opacity: quality == NetworkQuality.critical ? _pulseAnimation : const AlwaysStoppedAnimation(1.0),
+        opacity:
+            quality == NetworkQuality.critical
+                ? _pulseAnimation
+                : const AlwaysStoppedAnimation(1.0),
         child: Container(
           width: 10,
           height: 10,
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 6, spreadRadius: 1)],
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.5),
+                blurRadius: 6,
+                spreadRadius: 1,
+              ),
+            ],
           ),
         ),
       ),

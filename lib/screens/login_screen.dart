@@ -56,43 +56,90 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
     try {
-      final success = await Provider.of<CruxAuthProvider>(context, listen: false).signIn(
-        email: _emailCtrl.text.trim(),
-        password: _passwordCtrl.text,
-      );
+      final success = await Provider.of<CruxAuthProvider>(
+        context,
+        listen: false,
+      ).signIn(email: _emailCtrl.text.trim(), password: _passwordCtrl.text);
+
       if (!success && mounted) {
         _shakeError('Erreur de connexion. Vérifiez vos identifiants.');
+        setState(() => _loading = false);
+        return;
       }
-      // Navigation managed by AuthWrapper in main.dart
+
+      // Wait a moment for the auth state to propagate
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Navigation is handled by StreamBuilder in main.dart
+      if (mounted) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null && !user.isAnonymous) {
+          logger.i(
+            '✅ Auth successful, navigation will be handled by StreamBuilder',
+          );
+        } else {
+          _shakeError('Erreur de connexion. Session non établie.');
+          setState(() => _loading = false);
+        }
+      }
     } on FirebaseAuthException catch (e) {
       if (mounted) _shakeError(_friendlyAuthError(e.code));
+      setState(() => _loading = false);
     } catch (e) {
       logger.e('Login error: $e');
-      if (mounted) _shakeError('Erreur de connexion. Vérifiez votre connexion internet.');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        _shakeError('Erreur de connexion. Vérifiez votre connexion internet.');
+      }
+      setState(() => _loading = false);
     }
   }
 
   Future<void> _signInWithGoogle() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final success = await Provider.of<CruxAuthProvider>(context, listen: false).signInWithGoogle();
+      final success =
+          await Provider.of<CruxAuthProvider>(
+            context,
+            listen: false,
+          ).signInWithGoogle();
+
       if (!success && mounted) {
         _shakeError('Connexion Google annulée');
+        setState(() => _loading = false);
         return;
       }
-      // Navigation managed by AuthWrapper in main.dart
+
+      // Wait a moment for the auth state to propagate
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Navigation is handled by StreamBuilder in main.dart
+      if (mounted) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null && !user.isAnonymous) {
+          logger.i(
+            '✅ Google auth successful, navigation will be handled by StreamBuilder',
+          );
+        } else {
+          _shakeError('Erreur de connexion Google. Session non établie.');
+          setState(() => _loading = false);
+        }
+      }
     } on FirebaseAuthException catch (e) {
       if (mounted) _shakeError(_friendlyAuthError(e.code));
+      setState(() => _loading = false);
     } catch (e) {
       logger.e('Google sign-in error: $e');
       if (mounted) _shakeError('Connexion Google échouée: $e');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      setState(() => _loading = false);
     }
   }
 
@@ -113,7 +160,9 @@ class _LoginScreenState extends State<LoginScreen>
         );
       }
     } catch (_) {
-      if (mounted) _shakeError('Impossible d\'envoyer l\'email de réinitialisation');
+      if (mounted) {
+        _shakeError('Impossible d\'envoyer l\'email de réinitialisation');
+      }
     }
   }
 
@@ -210,8 +259,12 @@ class _LoginScreenState extends State<LoginScreen>
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Email requis';
-                        if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Email requis';
+                        }
+                        if (!RegExp(
+                          r'^[^@]+@[^@]+\.[^@]+',
+                        ).hasMatch(v.trim())) {
                           return 'Email invalide';
                         }
                         return null;
@@ -236,12 +289,16 @@ class _LoginScreenState extends State<LoginScreen>
                                 ? Icons.visibility_outlined
                                 : Icons.visibility_off_outlined,
                           ),
-                          onPressed: () =>
-                              setState(() => _obscurePassword = !_obscurePassword),
+                          onPressed:
+                              () => setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
                         ),
                       ),
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Mot de passe requis';
+                        if (v == null || v.isEmpty) {
+                          return 'Mot de passe requis';
+                        }
                         if (v.length < 6) return 'Minimum 6 caractères';
                         return null;
                       },
@@ -251,7 +308,10 @@ class _LoginScreenState extends State<LoginScreen>
                       child: TextButton(
                         onPressed: _resetPassword,
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 0,
+                            vertical: 4,
+                          ),
                         ),
                         child: Text(
                           'Mot de passe oublié ?',
@@ -265,29 +325,37 @@ class _LoginScreenState extends State<LoginScreen>
                     if (_error != null)
                       AnimatedBuilder(
                         animation: _shakeAnimation,
-                        builder: (_, child) => Transform.translate(
-                          offset: Offset(
-                            4 * (0.5 - _shakeAnimation.value).abs() *
-                                (1 - _shakeAnimation.value) *
-                                8,
-                            0,
-                          ),
-                          child: child,
-                        ),
+                        builder:
+                            (_, child) => Transform.translate(
+                              offset: Offset(
+                                4 *
+                                    (0.5 - _shakeAnimation.value).abs() *
+                                    (1 - _shakeAnimation.value) *
+                                    8,
+                                0,
+                              ),
+                              child: child,
+                            ),
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.errorSurface,
                             borderRadius: BorderRadius.circular(10),
-                            border:
-                                Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                            border: Border.all(
+                              color: AppColors.error.withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.warning_amber_rounded,
-                                  color: AppColors.error, size: 16),
+                              const Icon(
+                                Icons.warning_amber_rounded,
+                                color: AppColors.error,
+                                size: 16,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -305,21 +373,24 @@ class _LoginScreenState extends State<LoginScreen>
                     const SizedBox(height: 4),
                     ElevatedButton(
                       onPressed: _loading ? null : _signIn,
-                      child: _loading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: AppColors.textOnPrimary,
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                          : const Text('Se connecter'),
+                      child:
+                          _loading
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: AppColors.textOnPrimary,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                              : const Text('Se connecter'),
                     ),
                     const SizedBox(height: 16),
                     Row(
                       children: [
-                        const Expanded(child: Divider(color: AppColors.divider)),
+                        const Expanded(
+                          child: Divider(color: AppColors.divider),
+                        ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
@@ -330,7 +401,9 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
                         ),
-                        const Expanded(child: Divider(color: AppColors.divider)),
+                        const Expanded(
+                          child: Divider(color: AppColors.divider),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -340,8 +413,11 @@ class _LoginScreenState extends State<LoginScreen>
                         'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
                         width: 20,
                         height: 20,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.g_mobiledata_rounded, size: 22),
+                        errorBuilder:
+                            (_, __, ___) => const Icon(
+                              Icons.g_mobiledata_rounded,
+                              size: 22,
+                            ),
                       ),
                       label: const Text('Continuer avec Google'),
                     ),
@@ -357,8 +433,11 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                         ),
                         TextButton(
-                          onPressed: () => Navigator.pushReplacementNamed(
-                              context, '/signup'),
+                          onPressed:
+                              () => Navigator.pushReplacementNamed(
+                                context,
+                                '/signup',
+                              ),
                           style: TextButton.styleFrom(
                             padding: EdgeInsets.zero,
                             minimumSize: Size.zero,

@@ -12,15 +12,25 @@ class NoteService {
     required String meetingName,
     required String content,
   }) async {
-    await _db.collection('users').doc(userId).collection('notes').doc(meetingId).set({
-      'meetingId': meetingId,
-      'meetingName': meetingName,
-      'content': content,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('notes')
+        .doc(meetingId)
+        .set({
+          'meetingId': meetingId,
+          'meetingName': meetingName,
+          'content': content,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
   }
 
   Stream<QuerySnapshot> streamUserNotes(String userId) {
-    return _db.collection('users').doc(userId).collection('notes').orderBy('updatedAt', descending: true).snapshots();
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('notes')
+        .orderBy('updatedAt', descending: true)
+        .snapshots();
   }
 }

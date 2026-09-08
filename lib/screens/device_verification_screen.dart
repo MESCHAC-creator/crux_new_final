@@ -22,8 +22,8 @@ class _DeviceVerificationScreenState extends State<DeviceVerificationScreen> {
   @override
   void initState() {
     super.initState();
-    _verificationFuture = DeviceVerificationService.instance
-        .verifyDeviceSecurity();
+    _verificationFuture =
+        DeviceVerificationService.instance.verifyDeviceSecurity();
   }
 
   @override
@@ -106,17 +106,19 @@ class _DeviceVerificationScreenState extends State<DeviceVerificationScreen> {
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () => setState(() {
-              _verificationFuture = DeviceVerificationService.instance
-                  .verifyDeviceSecurity();
-            }),
+            onPressed:
+                () => setState(() {
+                  _verificationFuture =
+                      DeviceVerificationService.instance.verifyDeviceSecurity();
+                }),
             icon: const Icon(Icons.refresh),
             label: Builder(
               builder: (ctx2) {
-                final l = Provider.of<LocaleProvider>(
-                  ctx2,
-                  listen: false,
-                ).locale.languageCode;
+                final l =
+                    Provider.of<LocaleProvider>(
+                      ctx2,
+                      listen: false,
+                    ).locale.languageCode;
                 return Text(
                   AppTranslations.t('retry', l),
                   style: GoogleFonts.poppins(),

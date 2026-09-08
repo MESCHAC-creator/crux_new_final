@@ -21,16 +21,24 @@ class AppTheme {
       ),
       textTheme: TextTheme(
         displayLarge: GoogleFonts.spaceGrotesk(
-          fontSize: 57, fontWeight: FontWeight.w700, color: Colors.black87,
+          fontSize: 57,
+          fontWeight: FontWeight.w700,
+          color: Colors.black87,
         ),
         headlineSmall: GoogleFonts.spaceGrotesk(
-          fontSize: 24, fontWeight: FontWeight.w600, color: Colors.black87,
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
         ),
         bodyLarge: GoogleFonts.spaceGrotesk(
-          fontSize: 16, fontWeight: FontWeight.w400, color: Colors.black87,
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          color: Colors.black87,
         ),
         bodyMedium: GoogleFonts.spaceGrotesk(
-          fontSize: 14, fontWeight: FontWeight.w400, color: Colors.black54,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          color: Colors.black54,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -38,7 +46,9 @@ class AppTheme {
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           minimumSize: const Size(double.infinity, 52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
     );
@@ -75,64 +85,86 @@ class AppTheme {
       // ── Typographie Space Grotesk ───────────────────────────────────
       textTheme: TextTheme(
         displayLarge: GoogleFonts.spaceGrotesk(
-          fontSize: 57, fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary, letterSpacing: -0.5,
+          fontSize: 57,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+          letterSpacing: -0.5,
         ),
         displayMedium: GoogleFonts.spaceGrotesk(
-          fontSize: 45, fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary, letterSpacing: -0.5,
+          fontSize: 45,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+          letterSpacing: -0.5,
         ),
         displaySmall: GoogleFonts.spaceGrotesk(
-          fontSize: 36, fontWeight: FontWeight.w600,
+          fontSize: 36,
+          fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
         headlineLarge: GoogleFonts.spaceGrotesk(
-          fontSize: 32, fontWeight: FontWeight.w700,
+          fontSize: 32,
+          fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
         headlineMedium: GoogleFonts.spaceGrotesk(
-          fontSize: 28, fontWeight: FontWeight.w600,
+          fontSize: 28,
+          fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
         headlineSmall: GoogleFonts.spaceGrotesk(
-          fontSize: 24, fontWeight: FontWeight.w600,
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
         titleLarge: GoogleFonts.spaceGrotesk(
-          fontSize: 22, fontWeight: FontWeight.w600,
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
         titleMedium: GoogleFonts.spaceGrotesk(
-          fontSize: 16, fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary, letterSpacing: 0.15,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+          letterSpacing: 0.15,
         ),
         titleSmall: GoogleFonts.spaceGrotesk(
-          fontSize: 14, fontWeight: FontWeight.w500,
-          color: AppColors.textPrimary, letterSpacing: 0.1,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textPrimary,
+          letterSpacing: 0.1,
         ),
         bodyLarge: GoogleFonts.spaceGrotesk(
-          fontSize: 16, fontWeight: FontWeight.w400,
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
           color: AppColors.textPrimary,
         ),
         bodyMedium: GoogleFonts.spaceGrotesk(
-          fontSize: 14, fontWeight: FontWeight.w400,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
           color: AppColors.textSecondary,
         ),
         bodySmall: GoogleFonts.spaceGrotesk(
-          fontSize: 12, fontWeight: FontWeight.w400,
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
           color: AppColors.textTertiary,
         ),
         labelLarge: GoogleFonts.spaceGrotesk(
-          fontSize: 14, fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary, letterSpacing: 0.1,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+          letterSpacing: 0.1,
         ),
         labelMedium: GoogleFonts.spaceGrotesk(
-          fontSize: 12, fontWeight: FontWeight.w500,
-          color: AppColors.textSecondary, letterSpacing: 0.5,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textSecondary,
+          letterSpacing: 0.5,
         ),
         labelSmall: GoogleFonts.spaceGrotesk(
-          fontSize: 11, fontWeight: FontWeight.w500,
-          color: AppColors.textTertiary, letterSpacing: 0.5,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textTertiary,
+          letterSpacing: 0.5,
         ),
       ),
 
@@ -149,11 +181,15 @@ class AppTheme {
           systemNavigationBarIconBrightness: Brightness.light,
         ),
         titleTextStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 20, fontWeight: FontWeight.w700,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
         iconTheme: const IconThemeData(color: AppColors.textPrimary, size: 24),
-        actionsIconTheme: const IconThemeData(color: AppColors.textSecondary, size: 24),
+        actionsIconTheme: const IconThemeData(
+          color: AppColors.textSecondary,
+          size: 24,
+        ),
       ),
 
       // ── Boutons primaires ────────────────────────────────────────────
@@ -164,9 +200,13 @@ class AppTheme {
           elevation: 0,
           shadowColor: Colors.transparent,
           minimumSize: const Size(double.infinity, 52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           textStyle: GoogleFonts.spaceGrotesk(
-            fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.3,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
           ),
         ),
       ),
@@ -177,9 +217,13 @@ class AppTheme {
           foregroundColor: AppColors.primary,
           side: const BorderSide(color: AppColors.border, width: 1.5),
           minimumSize: const Size(double.infinity, 52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           textStyle: GoogleFonts.spaceGrotesk(
-            fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0.3,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.3,
           ),
         ),
       ),
@@ -190,7 +234,8 @@ class AppTheme {
           foregroundColor: AppColors.primary,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           textStyle: GoogleFonts.spaceGrotesk(
-            fontSize: 14, fontWeight: FontWeight.w600,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -201,7 +246,9 @@ class AppTheme {
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.textOnPrimary,
           minimumSize: const Size(0, 52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
 
@@ -209,7 +256,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.cardBackground,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColors.border, width: 1),
@@ -231,16 +281,20 @@ class AppTheme {
           borderSide: const BorderSide(color: AppColors.error, width: 2),
         ),
         hintStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 14, color: AppColors.textTertiary,
+          fontSize: 14,
+          color: AppColors.textTertiary,
         ),
         labelStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 14, color: AppColors.textSecondary,
+          fontSize: 14,
+          color: AppColors.textSecondary,
         ),
         floatingLabelStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 12, color: AppColors.primary,
+          fontSize: 12,
+          color: AppColors.primary,
         ),
         errorStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 12, color: AppColors.error,
+          fontSize: 12,
+          color: AppColors.error,
         ),
         prefixIconColor: AppColors.textTertiary,
         suffixIconColor: AppColors.textTertiary,
@@ -264,13 +318,18 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         titleTextStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textPrimary,
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textPrimary,
         ),
         subtitleTextStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 13, fontWeight: FontWeight.w400, color: AppColors.textSecondary,
+          fontSize: 13,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textSecondary,
         ),
         leadingAndTrailingTextStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 12, color: AppColors.textTertiary,
+          fontSize: 12,
+          color: AppColors.textTertiary,
         ),
         iconColor: AppColors.textSecondary,
       ),
@@ -292,10 +351,12 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 0,
         selectedLabelStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 11, fontWeight: FontWeight.w600,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
         ),
         unselectedLabelStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 11, fontWeight: FontWeight.w400,
+          fontSize: 11,
+          fontWeight: FontWeight.w400,
         ),
       ),
 
@@ -306,7 +367,9 @@ class AppTheme {
         side: const BorderSide(color: AppColors.border, width: 1),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         labelStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textPrimary,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       ),
@@ -317,10 +380,13 @@ class AppTheme {
         elevation: 24,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         titleTextStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
         ),
         contentTextStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 14, color: AppColors.textSecondary,
+          fontSize: 14,
+          color: AppColors.textSecondary,
         ),
       ),
 
@@ -328,7 +394,8 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.surfaceElevated,
         contentTextStyle: GoogleFonts.spaceGrotesk(
-          fontSize: 14, color: AppColors.textPrimary,
+          fontSize: 14,
+          color: AppColors.textPrimary,
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,
@@ -338,11 +405,15 @@ class AppTheme {
       // ── Switch / Checkbox / Radio ─────────────────────────────────────
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return AppColors.textOnPrimary;
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.textOnPrimary;
+          }
           return AppColors.textTertiary;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return AppColors.primary;
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.primary;
+          }
           return AppColors.border;
         }),
         trackOutlineColor: WidgetStateProperty.resolveWith((states) {
@@ -371,7 +442,9 @@ class AppTheme {
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           foregroundColor: AppColors.textSecondary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
 
@@ -402,8 +475,14 @@ class AppTheme {
           borderSide: BorderSide(color: AppColors.primary, width: 2),
           borderRadius: BorderRadius.vertical(top: Radius.circular(2)),
         ),
-        labelStyle: GoogleFonts.spaceGrotesk(fontSize: 14, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: GoogleFonts.spaceGrotesk(fontSize: 14, fontWeight: FontWeight.w400),
+        labelStyle: GoogleFonts.spaceGrotesk(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: GoogleFonts.spaceGrotesk(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
         indicatorSize: TabBarIndicatorSize.tab,
       ),
     );

@@ -1,14 +1,6 @@
-enum FeedLayout {
-  vertical,
-  horizontal,
-  grid,
-}
+enum FeedLayout { vertical, horizontal, grid }
 
-enum FeedDensity {
-  compact,
-  normal,
-  spacious,
-}
+enum FeedDensity { compact, normal, spacious }
 
 class LiveFeedConfig {
   final FeedLayout layout;

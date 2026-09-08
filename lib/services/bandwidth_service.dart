@@ -13,7 +13,11 @@ enum CruxVideoQuality {
   final int frameRate;
   final double estimatedBandwidth;
 
-  const CruxVideoQuality(this.resolution, this.frameRate, this.estimatedBandwidth);
+  const CruxVideoQuality(
+    this.resolution,
+    this.frameRate,
+    this.estimatedBandwidth,
+  );
 }
 
 class BandwidthService {
@@ -51,8 +55,10 @@ class BandwidthService {
     await _loadPreferences();
     _startBandwidthMonitoring();
 
-    _logger.i('BandwidthService initialized - Data Saver: $_dataSaverMode, '
-        'Auto Quality: $_autoQualityAdjustment');
+    _logger.i(
+      'BandwidthService initialized - Data Saver: $_dataSaverMode, '
+      'Auto Quality: $_autoQualityAdjustment',
+    );
   }
 
   /// Active/désactive le mode économie de données
@@ -117,8 +123,7 @@ class BandwidthService {
       measured = 3.0 + (DateTime.now().millisecondsSinceEpoch % 5000) / 1000;
 
       // Simulation légère de perte de paquets
-      packetLoss =
-          DateTime.now().millisecondsSinceEpoch % 100 > 95 ? 0.5 : 0.0;
+      packetLoss = DateTime.now().millisecondsSinceEpoch % 100 > 95 ? 0.5 : 0.0;
 
       // RTT simulé
       rttMs = 30 + (DateTime.now().millisecondsSinceEpoch % 50).toDouble();
@@ -127,8 +132,9 @@ class BandwidthService {
       _onBandwidthUpdate?.call(_estimatedBandwidth);
 
       _logger.i(
-          'Bandwidth: ${_estimatedBandwidth.toStringAsFixed(2)} Mbps | '
-          'Loss: ${packetLoss.toStringAsFixed(2)}% | RTT: ${rttMs.toStringAsFixed(0)}ms');
+        'Bandwidth: ${_estimatedBandwidth.toStringAsFixed(2)} Mbps | '
+        'Loss: ${packetLoss.toStringAsFixed(2)}% | RTT: ${rttMs.toStringAsFixed(0)}ms',
+      );
 
       if (_autoQualityAdjustment) {
         _adjustQualityBasedOnBandwidth();

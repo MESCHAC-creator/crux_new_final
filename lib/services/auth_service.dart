@@ -1,15 +1,16 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: [
-    'email',
-    'https://www.googleapis.com/auth/userinfo.profile',
-  ]);
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'https://www.googleapis.com/auth/userinfo.profile'],
+  );
   final _logger = Logger();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   static final AuthService _instance = AuthService._internal();
 
@@ -40,13 +41,12 @@ class AuthService {
       await user.updateDisplayName(name.trim());
       await user.reload();
 
+      // Create/update Firestore user profile
+      await _updateFirestoreProfile(user.uid, name.trim(), user.email);
+
       _logger.i('✅ Sign up successful');
 
-      return UserModel(
-        uid: user.uid,
-        email: email.trim(),
-        name: name.trim(),
-      );
+      return UserModel(uid: user.uid, email: email.trim(), name: name.trim());
     } on FirebaseAuthException catch (e) {
       _logger.e('❌ Auth error: ${e.code} — ${e.message}');
       rethrow;
@@ -63,18 +63,28 @@ class AuthService {
     try {
       _logger.i('🔑 Sign in: $email');
 
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          throw Exception('Délai de connexion dépassé. Vérifiez votre connexion internet.');
-        },
-      );
+      final userCredential = await _auth
+          .signInWithEmailAndPassword(email: email.trim(), password: password)
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw Exception(
+                'Délai de connexion dépassé. Vérifiez votre connexion internet.',
+              );
+            },
+          );
 
       final user = userCredential.user;
       if (user == null) throw Exception('Sign in failed');
+
+      // Update Firestore profile without blocking auth
+      _updateFirestoreProfile(
+        user.uid,
+        user.displayName,
+        user.email,
+      ).catchError((e) {
+        _logger.w('⚠️ Firestore profile update failed (non-blocking): $e');
+      });
 
       _logger.i('✅ Sign in successful');
 
@@ -99,7 +109,9 @@ class AuthService {
       final googleUser = await _googleSignIn.signIn().timeout(
         const Duration(seconds: 30),
         onTimeout: () {
-          throw Exception('Délai Google Sign-In dépassé. Vérifiez votre connexion internet.');
+          throw Exception(
+            'Délai Google Sign-In dépassé. Vérifiez votre connexion internet.',
+          );
         },
       );
       if (googleUser == null) {
@@ -113,15 +125,28 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _auth.signInWithCredential(credential).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          throw Exception('Délai authentification dépassé. Vérifiez votre connexion internet.');
-        },
-      );
+      final userCredential = await _auth
+          .signInWithCredential(credential)
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw Exception(
+                'Délai authentification dépassé. Vérifiez votre connexion internet.',
+              );
+            },
+          );
       final user = userCredential.user;
 
       if (user == null) throw Exception('Google sign in failed');
+
+      // Update Firestore profile without blocking auth
+      _updateFirestoreProfile(
+        user.uid,
+        user.displayName,
+        user.email,
+      ).catchError((e) {
+        _logger.w('⚠️ Firestore profile update failed (non-blocking): $e');
+      });
 
       _logger.i('✅ Google sign in successful');
 
@@ -150,6 +175,36 @@ class AuthService {
     } catch (e) {
       _logger.e('❌ Password reset failed: $e');
       rethrow;
+    }
+  }
+
+  /// Helper method to update Firestore user profile
+  Future<void> _updateFirestoreProfile(
+    String uid,
+    String? name,
+    String? email,
+  ) async {
+    try {
+      if (uid.isEmpty) return;
+
+      final data = <String, dynamic>{'updatedAt': FieldValue.serverTimestamp()};
+
+      if (name != null && name.trim().isNotEmpty) {
+        data['name'] = name.trim();
+      }
+
+      if (email != null && email.trim().isNotEmpty) {
+        data['email'] = email.trim();
+      }
+
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .set(data, SetOptions(merge: true));
+      _logger.i('✅ Firestore profile updated for user: $uid');
+    } catch (e) {
+      _logger.w('⚠️ Failed to update Firestore profile: $e');
+      // Don't throw - this is non-blocking
     }
   }
 

@@ -23,44 +23,47 @@ class ReactionEmojis extends StatelessWidget {
       decoration: BoxDecoration(
         color: PremiumColors.darkBackground,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: PremiumColors.borderGray.withValues(alpha: 0.2)),
+        border: Border.all(
+          color: PremiumColors.borderGray.withValues(alpha: 0.2),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Wrap(
             spacing: 8,
-            children: reactions.map((reaction) {
-              return GestureDetector(
-                onTap: () {
-                  onReactionSelected(reaction['emoji']!);
-                  Navigator.pop(context);
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: PremiumColors.surfaceGray.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        reaction['emoji']!,
-                        style: const TextStyle(fontSize: 28),
+            children:
+                reactions.map((reaction) {
+                  return GestureDetector(
+                    onTap: () {
+                      onReactionSelected(reaction['emoji']!);
+                      Navigator.pop(context);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: PremiumColors.surfaceGray.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        reaction['label']!,
-                        style: const TextStyle(
-                          color: PremiumColors.textTertiary,
-                          fontSize: 10,
-                        ),
+                      child: Column(
+                        children: [
+                          Text(
+                            reaction['emoji']!,
+                            style: const TextStyle(fontSize: 28),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            reaction['label']!,
+                            style: const TextStyle(
+                              color: PremiumColors.textTertiary,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              ).animate().scale(duration: 300.ms);
-            }).toList(),
+                    ),
+                  ).animate().scale(duration: 300.ms);
+                }).toList(),
           ),
         ],
       ),

@@ -8,6 +8,12 @@ analyzer:
     - lib/firebase_options.dart
     - lib/api/**
     - lib/database/**
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - macos/**
+    - linux/**
 
 linter:
   rules:

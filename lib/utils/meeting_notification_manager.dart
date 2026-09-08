@@ -11,18 +11,18 @@ enum MeetingReminder { oneHour, fifteenMin, fiveMin, atStart }
 
 extension MeetingReminderX on MeetingReminder {
   Duration get lead => switch (this) {
-        MeetingReminder.oneHour => const Duration(hours: 1),
-        MeetingReminder.fifteenMin => const Duration(minutes: 15),
-        MeetingReminder.fiveMin => const Duration(minutes: 5),
-        MeetingReminder.atStart => Duration.zero,
-      };
+    MeetingReminder.oneHour => const Duration(hours: 1),
+    MeetingReminder.fifteenMin => const Duration(minutes: 15),
+    MeetingReminder.fiveMin => const Duration(minutes: 5),
+    MeetingReminder.atStart => Duration.zero,
+  };
 
   String get label => switch (this) {
-        MeetingReminder.oneHour => 'dans 1 heure',
-        MeetingReminder.fifteenMin => 'dans 15 minutes',
-        MeetingReminder.fiveMin => 'dans 5 minutes',
-        MeetingReminder.atStart => 'commence maintenant',
-      };
+    MeetingReminder.oneHour => 'dans 1 heure',
+    MeetingReminder.fifteenMin => 'dans 15 minutes',
+    MeetingReminder.fiveMin => 'dans 5 minutes',
+    MeetingReminder.atStart => 'commence maintenant',
+  };
 
   /// Offset ajouté à l'ID de base (4 slots réservés par réunion).
   int get slot => index;
@@ -59,8 +59,7 @@ class MeetingNotificationManager {
         tz.setLocalLocation(tz.UTC);
       }
 
-      const androidInit =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
       const iosInit = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
@@ -71,8 +70,11 @@ class MeetingNotificationManager {
       );
 
       if (Platform.isAndroid) {
-        final android = _ln.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+        final android =
+            _ln
+                .resolvePlatformSpecificImplementation<
+                  AndroidFlutterLocalNotificationsPlugin
+                >();
         await android?.createNotificationChannel(
           const AndroidNotificationChannel(
             channelId,
@@ -94,8 +96,11 @@ class MeetingNotificationManager {
       _ready = true;
       logger.i('✅ MeetingNotificationManager prêt (${tz.local.name})');
     } catch (e, st) {
-      logger.e('MeetingNotificationManager.initialize',
-          error: e, stackTrace: st);
+      logger.e(
+        'MeetingNotificationManager.initialize',
+        error: e,
+        stackTrace: st,
+      );
     }
   }
 
@@ -107,16 +112,16 @@ class MeetingNotificationManager {
   }
 
   NotificationDetails get _details => const NotificationDetails(
-        android: AndroidNotificationDetails(
-          channelId,
-          channelName,
-          channelDescription: channelDescription,
-          importance: Importance.high,
-          priority: Priority.high,
-          category: AndroidNotificationCategory.event,
-        ),
-        iOS: DarwinNotificationDetails(),
-      );
+    android: AndroidNotificationDetails(
+      channelId,
+      channelName,
+      channelDescription: channelDescription,
+      importance: Importance.high,
+      priority: Priority.high,
+      category: AndroidNotificationCategory.event,
+    ),
+    iOS: DarwinNotificationDetails(),
+  );
 
   /// Programme les rappels demandés pour une réunion.
   ///
@@ -159,9 +164,10 @@ class MeetingNotificationManager {
           'Votre réunion ${reminder.label}.',
           tz.TZDateTime.from(when, tz.local),
           _details,
-          androidScheduleMode: _exactAlarmAllowed
-              ? AndroidScheduleMode.exactAllowWhileIdle
-              : AndroidScheduleMode.inexactAllowWhileIdle,
+          androidScheduleMode:
+              _exactAlarmAllowed
+                  ? AndroidScheduleMode.exactAllowWhileIdle
+                  : AndroidScheduleMode.inexactAllowWhileIdle,
           payload: 'meeting:$meetingId',
           matchDateTimeComponents: null,
         );
@@ -197,16 +203,15 @@ class MeetingNotificationManager {
     bool fifteenMin = true,
     bool fiveMin = true,
     bool atStart = true,
-  }) =>
-      scheduleForMeeting(
-        meetingId: meetingId,
-        title: title,
-        startTime: startTime,
-        oneHour: oneHour,
-        fifteenMin: fifteenMin,
-        fiveMin: fiveMin,
-        atStart: atStart,
-      );
+  }) => scheduleForMeeting(
+    meetingId: meetingId,
+    title: title,
+    startTime: startTime,
+    oneHour: oneHour,
+    fifteenMin: fifteenMin,
+    fiveMin: fiveMin,
+    atStart: atStart,
+  );
 
   /// Utile pour un écran de debug.
   Future<List<PendingNotificationRequest>> pending() async {

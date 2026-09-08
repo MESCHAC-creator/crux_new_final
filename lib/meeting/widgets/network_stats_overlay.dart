@@ -71,10 +71,7 @@ class _NetworkStatsOverlayState extends State<NetworkStatsOverlay>
           decoration: BoxDecoration(
             color: AppColors.surface.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _getNetworkQualityColor(),
-              width: 2,
-            ),
+            border: Border.all(color: _getNetworkQualityColor(), width: 2),
             boxShadow: AppColors.softShadow,
           ),
           child: _isExpanded ? _buildExpandedStats() : _buildCompactStats(),
@@ -138,7 +135,10 @@ class _NetworkStatsOverlayState extends State<NetworkStatsOverlay>
         const SizedBox(height: 8),
         _buildStatRow('FPS', '${widget.fps.toInt()}'),
         _buildStatRow('Latence', '${widget.latency}ms'),
-        _buildStatRow('Bande passante', '${widget.bandwidth.toStringAsFixed(1)} Mbps'),
+        _buildStatRow(
+          'Bande passante',
+          '${widget.bandwidth.toStringAsFixed(1)} Mbps',
+        ),
         _buildStatRow('Jitter', '${widget.jitter.toStringAsFixed(1)}ms'),
         const SizedBox(height: 8),
         _buildLatencyGauge(),

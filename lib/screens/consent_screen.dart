@@ -42,17 +42,18 @@ class _ConsentScreenState extends State<ConsentScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: isDark
-                ? const [
-                    Color(0xFF0F0F1A),
-                    Color(0xFF1A1A2E),
-                    Color(0xFF16213E),
-                  ]
-                : const [
-                    Color(0xFFF5F7FA),
-                    Color(0xFFEEEEFF),
-                    Color(0xFFF8F0FF),
-                  ],
+            colors:
+                isDark
+                    ? const [
+                      Color(0xFF0F0F1A),
+                      Color(0xFF1A1A2E),
+                      Color(0xFF16213E),
+                    ]
+                    : const [
+                      Color(0xFFF5F7FA),
+                      Color(0xFFEEEEFF),
+                      Color(0xFFF8F0FF),
+                    ],
           ),
         ),
         child: SafeArea(
@@ -64,15 +65,17 @@ class _ConsentScreenState extends State<ConsentScreen> {
                 const SizedBox(height: 24),
                 // Logo / App name
                 ShaderMask(
-                  shaderCallback: (bounds) =>
-                      AppColors.primaryGradient.createShader(bounds),
+                  shaderCallback:
+                      (bounds) =>
+                          AppColors.primaryGradient.createShader(bounds),
                   blendMode: BlendMode.srcIn,
                   child: const Icon(Icons.video_call_rounded, size: 64),
                 ),
                 const SizedBox(height: 12),
                 ShaderMask(
-                  shaderCallback: (bounds) =>
-                      AppColors.primaryGradient.createShader(bounds),
+                  shaderCallback:
+                      (bounds) =>
+                          AppColors.primaryGradient.createShader(bounds),
                   blendMode: BlendMode.srcIn,
                   child: Text(
                     'CRUX',
@@ -134,8 +137,8 @@ class _ConsentScreenState extends State<ConsentScreen> {
                   isDark: isDark,
                   value: _privacyAccepted,
                   label: 'J\'accepte la Politique de confidentialité',
-                  onChanged: (v) =>
-                      setState(() => _privacyAccepted = v ?? false),
+                  onChanged:
+                      (v) => setState(() => _privacyAccepted = v ?? false),
                 ),
                 const SizedBox(height: 36),
 
@@ -148,27 +151,31 @@ class _ConsentScreenState extends State<ConsentScreen> {
                     duration: const Duration(milliseconds: 250),
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        gradient: (_termsAccepted && _privacyAccepted)
-                            ? AppColors.primaryGradient
-                            : const LinearGradient(
-                                colors: [Colors.grey, Colors.grey],
-                              ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: (_termsAccepted && _privacyAccepted)
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.4),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
+                        gradient:
+                            (_termsAccepted && _privacyAccepted)
+                                ? AppColors.primaryGradient
+                                : const LinearGradient(
+                                  colors: [Colors.grey, Colors.grey],
                                 ),
-                              ]
-                            : [],
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow:
+                            (_termsAccepted && _privacyAccepted)
+                                ? [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.4,
+                                    ),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ]
+                                : [],
                       ),
                       child: ElevatedButton(
                         onPressed:
                             (_termsAccepted && _privacyAccepted && !_loading)
-                            ? _onContinue
-                            : null,
+                                ? _onContinue
+                                : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
@@ -176,23 +183,24 @@ class _ConsentScreenState extends State<ConsentScreen> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        child: _loading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2.5,
+                        child:
+                            _loading
+                                ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                                : Text(
+                                  'Continuer',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
                                 ),
-                              )
-                            : Text(
-                                'Continuer',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
-                                ),
-                              ),
                       ),
                     ),
                   ),
@@ -226,20 +234,23 @@ class _ConsentCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.06)
-            : Colors.white.withValues(alpha: 0.85),
+        color:
+            isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.white.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.1)
-              : Colors.black.withValues(alpha: 0.07),
+          color:
+              isDark
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.black.withValues(alpha: 0.07),
         ),
         boxShadow: [
           BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.2)
-                : Colors.black.withValues(alpha: 0.06),
+            color:
+                isDark
+                    ? Colors.black.withValues(alpha: 0.2)
+                    : Colors.black.withValues(alpha: 0.06),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -251,8 +262,8 @@ class _ConsentCard extends StatelessWidget {
           Row(
             children: [
               ShaderMask(
-                shaderCallback: (bounds) =>
-                    AppColors.primaryGradient.createShader(bounds),
+                shaderCallback:
+                    (bounds) => AppColors.primaryGradient.createShader(bounds),
                 blendMode: BlendMode.srcIn,
                 child: Icon(icon, size: 22),
               ),
@@ -332,17 +343,19 @@ class _CheckboxRow extends StatelessWidget {
               color: value ? null : Colors.transparent,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: value
-                    ? Colors.transparent
-                    : isDark
-                    ? Colors.white38
-                    : Colors.black26,
+                color:
+                    value
+                        ? Colors.transparent
+                        : isDark
+                        ? Colors.white38
+                        : Colors.black26,
                 width: 2,
               ),
             ),
-            child: value
-                ? const Icon(Icons.check, color: Colors.white, size: 16)
-                : null,
+            child:
+                value
+                    ? const Icon(Icons.check, color: Colors.white, size: 16)
+                    : null,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -351,7 +364,10 @@ class _CheckboxRow extends StatelessWidget {
               style: GoogleFonts.poppins(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white.withValues(alpha: 0.87) : Colors.black87,
+                color:
+                    isDark
+                        ? Colors.white.withValues(alpha: 0.87)
+                        : Colors.black87,
               ),
             ),
           ),

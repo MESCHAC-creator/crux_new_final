@@ -28,20 +28,19 @@ class SpeakerCard extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppColors.radiusCard),
           border: Border.all(
-            color: isDominantSpeaker
-                ? AppColors.primary
-                : AppColors.border,
+            color: isDominantSpeaker ? AppColors.primary : AppColors.border,
             width: isDominantSpeaker ? 2 : 1,
           ),
-          boxShadow: isDominantSpeaker
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    spreadRadius: 5,
-                  ),
-                ]
-              : AppColors.softShadow,
+          boxShadow:
+              isDominantSpeaker
+                  ? [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ]
+                  : AppColors.softShadow,
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(AppColors.radiusCard),
@@ -62,7 +61,8 @@ class SpeakerCard extends StatelessWidget {
 
   Widget _buildVideoContent() {
     if (participantState.isVideoEnabled) {
-      final videoPublications = participantState.participant.videoTrackPublications;
+      final videoPublications =
+          participantState.participant.videoTrackPublications;
       if (videoPublications.isNotEmpty) {
         final videoTrack = videoPublications.first.track;
         if (videoTrack != null && videoTrack is VideoTrack) {
@@ -102,10 +102,7 @@ class SpeakerCard extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Colors.transparent,
-              Colors.black.withValues(alpha: 0.7),
-            ],
+            colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
           ),
         ),
         child: Column(
@@ -123,10 +120,7 @@ class SpeakerCard extends StatelessWidget {
             if (participantState.isScreenSharing)
               const Text(
                 'Partage d\'écran',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
           ],
         ),
@@ -140,10 +134,8 @@ class SpeakerCard extends StatelessWidget {
       right: 12,
       child: Row(
         children: [
-          if (!participantState.isAudioActive)
-            _buildAudioBadge(),
-          if (participantState.isVideoEnabled)
-            _buildVideoBadge(),
+          if (!participantState.isAudioActive) _buildAudioBadge(),
+          if (participantState.isVideoEnabled) _buildVideoBadge(),
         ],
       ),
     );
@@ -156,11 +148,7 @@ class SpeakerCard extends StatelessWidget {
         color: AppColors.error,
         shape: BoxShape.circle,
       ),
-      child: const Icon(
-        Icons.mic_off,
-        size: 16,
-        color: AppColors.textPrimary,
-      ),
+      child: const Icon(Icons.mic_off, size: 16, color: AppColors.textPrimary),
     );
   }
 
@@ -171,11 +159,7 @@ class SpeakerCard extends StatelessWidget {
         color: AppColors.success,
         shape: BoxShape.circle,
       ),
-      child: const Icon(
-        Icons.videocam,
-        size: 16,
-        color: AppColors.textPrimary,
-      ),
+      child: const Icon(Icons.videocam, size: 16, color: AppColors.textPrimary),
     );
   }
 
@@ -192,11 +176,7 @@ class SpeakerCard extends StatelessWidget {
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.back_hand,
-              size: 16,
-              color: AppColors.textPrimary,
-            ),
+            Icon(Icons.back_hand, size: 16, color: AppColors.textPrimary),
             SizedBox(width: 4),
             Text(
               'Main levée',

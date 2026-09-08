@@ -40,7 +40,7 @@ class ElegantToast extends StatefulWidget {
     dismissCurrent();
 
     final overlayState = Overlay.of(context);
-    
+
     _currentOverlayEntry = OverlayEntry(
       builder: (context) {
         return Positioned(
@@ -73,9 +73,9 @@ class ElegantToast extends StatefulWidget {
   static void dismissCurrent() {
     _autoDismissTimer?.cancel();
     _autoDismissTimer = null;
-    
+
     if (_currentOverlayEntry != null) {
-      // We can let the widget handle its exit animation before removal if we want, 
+      // We can let the widget handle its exit animation before removal if we want,
       // but to keep it robust and simple without global state-sync lag, we remove it.
       // Actually, we can use a local state controller or a callback.
       // Let's make a beautiful self-animating list or a stateful overlay entry.
@@ -86,12 +86,13 @@ class ElegantToast extends StatefulWidget {
   }
 }
 
-class _ElegantToastState extends State<ElegantToast> with SingleTickerProviderStateMixin {
+class _ElegantToastState extends State<ElegantToast>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _slideAnimation;
   late Animation<double> _opacityAnimation;
   late Animation<double> _scaleAnimation;
-  
+
   double _dragOffset = 0.0;
   bool _isDisposed = false;
 
@@ -100,7 +101,9 @@ class _ElegantToastState extends State<ElegantToast> with SingleTickerProviderSt
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 550), // Framer motion feel: slightly longer, highly responsive physics
+      duration: const Duration(
+        milliseconds: 550,
+      ), // Framer motion feel: slightly longer, highly responsive physics
     );
 
     // Spring-like overshoot curve for entrance, fast-out for exit
@@ -184,10 +187,7 @@ class _ElegantToastState extends State<ElegantToast> with SingleTickerProviderSt
           opacity: _opacityAnimation.value,
           child: Transform.translate(
             offset: Offset(0, transformY),
-            child: Transform.scale(
-              scale: _scaleAnimation.value,
-              child: child,
-            ),
+            child: Transform.scale(scale: _scaleAnimation.value, child: child),
           ),
         );
       },
@@ -211,7 +211,9 @@ class _ElegantToastState extends State<ElegantToast> with SingleTickerProviderSt
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: const Color(0xFF121624).withValues(alpha: 0.92), // Glass surface
+            color: const Color(
+              0xFF121624,
+            ).withValues(alpha: 0.92), // Glass surface
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: typeColor.withValues(alpha: 0.25),
@@ -237,7 +239,10 @@ class _ElegantToastState extends State<ElegantToast> with SingleTickerProviderSt
               mainAxisSize: MainAxisSize.min,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -248,11 +253,7 @@ class _ElegantToastState extends State<ElegantToast> with SingleTickerProviderSt
                           color: typeColor.withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          typeIcon,
-                          color: typeColor,
-                          size: 22,
-                        ),
+                        child: Icon(typeIcon, color: typeColor, size: 22),
                       ),
                       const SizedBox(width: 14),
                       // Text Contents
@@ -301,10 +302,7 @@ class _ElegantToastState extends State<ElegantToast> with SingleTickerProviderSt
                   ),
                 ),
                 // Smooth Progress indicator at the bottom (shows duration remaining)
-                _ToastProgressBar(
-                  duration: widget.duration,
-                  color: typeColor,
-                ),
+                _ToastProgressBar(duration: widget.duration, color: typeColor),
               ],
             ),
           ),
@@ -318,25 +316,20 @@ class _ToastProgressBar extends StatefulWidget {
   final Duration duration;
   final Color color;
 
-  const _ToastProgressBar({
-    required this.duration,
-    required this.color,
-  });
+  const _ToastProgressBar({required this.duration, required this.color});
 
   @override
   State<_ToastProgressBar> createState() => _ToastProgressBarState();
 }
 
-class _ToastProgressBarState extends State<_ToastProgressBar> with SingleTickerProviderStateMixin {
+class _ToastProgressBarState extends State<_ToastProgressBar>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: widget.duration,
-    );
+    _controller = AnimationController(vsync: this, duration: widget.duration);
     _controller.forward();
   }
 

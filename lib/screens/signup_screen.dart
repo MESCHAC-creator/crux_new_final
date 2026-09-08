@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/error_handler_service.dart';
 import '../providers/locale_provider.dart';
 import '../providers/auth_provider.dart';
 import '../l10n/app_translations.dart';
+import '../utils/logger.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -58,7 +60,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
       hasError = true;
     }
     if (email.isEmpty || !email.contains('@')) {
-      setState(() => _emailError = AppTranslations.t('val_email_invalid', lang));
+      setState(
+        () => _emailError = AppTranslations.t('val_email_invalid', lang),
+      );
       hasError = true;
     }
     if (pass.isEmpty || pass.length < 6) {
@@ -66,7 +70,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
       hasError = true;
     }
     if (confirm != pass) {
-      setState(() => _confirmError = AppTranslations.t('val_pwd_mismatch', lang));
+      setState(
+        () => _confirmError = AppTranslations.t('val_pwd_mismatch', lang),
+      );
       hasError = true;
     }
 
@@ -74,24 +80,50 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final success = await Provider.of<CruxAuthProvider>(context, listen: false).signUp(
-        email: email,
-        password: pass,
-        name: name,
-      );
-      if (mounted && success) {
-        // Navigation handled by AuthWrapper in main.dart
+      final success = await Provider.of<CruxAuthProvider>(
+        context,
+        listen: false,
+      ).signUp(email: email, password: pass, name: name);
+
+      if (!success && mounted) {
+        setState(() => _isLoading = false);
+        _errorHandler.showError(
+          context,
+          'Erreur d\'inscription. Veuillez réessayer.',
+        );
+        return;
+      }
+
+      // Wait a moment for the auth state to propagate
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Navigation is handled by StreamBuilder in main.dart
+      if (mounted) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null && !user.isAnonymous) {
+          logger.i(
+            '✅ Sign up successful, navigation will be handled by StreamBuilder',
+          );
+        } else {
+          setState(() => _isLoading = false);
+          _errorHandler.showError(
+            context,
+            'Erreur d\'inscription. Session non établie.',
+          );
+        }
       }
     } catch (e) {
       if (!mounted) return;
+      logger.e('Sign up error: $e');
       final msg = e.toString().replaceFirst('Exception: ', '');
       if (msg.contains('email-already-in-use')) {
-        setState(() => _emailError = AppTranslations.t('auth_email_used', lang));
+        setState(
+          () => _emailError = AppTranslations.t('auth_email_used', lang),
+        );
       } else {
         _errorHandler.showError(context, msg);
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      setState(() => _isLoading = false);
     }
   }
 
@@ -113,7 +145,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
               Align(
                 alignment: Alignment.topLeft,
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
@@ -147,9 +183,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         const SizedBox(height: 24),
                         ShaderMask(
-                          shaderCallback: (bounds) => const LinearGradient(
-                            colors: [Color(0xFF00E5FF), Color(0xFF7C5CFF)],
-                          ).createShader(bounds),
+                          shaderCallback:
+                              (bounds) => const LinearGradient(
+                                colors: [Color(0xFF00E5FF), Color(0xFF7C5CFF)],
+                              ).createShader(bounds),
                           child: Text(
                             'CRUX',
                             style: GoogleFonts.spaceGrotesk(
@@ -162,7 +199,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          AppTranslations.t('create_account', lang).toUpperCase(),
+                          AppTranslations.t(
+                            'create_account',
+                            lang,
+                          ).toUpperCase(),
                           style: GoogleFonts.spaceGrotesk(
                             fontSize: 11,
                             color: const Color(0xFF8A8FA3),
@@ -192,8 +232,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           obscure: !_showPassword,
                           errorText: _passwordError,
                           suffix: IconButton(
-                            icon: Icon(_showPassword ? Icons.visibility : Icons.visibility_off, color: Colors.white38, size: 20),
-                            onPressed: () => setState(() => _showPassword = !_showPassword),
+                            icon: Icon(
+                              _showPassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              color: Colors.white38,
+                              size: 20,
+                            ),
+                            onPressed:
+                                () => setState(
+                                  () => _showPassword = !_showPassword,
+                                ),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -204,8 +253,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           obscure: !_showConfirmPassword,
                           errorText: _confirmError,
                           suffix: IconButton(
-                            icon: Icon(_showConfirmPassword ? Icons.visibility : Icons.visibility_off, color: Colors.white38, size: 20),
-                            onPressed: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
+                            icon: Icon(
+                              _showConfirmPassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              color: Colors.white38,
+                              size: 20,
+                            ),
+                            onPressed:
+                                () => setState(
+                                  () =>
+                                      _showConfirmPassword =
+                                          !_showConfirmPassword,
+                                ),
                           ),
                         ),
                         const SizedBox(height: 40),
@@ -220,7 +280,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           children: [
                             Text(
                               AppTranslations.t('have_account', lang),
-                              style: GoogleFonts.poppins(color: Colors.white38, fontSize: 14),
+                              style: GoogleFonts.poppins(
+                                color: Colors.white38,
+                                fontSize: 14,
+                              ),
                             ),
                             const SizedBox(width: 4),
                             GestureDetector(
@@ -263,7 +326,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: errorText != null ? Colors.redAccent.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.1)),
+            border: Border.all(
+              color:
+                  errorText != null
+                      ? Colors.redAccent.withValues(alpha: 0.5)
+                      : Colors.white.withValues(alpha: 0.1),
+            ),
           ),
           child: TextField(
             controller: controller,
@@ -271,24 +339,37 @@ class _SignUpScreenState extends State<SignUpScreen> {
             style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: GoogleFonts.poppins(color: Colors.white24, fontSize: 15),
+              hintStyle: GoogleFonts.poppins(
+                color: Colors.white24,
+                fontSize: 15,
+              ),
               prefixIcon: Icon(icon, color: Colors.white38, size: 20),
               suffixIcon: suffix,
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
             ),
           ),
         ),
         if (errorText != null)
           Padding(
             padding: const EdgeInsets.only(left: 16, top: 8),
-            child: Text(errorText, style: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 12)),
+            child: Text(
+              errorText,
+              style: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 12),
+            ),
           ),
       ],
     );
   }
 
-  Widget _buildPrimaryButton({required VoidCallback? onPressed, required String label, bool loading = false}) {
+  Widget _buildPrimaryButton({
+    required VoidCallback? onPressed,
+    required String label,
+    bool loading = false,
+  }) {
     return SizedBox(
       width: double.infinity,
       height: 56,
@@ -297,12 +378,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           elevation: 0,
         ),
-        child: loading
-            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-            : Text(label.toUpperCase(), style: GoogleFonts.poppins(fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+        child:
+            loading
+                ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.black,
+                  ),
+                )
+                : Text(
+                  label.toUpperCase(),
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                  ),
+                ),
       ),
     );
   }

@@ -56,7 +56,8 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
     }
     if (passcode.isNotEmpty && !RegExp(r'^\d+$').hasMatch(passcode)) {
       setState(
-          () => _error = 'Le code d\'accès ne doit contenir que des chiffres');
+        () => _error = 'Le code d\'accès ne doit contenir que des chiffres',
+      );
       return;
     }
 
@@ -89,28 +90,30 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => LargeConferenceScreen(
-              meetingId: meetingId,
-              meetingName: title,
-              userId: current.uid,
-              userName: _displayName(),
-              userEmail: current.email,
-              isHost: true,
-            ),
+            builder:
+                (_) => LargeConferenceScreen(
+                  meetingId: meetingId,
+                  meetingName: title,
+                  userId: current.uid,
+                  userName: _displayName(),
+                  userEmail: current.email,
+                  isHost: true,
+                ),
           ),
         );
       } else {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => MeetingScreen(
-              meetingId: meetingId,
-              meetingName: title,
-              userId: current.uid,
-              userName: _displayName(),
-              userEmail: current.email,
-              isHost: true,
-            ),
+            builder:
+                (_) => MeetingScreen(
+                  meetingId: meetingId,
+                  meetingName: title,
+                  userId: current.uid,
+                  userName: _displayName(),
+                  userEmail: current.email,
+                  isHost: true,
+                ),
           ),
         );
       }
@@ -135,7 +138,9 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
         title: Text(
           widget.largeConference ? 'Grande conférence' : 'Nouvelle réunion',
           style: GoogleFonts.poppins(
-              color: Colors.white, fontWeight: FontWeight.w600),
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       body: SafeArea(
@@ -161,9 +166,10 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
               Text(
                 'Titre de la réunion',
                 style: GoogleFonts.poppins(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -221,9 +227,10 @@ class _CreateMeetingScreenState extends State<CreateMeetingScreen> {
               ],
               if (_error != null) ...[
                 const SizedBox(height: 16),
-                Text(_error!,
-                    style:
-                        const TextStyle(color: AppColors.error, fontSize: 13)),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: AppColors.error, fontSize: 13),
+                ),
               ],
               const SizedBox(height: 28),
               CustomButton(

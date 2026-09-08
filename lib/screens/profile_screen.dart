@@ -62,10 +62,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (mounted) setState(() => _localPhotoPath = path);
     if (uid == null) return;
     try {
-      final snap = await _db
-          .collection('meetings')
-          .where('organizerId', isEqualTo: uid)
-          .get();
+      final snap =
+          await _db
+              .collection('meetings')
+              .where('organizerId', isEqualTo: uid)
+              .get();
       if (mounted) setState(() => _meetingsHosted = snap.docs.length);
     } catch (_) {}
   }
@@ -135,7 +136,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       _db
           .collection('users')
           .doc(uid)
-          .update({'photoBase64': FieldValue.delete()}).catchError((_) {});
+          .update({'photoBase64': FieldValue.delete()})
+          .catchError((_) {});
     }
     if (mounted) {
       setState(() => _localPhotoPath = null);
@@ -152,63 +154,64 @@ class _ProfileScreenState extends State<ProfileScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          border: Border(top: BorderSide(color: AppColors.border)),
-        ),
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 48),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.divider,
-                borderRadius: BorderRadius.circular(2),
-              ),
+      builder:
+          (_) => Container(
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border(top: BorderSide(color: AppColors.border)),
             ),
-            const SizedBox(height: 20),
-            Text(
-              AppTranslations.t('change_photo', lang),
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 48),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  AppTranslations.t('change_photo', lang),
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _SheetTile(
+                  icon: Icons.photo_library_outlined,
+                  label: AppTranslations.t('photo_gallery', lang),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickPhoto(ImageSource.gallery);
+                  },
+                ),
+                _SheetTile(
+                  icon: Icons.camera_alt_outlined,
+                  label: AppTranslations.t('photo_camera', lang),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickPhoto(ImageSource.camera);
+                  },
+                ),
+                if (_localPhotoPath != null)
+                  _SheetTile(
+                    icon: Icons.delete_outline,
+                    label: AppTranslations.t('remove_photo', lang),
+                    danger: true,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _removePhoto();
+                    },
+                  ),
+              ],
             ),
-            const SizedBox(height: 16),
-            _SheetTile(
-              icon: Icons.photo_library_outlined,
-              label: AppTranslations.t('photo_gallery', lang),
-              onTap: () {
-                Navigator.pop(context);
-                _pickPhoto(ImageSource.gallery);
-              },
-            ),
-            _SheetTile(
-              icon: Icons.camera_alt_outlined,
-              label: AppTranslations.t('photo_camera', lang),
-              onTap: () {
-                Navigator.pop(context);
-                _pickPhoto(ImageSource.camera);
-              },
-            ),
-            if (_localPhotoPath != null)
-              _SheetTile(
-                icon: Icons.delete_outline,
-                label: AppTranslations.t('remove_photo', lang),
-                danger: true,
-                onTap: () {
-                  Navigator.pop(context);
-                  _removePhoto();
-                },
-              ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
@@ -216,9 +219,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     return InputDecoration(
       labelText: label,
       labelStyle: GoogleFonts.poppins(color: AppColors.textSecondary),
-      prefixIcon: icon == null
-          ? null
-          : Icon(icon, color: AppColors.primaryDark),
+      prefixIcon:
+          icon == null ? null : Icon(icon, color: AppColors.primaryDark),
       filled: true,
       fillColor: AppColors.surfaceVariant,
       border: OutlineInputBorder(
@@ -242,51 +244,52 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceElevated,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppColors.radiusCard),
-        ),
-        title: Text(
-          AppTranslations.t('change_name', lang),
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: GoogleFonts.poppins(color: AppColors.textPrimary),
-          decoration: _fieldDecoration(
-            AppTranslations.t('enter_new_name', lang),
-            icon: Icons.person_outline,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              AppTranslations.t('cancel', lang),
-              style: GoogleFonts.poppins(color: AppColors.textSecondary),
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: AppColors.surfaceElevated,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppColors.radiusCard),
             ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.textOnPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppColors.radiusButton),
+            title: Text(
+              AppTranslations.t('change_name', lang),
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
               ),
             ),
-            child: Text(
-              AppTranslations.t('save', lang),
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+            content: TextField(
+              controller: ctrl,
+              autofocus: true,
+              style: GoogleFonts.poppins(color: AppColors.textPrimary),
+              decoration: _fieldDecoration(
+                AppTranslations.t('enter_new_name', lang),
+                icon: Icons.person_outline,
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(
+                  AppTranslations.t('cancel', lang),
+                  style: GoogleFonts.poppins(color: AppColors.textSecondary),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.textOnPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.radiusButton),
+                  ),
+                ),
+                child: Text(
+                  AppTranslations.t('save', lang),
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
     if (confirmed != true || !mounted) return;
     var newName = ctrl.text.trim();
@@ -320,91 +323,105 @@ class _ProfileScreenState extends State<ProfileScreen>
     bool obscure1 = true, obscure2 = true;
     await showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          backgroundColor: AppColors.surfaceElevated,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppColors.radiusCard),
-          ),
-          title: Text(
-            AppTranslations.t('change_password', lang),
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: currentCtrl,
-                obscureText: obscure1,
-                style: GoogleFonts.poppins(color: AppColors.textPrimary),
-                decoration: _fieldDecoration(
-                  AppTranslations.t('current_password', lang),
-                  icon: Icons.lock_outline,
-                ).copyWith(
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      obscure1 ? Icons.visibility_off : Icons.visibility,
-                      color: AppColors.textTertiary,
-                      size: 20,
-                    ),
-                    onPressed: () => setS(() => obscure1 = !obscure1),
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (ctx, setS) => AlertDialog(
+                  backgroundColor: AppColors.surfaceElevated,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.radiusCard),
                   ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: newCtrl,
-                obscureText: obscure2,
-                style: GoogleFonts.poppins(color: AppColors.textPrimary),
-                decoration: _fieldDecoration(
-                  AppTranslations.t('new_password', lang),
-                  icon: Icons.lock_reset,
-                ).copyWith(
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      obscure2 ? Icons.visibility_off : Icons.visibility,
-                      color: AppColors.textTertiary,
-                      size: 20,
+                  title: Text(
+                    AppTranslations.t('change_password', lang),
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
                     ),
-                    onPressed: () => setS(() => obscure2 = !obscure2),
                   ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: currentCtrl,
+                        obscureText: obscure1,
+                        style: GoogleFonts.poppins(
+                          color: AppColors.textPrimary,
+                        ),
+                        decoration: _fieldDecoration(
+                          AppTranslations.t('current_password', lang),
+                          icon: Icons.lock_outline,
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscure1
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: AppColors.textTertiary,
+                              size: 20,
+                            ),
+                            onPressed: () => setS(() => obscure1 = !obscure1),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: newCtrl,
+                        obscureText: obscure2,
+                        style: GoogleFonts.poppins(
+                          color: AppColors.textPrimary,
+                        ),
+                        decoration: _fieldDecoration(
+                          AppTranslations.t('new_password', lang),
+                          icon: Icons.lock_reset,
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscure2
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: AppColors.textTertiary,
+                              size: 20,
+                            ),
+                            onPressed: () => setS(() => obscure2 = !obscure2),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        AppTranslations.t('cancel', lang),
+                        style: GoogleFonts.poppins(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final cur = currentCtrl.text.trim();
+                        final nw = newCtrl.text.trim();
+                        Navigator.pop(ctx);
+                        await _changePassword(cur, nw, lang);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.textOnPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppColors.radiusButton,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        AppTranslations.t('save', lang),
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(
-                AppTranslations.t('cancel', lang),
-                style: GoogleFonts.poppins(color: AppColors.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final cur = currentCtrl.text.trim();
-                final nw = newCtrl.text.trim();
-                Navigator.pop(ctx);
-                await _changePassword(cur, nw, lang);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.textOnPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppColors.radiusButton),
-                ),
-              ),
-              child: Text(
-                AppTranslations.t('save', lang),
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -432,9 +449,10 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (mounted) _snack(AppTranslations.t('password_updated', lang));
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        final msg = e.code == 'wrong-password' || e.code == 'invalid-credential'
-            ? '❌ Mot de passe actuel incorrect'
-            : '❌ ${e.message}';
+        final msg =
+            e.code == 'wrong-password' || e.code == 'invalid-credential'
+                ? '❌ Mot de passe actuel incorrect'
+                : '❌ ${e.message}';
         _snack(msg);
       }
     } catch (e) {
@@ -443,147 +461,157 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _confirmDeleteAccount(String lang) async {
-    final hasEmail = _auth.currentUser?.providerData
-            .any((p) => p.providerId == 'password') ??
+    final hasEmail =
+        _auth.currentUser?.providerData.any(
+          (p) => p.providerId == 'password',
+        ) ??
         false;
     String? reAuthPassword;
     if (hasEmail) {
       final ctrl = TextEditingController();
       reAuthPassword = await showDialog<String>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.surfaceElevated,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppColors.radiusCard),
-          ),
-          title: Text(
-            AppTranslations.t('confirm_identity', lang),
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                AppTranslations.t('confirm_delete_msg', lang),
+        builder:
+            (ctx) => AlertDialog(
+              backgroundColor: AppColors.surfaceElevated,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppColors.radiusCard),
+              ),
+              title: Text(
+                AppTranslations.t('confirm_identity', lang),
                 style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: ctrl,
-                obscureText: true,
-                autofocus: true,
-                style: GoogleFonts.poppins(color: AppColors.textPrimary),
-                decoration: _fieldDecoration(
-                  AppTranslations.t('password', lang),
-                  icon: Icons.lock_outline,
-                ).copyWith(
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppColors.radiusField),
-                    borderSide:
-                        const BorderSide(color: AppColors.error, width: 2),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    AppTranslations.t('confirm_delete_msg', lang),
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: ctrl,
+                    obscureText: true,
+                    autofocus: true,
+                    style: GoogleFonts.poppins(color: AppColors.textPrimary),
+                    decoration: _fieldDecoration(
+                      AppTranslations.t('password', lang),
+                      icon: Icons.lock_outline,
+                    ).copyWith(
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppColors.radiusField,
+                        ),
+                        borderSide: const BorderSide(
+                          color: AppColors.error,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(
+                    AppTranslations.t('cancel', lang),
+                    style: GoogleFonts.poppins(color: AppColors.textSecondary),
                   ),
                 ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(
-                AppTranslations.t('cancel', lang),
-                style: GoogleFonts.poppins(color: AppColors.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, ctrl.text),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: AppColors.textPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppColors.radiusButton),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, ctrl.text),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    foregroundColor: AppColors.textPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppColors.radiusButton,
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    AppTranslations.t('confirm_btn', lang),
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+                  ),
                 ),
-              ),
-              child: Text(
-                AppTranslations.t('confirm_btn', lang),
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-              ),
+              ],
             ),
-          ],
-        ),
       );
       if (reAuthPassword == null || !mounted) return;
     }
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceElevated,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppColors.radiusCard),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: AppColors.errorSurface,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.warning_outlined,
-                color: AppColors.error,
-                size: 22,
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: AppColors.surfaceElevated,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppColors.radiusCard),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: AppColors.errorSurface,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.warning_outlined,
+                    color: AppColors.error,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    AppTranslations.t('delete_account', lang),
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.error,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              AppTranslations.t('delete_confirm', lang),
+              style: GoogleFonts.poppins(
+                color: AppColors.textSecondary,
+                fontSize: 13,
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                AppTranslations.t('delete_account', lang),
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.error,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(
+                  AppTranslations.t('cancel', lang),
+                  style: GoogleFonts.poppins(color: AppColors.textSecondary),
                 ),
               ),
-            ),
-          ],
-        ),
-        content: Text(
-          AppTranslations.t('delete_confirm', lang),
-          style: GoogleFonts.poppins(
-            color: AppColors.textSecondary,
-            fontSize: 13,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              AppTranslations.t('cancel', lang),
-              style: GoogleFonts.poppins(color: AppColors.textSecondary),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: AppColors.textPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppColors.radiusButton),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                  foregroundColor: AppColors.textPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.radiusButton),
+                  ),
+                ),
+                child: Text(
+                  AppTranslations.t('delete_account', lang),
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+                ),
               ),
-            ),
-            child: Text(
-              AppTranslations.t('delete_account', lang),
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-            ),
+            ],
           ),
-        ],
-      ),
     );
     if (confirmed != true || !mounted) return;
     try {
@@ -597,11 +625,12 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
       await _db.collection('users').doc(user.uid).delete();
       try {
-        final presenceQuery = await _db
-            .collectionGroup('presence')
-            .where('userId', isEqualTo: user.uid)
-            .limit(20)
-            .get();
+        final presenceQuery =
+            await _db
+                .collectionGroup('presence')
+                .where('userId', isEqualTo: user.uid)
+                .limit(20)
+                .get();
         for (final doc in presenceQuery.docs) {
           doc.reference.delete().catchError((_) {});
         }
@@ -622,21 +651,23 @@ class _ProfileScreenState extends State<ProfileScreen>
       context,
       title: isError ? 'Erreur' : (isSuccess ? 'Succès' : 'Information'),
       message: cleanMsg,
-      type: isError
-          ? ElegantToastType.error
-          : (isSuccess ? ElegantToastType.success : ElegantToastType.info),
+      type:
+          isError
+              ? ElegantToastType.error
+              : (isSuccess ? ElegantToastType.success : ElegantToastType.info),
     );
   }
 
   Widget _buildAvatar() {
     final user = _auth.currentUser;
-    final initials = (user?.displayName?.isNotEmpty == true)
-        ? user!.displayName!
-            .split(' ')
-            .take(2)
-            .map((w) => w[0].toUpperCase())
-            .join()
-        : (user?.email?[0].toUpperCase() ?? 'U');
+    final initials =
+        (user?.displayName?.isNotEmpty == true)
+            ? user!.displayName!
+                .split(' ')
+                .take(2)
+                .map((w) => w[0].toUpperCase())
+                .join()
+            : (user?.email?[0].toUpperCase() ?? 'U');
 
     Widget photo;
     if (_isUpdatingPhoto) {
@@ -670,9 +701,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     return Stack(
       children: [
         GestureDetector(
-          onTap: () => _showPhotoOptions(
-            context.read<LocaleProvider>().locale.languageCode,
-          ),
+          onTap:
+              () => _showPhotoOptions(
+                context.read<LocaleProvider>().locale.languageCode,
+              ),
           child: Container(
             width: 90,
             height: 90,
@@ -688,9 +720,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           right: 0,
           bottom: 0,
           child: GestureDetector(
-            onTap: () => _showPhotoOptions(
-              context.read<LocaleProvider>().locale.languageCode,
-            ),
+            onTap:
+                () => _showPhotoOptions(
+                  context.read<LocaleProvider>().locale.languageCode,
+                ),
             child: Container(
               width: 28,
               height: 28,
@@ -803,9 +836,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _SectionLabel(
-                          AppTranslations.t('account_stats', lang),
-                        ),
+                        _SectionLabel(AppTranslations.t('account_stats', lang)),
                         _Card(
                           child: Row(
                             children: [
@@ -830,9 +861,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     'member_since',
                                     lang,
                                   ),
-                                  value: createdAt != null
-                                      ? '${createdAt.day}/${createdAt.month}/${createdAt.year}'
-                                      : '—',
+                                  value:
+                                      createdAt != null
+                                          ? '${createdAt.day}/${createdAt.month}/${createdAt.year}'
+                                          : '—',
                                   icon: Icons.calendar_today_outlined,
                                 ),
                               ),
@@ -840,9 +872,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                         ),
                         const SizedBox(height: 28),
-                        _SectionLabel(
-                          AppTranslations.t('profile_info', lang),
-                        ),
+                        _SectionLabel(AppTranslations.t('profile_info', lang)),
                         _Card(
                           child: Column(
                             children: [
@@ -850,20 +880,21 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 icon: Icons.person_outline,
                                 title: AppTranslations.t('display_name', lang),
                                 subtitle: user?.displayName ?? '—',
-                                trailing: _isSavingName
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: AppColors.primary,
+                                trailing:
+                                    _isSavingName
+                                        ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: AppColors.primary,
+                                          ),
+                                        )
+                                        : const Icon(
+                                          Icons.edit_outlined,
+                                          color: AppColors.primaryDark,
+                                          size: 20,
                                         ),
-                                      )
-                                    : const Icon(
-                                        Icons.edit_outlined,
-                                        color: AppColors.primaryDark,
-                                        size: 20,
-                                      ),
                                 onTap: () => _showEditNameDialog(lang),
                               ),
                               const _Hairline(),
@@ -921,15 +952,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                         ],
                         const SizedBox(height: 28),
-                        const _SectionLabel(
-                          'Zone dangereuse',
-                          danger: true,
-                        ),
+                        const _SectionLabel('Zone dangereuse', danger: true),
                         Container(
                           decoration: BoxDecoration(
                             color: AppColors.errorSurface,
-                            borderRadius:
-                                BorderRadius.circular(AppColors.radiusCard),
+                            borderRadius: BorderRadius.circular(
+                              AppColors.radiusCard,
+                            ),
                             border: Border.all(
                               color: AppColors.error.withValues(alpha: 0.35),
                             ),
@@ -944,8 +973,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                         const SizedBox(height: 28),
                         const _SectionLabel('Historique & Notes'),
                         StreamBuilder<QuerySnapshot>(
-                          stream: NoteService.instance
-                              .streamUserNotes(user?.uid ?? ''),
+                          stream: NoteService.instance.streamUserNotes(
+                            user?.uid ?? '',
+                          ),
                           builder: (context, snap) {
                             if (!snap.hasData || snap.data!.docs.isEmpty) {
                               return _Card(
@@ -964,38 +994,41 @@ class _ProfileScreenState extends State<ProfileScreen>
                               );
                             }
                             return Column(
-                              children: snap.data!.docs.map((doc) {
-                                final data =
-                                    doc.data() as Map<String, dynamic>;
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _Card(
-                                    child: ListTile(
-                                      title: Text(
-                                        '${data['meetingName']}',
-                                        style: GoogleFonts.poppins(
-                                          color: AppColors.textPrimary,
-                                          fontWeight: FontWeight.w600,
+                              children:
+                                  snap.data!.docs.map((doc) {
+                                    final data =
+                                        doc.data() as Map<String, dynamic>;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 10,
+                                      ),
+                                      child: _Card(
+                                        child: ListTile(
+                                          title: Text(
+                                            '${data['meetingName']}',
+                                            style: GoogleFonts.poppins(
+                                              color: AppColors.textPrimary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          subtitle: Text(
+                                            '${data['content']}',
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: GoogleFonts.poppins(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                          trailing: const Icon(
+                                            Icons.chevron_right,
+                                            color: AppColors.textTertiary,
+                                          ),
+                                          onTap: () => _showNoteDetail(data),
                                         ),
                                       ),
-                                      subtitle: Text(
-                                        '${data['content']}',
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.poppins(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      trailing: const Icon(
-                                        Icons.chevron_right,
-                                        color: AppColors.textTertiary,
-                                      ),
-                                      onTap: () => _showNoteDetail(data),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
+                                    );
+                                  }).toList(),
                             );
                           },
                         ),
@@ -1014,28 +1047,29 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _showNoteDetail(Map<String, dynamic> data) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: Text(
-          '${data['meetingName']}',
-          style: GoogleFonts.poppins(color: AppColors.textPrimary),
-        ),
-        content: SingleChildScrollView(
-          child: Text(
-            '${data['content']}',
-            style: GoogleFonts.poppins(color: AppColors.textSecondary),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Fermer',
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: Text(
+              '${data['meetingName']}',
               style: GoogleFonts.poppins(color: AppColors.textPrimary),
             ),
+            content: SingleChildScrollView(
+              child: Text(
+                '${data['content']}',
+                style: GoogleFonts.poppins(color: AppColors.textSecondary),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Fermer',
+                  style: GoogleFonts.poppins(color: AppColors.textPrimary),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 }
@@ -1047,17 +1081,17 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 10, left: 4),
-        child: Text(
-          text.toUpperCase(),
-          style: GoogleFonts.poppins(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: danger ? AppColors.error : AppColors.textSecondary,
-            letterSpacing: 1.2,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 10, left: 4),
+    child: Text(
+      text.toUpperCase(),
+      style: GoogleFonts.poppins(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: danger ? AppColors.error : AppColors.textSecondary,
+        letterSpacing: 1.2,
+      ),
+    ),
+  );
 }
 
 class _Card extends StatelessWidget {
@@ -1065,14 +1099,14 @@ class _Card extends StatelessWidget {
   const _Card({required this.child});
   @override
   Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          gradient: AppColors.cardGradient,
-          borderRadius: BorderRadius.circular(AppColors.radiusCard),
-          border: Border.all(color: AppColors.border),
-          boxShadow: AppColors.softShadow,
-        ),
-        child: child,
-      );
+    decoration: BoxDecoration(
+      gradient: AppColors.cardGradient,
+      borderRadius: BorderRadius.circular(AppColors.radiusCard),
+      border: Border.all(color: AppColors.border),
+      boxShadow: AppColors.softShadow,
+    ),
+    child: child,
+  );
 }
 
 class _Tile extends StatelessWidget {
@@ -1095,12 +1129,13 @@ class _Tile extends StatelessWidget {
   Widget build(BuildContext context) {
     final iconColor = danger ? AppColors.error : AppColors.primaryDark;
     return InkWell(
-      onTap: onTap == null
-          ? null
-          : () {
-              HapticFeedback.selectionClick();
-              onTap!();
-            },
+      onTap:
+          onTap == null
+              ? null
+              : () {
+                HapticFeedback.selectionClick();
+                onTap!();
+              },
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 48),
         child: Padding(
@@ -1111,9 +1146,10 @@ class _Tile extends StatelessWidget {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: danger
-                      ? AppColors.error.withValues(alpha: 0.12)
-                      : AppColors.surfaceElevated,
+                  color:
+                      danger
+                          ? AppColors.error.withValues(alpha: 0.12)
+                          : AppColors.surfaceElevated,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: iconColor, size: 20),
@@ -1145,12 +1181,13 @@ class _Tile extends StatelessWidget {
               trailing ??
                   (onTap != null
                       ? Icon(
-                          Icons.chevron_right,
-                          color: danger
-                              ? AppColors.error.withValues(alpha: 0.7)
-                              : AppColors.textTertiary,
-                          size: 20,
-                        )
+                        Icons.chevron_right,
+                        color:
+                            danger
+                                ? AppColors.error.withValues(alpha: 0.7)
+                                : AppColors.textTertiary,
+                        size: 20,
+                      )
                       : const SizedBox()),
             ],
           ),
@@ -1164,49 +1201,45 @@ class _Hairline extends StatelessWidget {
   const _Hairline();
   @override
   Widget build(BuildContext context) => const Divider(
-        height: 1,
-        thickness: 0.5,
-        indent: 68,
-        color: AppColors.divider,
-      );
+    height: 1,
+    thickness: 0.5,
+    indent: 68,
+    color: AppColors.divider,
+  );
 }
 
 class _Stat extends StatelessWidget {
   final String label, value;
   final IconData icon;
-  const _Stat({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
+  const _Stat({required this.label, required this.value, required this.icon});
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: AppColors.primaryDark, size: 26),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w800,
-                fontSize: 20,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 10,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: AppColors.primaryDark, size: 26),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w800,
+            fontSize: 20,
+            color: AppColors.textPrimary,
+          ),
         ),
-      );
+        const SizedBox(height: 2),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.poppins(
+            fontSize: 10,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _StatusBadge extends StatelessWidget {
@@ -1214,20 +1247,20 @@ class _StatusBadge extends StatelessWidget {
   const _StatusBadge(this.label);
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: AppColors.successSurface,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.poppins(
-            color: AppColors.success,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: AppColors.successSurface,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(
+      label,
+      style: GoogleFonts.poppins(
+        color: AppColors.success,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 }
 
 class _SheetTile extends StatelessWidget {
@@ -1243,36 +1276,39 @@ class _SheetTile extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          constraints: const BoxConstraints(minHeight: 48),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.overlayMedium,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: danger ? AppColors.error.withValues(alpha: 0.35) : AppColors.border,
+    onTap: onTap,
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      constraints: const BoxConstraints(minHeight: 48),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.overlayMedium,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color:
+              danger
+                  ? AppColors.error.withValues(alpha: 0.35)
+                  : AppColors.border,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: danger ? AppColors.error : AppColors.primaryDark,
+            size: 22,
+          ),
+          const SizedBox(width: 14),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+              color: AppColors.textPrimary,
             ),
           ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: danger ? AppColors.error : AppColors.primaryDark,
-                size: 22,
-              ),
-              const SizedBox(width: 14),
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }

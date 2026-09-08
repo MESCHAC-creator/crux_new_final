@@ -75,6 +75,7 @@
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
     "copilot.chat.legacySessionMetadata.migrated": "true",
+    "dart.analysis.tool.window.visible": "false",
     "git-widget-placeholder": "claude/kind-babbage-vqDxq",
     "io.flutter.project.isFirstOpen": "true",
     "kotlin-language-version-configured": "true",

@@ -48,15 +48,15 @@ class ParticipantGridWidget extends StatelessWidget {
   Widget _buildParticipantTile(ParticipantDisplayState participant) {
     return GestureDetector(
       onTap: () => onParticipantTap?.call(participant.participantId),
-      onLongPress: () => onParticipantLongPress?.call(participant.participantId),
+      onLongPress:
+          () => onParticipantLongPress?.call(participant.participantId),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.cardBackground,
           borderRadius: BorderRadius.circular(AppColors.radiusCard),
           border: Border.all(
-            color: participant.isSpeaking
-                ? AppColors.primary
-                : AppColors.border,
+            color:
+                participant.isSpeaking ? AppColors.primary : AppColors.border,
             width: participant.isSpeaking ? 2 : 1,
           ),
         ),
@@ -119,10 +119,7 @@ class ParticipantGridWidget extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Colors.transparent,
-              Colors.black54,
-            ],
+            colors: [Colors.transparent, Colors.black54],
           ),
         ),
         child: Text(
@@ -146,9 +143,8 @@ class ParticipantGridWidget extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: participant.isAudioActive
-              ? AppColors.success
-              : AppColors.error,
+          color:
+              participant.isAudioActive ? AppColors.success : AppColors.error,
           shape: BoxShape.circle,
         ),
         child: Icon(
@@ -173,11 +169,7 @@ class ParticipantGridWidget extends StatelessWidget {
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.back_hand,
-              size: 10,
-              color: AppColors.textPrimary,
-            ),
+            Icon(Icons.back_hand, size: 10, color: AppColors.textPrimary),
             SizedBox(width: 2),
             Text(
               'Main',
@@ -198,18 +190,11 @@ class ParticipantGridWidget extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.people_outline,
-            size: 48,
-            color: AppColors.textSecondary,
-          ),
+          Icon(Icons.people_outline, size: 48, color: AppColors.textSecondary),
           SizedBox(height: 16),
           Text(
             'Aucun participant',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
           ),
         ],
       ),
@@ -238,7 +223,7 @@ class VirtualizedParticipantGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visibleParticipants = participants.take(maxVisibleItems).toList();
-    
+
     return ParticipantGridWidget(
       participants: visibleParticipants,
       crossAxisCount: crossAxisCount,

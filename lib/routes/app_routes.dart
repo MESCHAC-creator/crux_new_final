@@ -43,22 +43,25 @@ class AppRoutes {
       case home:
         final user = routeSettings.arguments as UserModel?;
         return MaterialPageRoute(
-          builder: (_) => HomeScreen(
-            user: user ?? UserModel(uid: '', email: '', name: 'Utilisateur'),
-          ),
+          builder:
+              (_) => HomeScreen(
+                user:
+                    user ?? UserModel(uid: '', email: '', name: 'Utilisateur'),
+              ),
         );
 
       case meeting:
         final args = routeSettings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
-          builder: (_) => MeetingScreen(
-            meetingId: args?['meetingId'] ?? '',
-            meetingName: args?['meetingName'] ?? 'Réunion',
-            userId: args?['userId'] ?? '',
-            userName: args?['userName'] ?? 'Utilisateur',
-            userEmail: args?['userEmail'],
-            isHost: args?['isHost'] ?? false,
-          ),
+          builder:
+              (_) => MeetingScreen(
+                meetingId: args?['meetingId'] ?? '',
+                meetingName: args?['meetingName'] ?? 'Réunion',
+                userId: args?['userId'] ?? '',
+                userName: args?['userName'] ?? 'Utilisateur',
+                userEmail: args?['userEmail'],
+                isHost: args?['isHost'] ?? false,
+              ),
         );
 
       case schedule:
@@ -66,9 +69,10 @@ class AppRoutes {
         // calendrier) ou null.
         final initial = routeSettings.arguments;
         return MaterialPageRoute(
-          builder: (_) => ScheduleMeetingScreen(
-            initialStart: initial is DateTime ? initial : null,
-          ),
+          builder:
+              (_) => ScheduleMeetingScreen(
+                initialStart: initial is DateTime ? initial : null,
+              ),
         );
 
       case settings:

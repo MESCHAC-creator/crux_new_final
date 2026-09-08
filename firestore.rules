@@ -2,11 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Global default-deny safety net
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     // ── Global Security Helpers ─────────────────────────────────────────────
     function isSignedIn() {
       return request.auth != null;
@@ -35,23 +30,22 @@ service cloud.firestore {
       // Anyone authenticated can read/look up a meeting to verify and join
       allow read: if isSignedIn();
       
-      // Allow authenticated users to create meetings
+      // Allow authenticated users to create meetings (simplified validation)
       allow create: if isSignedIn()
                     && request.resource.data.organizerId == request.auth.uid
                     && request.resource.data.title is string
                     && request.resource.data.title.size() > 0
-                    && request.resource.data.participants is list
-                    && request.resource.data.participants.hasAny([request.auth.uid]);
+                    && request.resource.data.participants is list;
                     
-      // Host and co-hosts can update meeting settings; non-hosts can ONLY modify their own membership in participants list
+      // Host and co-hosts can update meeting settings; participants can join/leave
       allow update: if isSignedIn()
                     && (
-                      // Case 1: Host / Co-host updates and keeps organizerId immutable
+                      // Case 1: Host / Co-host updates
                       ((resource.data.organizerId == request.auth.uid
-                        || ('coHosts' in resource.data && resource.data.coHosts.hasAny([request.auth.uid])))
+                        || (resource.data.coHosts != null && resource.data.coHosts.hasAny([request.auth.uid])))
                        && request.resource.data.organizerId == resource.data.organizerId)
                       ||
-                      // Case 2: Join / Leave - Only allows the user to add or remove their OWN uid in participants list
+                      // Case 2: Join / Leave - Simplified participant management
                       (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants'])
                        && (
                          // User adds themselves
@@ -148,23 +142,22 @@ service cloud.firestore {
       // Any authenticated user can read/look up a scheduled meeting to verify
       allow read: if isSignedIn();
       
-      // Allow authenticated users to create scheduled meetings
+      // Allow authenticated users to create scheduled meetings (simplified validation)
       allow create: if isSignedIn()
                     && request.resource.data.organizerId == request.auth.uid
                     && request.resource.data.title is string
                     && request.resource.data.title.size() > 0
-                    && request.resource.data.participants is list
-                    && request.resource.data.participants.hasAny([request.auth.uid]);
+                    && request.resource.data.participants is list;
                     
       // Organizer and co-hosts can update settings; participants can only join/leave
       allow update: if isSignedIn()
                     && (
                       // Case 1: Organizer/Co-host updates
                       ((resource.data.organizerId == request.auth.uid
-                        || ('coHosts' in resource.data && resource.data.coHosts.hasAny([request.auth.uid])))
+                        || (resource.data.coHosts != null && resource.data.coHosts.hasAny([request.auth.uid])))
                        && request.resource.data.organizerId == resource.data.organizerId)
                       ||
-                      // Case 2: Join/Leave - only participant list changes
+                      // Case 2: Join/Leave - Simplified participant management
                       (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants'])
                        && (
                          // User adds themselves

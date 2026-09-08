@@ -26,7 +26,9 @@ class HostControlsPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: PremiumColors.darkBackground,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: PremiumColors.flamePrimary.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: PremiumColors.flamePrimary.withValues(alpha: 0.3),
+        ),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -47,9 +49,10 @@ class HostControlsPanel extends StatelessWidget {
           _HostControlButton(
             icon: Icons.fiber_manual_record,
             label: isRecording ? 'Stop Recording' : 'Start Recording',
-            color: isRecording
-                ? PremiumColors.errorRed
-                : PremiumColors.successGreen,
+            color:
+                isRecording
+                    ? PremiumColors.errorRed
+                    : PremiumColors.successGreen,
             onPressed: onToggleRecording,
           ),
 

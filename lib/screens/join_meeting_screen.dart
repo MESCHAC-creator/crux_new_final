@@ -67,15 +67,17 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
 
     try {
       logger.i('🔍 Tentative de rejoindre réunion avec code: $code');
-      
+
       // Try to find meeting by meetingCode via backend API
       final backendService = BackendApiService();
       final meetingData = await backendService.getMeetingByCode(code);
-      
+
       if (!mounted) return;
 
       if (meetingData == null) {
-        logger.w('⚠️ Backend n\'a pas trouvé la réunion, tentative via Firestore direct');
+        logger.w(
+          '⚠️ Backend n\'a pas trouvé la réunion, tentative via Firestore direct',
+        );
         // Fallback to direct Firestore lookup by code
         final meeting = await MeetingService().getMeetingByCode(code);
         if (!mounted) return;
@@ -88,12 +90,12 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
           });
           return;
         }
-        
+
         logger.i('✅ Réunion trouvée via Firestore: ${meeting.id}');
         _navigateToMeeting(meeting, current);
         return;
       }
-      
+
       final meeting = backendService.parseMeetingData(meetingData);
       if (meeting != null) {
         logger.i('✅ Réunion trouvée via backend: ${meeting.id}');
@@ -102,11 +104,14 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
           await backendService.addParticipant(meeting.id);
           logger.i('✅ Participant ajouté via backend');
         } catch (e) {
-          logger.w('Failed to add participant via backend, trying direct Firestore', error: e);
+          logger.w(
+            'Failed to add participant via backend, trying direct Firestore',
+            error: e,
+          );
           await MeetingService().addParticipant(meeting.id, current.uid);
           logger.i('✅ Participant ajouté via Firestore direct');
         }
-        
+
         _navigateToMeeting(meeting, current);
       } else {
         logger.e('❌ Erreur parsing meeting data du backend');
@@ -128,8 +133,9 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
 
   void _navigateToMeeting(MeetingModel meeting, User current) {
     if (!mounted) return;
-    
-    final hasPasscode = meeting.passcode != null && meeting.passcode!.isNotEmpty;
+
+    final hasPasscode =
+        meeting.passcode != null && meeting.passcode!.isNotEmpty;
     if (hasPasscode && !_needsPasscode) {
       setState(() {
         _loading = false;
@@ -151,26 +157,28 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => LargeConferenceScreen(
-            meetingId: meeting.id,
-            meetingName: meeting.title,
-            userId: current.uid,
-            userName: _displayName(),
-          ),
+          builder:
+              (_) => LargeConferenceScreen(
+                meetingId: meeting.id,
+                meetingName: meeting.title,
+                userId: current.uid,
+                userName: _displayName(),
+              ),
         ),
       );
     } else {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => MeetingScreen(
-            meetingId: meeting.id,
-            meetingName: meeting.title,
-            userId: current.uid,
-            userName: _displayName(),
-            userEmail: current.email,
-            isHost: false,
-          ),
+          builder:
+              (_) => MeetingScreen(
+                meetingId: meeting.id,
+                meetingName: meeting.title,
+                userId: current.uid,
+                userName: _displayName(),
+                userEmail: current.email,
+                isHost: false,
+              ),
         ),
       );
     }
@@ -185,7 +193,10 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
         elevation: 0,
         title: Text(
           'Rejoindre une réunion',
-          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       body: SafeArea(
@@ -201,12 +212,20 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
                   gradient: AppColors.primaryGradient,
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(Icons.meeting_room, color: Colors.white, size: 32),
+                child: const Icon(
+                  Icons.meeting_room,
+                  color: Colors.white,
+                  size: 32,
+                ),
               ),
               const SizedBox(height: 24),
               Text(
                 'Code de la réunion',
-                style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                style: GoogleFonts.poppins(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -236,7 +255,11 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
                 const SizedBox(height: 20),
                 Text(
                   'Code d\'accès requis',
-                  style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.poppins(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -259,13 +282,17 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
               ],
               if (_error != null) ...[
                 const SizedBox(height: 16),
-                Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: AppColors.error, fontSize: 13),
+                ),
               ],
               const SizedBox(height: 28),
               CustomButton(
-                label: _loading
-                    ? 'Recherche…'
-                    : (_needsPasscode ? 'Valider le code' : 'Rejoindre'),
+                label:
+                    _loading
+                        ? 'Recherche…'
+                        : (_needsPasscode ? 'Valider le code' : 'Rejoindre'),
                 isLoading: _loading,
                 onPressed: _loading ? () {} : _join,
               ),

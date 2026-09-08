@@ -20,12 +20,12 @@ class PollsService {
 
   // État des sondages actifs
   final List<Poll> _activePolls = [];
-  final StreamController<List<Poll>> _pollsController = 
+  final StreamController<List<Poll>> _pollsController =
       StreamController<List<Poll>>.broadcast();
 
   // Questions-réponses
   final List<QAQuestion> _qaQuestions = [];
-  final StreamController<List<QAQuestion>> _qaController = 
+  final StreamController<List<QAQuestion>> _qaController =
       StreamController<List<QAQuestion>>.broadcast();
 
   // Getters
@@ -127,7 +127,7 @@ class PollsService {
       if (pollIndex == -1) throw Exception('Poll not found');
 
       final poll = _activePolls[pollIndex];
-      
+
       // Vérifier si l'utilisateur a déjà répondu
       if (poll.responses.containsKey(userId)) {
         throw Exception('Already responded to this poll');
@@ -146,16 +146,17 @@ class PollsService {
       );
 
       // Mettre à jour les options
-      final updatedOptions = poll.options.map((option) {
-        if (selectedOptionIds.contains(option.id)) {
-          return PollOption(
-            id: option.id,
-            text: option.text,
-            votes: option.votes + 1,
-          );
-        }
-        return option;
-      }).toList();
+      final updatedOptions =
+          poll.options.map((option) {
+            if (selectedOptionIds.contains(option.id)) {
+              return PollOption(
+                id: option.id,
+                text: option.text,
+                votes: option.votes + 1,
+              );
+            }
+            return option;
+          }).toList();
 
       final updatedPoll = poll.copyWith(
         options: updatedOptions,
@@ -217,20 +218,25 @@ class PollsService {
       orElse: () => throw Exception('Poll not found'),
     );
 
-    final totalVotes = poll.options.fold<int>(0, (total, option) => total + option.votes);
-    
-    final optionResults = poll.options.map((option) {
-      final percentage = totalVotes > 0 
-          ? (option.votes / totalVotes * 100).toStringAsFixed(1)
-          : '0.0';
-      
-      return PollOptionResult(
-        optionId: option.id,
-        text: option.text,
-        votes: option.votes,
-        percentage: double.parse(percentage),
-      );
-    }).toList();
+    final totalVotes = poll.options.fold<int>(
+      0,
+      (total, option) => total + option.votes,
+    );
+
+    final optionResults =
+        poll.options.map((option) {
+          final percentage =
+              totalVotes > 0
+                  ? (option.votes / totalVotes * 100).toStringAsFixed(1)
+                  : '0.0';
+
+          return PollOptionResult(
+            optionId: option.id,
+            text: option.text,
+            votes: option.votes,
+            percentage: double.parse(percentage),
+          );
+        }).toList();
 
     return PollResults(
       pollId: pollId,
@@ -379,7 +385,10 @@ class PollsService {
   /// Sauvegarde une question Q&A
   Future<void> _saveQAQuestion(QAQuestion question) async {
     try {
-      await _firestore.collection('qa_questions').doc(question.id).set(question.toJson());
+      await _firestore
+          .collection('qa_questions')
+          .doc(question.id)
+          .set(question.toJson());
     } catch (e) {
       _logger.e('Failed to save QA question', error: e);
       rethrow;
@@ -482,18 +491,21 @@ class Poll {
       meetingId: json['meetingId'] as String,
       createdBy: json['createdBy'] as String,
       question: json['question'] as String,
-      options: (json['options'] as List)
-          .map((o) => PollOption.fromJson(o as Map<String, dynamic>))
-          .toList(),
+      options:
+          (json['options'] as List)
+              .map((o) => PollOption.fromJson(o as Map<String, dynamic>))
+              .toList(),
       allowMultipleAnswers: json['allowMultipleAnswers'] as bool,
       anonymous: json['anonymous'] as bool,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      endsAt: json['endsAt'] != null 
-          ? DateTime.parse(json['endsAt'] as String) 
-          : null,
-      endedAt: json['endedAt'] != null 
-          ? DateTime.parse(json['endedAt'] as String) 
-          : null,
+      endsAt:
+          json['endsAt'] != null
+              ? DateTime.parse(json['endsAt'] as String)
+              : null,
+      endedAt:
+          json['endedAt'] != null
+              ? DateTime.parse(json['endedAt'] as String)
+              : null,
       isActive: json['isActive'] as bool,
       totalResponses: json['totalResponses'] as int,
       responses: (json['responses'] as Map<String, dynamic>).map(
@@ -509,18 +521,10 @@ class PollOption {
   final String text;
   final int votes;
 
-  PollOption({
-    required this.id,
-    required this.text,
-    this.votes = 0,
-  });
+  PollOption({required this.id, required this.text, this.votes = 0});
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'text': text,
-      'votes': votes,
-    };
+    return {'id': id, 'text': text, 'votes': votes};
   }
 
   static PollOption fromJson(Map<String, dynamic> json) {
@@ -684,16 +688,13 @@ class QAQuestion {
       upvoters: (json['upvoters'] as List?)?.cast<String>(),
       answer: json['answer'] as String?,
       answeredBy: json['answeredBy'] as String?,
-      answeredAt: json['answeredAt'] != null 
-          ? DateTime.parse(json['answeredAt'] as String) 
-          : null,
+      answeredAt:
+          json['answeredAt'] != null
+              ? DateTime.parse(json['answeredAt'] as String)
+              : null,
     );
   }
 }
 
 /// Statut d'une question Q&A
-enum QAStatus {
-  pending,
-  answered,
-  archived,
-}
+enum QAStatus { pending, answered, archived }

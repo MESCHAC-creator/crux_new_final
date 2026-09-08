@@ -49,18 +49,20 @@ class BreakoutRoomsService {
             .doc(meetingId)
             .collection('breakout_rooms')
             .add({
-          'roomId': 'room_$i',
-          'roomName': 'Salle ${i + 1}',
-          'participants': [],
-          'createdAt': FieldValue.serverTimestamp(),
-          'isActive': true,
-        });
+              'roomId': 'room_$i',
+              'roomName': 'Salle ${i + 1}',
+              'participants': [],
+              'createdAt': FieldValue.serverTimestamp(),
+              'isActive': true,
+            });
       }
 
       // Démarrer le timer
       _startBreakoutTimer(meetingId);
 
-      _logger.i('Breakout rooms enabled: $numberOfRooms rooms for $durationMinutes minutes');
+      _logger.i(
+        'Breakout rooms enabled: $numberOfRooms rooms for $durationMinutes minutes',
+      );
     } catch (e) {
       _logger.e('Error enabling breakout rooms', error: e);
       rethrow;
@@ -75,12 +77,13 @@ class BreakoutRoomsService {
       _breakoutTimer = null;
 
       // Désactiver toutes les salles
-      final rooms = await _firestore
-          .collection('meetings')
-          .doc(meetingId)
-          .collection('breakout_rooms')
-          .where('isActive', isEqualTo: true)
-          .get();
+      final rooms =
+          await _firestore
+              .collection('meetings')
+              .doc(meetingId)
+              .collection('breakout_rooms')
+              .where('isActive', isEqualTo: true)
+              .get();
 
       for (var doc in rooms.docs) {
         await doc.reference.update({'isActive': false});
@@ -110,13 +113,13 @@ class BreakoutRoomsService {
           .limit(1)
           .get()
           .then((snapshot) async {
-        if (snapshot.docs.isNotEmpty) {
-          await snapshot.docs.first.reference.update({
-            'participants': FieldValue.arrayUnion([participantId]),
+            if (snapshot.docs.isNotEmpty) {
+              await snapshot.docs.first.reference.update({
+                'participants': FieldValue.arrayUnion([participantId]),
+              });
+              _logger.i('Participant $participantId assigned to room $roomId');
+            }
           });
-          _logger.i('Participant $participantId assigned to room $roomId');
-        }
-      });
     } catch (e) {
       _logger.e('Error assigning participant to room', error: e);
       rethrow;
@@ -150,12 +153,12 @@ class BreakoutRoomsService {
           .limit(1)
           .get()
           .then((snapshot) async {
-        if (snapshot.docs.isNotEmpty) {
-          await snapshot.docs.first.reference.update({
-            'participants': FieldValue.arrayRemove([participantId]),
+            if (snapshot.docs.isNotEmpty) {
+              await snapshot.docs.first.reference.update({
+                'participants': FieldValue.arrayRemove([participantId]),
+              });
+            }
           });
-        }
-      });
 
       // Ajouter à la nouvelle salle
       await assignParticipantToRoom(
@@ -165,7 +168,9 @@ class BreakoutRoomsService {
         participantName: '',
       );
 
-      _logger.i('Participant $participantId moved from $currentRoomId to $newRoomId');
+      _logger.i(
+        'Participant $participantId moved from $currentRoomId to $newRoomId',
+      );
     } catch (e) {
       _logger.e('Error moving participant between rooms', error: e);
       rethrow;
@@ -178,12 +183,13 @@ class BreakoutRoomsService {
     required String message,
   }) async {
     try {
-      final rooms = await _firestore
-          .collection('meetings')
-          .doc(meetingId)
-          .collection('breakout_rooms')
-          .where('isActive', isEqualTo: true)
-          .get();
+      final rooms =
+          await _firestore
+              .collection('meetings')
+              .doc(meetingId)
+              .collection('breakout_rooms')
+              .where('isActive', isEqualTo: true)
+              .get();
 
       for (var doc in rooms.docs) {
         await doc.reference.update({

@@ -39,18 +39,14 @@ class MeetingService {
   // ---------------------------------------------------------------------------
 
   String _generateMeetingId() {
-    return const Uuid()
-        .v4()
-        .replaceAll('-', '')
-        .substring(0, 12)
-        .toUpperCase();
+    return const Uuid().v4().replaceAll('-', '').substring(0, 12).toUpperCase();
   }
 
   String _generateMeetingCode() {
     // Generate XXX-XXX-XXX format (9 characters with dashes)
     final chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final random = DateTime.now().millisecondsSinceEpoch;
-    
+
     String generateSegment(int offset) {
       String segment = '';
       for (int i = 0; i < 3; i++) {
@@ -58,7 +54,7 @@ class MeetingService {
       }
       return segment;
     }
-    
+
     return '${generateSegment(0)}-${generateSegment(100)}-${generateSegment(200)}';
   }
 
@@ -141,8 +137,7 @@ class MeetingService {
         meetingCode: meetingCode,
       );
 
-      final meetingRef =
-          _firestore.collection('meetings').doc(meetingId);
+      final meetingRef = _firestore.collection('meetings').doc(meetingId);
 
       bool written = false;
 
@@ -161,9 +156,7 @@ class MeetingService {
           );
 
           if (attempt < 2) {
-            await Future.delayed(
-              Duration(milliseconds: 100 * (1 << attempt)),
-            );
+            await Future.delayed(Duration(milliseconds: 100 * (1 << attempt)));
           }
         }
       }
@@ -195,11 +188,7 @@ class MeetingService {
       _log.e('Firebase Auth error: ${e.code}');
       throw Exception('auth_failed: ${e.code}');
     } catch (e, stackTrace) {
-      _log.e(
-        'createMeeting error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('createMeeting error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -273,8 +262,7 @@ class MeetingService {
           passcode?.trim().isNotEmpty == true ? passcode!.trim() : null;
 
       if (cleanPasscode != null) {
-        if (cleanPasscode.length < 4 ||
-            cleanPasscode.length > 6) {
+        if (cleanPasscode.length < 4 || cleanPasscode.length > 6) {
           throw Exception('passcode_invalid_length');
         }
 
@@ -283,17 +271,17 @@ class MeetingService {
         }
       }
 
-      final cleanInvitedEmails = invitedEmails
-          .map((email) => email.trim().toLowerCase())
-          .where((email) => email.isNotEmpty)
-          .toSet()
-          .toList();
+      final cleanInvitedEmails =
+          invitedEmails
+              .map((email) => email.trim().toLowerCase())
+              .where((email) => email.isNotEmpty)
+              .toSet()
+              .toList();
 
       final meetingId = _generateMeetingId();
       final meetingCode = _generateMeetingCode();
 
-      final meetingLink =
-          'https://crux-app.web/join/$meetingId';
+      final meetingLink = 'https://crux-app.web/join/$meetingId';
 
       final meeting = ScheduledMeetingModel(
         id: meetingId,
@@ -356,9 +344,7 @@ class MeetingService {
           );
 
           if (attempt < 2) {
-            await Future.delayed(
-              Duration(milliseconds: 100 * (1 << attempt)),
-            );
+            await Future.delayed(Duration(milliseconds: 100 * (1 << attempt)));
           }
         }
       }
@@ -372,11 +358,7 @@ class MeetingService {
       _log.e('Firebase Auth error: ${e.code}');
       throw Exception('auth_failed: ${e.code}');
     } catch (e, stackTrace) {
-      _log.e(
-        'scheduleProMeeting error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('scheduleProMeeting error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -413,11 +395,7 @@ class MeetingService {
       _log.e('Firebase Auth error: ${e.code}');
       throw Exception('auth_failed: ${e.code}');
     } catch (e, stackTrace) {
-      _log.e(
-        'scheduleMeeting error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('scheduleMeeting error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -427,11 +405,9 @@ class MeetingService {
   // ---------------------------------------------------------------------------
 
   Stream<MeetingModel?> getMeeting(String meetingId) {
-    return _firestore
-        .collection('meetings')
-        .doc(meetingId)
-        .snapshots()
-        .map((snap) {
+    return _firestore.collection('meetings').doc(meetingId).snapshots().map((
+      snap,
+    ) {
       if (!snap.exists || snap.data() == null) {
         return null;
       }
@@ -445,9 +421,7 @@ class MeetingService {
       final snap = await _firestore
           .collection('meetings')
           .doc(meetingId)
-          .get(
-            const GetOptions(source: Source.server),
-          );
+          .get(const GetOptions(source: Source.server));
 
       if (!snap.exists || snap.data() == null) {
         return null;
@@ -458,10 +432,8 @@ class MeetingService {
       _log.w('getMeetingOnce server error: $e');
 
       try {
-        final snap = await _firestore
-            .collection('meetings')
-            .doc(meetingId)
-            .get();
+        final snap =
+            await _firestore.collection('meetings').doc(meetingId).get();
 
         if (!snap.exists || snap.data() == null) {
           return null;
@@ -469,9 +441,7 @@ class MeetingService {
 
         return MeetingModel.fromJson(snap.data()!);
       } catch (fallbackError) {
-        _log.w(
-          'getMeetingOnce fallback error: $fallbackError',
-        );
+        _log.w('getMeetingOnce fallback error: $fallbackError');
 
         return null;
       }
@@ -482,9 +452,7 @@ class MeetingService {
   // GET MEETING BY CODE
   // ---------------------------------------------------------------------------
 
-  Future<MeetingModel?> getMeetingByCode(
-    String meetingCode,
-  ) async {
+  Future<MeetingModel?> getMeetingByCode(String meetingCode) async {
     final upperCode = meetingCode.trim().toUpperCase();
 
     if (upperCode.isEmpty) {
@@ -494,48 +462,33 @@ class MeetingService {
     try {
       final snap = await _firestore
           .collection('meetings')
-          .where(
-            'meetingCode',
-            isEqualTo: upperCode,
-          )
+          .where('meetingCode', isEqualTo: upperCode)
           .limit(1)
-          .get(
-            const GetOptions(source: Source.server),
-          );
+          .get(const GetOptions(source: Source.server));
 
       if (snap.docs.isEmpty) {
         return null;
       }
 
-      return MeetingModel.fromJson(
-        snap.docs.first.data(),
-      );
+      return MeetingModel.fromJson(snap.docs.first.data());
     } catch (e) {
-      _log.w(
-        'getMeetingByCode server error: $e',
-      );
+      _log.w('getMeetingByCode server error: $e');
 
       try {
-        final snap = await _firestore
-            .collection('meetings')
-            .where(
-              'meetingCode',
-              isEqualTo: upperCode,
-            )
-            .limit(1)
-            .get();
+        final snap =
+            await _firestore
+                .collection('meetings')
+                .where('meetingCode', isEqualTo: upperCode)
+                .limit(1)
+                .get();
 
         if (snap.docs.isEmpty) {
           return null;
         }
 
-        return MeetingModel.fromJson(
-          snap.docs.first.data(),
-        );
+        return MeetingModel.fromJson(snap.docs.first.data());
       } catch (fallbackError) {
-        _log.w(
-          'getMeetingByCode fallback error: $fallbackError',
-        );
+        _log.w('getMeetingByCode fallback error: $fallbackError');
 
         return null;
       }
@@ -546,24 +499,18 @@ class MeetingService {
   // GET SCHEDULED MEETING
   // ---------------------------------------------------------------------------
 
-  Future<ScheduledMeetingModel?> getScheduledMeeting(
-    String meetingId,
-  ) async {
+  Future<ScheduledMeetingModel?> getScheduledMeeting(String meetingId) async {
     try {
       final snap = await _firestore
           .collection('scheduled_meetings')
           .doc(meetingId)
-          .get(
-            const GetOptions(source: Source.server),
-          );
+          .get(const GetOptions(source: Source.server));
 
       if (!snap.exists || snap.data() == null) {
         return null;
       }
 
-      return ScheduledMeetingModel.fromJson(
-        snap.data()!,
-      );
+      return ScheduledMeetingModel.fromJson(snap.data()!);
     } catch (e) {
       _log.w('getScheduledMeeting error: $e');
       return null;
@@ -574,34 +521,23 @@ class MeetingService {
   // STREAM USER SCHEDULED MEETINGS
   // ---------------------------------------------------------------------------
 
-  Stream<List<ScheduledMeetingModel>>
-      streamUserScheduledMeetings(
+  Stream<List<ScheduledMeetingModel>> streamUserScheduledMeetings(
     String userId, {
     ScheduledMeetingStatus? statusFilter,
   }) {
     Query<Map<String, dynamic>> query = _firestore
         .collection('scheduled_meetings')
-        .where(
-          'participants',
-          arrayContains: userId,
-        );
+        .where('participants', arrayContains: userId);
 
     if (statusFilter != null) {
-      query = query.where(
-        'status',
-        isEqualTo: _enumValue(statusFilter),
-      );
+      query = query.where('status', isEqualTo: _enumValue(statusFilter));
     }
 
     query = query.orderBy('scheduledStart');
 
     return query.snapshots().map((snap) {
       return snap.docs
-          .map(
-            (doc) => ScheduledMeetingModel.fromJson(
-              doc.data(),
-            ),
-          )
+          .map((doc) => ScheduledMeetingModel.fromJson(doc.data()))
           .toList();
     });
   }
@@ -615,18 +551,11 @@ class MeetingService {
     MeetingStatus status,
   ) async {
     try {
-      await _firestore
-          .collection('meetings')
-          .doc(meetingId)
-          .update({
+      await _firestore.collection('meetings').doc(meetingId).update({
         'status': _enumValue(status),
       });
     } catch (e, stackTrace) {
-      _log.e(
-        'updateMeetingStatus error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('updateMeetingStatus error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -636,16 +565,12 @@ class MeetingService {
     ScheduledMeetingStatus status,
   ) async {
     try {
-      final Map<String, dynamic> data = {
-        'status': _enumValue(status),
-      };
+      final Map<String, dynamic> data = {'status': _enumValue(status)};
 
       if (status == ScheduledMeetingStatus.live) {
-        data['actualStart'] =
-            FieldValue.serverTimestamp();
+        data['actualStart'] = FieldValue.serverTimestamp();
       } else if (status == ScheduledMeetingStatus.ended) {
-        data['actualEnd'] =
-            FieldValue.serverTimestamp();
+        data['actualEnd'] = FieldValue.serverTimestamp();
       }
 
       await _firestore
@@ -676,19 +601,12 @@ class MeetingService {
     String reason = 'Cancelled by organizer',
   }) async {
     try {
-      await _firestore
-          .collection('scheduled_meetings')
-          .doc(meetingId)
-          .update({
-        'status': _enumValue(
-          ScheduledMeetingStatus.cancelled,
-        ),
+      await _firestore.collection('scheduled_meetings').doc(meetingId).update({
+        'status': _enumValue(ScheduledMeetingStatus.cancelled),
         'cancellationReason': reason,
       });
 
-      _log.i(
-        'Réunion planifiée annulée: $meetingId',
-      );
+      _log.i('Réunion planifiée annulée: $meetingId');
     } catch (e, stackTrace) {
       _log.e(
         'cancelScheduledMeeting error: $e',
@@ -703,23 +621,13 @@ class MeetingService {
   // PARTICIPANTS
   // ---------------------------------------------------------------------------
 
-  Future<void> addParticipant(
-    String meetingId,
-    String userId,
-  ) async {
+  Future<void> addParticipant(String meetingId, String userId) async {
     try {
-      await _firestore
-          .collection('meetings')
-          .doc(meetingId)
-          .update({
+      await _firestore.collection('meetings').doc(meetingId).update({
         'participants': FieldValue.arrayUnion([userId]),
       });
     } catch (e, stackTrace) {
-      _log.e(
-        'addParticipant error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('addParticipant error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -729,10 +637,7 @@ class MeetingService {
     String userId,
   ) async {
     try {
-      await _firestore
-          .collection('scheduled_meetings')
-          .doc(meetingId)
-          .update({
+      await _firestore.collection('scheduled_meetings').doc(meetingId).update({
         'participants': FieldValue.arrayUnion([userId]),
       });
     } catch (e, stackTrace) {
@@ -750,10 +655,7 @@ class MeetingService {
     String userId,
   ) async {
     try {
-      await _firestore
-          .collection('scheduled_meetings')
-          .doc(meetingId)
-          .update({
+      await _firestore.collection('scheduled_meetings').doc(meetingId).update({
         'participants': FieldValue.arrayRemove([userId]),
       });
     } catch (e, stackTrace) {
@@ -766,23 +668,13 @@ class MeetingService {
     }
   }
 
-  Future<void> removeParticipant(
-    String meetingId,
-    String userId,
-  ) async {
+  Future<void> removeParticipant(String meetingId, String userId) async {
     try {
-      await _firestore
-          .collection('meetings')
-          .doc(meetingId)
-          .update({
+      await _firestore.collection('meetings').doc(meetingId).update({
         'participants': FieldValue.arrayRemove([userId]),
       });
     } catch (e, stackTrace) {
-      _log.e(
-        'removeParticipant error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('removeParticipant error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -802,32 +694,22 @@ class MeetingService {
           .doc(meetingId)
           .collection('presence')
           .doc(userId)
-          .set(
-        {
-          'userId': userId,
-          'name': userName,
-          'micOn': true,
-          'camOn': true,
-          'handRaised': false,
-          'isSpeaking': false,
-          'joinedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
+          .set({
+            'userId': userId,
+            'name': userName,
+            'micOn': true,
+            'camOn': true,
+            'handRaised': false,
+            'isSpeaking': false,
+            'joinedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
     } catch (e, stackTrace) {
-      _log.e(
-        'registerPresence error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('registerPresence error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
 
-  Future<void> removePresence(
-    String meetingId,
-    String userId,
-  ) async {
+  Future<void> removePresence(String meetingId, String userId) async {
     try {
       await _firestore
           .collection('meetings')
@@ -836,11 +718,7 @@ class MeetingService {
           .doc(userId)
           .delete();
     } catch (e, stackTrace) {
-      _log.e(
-        'removePresence error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('removePresence error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -857,62 +735,38 @@ class MeetingService {
     bool endMeeting = false,
   }) async {
     try {
-      final userRef =
-          _firestore.collection('users').doc(userId);
+      final userRef = _firestore.collection('users').doc(userId);
 
-      final historyRef =
-          userRef.collection('meeting_history').doc(meetingId);
+      final historyRef = userRef.collection('meeting_history').doc(meetingId);
 
-      final meetingRef =
-          _firestore.collection('meetings').doc(meetingId);
+      final meetingRef = _firestore.collection('meetings').doc(meetingId);
 
-      final safeDuration =
-          durationSeconds < 0 ? 0 : durationSeconds;
+      final safeDuration = durationSeconds < 0 ? 0 : durationSeconds;
 
-      await _firestore.runTransaction(
-        (transaction) async {
-          final existingHistory =
-              await transaction.get(historyRef);
+      await _firestore.runTransaction((transaction) async {
+        final existingHistory = await transaction.get(historyRef);
 
-          transaction.set(
-            historyRef,
-            {
-              'meetingId': meetingId,
-              'title': title,
-              'duration': safeDuration,
-              'endedAt': FieldValue.serverTimestamp(),
-            },
-            SetOptions(merge: true),
-          );
+        transaction.set(historyRef, {
+          'meetingId': meetingId,
+          'title': title,
+          'duration': safeDuration,
+          'endedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
 
-          if (!existingHistory.exists) {
-            transaction.set(
-              userRef,
-              {
-                'meetingCount':
-                    FieldValue.increment(1),
-                'totalDuration':
-                    FieldValue.increment(safeDuration),
-              },
-              SetOptions(merge: true),
-            );
-          }
+        if (!existingHistory.exists) {
+          transaction.set(userRef, {
+            'meetingCount': FieldValue.increment(1),
+            'totalDuration': FieldValue.increment(safeDuration),
+          }, SetOptions(merge: true));
+        }
 
-          if (endMeeting) {
-            transaction.set(
-              meetingRef,
-              {
-                'status': _enumValue(
-                  MeetingStatus.ended,
-                ),
-                'endedAt':
-                    FieldValue.serverTimestamp(),
-              },
-              SetOptions(merge: true),
-            );
-          }
-        },
-      );
+        if (endMeeting) {
+          transaction.set(meetingRef, {
+            'status': _enumValue(MeetingStatus.ended),
+            'endedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+      });
     } catch (e, stackTrace) {
       _log.e(
         'saveMeetingHistoryForUser error: $e',
@@ -927,64 +781,37 @@ class MeetingService {
   // PRESENCE STREAM
   // ---------------------------------------------------------------------------
 
-  Stream<List<Map<String, dynamic>>> streamPresence(
-    String meetingId,
-  ) {
+  Stream<List<Map<String, dynamic>>> streamPresence(String meetingId) {
     return _firestore
         .collection('meetings')
         .doc(meetingId)
         .collection('presence')
         .snapshots()
-        .map(
-          (snap) => snap.docs
-              .map(
-                (doc) => doc.data(),
-              )
-              .toList(),
-        );
+        .map((snap) => snap.docs.map((doc) => doc.data()).toList());
   }
 
   // ---------------------------------------------------------------------------
   // LOCK / MUTE ALL
   // ---------------------------------------------------------------------------
 
-  Future<void> setLocked(
-    String meetingId,
-    bool locked,
-  ) async {
+  Future<void> setLocked(String meetingId, bool locked) async {
     try {
-      await _firestore
-          .collection('meetings')
-          .doc(meetingId)
-          .update({
+      await _firestore.collection('meetings').doc(meetingId).update({
         'isLocked': locked,
       });
     } catch (e, stackTrace) {
-      _log.e(
-        'setLocked error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('setLocked error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
 
-  Future<void> triggerMuteAll(
-    String meetingId,
-  ) async {
+  Future<void> triggerMuteAll(String meetingId) async {
     try {
-      await _firestore
-          .collection('meetings')
-          .doc(meetingId)
-          .update({
+      await _firestore.collection('meetings').doc(meetingId).update({
         'muteAllCount': FieldValue.increment(1),
       });
     } catch (e, stackTrace) {
-      _log.e(
-        'triggerMuteAll error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('triggerMuteAll error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -993,36 +820,20 @@ class MeetingService {
   // CO-HOSTS
   // ---------------------------------------------------------------------------
 
-  Future<void> addCoHost(
-    String meetingId,
-    String userId,
-  ) async {
+  Future<void> addCoHost(String meetingId, String userId) async {
     try {
-      await _firestore
-          .collection('meetings')
-          .doc(meetingId)
-          .update({
+      await _firestore.collection('meetings').doc(meetingId).update({
         'coHosts': FieldValue.arrayUnion([userId]),
       });
     } catch (e, stackTrace) {
-      _log.e(
-        'addCoHost error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('addCoHost error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
 
-  Future<void> addCoHostToScheduled(
-    String meetingId,
-    String userId,
-  ) async {
+  Future<void> addCoHostToScheduled(String meetingId, String userId) async {
     try {
-      await _firestore
-          .collection('scheduled_meetings')
-          .doc(meetingId)
-          .update({
+      await _firestore.collection('scheduled_meetings').doc(meetingId).update({
         'coHosts': FieldValue.arrayUnion([userId]),
       });
     } catch (e, stackTrace) {
@@ -1035,23 +846,13 @@ class MeetingService {
     }
   }
 
-  Future<void> removeCoHost(
-    String meetingId,
-    String userId,
-  ) async {
+  Future<void> removeCoHost(String meetingId, String userId) async {
     try {
-      await _firestore
-          .collection('meetings')
-          .doc(meetingId)
-          .update({
+      await _firestore.collection('meetings').doc(meetingId).update({
         'coHosts': FieldValue.arrayRemove([userId]),
       });
     } catch (e, stackTrace) {
-      _log.e(
-        'removeCoHost error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('removeCoHost error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -1075,26 +876,21 @@ class MeetingService {
         throw Exception('user_id_mismatch');
       }
 
-      final cleanCode =
-          meetingCode.trim().toUpperCase();
+      final cleanCode = meetingCode.trim().toUpperCase();
 
       if (cleanCode.isEmpty) {
         throw Exception('meeting_code_empty');
       }
 
-      final snapshot = await _firestore
-          .collection('meetings')
-          .where(
-            'meetingCode',
-            isEqualTo: cleanCode,
-          )
-          .limit(1)
-          .get();
+      final snapshot =
+          await _firestore
+              .collection('meetings')
+              .where('meetingCode', isEqualTo: cleanCode)
+              .limit(1)
+              .get();
 
       if (snapshot.docs.isEmpty) {
-        _log.e(
-          'Réunion non trouvée: $cleanCode',
-        );
+        _log.e('Réunion non trouvée: $cleanCode');
 
         throw Exception('meeting_not_found');
       }
@@ -1103,10 +899,7 @@ class MeetingService {
 
       final meetingId = meetingDoc.id;
 
-      final meeting = MeetingModel.fromDoc(
-        meetingId,
-        meetingDoc.data(),
-      );
+      final meeting = MeetingModel.fromDoc(meetingId, meetingDoc.data());
 
       // Vérification d'une réunion terminée.
       if (meeting.status == MeetingStatus.ended) {
@@ -1114,14 +907,10 @@ class MeetingService {
       }
 
       if (!meeting.participants.contains(userId)) {
-        await addParticipant(
-          meetingId,
-          userId,
-        );
+        await addParticipant(meetingId, userId);
       }
 
-      final isHost =
-          meeting.organizerId == userId;
+      final isHost = meeting.organizerId == userId;
 
       _log.i(
         'Utilisateur $userId rejoint '
@@ -1134,11 +923,7 @@ class MeetingService {
         'meetingTitle': meeting.title,
       };
     } catch (e, stackTrace) {
-      _log.e(
-        'joinMeetingByCode error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('joinMeetingByCode error: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -1147,33 +932,20 @@ class MeetingService {
   // HOST CHECK
   // ---------------------------------------------------------------------------
 
-  Future<bool> isUserHostOfMeeting(
-    String meetingId,
-    String userId,
-  ) async {
+  Future<bool> isUserHostOfMeeting(String meetingId, String userId) async {
     try {
-      final meetingDoc = await _firestore
-          .collection('meetings')
-          .doc(meetingId)
-          .get();
+      final meetingDoc =
+          await _firestore.collection('meetings').doc(meetingId).get();
 
-      if (!meetingDoc.exists ||
-          meetingDoc.data() == null) {
+      if (!meetingDoc.exists || meetingDoc.data() == null) {
         return false;
       }
 
-      final meeting = MeetingModel.fromDoc(
-        meetingId,
-        meetingDoc.data()!,
-      );
+      final meeting = MeetingModel.fromDoc(meetingId, meetingDoc.data()!);
 
       return meeting.organizerId == userId;
     } catch (e, stackTrace) {
-      _log.e(
-        'isUserHostOfMeeting error: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _log.e('isUserHostOfMeeting error: $e', error: e, stackTrace: stackTrace);
 
       return false;
     }

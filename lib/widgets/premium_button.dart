@@ -61,17 +61,18 @@ class _PremiumButtonState extends State<PremiumButton> {
               widget.padding ??
               const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           decoration: BoxDecoration(
-            gradient: _isPressed
-                ? LinearGradient(
-                    colors: [bgColor.withValues(alpha: 0.8), bgColor],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : LinearGradient(
-                    colors: [bgColor, bgColor.withValues(alpha: 0.9)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+            gradient:
+                _isPressed
+                    ? LinearGradient(
+                      colors: [bgColor.withValues(alpha: 0.8), bgColor],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                    : LinearGradient(
+                      colors: [bgColor, bgColor.withValues(alpha: 0.9)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -118,9 +119,10 @@ class _PremiumButtonState extends State<PremiumButton> {
       ),
     );
 
-    final finalWidget = widget.isFullWidth
-        ? SizedBox(width: double.infinity, child: button)
-        : button;
+    final finalWidget =
+        widget.isFullWidth
+            ? SizedBox(width: double.infinity, child: button)
+            : button;
 
     return finalWidget
         .animate()

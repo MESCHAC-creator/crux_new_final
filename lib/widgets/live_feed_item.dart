@@ -39,10 +39,9 @@ class _LiveFeedItemState extends State<LiveFeedItem>
     _dismissAnimation = Tween<Offset>(
       begin: Offset.zero,
       end: const Offset(1.0, 0),
-    ).animate(CurvedAnimation(
-      parent: _dismissController,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(
+      CurvedAnimation(parent: _dismissController, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -72,13 +71,15 @@ class _LiveFeedItemState extends State<LiveFeedItem>
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: widget.isActive
-                    ? AppColors.surfaceElevated
-                    : AppColors.cardBackground,
+                color:
+                    widget.isActive
+                        ? AppColors.surfaceElevated
+                        : AppColors.cardBackground,
                 border: Border.all(
-                  color: widget.isActive
-                      ? AppColors.borderFocused
-                      : AppColors.border,
+                  color:
+                      widget.isActive
+                          ? AppColors.borderFocused
+                          : AppColors.border,
                   width: widget.isActive ? 1.5 : 1.0,
                 ),
                 borderRadius: BorderRadius.circular(12),
@@ -93,9 +94,7 @@ class _LiveFeedItemState extends State<LiveFeedItem>
                         radius: 20,
                         backgroundColor: AppColors.cardBackgroundAlt,
                         child: Text(
-                          widget.participant.name
-                              .substring(0, 1)
-                              .toUpperCase(),
+                          widget.participant.name.substring(0, 1).toUpperCase(),
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -160,7 +159,10 @@ class _LiveFeedItemState extends State<LiveFeedItem>
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (widget.participant.audioTrackPublications.isNotEmpty)
+                            if (widget
+                                .participant
+                                .audioTrackPublications
+                                .isNotEmpty)
                               const Padding(
                                 padding: EdgeInsets.only(right: 4),
                                 child: Icon(
@@ -169,7 +171,10 @@ class _LiveFeedItemState extends State<LiveFeedItem>
                                   color: AppColors.micActive,
                                 ),
                               ),
-                            if (widget.participant.videoTrackPublications.isNotEmpty)
+                            if (widget
+                                .participant
+                                .videoTrackPublications
+                                .isNotEmpty)
                               const Icon(
                                 Icons.videocam,
                                 size: 10,
@@ -185,28 +190,29 @@ class _LiveFeedItemState extends State<LiveFeedItem>
 
                   // ─ Menu (long-press)
                   PopupMenuButton(
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        onTap: widget.onTap,
-                        child: const Row(
-                          children: [
-                            Icon(Icons.push_pin, size: 16),
-                            SizedBox(width: 8),
-                            Text('Épingler'),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        onTap: _handleDismiss,
-                        child: const Row(
-                          children: [
-                            Icon(Icons.visibility_off, size: 16),
-                            SizedBox(width: 8),
-                            Text('Masquer'),
-                          ],
-                        ),
-                      ),
-                    ],
+                    itemBuilder:
+                        (context) => [
+                          PopupMenuItem(
+                            onTap: widget.onTap,
+                            child: const Row(
+                              children: [
+                                Icon(Icons.push_pin, size: 16),
+                                SizedBox(width: 8),
+                                Text('Épingler'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            onTap: _handleDismiss,
+                            child: const Row(
+                              children: [
+                                Icon(Icons.visibility_off, size: 16),
+                                SizedBox(width: 8),
+                                Text('Masquer'),
+                              ],
+                            ),
+                          ),
+                        ],
                   ),
                 ],
               ),

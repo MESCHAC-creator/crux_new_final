@@ -102,11 +102,11 @@ class _ReactionsOverlayState extends State<ReactionsOverlay>
       rotation: _random.nextDouble() * 360,
       duration: Duration(milliseconds: 2000 + _random.nextInt(2000)),
     );
-    
+
     setState(() {
       _activeParticles.add(particle);
     });
-    
+
     widget.onReactionTap?.call(emoji);
   }
 
@@ -116,28 +116,25 @@ class _ReactionsOverlayState extends State<ReactionsOverlay>
       children: [
         // Particle layer
         ..._activeParticles.map((particle) => _buildParticle(particle)),
-        
+
         // Reaction picker
-        Positioned(
-          bottom: 100,
-          right: 20,
-          child: _buildReactionPicker(),
-        ),
+        Positioned(bottom: 100, right: 20, child: _buildReactionPicker()),
       ],
     );
   }
 
   Widget _buildParticle(ReactionParticle particle) {
-    final progress = DateTime.now().difference(particle.createdAt).inMilliseconds / 
-                     particle.duration.inMilliseconds;
+    final progress =
+        DateTime.now().difference(particle.createdAt).inMilliseconds /
+        particle.duration.inMilliseconds;
     final progressClamped = progress.clamp(0.0, 1.0);
-    
-    final currentPosition = particle.startPosition + 
-                           particle.velocity * progressClamped;
+
+    final currentPosition =
+        particle.startPosition + particle.velocity * progressClamped;
     final currentScale = particle.scale * (1 - progressClamped * 0.5);
     final currentRotation = particle.rotation * progressClamped;
     final opacity = 1.0 - progressClamped;
-    
+
     return Positioned(
       left: currentPosition.dx,
       top: currentPosition.dy,
@@ -147,10 +144,7 @@ class _ReactionsOverlayState extends State<ReactionsOverlay>
           opacity: opacity,
           child: Transform.scale(
             scale: currentScale,
-            child: Text(
-              particle.emoji,
-              style: const TextStyle(fontSize: 32),
-            ),
+            child: Text(particle.emoji, style: const TextStyle(fontSize: 32)),
           ),
         ),
       ),
@@ -171,16 +165,18 @@ class _ReactionsOverlayState extends State<ReactionsOverlay>
         children: [
           Row(
             mainAxisSize: MainAxisSize.min,
-            children: ReactionEmoji.values.take(4).map((emoji) {
-              return _buildReactionButton(emoji);
-            }).toList(),
+            children:
+                ReactionEmoji.values.take(4).map((emoji) {
+                  return _buildReactionButton(emoji);
+                }).toList(),
           ),
           const SizedBox(height: 4),
           Row(
             mainAxisSize: MainAxisSize.min,
-            children: ReactionEmoji.values.skip(4).map((emoji) {
-              return _buildReactionButton(emoji);
-            }).toList(),
+            children:
+                ReactionEmoji.values.skip(4).map((emoji) {
+                  return _buildReactionButton(emoji);
+                }).toList(),
           ),
         ],
       ),
@@ -199,10 +195,7 @@ class _ReactionsOverlayState extends State<ReactionsOverlay>
           shape: BoxShape.circle,
         ),
         child: Center(
-          child: Text(
-            emoji.emoji,
-            style: const TextStyle(fontSize: 24),
-          ),
+          child: Text(emoji.emoji, style: const TextStyle(fontSize: 24)),
         ),
       ),
     );
@@ -222,7 +215,7 @@ class QuickReactionsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!isExpanded) return const SizedBox.shrink();
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -249,10 +242,7 @@ class QuickReactionsBar extends StatelessWidget {
           color: AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(
-          emoji.emoji,
-          style: const TextStyle(fontSize: 20),
-        ),
+        child: Text(emoji.emoji, style: const TextStyle(fontSize: 20)),
       ),
     );
   }

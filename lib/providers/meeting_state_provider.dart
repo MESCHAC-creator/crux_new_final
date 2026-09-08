@@ -9,24 +9,24 @@ import '../meeting/conference_layout_controller.dart';
 
 class MeetingStateProvider extends ChangeNotifier {
   final ConferenceLayoutController _layoutController;
-  
+
   // Local media state
   bool _isMicEnabled = true;
   bool _isCameraEnabled = true;
   bool _isScreenSharing = false;
   bool _isHandRaised = false;
-  
+
   // Network stats
   double _fps = 60.0;
   int _latency = 0;
   double _bandwidth = 0.0;
   double _jitter = 0.0;
-  
+
   // Meeting info
   String? _meetingId;
   String? _meetingName;
   Room? _room;
-  
+
   MeetingStateProvider() : _layoutController = ConferenceLayoutController() {
     _layoutController.initialize();
   }
@@ -36,26 +36,26 @@ class MeetingStateProvider extends ChangeNotifier {
   SpeakerState get speakerState => _layoutController.speakerState;
   LiveFeedConfig get feedConfig => _layoutController.feedConfig;
   SpeakerQueue get speakerQueue => _layoutController.speakerQueue;
-  Map<String, ParticipantDisplayState> get participantStates => 
-    _layoutController.participantStates;
-    
+  Map<String, ParticipantDisplayState> get participantStates =>
+      _layoutController.participantStates;
+
   bool get isMicEnabled => _isMicEnabled;
   bool get isCameraEnabled => _isCameraEnabled;
   bool get isScreenSharing => _isScreenSharing;
   bool get isHandRaised => _isHandRaised;
-  
+
   double get fps => _fps;
   int get latency => _latency;
   double get bandwidth => _bandwidth;
   double get jitter => _jitter;
-  
+
   String? get meetingId => _meetingId;
   String? get meetingName => _meetingName;
   Room? get room => _room;
-  
+
   int get participantCount => _layoutController.participantCount;
-  List<ParticipantDisplayState> get activeParticipants => 
-    _layoutController.activeParticipants;
+  List<ParticipantDisplayState> get activeParticipants =>
+      _layoutController.activeParticipants;
 
   // Initialize meeting
   void initializeMeeting({
@@ -156,7 +156,10 @@ class MeetingStateProvider extends ChangeNotifier {
     _layoutController.updateAudioLevel(participantId, level);
   }
 
-  void updateParticipantMode(String participantId, ParticipantDisplayMode mode) {
+  void updateParticipantMode(
+    String participantId,
+    ParticipantDisplayMode mode,
+  ) {
     _layoutController.updateParticipantMode(participantId, mode);
   }
 

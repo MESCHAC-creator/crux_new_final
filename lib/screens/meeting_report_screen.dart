@@ -172,9 +172,10 @@ class MeetingReportScreen extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: report.participantNames
-                .map((name) => _ParticipantChip(name: name))
-                .toList(),
+            children:
+                report.participantNames
+                    .map((name) => _ParticipantChip(name: name))
+                    .toList(),
           ),
         ],
       ),
@@ -315,9 +316,15 @@ class _ParticipantChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = name.trim().isEmpty
-        ? '?'
-        : name.trim().split(' ').map((w) => w[0].toUpperCase()).take(2).join();
+    final initials =
+        name.trim().isEmpty
+            ? '?'
+            : name
+                .trim()
+                .split(' ')
+                .map((w) => w[0].toUpperCase())
+                .take(2)
+                .join();
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

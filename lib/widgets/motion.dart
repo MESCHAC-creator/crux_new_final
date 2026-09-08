@@ -119,13 +119,14 @@ class _FadeSlideInState extends State<FadeSlideIn>
     final curved = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
     return AnimatedBuilder(
       animation: curved,
-      builder: (context, child) => Opacity(
-        opacity: curved.value,
-        child: Transform.translate(
-          offset: Offset(0, widget.offset * (1 - curved.value)),
-          child: child,
-        ),
-      ),
+      builder:
+          (context, child) => Opacity(
+            opacity: curved.value,
+            child: Transform.translate(
+              offset: Offset(0, widget.offset * (1 - curved.value)),
+              child: child,
+            ),
+          ),
       child: widget.child,
     );
   }

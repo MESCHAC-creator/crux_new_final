@@ -30,14 +30,16 @@ class LiveFeedItem extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         decoration: BoxDecoration(
-          color: participantState.isSpeaking
-              ? AppColors.surfaceElevated
-              : AppColors.surfaceVariant,
+          color:
+              participantState.isSpeaking
+                  ? AppColors.surfaceElevated
+                  : AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: participantState.isSpeaking
-                ? AppColors.primary
-                : AppColors.borderSubtle,
+            color:
+                participantState.isSpeaking
+                    ? AppColors.primary
+                    : AppColors.borderSubtle,
             width: participantState.isSpeaking ? 2 : 1,
           ),
         ),
@@ -55,9 +57,10 @@ class LiveFeedItem extends StatelessWidget {
                     style: TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 14,
-                      fontWeight: participantState.isSpeaking
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      fontWeight:
+                          participantState.isSpeaking
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -100,9 +103,10 @@ class LiveFeedItem extends StatelessWidget {
         color: AppColors.cardBackground,
         shape: BoxShape.circle,
         border: Border.all(
-          color: participantState.isSpeaking
-              ? AppColors.primary
-              : AppColors.border,
+          color:
+              participantState.isSpeaking
+                  ? AppColors.primary
+                  : AppColors.border,
           width: participantState.isSpeaking ? 2 : 1,
         ),
       ),
@@ -123,10 +127,7 @@ class LiveFeedItem extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.primary,
-                    width: 2,
-                  ),
+                  border: Border.all(color: AppColors.primary, width: 2),
                 ),
               ),
             ),
@@ -139,13 +140,12 @@ class LiveFeedItem extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(right: 8),
       child: Icon(
-        participantState.isAudioActive
-            ? Icons.mic
-            : Icons.mic_off,
+        participantState.isAudioActive ? Icons.mic : Icons.mic_off,
         size: 16,
-        color: participantState.isAudioActive
-            ? AppColors.success
-            : AppColors.error,
+        color:
+            participantState.isAudioActive
+                ? AppColors.success
+                : AppColors.error,
       ),
     );
   }

@@ -27,22 +27,27 @@ class AppConfig {
   ///
   /// IMPORTANT :
   /// Cette valeur ne doit PAS être le endpoint HTTP du token server.
+  /// Elle sera obtenue dynamiquement depuis la réponse du sandbox API.
   static const String livekitWssUrl = String.fromEnvironment(
     'LIVEKIT_WSS_URL',
-    defaultValue: 'wss://crux-88fihb12.livekit.cloud',
+    defaultValue: 'wss://crux-6l6num.sandbox.livekit.io',
+  );
+
+  /// LiveKit Sandbox ID pour l'API cloud-api.livekit.io
+  static const String livekitSandboxId = String.fromEnvironment(
+    'LIVEKIT_SANDBOX_ID',
+    defaultValue: 'crux-6l6num',
   );
 
   /// Endpoint HTTP/HTTPS du serveur qui génère les tokens LiveKit.
   ///
-  /// Le workflow actuel de CRUX utilise LIVEKIT_TOKEN_SERVER_URL.
-  ///
-  /// On accepte également LIVEKIT_TOKEN_ENDPOINT afin de rester
-  /// compatible avec les anciennes configurations.
+  /// Utilise l'API LiveKit Sandbox pour obtenir serverUrl et participantToken
   static const String livekitTokenEndpoint = String.fromEnvironment(
     'LIVEKIT_TOKEN_SERVER_URL',
     defaultValue: String.fromEnvironment(
       'LIVEKIT_TOKEN_ENDPOINT',
-      defaultValue: 'https://crux-new-final.onrender.com',
+      defaultValue:
+          'https://cloud-api.livekit.io/api/sandbox/connection-details',
     ),
   );
 
@@ -84,21 +89,13 @@ class AppConfig {
   // TIMEOUTS
   // ===========================================================================
 
-  static const Duration tokenTimeout = Duration(
-    seconds: 30,
-  );
+  static const Duration tokenTimeout = Duration(seconds: 30);
 
-  static const Duration roomConnectionTimeout = Duration(
-    seconds: 45,
-  );
+  static const Duration roomConnectionTimeout = Duration(seconds: 45);
 
-  static const Duration reconnectDelay = Duration(
-    seconds: 5,
-  );
+  static const Duration reconnectDelay = Duration(seconds: 5);
 
-  static const Duration retryBackoff = Duration(
-    seconds: 2,
-  );
+  static const Duration retryBackoff = Duration(seconds: 2);
 
   static const int maxReconnectAttempts = 8;
 

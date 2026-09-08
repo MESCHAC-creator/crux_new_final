@@ -22,7 +22,9 @@ class NotificationService {
   Future<void> initialize() async {
     if (_initialized) return;
     try {
-      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const androidSettings = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
       const iosSettings = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
@@ -36,14 +38,20 @@ class NotificationService {
 
       if (Platform.isAndroid) {
         await _ln
-            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >()
             ?.requestNotificationsPermission();
       }
 
       _initialized = true;
       logger.i('✅ NotificationService initialized');
     } catch (e, st) {
-      logger.e('NotificationService.initialize error', error: e, stackTrace: st);
+      logger.e(
+        'NotificationService.initialize error',
+        error: e,
+        stackTrace: st,
+      );
     }
   }
 
@@ -67,7 +75,10 @@ class NotificationService {
   }
 
   /// Rappel quotidien pour se reconnecter à l'app.
-  Future<void> notifyDailyReminder({required String userToken, String? message}) async {
+  Future<void> notifyDailyReminder({
+    required String userToken,
+    String? message,
+  }) async {
     await _show(
       1001,
       'CRUX',
@@ -80,9 +91,10 @@ class NotificationService {
     required String userToken,
     required int minutesRemaining,
   }) async {
-    final message = minutesRemaining > 0
-        ? '⚡ Plus que $minutesRemaining minutes avant CRUX PRO !'
-        : '🎬 Passe à CRUX PRO pour des appels sans limites !';
+    final message =
+        minutesRemaining > 0
+            ? '⚡ Plus que $minutesRemaining minutes avant CRUX PRO !'
+            : '🎬 Passe à CRUX PRO pour des appels sans limites !';
     await _show(1002, 'CRUX PRO', message);
   }
 
@@ -103,7 +115,9 @@ class NotificationService {
         if (androidInfo.version.sdkInt >= 31) {
           final hasExactAlarm = await _checkExactAlarmPermission();
           if (!hasExactAlarm) {
-            logger.w('Exact alarm permission not granted, using inexact scheduling');
+            logger.w(
+              'Exact alarm permission not granted, using inexact scheduling',
+            );
           }
         }
       }

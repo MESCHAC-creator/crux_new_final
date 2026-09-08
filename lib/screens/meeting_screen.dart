@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../services/meeting_service.dart';
@@ -71,42 +70,21 @@ class _MeetingScreenState extends State<MeetingScreen> {
 
   Future<void> _addParticipantViaBackend(String meetingId) async {
     try {
-      const tokenServerUrl = String.fromEnvironment(
-        'LIVEKIT_TOKEN_SERVER_URL',
-        defaultValue: 'https://crux-token-server.vercel.app',
-      );
-
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception('Authentification requise');
+      // Utiliser Firebase UID comme identité LiveKit
+      final firebaseUid = FirebaseAuth.instance.currentUser?.uid;
+      if (firebaseUid == null || firebaseUid.isEmpty) {
+        throw Exception('Authentification Firebase requise');
       }
 
-      final idToken = await user.getIdToken();
-
-      final response = await http.put(
-        Uri.parse('$tokenServerUrl/api/meetings/$meetingId/participants'),
-        headers: {
-          'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Erreur ajout participant: ${response.body}');
-      }
+      // Ajouter le participant via Firestore direct
+      await _meetingService.addParticipant(meetingId, firebaseUid);
     } catch (e) {
-      // Fallback to direct Firestore if backend fails
-      await _meetingService.addParticipant(
-        meetingId,
-        widget.userId,
-      );
+      throw Exception('Erreur ajout participant: $e');
     }
   }
 
   void _copyId() {
-    Clipboard.setData(
-      ClipboardData(text: widget.meetingId),
-    );
+    Clipboard.setData(ClipboardData(text: widget.meetingId));
 
     ElegantToast.show(
       context,
@@ -120,20 +98,18 @@ class _MeetingScreenState extends State<MeetingScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => LargeConferenceScreen(
-          meetingId: widget.meetingId,
-          meetingName: widget.meetingName,
-          userId: widget.userId,
-          userName: widget.userName,
-          userEmail: widget.userEmail,
-          isHost: widget.isHost,
-        ),
+        builder:
+            (_) => LargeConferenceScreen(
+              meetingId: widget.meetingId,
+              meetingName: widget.meetingName,
+              userId: widget.userId,
+              userName: widget.userName,
+              userEmail: widget.userEmail,
+              isHost: widget.isHost,
+            ),
       ),
     ).then((_) async {
-      await _meetingService.removeParticipant(
-        widget.meetingId,
-        widget.userId,
-      );
+      await _meetingService.removeParticipant(widget.meetingId, widget.userId);
 
       if (mounted) {
         Navigator.pop(context);
@@ -146,14 +122,15 @@ class _MeetingScreenState extends State<MeetingScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: _preparing
-            ? const Center(
-                child: CircularProgressIndicator(
-                  color: AppColors.primary,
-                  strokeWidth: 2,
-                ),
-              )
-            : _error != null
+        child:
+            _preparing
+                ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                    strokeWidth: 2,
+                  ),
+                )
+                : _error != null
                 ? _buildError()
                 : _buildContent(),
       ),
@@ -167,11 +144,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.error_outline,
-              color: AppColors.error,
-              size: 52,
-            ),
+            const Icon(Icons.error_outline, color: AppColors.error, size: 52),
             const SizedBox(height: 20),
             const Text(
               'Impossible de préparer la réunion',
@@ -201,9 +174,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
                   foregroundColor: AppColors.textOnPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      AppColors.radiusButton,
-                    ),
+                    borderRadius: BorderRadius.circular(AppColors.radiusButton),
                   ),
                 ),
                 child: const Text('Retour'),
@@ -231,9 +202,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text(
               'Annuler',
-              style: TextStyle(
-                color: AppColors.textTertiary,
-              ),
+              style: TextStyle(color: AppColors.textTertiary),
             ),
           ),
         ],
@@ -274,12 +243,8 @@ class _MeetingScreenState extends State<MeetingScreen> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(
-          AppColors.radiusCard,
-        ),
-        border: Border.all(
-          color: AppColors.borderSubtle,
-        ),
+        borderRadius: BorderRadius.circular(AppColors.radiusCard),
+        border: Border.all(color: AppColors.borderSubtle),
         boxShadow: AppColors.softShadow,
       ),
       child: Column(
@@ -321,16 +286,11 @@ class _MeetingScreenState extends State<MeetingScreen> {
             onTap: _copyId,
             borderRadius: BorderRadius.circular(12),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 11,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               decoration: BoxDecoration(
                 color: AppColors.surfaceVariant,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.borderSubtle,
-                ),
+                border: Border.all(color: AppColors.borderSubtle),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -373,19 +333,14 @@ class _MeetingScreenState extends State<MeetingScreen> {
         icon: const Icon(Icons.videocam_outlined),
         label: const Text(
           "DÉMARRER L'APPEL",
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            letterSpacing: .3,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: .3),
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.textOnPrimary,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(
-              AppColors.radiusButton,
-            ),
+            borderRadius: BorderRadius.circular(AppColors.radiusButton),
           ),
         ),
       ),

@@ -17,9 +17,10 @@ class ParticipantTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: participant.isSpeaking
-              ? Border.all(color: AppColors.primary, width: 2)
-              : null,
+          border:
+              participant.isSpeaking
+                  ? Border.all(color: AppColors.primary, width: 2)
+                  : null,
         ),
         child: Stack(
           fit: StackFit.expand,
@@ -33,8 +34,8 @@ class ParticipantTile extends StatelessWidget {
                       .substring(0, participant.name.length.clamp(1, 2))
                       .toUpperCase(),
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             // Badge nom + micro
@@ -56,9 +57,9 @@ class ParticipantTile extends StatelessWidget {
                     ],
                     Text(
                       participant.name,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: Colors.white),
                     ),
                   ],
                 ),

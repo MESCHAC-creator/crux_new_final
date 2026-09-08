@@ -50,7 +50,7 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
 
   void _handleControlAction(ControlAction action) {
     final provider = context.read<MeetingStateProvider>();
-    
+
     switch (action) {
       case ControlAction.mic:
         provider.toggleMic();
@@ -82,7 +82,8 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
       final particle = ReactionParticle(
         emoji: emoji.emoji,
         startPosition: Offset(
-          size.width * 0.3 + (size.width * 0.4 / 8) * (_reactionParticles.length % 8),
+          size.width * 0.3 +
+              (size.width * 0.4 / 8) * (_reactionParticles.length % 8),
           size.height * 0.7,
         ),
         velocity: Offset(
@@ -109,14 +110,14 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
             feedConfig: provider.feedConfig,
             participantCount: provider.participantCount,
           );
-          
+
           final layoutMetrics = layoutEngine.calculateLayout();
-          
+
           return Stack(
             children: [
               // Main content area
               _buildMainContent(provider, layoutMetrics),
-              
+
               // Network stats overlay
               NetworkStatsOverlay(
                 fps: provider.fps,
@@ -124,13 +125,13 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
                 bandwidth: provider.bandwidth,
                 jitter: provider.jitter,
               ),
-              
+
               // Reactions overlay
               ReactionsOverlay(
                 particles: _reactionParticles,
                 onReactionTap: _addReaction,
               ),
-              
+
               // Contextual controls
               Positioned(
                 left: layoutMetrics.controlsArea.left,
@@ -150,7 +151,10 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
     );
   }
 
-  Widget _buildMainContent(MeetingStateProvider provider, LayoutMetrics layoutMetrics) {
+  Widget _buildMainContent(
+    MeetingStateProvider provider,
+    LayoutMetrics layoutMetrics,
+  ) {
     switch (provider.speakerState.mode) {
       case SpeakerMode.single:
         return _buildSingleSpeakerLayout(provider, layoutMetrics);
@@ -163,13 +167,19 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
     }
   }
 
-  Widget _buildSingleSpeakerLayout(MeetingStateProvider provider, LayoutMetrics layoutMetrics) {
+  Widget _buildSingleSpeakerLayout(
+    MeetingStateProvider provider,
+    LayoutMetrics layoutMetrics,
+  ) {
     final speakerState = provider.speakerState;
     if (!speakerState.hasSpeaker) {
       return _buildWaitingRoom();
     }
 
-    final speakerParticipant = _getParticipantDisplayState(provider, speakerState.currentSpeaker!.sid);
+    final speakerParticipant = _getParticipantDisplayState(
+      provider,
+      speakerState.currentSpeaker!.sid,
+    );
     if (speakerParticipant == null) {
       return _buildWaitingRoom();
     }
@@ -185,12 +195,14 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
               participantState: speakerParticipant,
               isPinned: speakerState.isPinned,
               isDominantSpeaker: true,
-              onTap: () => provider.pinParticipant(speakerParticipant.participantId),
+              onTap:
+                  () =>
+                      provider.pinParticipant(speakerParticipant.participantId),
               onLongPress: () => provider.unpinParticipant(),
             ),
           ),
         ),
-        
+
         // Live feed
         if (layoutMetrics.feedVisible)
           Positioned.fromRect(
@@ -201,16 +213,26 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
     );
   }
 
-  Widget _buildDualSpeakerLayout(MeetingStateProvider provider, LayoutMetrics layoutMetrics) {
+  Widget _buildDualSpeakerLayout(
+    MeetingStateProvider provider,
+    LayoutMetrics layoutMetrics,
+  ) {
     final speakerState = provider.speakerState;
     if (!speakerState.hasSpeaker || !speakerState.isDualSpeaker) {
       return _buildSingleSpeakerLayout(provider, layoutMetrics);
     }
 
-    final primarySpeaker = _getParticipantDisplayState(provider, speakerState.currentSpeaker!.sid);
-    final secondarySpeaker = speakerState.secondarySpeaker != null
-        ? _getParticipantDisplayState(provider, speakerState.secondarySpeaker!.sid)
-        : null;
+    final primarySpeaker = _getParticipantDisplayState(
+      provider,
+      speakerState.currentSpeaker!.sid,
+    );
+    final secondarySpeaker =
+        speakerState.secondarySpeaker != null
+            ? _getParticipantDisplayState(
+              provider,
+              speakerState.secondarySpeaker!.sid,
+            )
+            : null;
 
     if (primarySpeaker == null) {
       return _buildWaitingRoom();
@@ -232,12 +254,13 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
             isDominantSpeaker: true,
           ),
         ),
-        
+
         // Secondary speaker
         if (secondarySpeaker != null)
           Positioned.fromRect(
             rect: Rect.fromLTWH(
-              layoutMetrics.speakerArea.left + layoutMetrics.speakerArea.width / 2,
+              layoutMetrics.speakerArea.left +
+                  layoutMetrics.speakerArea.width / 2,
               layoutMetrics.speakerArea.top,
               layoutMetrics.speakerArea.width / 2,
               layoutMetrics.speakerArea.height,
@@ -247,7 +270,7 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
               isDominantSpeaker: false,
             ),
           ),
-        
+
         // Live feed
         if (layoutMetrics.feedVisible)
           Positioned.fromRect(
@@ -258,7 +281,10 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
     );
   }
 
-  Widget _buildScreenshareLayout(MeetingStateProvider provider, LayoutMetrics layoutMetrics) {
+  Widget _buildScreenshareLayout(
+    MeetingStateProvider provider,
+    LayoutMetrics layoutMetrics,
+  ) {
     final screenSharingParticipant = provider.activeParticipants.firstWhere(
       (p) => p.isScreenSharing,
       orElse: () => provider.activeParticipants.first,
@@ -298,7 +324,7 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
             ),
           ),
         ),
-        
+
         // Live feed
         if (layoutMetrics.feedVisible)
           Positioned.fromRect(
@@ -309,7 +335,10 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
     );
   }
 
-  Widget _buildGalleryLayout(MeetingStateProvider provider, LayoutMetrics layoutMetrics) {
+  Widget _buildGalleryLayout(
+    MeetingStateProvider provider,
+    LayoutMetrics layoutMetrics,
+  ) {
     return Positioned.fromRect(
       rect: layoutMetrics.speakerArea,
       child: _buildParticipantGrid(provider, layoutMetrics),
@@ -339,7 +368,10 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
     );
   }
 
-  Widget _buildParticipantGrid(MeetingStateProvider provider, LayoutMetrics layoutMetrics) {
+  Widget _buildParticipantGrid(
+    MeetingStateProvider provider,
+    LayoutMetrics layoutMetrics,
+  ) {
     if (!layoutMetrics.isGridLayout) {
       return _buildWaitingRoom();
     }
@@ -347,8 +379,9 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
     return GridView.builder(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: layoutMetrics.gridColumns!,
-        childAspectRatio: (layoutMetrics.tileSize?.width ?? 100) / 
-                         (layoutMetrics.tileSize?.height ?? 100),
+        childAspectRatio:
+            (layoutMetrics.tileSize?.width ?? 100) /
+            (layoutMetrics.tileSize?.height ?? 100),
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
@@ -369,11 +402,7 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.people_outline,
-            size: 64,
-            color: AppColors.textSecondary,
-          ),
+          Icon(Icons.people_outline, size: 64, color: AppColors.textSecondary),
           SizedBox(height: 16),
           Text(
             'En attente de participants...',
@@ -384,7 +413,10 @@ class _CruxConferenceViewState extends State<CruxConferenceView>
     );
   }
 
-  ParticipantDisplayState? _getParticipantDisplayState(MeetingStateProvider provider, String participantId) {
+  ParticipantDisplayState? _getParticipantDisplayState(
+    MeetingStateProvider provider,
+    String participantId,
+  ) {
     return provider.participantStates[participantId];
   }
 }

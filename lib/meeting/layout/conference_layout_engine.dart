@@ -33,7 +33,7 @@ class ConferenceLayoutEngine {
     final speakerWidth = screenSize.width * 0.70;
     final speakerHeight = screenSize.height * 0.70;
     final feedWidth = feedConfig.feedWidth;
-    
+
     return LayoutMetrics(
       speakerArea: Rect.fromLTWH(
         (screenSize.width - speakerWidth) / 2,
@@ -61,7 +61,7 @@ class ConferenceLayoutEngine {
   LayoutMetrics _calculateDualSpeakerLayout() {
     final speakerWidth = screenSize.width * 0.45;
     final speakerHeight = screenSize.height * 0.65;
-    
+
     return LayoutMetrics(
       speakerArea: Rect.fromLTWH(
         (screenSize.width - speakerWidth * 2) / 2,
@@ -89,7 +89,7 @@ class ConferenceLayoutEngine {
   LayoutMetrics _calculateScreenshareLayout() {
     final shareWidth = screenSize.width * 0.80;
     final shareHeight = screenSize.height * 0.75;
-    
+
     return LayoutMetrics(
       speakerArea: Rect.fromLTWH(
         (screenSize.width - shareWidth) / 2,
@@ -119,9 +119,14 @@ class ConferenceLayoutEngine {
     final rows = _calculateGridRows(columns);
     final tileWidth = (screenSize.width - 32) / columns;
     final tileHeight = (screenSize.height - 100) / rows;
-    
+
     return LayoutMetrics(
-      speakerArea: Rect.fromLTWH(16, 60, screenSize.width - 32, screenSize.height - 160),
+      speakerArea: Rect.fromLTWH(
+        16,
+        60,
+        screenSize.width - 32,
+        screenSize.height - 160,
+      ),
       feedArea: Rect.zero,
       controlsArea: Rect.fromLTWH(
         (screenSize.width - 200) / 2,

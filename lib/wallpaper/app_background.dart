@@ -10,11 +10,7 @@ class AppBackground extends StatelessWidget {
   final WallpaperConfig config;
   final Widget child;
 
-  const AppBackground({
-    super.key,
-    required this.config,
-    required this.child,
-  });
+  const AppBackground({super.key, required this.config, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +48,7 @@ class AppBackground extends StatelessWidget {
 
 class _UniformBlurBackground extends StatelessWidget {
   final WallpaperConfig config;
-  
+
   const _UniformBlurBackground({required this.config});
 
   @override
@@ -74,7 +70,7 @@ class _UniformBlurBackground extends StatelessWidget {
 
 class _ProgressiveBlurBackground extends StatelessWidget {
   final WallpaperConfig config;
-  
+
   const _ProgressiveBlurBackground({required this.config});
 
   @override
@@ -91,12 +87,13 @@ class _ProgressiveBlurBackground extends StatelessWidget {
         ),
         // Couche floue dessus, masquée en dégradé : flou en haut, net en bas
         ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.black, Colors.black, Colors.transparent],
-            stops: [0.0, 0.45, 1.0],
-          ).createShader(bounds),
+          shaderCallback:
+              (bounds) => const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.black, Colors.black, Colors.transparent],
+                stops: [0.0, 0.45, 1.0],
+              ).createShader(bounds),
           blendMode: BlendMode.dstIn,
           child: ImageFiltered(
             imageFilter: ImageFilter.blur(

@@ -28,9 +28,9 @@ class MeetingHeader extends StatelessWidget {
             // Durée écoulée, jamais l'heure courante
             Text(
               _formatDuration(elapsedSeconds),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.textPrimary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
             ),
             const SizedBox(width: 16),
             _HealthIndicator(health: health),
@@ -39,9 +39,9 @@ class MeetingHeader extends StatelessWidget {
             IconButton(
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: roomUrl));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Lien copié')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Lien copié')));
               },
               icon: const Icon(Icons.copy, color: AppColors.textSecondary),
               tooltip: 'Copier le lien',
@@ -56,7 +56,9 @@ class MeetingHeader extends StatelessWidget {
     final h = seconds ~/ 3600;
     final m = (seconds % 3600) ~/ 60;
     final s = seconds % 60;
-    if (h > 0) return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    if (h > 0) {
+      return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    }
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 }
@@ -78,17 +80,11 @@ class _HealthIndicator extends StatelessWidget {
       avatar: Container(
         width: 10,
         height: 10,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-        ),
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
       label: Text(
         '${health.rttMs} ms',
-        style: const TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 12,
-        ),
+        style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
       ),
       backgroundColor: AppColors.surface.withValues(alpha: 0.8),
       side: BorderSide.none,

@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
@@ -29,7 +30,7 @@ class DefaultFirebaseOptions {
         );
     }
   }
-    
+
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyArg6eFPp6trk50fCRGC_xqPgslkIa5WTE',
     appId: '1:33175700363:web:8dff2f40e10d1ead66658e',
@@ -39,7 +40,7 @@ class DefaultFirebaseOptions {
     storageBucket: 'crux-3c6be.firebasestorage.app',
     measurementId: 'G-6GVHG2D4YB',
   );
-    
+
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCvdzbDqAszGXUQ5iDesApht-Aps7_ObcQ',
     appId: '1:33175700363:android:47532d59f11f2e1a66658e',

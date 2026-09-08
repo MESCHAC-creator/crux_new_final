@@ -13,20 +13,21 @@ class ConferenceLayoutController extends ChangeNotifier {
   final Map<String, ParticipantDisplayState> _participantStates = {};
   Timer? _speakerDetectionTimer;
   Timer? _audioLevelTimer;
-  
+
   static const double _dominantSpeakerThreshold = -40.0;
   static const Duration _speakerHoldDuration = Duration(milliseconds: 500);
-  
+
   ConferenceLayoutController();
 
   SpeakerState get speakerState => _speakerState;
   LiveFeedConfig get feedConfig => _feedConfig;
   SpeakerQueue get speakerQueue => _speakerQueue;
-  Map<String, ParticipantDisplayState> get participantStates => Map.unmodifiable(_participantStates);
-  
-  List<ParticipantDisplayState> get activeParticipants => 
-    _participantStates.values.where((p) => p.isVisible).toList();
-    
+  Map<String, ParticipantDisplayState> get participantStates =>
+      Map.unmodifiable(_participantStates);
+
+  List<ParticipantDisplayState> get activeParticipants =>
+      _participantStates.values.where((p) => p.isVisible).toList();
+
   int get participantCount => _participantStates.length;
 
   void initialize() {
@@ -53,7 +54,7 @@ class ConferenceLayoutController extends ChangeNotifier {
       audioLevel: existingState?.audioLevel ?? 0.0,
       lastActiveTime: existingState?.lastActiveTime ?? DateTime.now(),
     );
-    
+
     _participantStates[participant.sid] = newState;
     notifyListeners();
   }
@@ -61,11 +62,11 @@ class ConferenceLayoutController extends ChangeNotifier {
   void removeParticipant(String participantId) {
     _participantStates.remove(participantId);
     _speakerQueue.removeWhere((p) => p.sid == participantId);
-    
+
     if (_speakerState.currentSpeaker?.sid == participantId) {
       _switchToNextSpeaker();
     }
-    
+
     notifyListeners();
   }
 
@@ -76,7 +77,7 @@ class ConferenceLayoutController extends ChangeNotifier {
         audioLevel: level,
         lastActiveTime: level > 0.1 ? DateTime.now() : state.lastActiveTime,
       );
-      
+
       if (level > _dominantSpeakerThreshold && !_speakerState.isPinned) {
         _considerAsDominantSpeaker(participantId);
       }
@@ -131,18 +132,18 @@ class ConferenceLayoutController extends ChangeNotifier {
 
   void _detectDominantSpeaker(_) {
     if (_speakerState.isPinned) return;
-    
+
     Participant? loudestParticipant;
     double highestLevel = _dominantSpeakerThreshold;
-    
+
     for (final state in _participantStates.values) {
       if (state.isAudioActive && state.audioLevel > highestLevel) {
         highestLevel = state.audioLevel;
         loudestParticipant = state.participant;
       }
     }
-    
-    if (loudestParticipant != null && 
+
+    if (loudestParticipant != null &&
         loudestParticipant.sid != _speakerState.currentSpeaker?.sid) {
       _switchSpeaker(loudestParticipant);
     }
@@ -153,7 +154,9 @@ class ConferenceLayoutController extends ChangeNotifier {
       if (state.isAudioActive && state.audioLevel > 0.1) {
         final participant = state.participant;
         if (participant is LocalParticipant) {
-          final audioPub = participant.getTrackPublicationBySource(TrackSource.microphone);
+          final audioPub = participant.getTrackPublicationBySource(
+            TrackSource.microphone,
+          );
           if (audioPub != null) {
             // Simulate audio level for local participant
             updateAudioLevel(state.participantId, 0.5);
@@ -167,7 +170,7 @@ class ConferenceLayoutController extends ChangeNotifier {
     final participant = _participantStates[participantId]?.participant;
     if (participant != null) {
       _speakerQueue.add(participant);
-      
+
       if (!_speakerState.isPinned) {
         _switchSpeakerWithDelay(participant);
       }
@@ -176,7 +179,7 @@ class ConferenceLayoutController extends ChangeNotifier {
 
   void _switchSpeakerWithDelay(Participant participant) {
     Future.delayed(_speakerHoldDuration, () {
-      if (_speakerState.currentSpeaker?.sid != participant.sid && 
+      if (_speakerState.currentSpeaker?.sid != participant.sid &&
           !_speakerState.isPinned) {
         _switchSpeaker(participant);
       }
@@ -188,7 +191,7 @@ class ConferenceLayoutController extends ChangeNotifier {
       currentSpeaker: newSpeaker,
       speakerTimestamp: DateTime.now(),
     );
-    
+
     _speakerQueue.add(newSpeaker);
     notifyListeners();
   }
@@ -208,18 +211,21 @@ class ConferenceLayoutController extends ChangeNotifier {
     final state = _participantStates[participantId];
     if (state != null) {
       _participantStates[participantId] = state.copyWith(hasHandRaised: raised);
-      
+
       if (raised && !_speakerState.isPinned) {
         final participant = state.participant;
         _speakerQueue.add(participant);
         _switchSpeakerWithDelay(participant);
       }
-      
+
       notifyListeners();
     }
   }
 
-  void updateParticipantMode(String participantId, ParticipantDisplayMode mode) {
+  void updateParticipantMode(
+    String participantId,
+    ParticipantDisplayMode mode,
+  ) {
     final state = _participantStates[participantId];
     if (state != null) {
       _participantStates[participantId] = state.copyWith(mode: mode);
@@ -228,12 +234,14 @@ class ConferenceLayoutController extends ChangeNotifier {
   }
 
   SpeakerMode determineOptimalMode() {
-    final screenSharingParticipant = _participantStates.values
-        .firstWhere((p) => p.isScreenSharing, orElse: () => _participantStates.values.first);
-    
+    final screenSharingParticipant = _participantStates.values.firstWhere(
+      (p) => p.isScreenSharing,
+      orElse: () => _participantStates.values.first,
+    );
+
     final hasScreenShare = screenSharingParticipant.isScreenSharing;
     final participantCount = _participantStates.length;
-    
+
     return ConferenceLayoutEngine.determineSpeakerMode(
       hasScreenShare: hasScreenShare,
       participantCount: participantCount,

@@ -61,9 +61,8 @@ class UserService {
   static Uint8List? decodePhoto(String? base64Str) {
     if (base64Str == null || base64Str.isEmpty) return null;
     try {
-      final clean = base64Str.contains(',')
-          ? base64Str.split(',').last
-          : base64Str;
+      final clean =
+          base64Str.contains(',') ? base64Str.split(',').last : base64Str;
       return base64Decode(clean);
     } catch (_) {
       return null;

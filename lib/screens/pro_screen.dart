@@ -72,7 +72,10 @@ class _ProScreenState extends State<ProScreen> {
         elevation: 0,
         title: Text(
           'CRUX PRO',
-          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       body: SafeArea(
@@ -115,7 +118,10 @@ class _ProScreenState extends State<ProScreen> {
                       Expanded(
                         child: Text(
                           f.$1,
-                          style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ],
@@ -155,7 +161,10 @@ class _ProScreenState extends State<ProScreen> {
               Center(
                 child: Text(
                   'Paiement sécurisé via PayDunya',
-                  style: GoogleFonts.poppins(color: Colors.white38, fontSize: 12),
+                  style: GoogleFonts.poppins(
+                    color: Colors.white38,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],

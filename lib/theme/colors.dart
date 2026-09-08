@@ -133,20 +133,20 @@ class AppColors {
   static Color scrim = _black.withValues(alpha: 0.85);
 
   static List<BoxShadow> get softShadow => [
-        BoxShadow(
-          color: _black.withValues(alpha: 0.6),
-          blurRadius: 20,
-          offset: const Offset(0, 8),
-        ),
-      ];
+    BoxShadow(
+      color: _black.withValues(alpha: 0.6),
+      blurRadius: 20,
+      offset: const Offset(0, 8),
+    ),
+  ];
 
   static List<BoxShadow> get glowShadow => [
-        BoxShadow(
-          color: _white.withValues(alpha: 0.04),
-          blurRadius: 24,
-          spreadRadius: -4,
-        ),
-      ];
+    BoxShadow(
+      color: _white.withValues(alpha: 0.04),
+      blurRadius: 24,
+      spreadRadius: -4,
+    ),
+  ];
 
   static Color primaryWithOpacity(double opacity) =>
       _white.withValues(alpha: opacity);

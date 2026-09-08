@@ -106,21 +106,13 @@ class DeviceVerificationService {
 
       final webInfo = await deviceInfo.webBrowserInfo;
 
-      _log.d(
-        'Web browser: ${webInfo.browserName}',
-      );
+      _log.d('Web browser: ${webInfo.browserName}');
 
-      _log.d(
-        'Web platform: ${webInfo.platform}',
-      );
+      _log.d('Web platform: ${webInfo.platform}');
 
-      _log.d(
-        'Web user agent: ${webInfo.userAgent}',
-      );
+      _log.d('Web user agent: ${webInfo.userAgent}');
     } catch (e) {
-      _log.w(
-        'Impossible de récupérer les informations du navigateur: $e',
-      );
+      _log.w('Impossible de récupérer les informations du navigateur: $e');
     }
 
     // Sur Web :
@@ -141,17 +133,11 @@ class DeviceVerificationService {
 
       final sdk = androidInfo.version.sdkInt;
 
-      _log.d(
-        'Android SDK: $sdk',
-      );
+      _log.d('Android SDK: $sdk');
 
-      _log.d(
-        'Android model: ${androidInfo.model}',
-      );
+      _log.d('Android model: ${androidInfo.model}');
 
-      _log.d(
-        'Android manufacturer: ${androidInfo.manufacturer}',
-      );
+      _log.d('Android manufacturer: ${androidInfo.manufacturer}');
 
       // Android 8.0 minimum.
       if (sdk < 26) {
@@ -171,9 +157,7 @@ class DeviceVerificationService {
         rethrow;
       }
 
-      _log.w(
-        'Vérification Android partielle: $e',
-      );
+      _log.w('Vérification Android partielle: $e');
     }
   }
 
@@ -187,13 +171,9 @@ class DeviceVerificationService {
 
       final version = iosInfo.systemVersion;
 
-      _log.d(
-        'iOS version: $version',
-      );
+      _log.d('iOS version: $version');
 
-      _log.d(
-        'iOS model: ${iosInfo.utsname.machine}',
-      );
+      _log.d('iOS model: ${iosInfo.utsname.machine}');
 
       if (!_isIOSVersionValid(version)) {
         throw const DeviceVerificationException(
@@ -207,9 +187,7 @@ class DeviceVerificationService {
         rethrow;
       }
 
-      _log.w(
-        'Vérification iOS partielle: $e',
-      );
+      _log.w('Vérification iOS partielle: $e');
     }
   }
 
@@ -221,13 +199,9 @@ class DeviceVerificationService {
     try {
       final info = await deviceInfo.deviceInfo;
 
-      _log.d(
-        'Desktop device information: ${info.data}',
-      );
+      _log.d('Desktop device information: ${info.data}');
     } catch (e) {
-      _log.w(
-        'Informations desktop indisponibles: $e',
-      );
+      _log.w('Informations desktop indisponibles: $e');
     }
   }
 
@@ -243,17 +217,11 @@ class DeviceVerificationService {
       final version = packageInfo.version;
       final buildNumber = packageInfo.buildNumber;
 
-      _log.d(
-        'Application: $packageName',
-      );
+      _log.d('Application: $packageName');
 
-      _log.d(
-        'Version: $version',
-      );
+      _log.d('Version: $version');
 
-      _log.d(
-        'Build: $buildNumber',
-      );
+      _log.d('Build: $buildNumber');
 
       // Les applications Web n'ont pas le même package name
       // qu'Android/iOS.
@@ -267,14 +235,10 @@ class DeviceVerificationService {
       };
 
       if (!kIsWeb && !expectedPackages.contains(packageName)) {
-        _log.w(
-          'Package name inattendu: $packageName',
-        );
+        _log.w('Package name inattendu: $packageName');
       }
     } catch (e) {
-      _log.w(
-        'Impossible de récupérer les informations de l’application: $e',
-      );
+      _log.w('Impossible de récupérer les informations de l’application: $e');
     }
   }
 

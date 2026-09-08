@@ -32,9 +32,8 @@ class UserModel {
       email: json['email'] ?? '',
       name: json['name'] ?? '',
       profileImageUrl: json['profileImageUrl'],
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : null,
+      createdAt:
+          json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
       isOnline: json['isOnline'] ?? false,
     );
   }

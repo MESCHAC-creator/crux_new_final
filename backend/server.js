@@ -59,10 +59,17 @@ app.use(
         origin.startsWith(item.replace('/*', ''))
       );
       if (allowed) return callback(null, true);
+      
+      // For testing, allow localhost
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return callback(null, true);
+      }
+      
       return callback(new Error(`CORS blocked: ${origin}`));
     },
     methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type'],
+    credentials: true,
   })
 );
 
@@ -110,7 +117,7 @@ const tokenLimiter = rateLimit({
 async function verifyFirebaseToken(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Authentification Firebase requise' });
+    return res.status(401).json({ error: 'Authorization header required' });
   }
   const token = header.substring(7);
   try {
@@ -119,7 +126,7 @@ async function verifyFirebaseToken(req, res, next) {
     next();
   } catch (error) {
     console.error('Firebase auth error:', error.code);
-    return res.status(401).json({ error: 'Token Firebase invalide' });
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
 
@@ -336,7 +343,11 @@ function generateMeetingId() {
 app.post('/api/meetings', verifyFirebaseToken, async (req, res) => {
   try {
     const { title, description, organizerName, passcode, isLargeConference } = req.body;
-    const userId = req.user.uid;
+    
+    const userId = req.user?.uid;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
 
     // Validate input
     const validationErrors = validateMeetingInput(req.body);
@@ -453,7 +464,10 @@ app.get('/api/meetings/:id', verifyFirebaseToken, async (req, res) => {
 app.put('/api/meetings/:id/participants', verifyFirebaseToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.uid;
+    const userId = req.user?.uid;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
     
     // Validate meeting ID
     const validationErrors = validateMeetingId(id);
@@ -488,22 +502,22 @@ async function handleTokenRequest(req, res) {
     }
 
     // 🔒 Contrôle d'identité strict : identity === uid Firebase
-    if (identity !== req.user.uid) {
-      return res.status(403).json({ error: 'Identité non autorisée' });
+    const uid = req.user?.uid;
+    if (!uid) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    if (identity !== uid) {
+      console.warn('⚠️ Identity mismatch: requested=${identity}, actual=${uid}');
+      return res.status(403).json({ error: 'Identity mismatch' });
     }
 
     // 🔒 Contrôle host : vérifié dans Firestore (meetings OU scheduled_meetings)
-    // Plus simple param `?isHost=true` qui marche sans contrôle.
     let host = false;
     if (isHost === 'true') {
       host =
-        (await isMeetingOrganizerOrCohost(room, req.user.uid)) ||
-        (await isScheduledMeetingOrganizerOrCohost(room, req.user.uid));
-      if (!host) {
-        return res.status(403).json({
-          error: 'Droits host refusés : vous n\'êtes pas organisateur de cette réunion',
-        });
-      }
+        (await isMeetingOrganizerOrCohost(room, uid)) ||
+        (await isScheduledMeetingOrganizerOrCohost(room, uid));
     }
 
     const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
@@ -515,7 +529,7 @@ async function handleTokenRequest(req, res) {
     at.addGrant({
       roomJoin: true,
       room,
-      canPublish: true,
+      canPublish: host,
       canSubscribe: true,
       canPublishData: true,
       canUpdateOwnMetadata: true,

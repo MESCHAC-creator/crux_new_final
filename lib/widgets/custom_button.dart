@@ -52,11 +52,12 @@ class _CustomButtonState extends State<CustomButton> {
               widget.padding ??
               const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           decoration: BoxDecoration(
-            color: widget.isLoading
-                ? bgColor.withValues(alpha: 0.6)
-                : _isPressed
-                ? bgColor.withValues(alpha: 0.8)
-                : bgColor,
+            color:
+                widget.isLoading
+                    ? bgColor.withValues(alpha: 0.6)
+                    : _isPressed
+                    ? bgColor.withValues(alpha: 0.8)
+                    : bgColor,
             borderRadius: BorderRadius.circular(borderRadius),
             boxShadow: [
               BoxShadow(

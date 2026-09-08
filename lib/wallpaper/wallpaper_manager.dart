@@ -69,9 +69,10 @@ class WallpaperManager {
   Future<String> importImage(String sourcePath) async {
     final dir = await _wallpaperDir();
 
-    var extension = sourcePath.contains('.')
-        ? sourcePath.split('.').last.toLowerCase()
-        : 'jpg';
+    var extension =
+        sourcePath.contains('.')
+            ? sourcePath.split('.').last.toLowerCase()
+            : 'jpg';
     if (extension.length > 5) extension = 'jpg';
 
     final target = File(

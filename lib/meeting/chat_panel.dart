@@ -60,28 +60,34 @@ class _ChatPanelState extends State<ChatPanel> {
                     controller: _controller,
                     decoration: InputDecoration(
                       hintText: 'Message',
-                      hintStyle: const TextStyle(color: AppColors.textSecondary),
+                      hintStyle: const TextStyle(
+                        color: AppColors.textSecondary,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
                       ),
                       filled: true,
                       fillColor: AppColors.background,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
                     ),
                     style: const TextStyle(color: AppColors.textPrimary),
                   ),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
-                  onPressed: _controller.text.isNotEmpty
-                      ? () {
-                          widget.onSend(
-                              _controller.text.trim(), _recipient?.sid);
-                          _controller.clear();
-                        }
-                      : null,
+                  onPressed:
+                      _controller.text.isNotEmpty
+                          ? () {
+                            widget.onSend(
+                              _controller.text.trim(),
+                              _recipient?.sid,
+                            );
+                            _controller.clear();
+                          }
+                          : null,
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(48, 48),
                     shape: const CircleBorder(),
@@ -101,37 +107,42 @@ class _ChatPanelState extends State<ChatPanel> {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text(
-                'Tout le monde',
-                style: TextStyle(color: AppColors.textPrimary),
-              ),
-              onTap: () {
-                setState(() => _recipient = null);
-                Navigator.pop(context);
-              },
-            ),
-            ...widget.participants.where((p) => !p.isLocal).map((p) => ListTile(
-                  title: Text(
-                    p.name,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                  ),
-                  subtitle: const Text(
-                    'Message privé',
-                    style: TextStyle(color: AppColors.textSecondary),
+      builder:
+          (context) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: const Text(
+                    'Tout le monde',
+                    style: TextStyle(color: AppColors.textPrimary),
                   ),
                   onTap: () {
-                    setState(() => _recipient = p);
+                    setState(() => _recipient = null);
                     Navigator.pop(context);
                   },
-                )),
-          ],
-        ),
-      ),
+                ),
+                ...widget.participants
+                    .where((p) => !p.isLocal)
+                    .map(
+                      (p) => ListTile(
+                        title: Text(
+                          p.name,
+                          style: const TextStyle(color: AppColors.textPrimary),
+                        ),
+                        subtitle: const Text(
+                          'Message privé',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                        onTap: () {
+                          setState(() => _recipient = p);
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ),
+              ],
+            ),
+          ),
     );
   }
 }
@@ -153,26 +164,27 @@ class _MessageBubble extends StatelessWidget {
           Text(
             '${message.senderName}${isPrivate ? ' · privé' : ''}',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                ),
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
           ),
           const SizedBox(height: 2),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: message.fromMe
-                  ? AppColors.primary.withValues(alpha: 0.3)
-                  : isPrivate
+              color:
+                  message.fromMe
+                      ? AppColors.primary.withValues(alpha: 0.3)
+                      : isPrivate
                       ? AppColors.secondary.withValues(alpha: 0.3)
                       : AppColors.surface,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
               message.body,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: AppColors.textPrimary),
             ),
           ),
           const SizedBox(height: 8),

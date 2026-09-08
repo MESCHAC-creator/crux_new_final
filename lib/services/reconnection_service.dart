@@ -140,9 +140,13 @@ class ReconnectionService {
     _reconnectAttempts++;
 
     final delay = _calculateReconnectDelay();
-    _logger.i('Starting reconnection attempt $_reconnectAttempts/${AppConfig.maxReconnectAttempts} with delay ${delay.inSeconds}s');
+    _logger.i(
+      'Starting reconnection attempt $_reconnectAttempts/${AppConfig.maxReconnectAttempts} with delay ${delay.inSeconds}s',
+    );
 
-    _onReconnecting?.call('Tentative de reconnexion $_reconnectAttempts/${AppConfig.maxReconnectAttempts}...');
+    _onReconnecting?.call(
+      'Tentative de reconnexion $_reconnectAttempts/${AppConfig.maxReconnectAttempts}...',
+    );
 
     await Future.delayed(delay);
 
@@ -157,14 +161,23 @@ class ReconnectionService {
 
   /// Calcule le délai de reconnexion avec backoff exponentiel
   Duration _calculateReconnectDelay() {
-    final exponentialDelay = _initialReconnectDelay * (1 << (_reconnectAttempts - 1));
-    final clampedDelay = exponentialDelay > _maxReconnectDelay 
-        ? _maxReconnectDelay 
-        : exponentialDelay;
-    
+    final exponentialDelay =
+        _initialReconnectDelay * (1 << (_reconnectAttempts - 1));
+    final clampedDelay =
+        exponentialDelay > _maxReconnectDelay
+            ? _maxReconnectDelay
+            : exponentialDelay;
+
     // Ajouter un peu de jitter pour éviter la synchronisation
-    final jitter = Duration(milliseconds: (clampedDelay.inMilliseconds * 0.1 * (DateTime.now().millisecond % 10) / 10).toInt());
-    
+    final jitter = Duration(
+      milliseconds:
+          (clampedDelay.inMilliseconds *
+                  0.1 *
+                  (DateTime.now().millisecond % 10) /
+                  10)
+              .toInt(),
+    );
+
     return clampedDelay + jitter;
   }
 
@@ -173,7 +186,7 @@ class ReconnectionService {
     _isReconnecting = false;
     _reconnectAttempts = 0;
     _reconnectTimer?.cancel();
-    
+
     _logger.i('Reconnection successful');
     _onReconnected?.call();
   }
@@ -192,7 +205,9 @@ class ReconnectionService {
     } else {
       // Échec définitif
       _isReconnecting = false;
-      _onReconnectionFailed?.call('Échec de la reconnexion après $_reconnectAttempts tentatives: $error');
+      _onReconnectionFailed?.call(
+        'Échec de la reconnexion après $_reconnectAttempts tentatives: $error',
+      );
     }
   }
 
