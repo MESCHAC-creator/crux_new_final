@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
@@ -28,7 +30,7 @@ class AuthService {
     required String name,
   }) async {
     try {
-      _logger.i('📝 Sign up: $email');
+      _logger.i('Sign up: $email');
 
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
@@ -41,17 +43,19 @@ class AuthService {
       await user.updateDisplayName(name.trim());
       await user.reload();
 
-      // Create/update Firestore user profile
-      await _updateFirestoreProfile(user.uid, name.trim(), user.email);
+      // Create/update Firestore user profile (non-blocking on auth flow)
+      _updateFirestoreProfile(user.uid, name.trim(), user.email).catchError((e) {
+        _logger.w('Firestore profile creation failed (non-blocking): $e');
+      });
 
-      _logger.i('✅ Sign up successful');
+      _logger.i('Sign up successful');
 
       return UserModel(uid: user.uid, email: email.trim(), name: name.trim());
     } on FirebaseAuthException catch (e) {
-      _logger.e('❌ Auth error: ${e.code} — ${e.message}');
+      _logger.e('Auth error: ${e.code} — ${e.message}');
       rethrow;
     } catch (e) {
-      _logger.e('❌ Sign up failed: $e');
+      _logger.e('Sign up failed: $e');
       rethrow;
     }
   }
@@ -61,7 +65,7 @@ class AuthService {
     required String password,
   }) async {
     try {
-      _logger.i('🔑 Sign in: $email');
+      _logger.i('Sign in: $email');
 
       final userCredential = await _auth
           .signInWithEmailAndPassword(email: email.trim(), password: password)
@@ -83,10 +87,10 @@ class AuthService {
         user.displayName,
         user.email,
       ).catchError((e) {
-        _logger.w('⚠️ Firestore profile update failed (non-blocking): $e');
+        _logger.w('Firestore profile update failed (non-blocking): $e');
       });
 
-      _logger.i('✅ Sign in successful');
+      _logger.i('Sign in successful');
 
       return UserModel(
         uid: user.uid,
@@ -94,48 +98,60 @@ class AuthService {
         name: user.displayName ?? 'User',
       );
     } on FirebaseAuthException catch (e) {
-      _logger.e('❌ Auth error: ${e.code} — ${e.message}');
+      _logger.e('Auth error: ${e.code} — ${e.message}');
       rethrow;
     } catch (e) {
-      _logger.e('❌ Sign in failed: $e');
+      _logger.e('Sign in failed: $e');
       rethrow;
     }
   }
 
+  /// CORRIGÉ (bug #6) : branche Web vs Mobile.
+  /// Web : FirebaseAuth.signInWithPopup(GoogleAuthProvider())
+  /// Mobile : GoogleSignIn → credential → signInWithCredential()
   Future<UserModel?> signInWithGoogle() async {
     try {
-      _logger.i('🔑 Google Sign In...');
+      _logger.i('Google Sign In...');
 
-      final googleUser = await _googleSignIn.signIn().timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw Exception(
-            'Délai Google Sign-In dépassé. Vérifiez votre connexion internet.',
-          );
-        },
-      );
-      if (googleUser == null) {
-        _logger.w('⚠️ Google sign in cancelled');
-        return null;
+      User? user;
+
+      if (kIsWeb) {
+        // ── WEB : popup directe via Firebase Auth ──────────────────────
+        final provider = GoogleAuthProvider()
+          ..addScope('email')
+          ..addScope('https://www.googleapis.com/auth/userinfo.profile')
+          ..setCustomParameters({'prompt': 'select_account'});
+
+        final cred = await _auth
+            .signInWithPopup(provider)
+            .timeout(const Duration(seconds: 30));
+        user = cred.user;
+      } else {
+        // ── ANDROID / iOS : GoogleSignIn → credential ─────────────────
+        final googleUser = await _googleSignIn.signIn().timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            throw Exception(
+              'Délai Google Sign-In dépassé. Vérifiez votre connexion internet.',
+            );
+          },
+        );
+        if (googleUser == null) {
+          _logger.w('Google sign in cancelled');
+          return null;
+        }
+
+        final googleAuth = await googleUser.authentication;
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        final cred = await _auth
+            .signInWithCredential(credential)
+            .timeout(const Duration(seconds: 15));
+        user = cred.user;
       }
-
-      final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final userCredential = await _auth
-          .signInWithCredential(credential)
-          .timeout(
-            const Duration(seconds: 15),
-            onTimeout: () {
-              throw Exception(
-                'Délai authentification dépassé. Vérifiez votre connexion internet.',
-              );
-            },
-          );
-      final user = userCredential.user;
 
       if (user == null) throw Exception('Google sign in failed');
 
@@ -145,40 +161,40 @@ class AuthService {
         user.displayName,
         user.email,
       ).catchError((e) {
-        _logger.w('⚠️ Firestore profile update failed (non-blocking): $e');
+        _logger.w('Firestore profile update failed (non-blocking): $e');
       });
 
-      _logger.i('✅ Google sign in successful');
+      _logger.i('Google sign in successful');
 
       return UserModel(
         uid: user.uid,
         email: user.email ?? '',
-        name: user.displayName ?? googleUser.displayName ?? 'User',
+        name: user.displayName ?? 'User',
       );
     } on FirebaseAuthException catch (e) {
-      _logger.e('❌ Google auth error: ${e.code} — ${e.message}');
+      _logger.e('Google auth error: ${e.code} — ${e.message}');
       rethrow;
     } catch (e) {
-      _logger.e('❌ Google sign in failed: $e');
+      _logger.e('Google sign in failed: $e');
       rethrow;
     }
   }
 
   Future<void> resetPassword(String email) async {
     try {
-      _logger.i('🔄 Password reset: $email');
+      _logger.i('Password reset: $email');
       await _auth.sendPasswordResetEmail(email: email.trim());
-      _logger.i('✅ Password reset email sent');
+      _logger.i('Password reset email sent');
     } on FirebaseAuthException catch (e) {
-      _logger.e('❌ Reset error: ${e.code}');
+      _logger.e('Reset error: ${e.code}');
       rethrow;
     } catch (e) {
-      _logger.e('❌ Password reset failed: $e');
+      _logger.e('Password reset failed: $e');
       rethrow;
     }
   }
 
-  /// Helper method to update Firestore user profile
+  /// Helper method to update Firestore user profile (non-blocking)
   Future<void> _updateFirestoreProfile(
     String uid,
     String? name,
@@ -197,27 +213,30 @@ class AuthService {
         data['email'] = email.trim();
       }
 
+      // NOTE: isPro n'est jamais écrit ici — c'est volontaire.
+      // La règle Firestore users/{uid} CREATE interdit isPro==true,
+      // et UPDATE bloque toute modification isPro par l'utilisateur.
       await _firestore
           .collection('users')
           .doc(uid)
           .set(data, SetOptions(merge: true));
-      _logger.i('✅ Firestore profile updated for user: $uid');
+      _logger.i('Firestore profile updated for user: $uid');
     } catch (e) {
-      _logger.w('⚠️ Failed to update Firestore profile: $e');
+      _logger.w('Failed to update Firestore profile: $e');
       // Don't throw - this is non-blocking
     }
   }
 
   Future<void> signOut() async {
     try {
-      _logger.i('👋 Signing out...');
+      _logger.i('Signing out...');
       await Future.wait([
         _googleSignIn.signOut().then((_) => null, onError: (_) => null),
         _auth.signOut(),
       ]);
-      _logger.i('✅ Sign out successful');
+      _logger.i('Sign out successful');
     } catch (e) {
-      _logger.e('⚠️ Sign out error: $e');
+      _logger.e('Sign out error: $e');
       // Local sign out should always succeed
     }
   }
