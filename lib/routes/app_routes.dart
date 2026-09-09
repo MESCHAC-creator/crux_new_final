@@ -57,6 +57,7 @@ class AppRoutes {
               (_) => MeetingScreen(
                 meetingId: args?['meetingId'] ?? '',
                 meetingName: args?['meetingName'] ?? 'Réunion',
+                meetingCode: args?['meetingCode'], // ← AJOUT
                 userId: args?['userId'] ?? '',
                 userName: args?['userName'] ?? 'Utilisateur',
                 userEmail: args?['userEmail'],
