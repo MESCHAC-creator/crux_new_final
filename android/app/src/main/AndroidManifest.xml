@@ -23,9 +23,9 @@
     <!-- STORAGE -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission
-    android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-    android:maxSdkVersion="32"
-    tools:replace="android:maxSdkVersion" />
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"
+        tools:replace="android:maxSdkVersion" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
@@ -36,37 +36,29 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- FOREGROUND SERVICES -->
+    <!-- FOREGROUND SERVICES (appel + screen share) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
-       <!-- Screen Share — requis par LiveKit pour MediaProjection -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-
     <!-- PHONE STATE -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
     <application
-    android:label="CRUX"
-    android:name=".CruxApplication"
-    android:icon="@mipmap/ic_launcher"
-    android:roundIcon="@mipmap/ic_launcher"
-    android:networkSecurityConfig="@xml/network_security_config"
-    android:allowBackup="true"
-    android:fullBackupContent="@xml/backup_rules"
-    android:usesCleartextTraffic="false"
-    android:requestLegacyExternalStorage="false"
-    android:hardwareAccelerated="true"
-    android:theme="@style/Theme.Crux"
-    tools:replace="android:allowBackup,android:fullBackupContent">
+        android:label="CRUX"
+        android:name=".CruxApplication"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:usesCleartextTraffic="false"
+        android:requestLegacyExternalStorage="false"
+        android:hardwareAccelerated="true"
+        android:theme="@style/Theme.Crux"
+        tools:replace="android:allowBackup,android:fullBackupContent">
 
         <activity
             android:name=".MainActivity"
@@ -104,12 +96,21 @@
             </intent-filter>
         </activity>
 
-        <!-- Foreground Service for Calls -->
+        <!-- Foreground Service for Calls (microphone + camera) -->
         <service
             android:name=".CallForegroundService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="microphone|camera" />
+
+        <!-- CORRIGÉ : LiveKit Foreground Service pour le PARTAGE D'ÉCRAN (MediaProjection)
+             Doit être DANS <application> et non après. -->
+        <service
+            android:name="io.livekit.android.services.ForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection"
+            android:stopWithTask="true" />
 
         <!-- FCM -->
         <meta-data
@@ -126,9 +127,4 @@
             android:value="2" />
 
     </application>
-            <service
-            android:name="io.livekit.android.services.ForegroundService"
-            android:foregroundServiceType="mediaProjection"
-            android:stopWithTask="true"
-            android:exported="false" />
 </manifest>
