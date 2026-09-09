@@ -61,12 +61,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-   // ============================================================
-  // CORRIGÉ (bug #11) : crée la réunion dans Firestore AVANT de naviguer
-  // ============================================================
   Future<void> _startInstant() async {
     try {
-      // 1. Créer la réunion dans Firestore AVANT de naviguer
+      // 1. Créer la réunion dans Firestore
       final meetingId = await MeetingService().createMeeting(
         title: 'Réunion instantanée',
         description: '',
@@ -76,11 +73,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
-      // 2. Naviguer vers l'écran de réunion avec l'ID réel
+      // 2. Récupérer le meetingCode (XXX-XXX-XXX) depuis Firestore
+      final meeting = await MeetingService().getMeetingOnce(meetingId);
+      if (!mounted) return;
+      final meetingCode = meeting?.meetingCode ?? '';
+
+      // 3. Naviguer vers l'écran de réunion avec l'ID + le code
       Navigator.of(context).pushNamed(
         AppRoutes.meeting,
         arguments: {
           'meetingId': meetingId,
+          'meetingCode': meetingCode, // ← AJOUT
           'meetingName': 'Réunion instantanée',
           'userId': _uid,
           'userName': _displayName,
@@ -95,12 +98,13 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
   }
-
+  
   void _joinMeeting(MeetingModel meeting) {
     Navigator.of(context).pushNamed(
       AppRoutes.meeting,
       arguments: {
         'meetingId': meeting.id,
+        'meetingCode': meeting.meetingCode,
         'meetingName': meeting.title,
         'userId': _uid,
         'userName': _displayName,
