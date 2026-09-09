@@ -809,46 +809,98 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
       logger.w('Camera toggle failed', error: e);
     }
   }
+  // ===========================================================================
+  // SCREEN SHARE (CORRIGÉ — anti-crash Android + Web)
+  // ===========================================================================
 
-  // ===========================================================================
-  // SCREEN SHARE
-  // ===========================================================================
+  bool _isScreenSharingStarting = false;
 
   Future<void> _toggleScreenShare() async {
-    final local = _room?.localParticipant;
+    // Évite le double-tap qui lance 2 MediaProjection simultanés (crash Android)
+    if (_isScreenSharingStarting) {
+      logger.w('Screen share already starting/stopping — ignoring tap');
+      return;
+    }
 
+    final local = _room?.localParticipant;
     if (local == null) {
       logger.w('Cannot toggle screen share: no local participant');
       return;
     }
 
-    final next = !_screenSharing;
+    // Si on est en train de partager → on arrête (pas de risque)
+    if (_screenSharing) {
+      _isScreenSharingStarting = true;
+      try {
+        await local.setScreenShareEnabled(false);
+        if (mounted) {
+          setState(() => _screenSharing = false);
+          context.read<MeetingStateProvider>().setScreenSharing(false);
+        }
+      } catch (e) {
+        logger.e('Screen share STOP failed', error: e);
+      } finally {
+        _isScreenSharingStarting = false;
+      }
+      return;
+    }
 
+    // Démarrage du partage — peut crash si permission refusée ou MediaProjection annulé
+    _isScreenSharingStarting = true;
     try {
-      logger.i('Toggling screen share: $next');
+      logger.i('Starting screen share...');
 
-      await local.setScreenShareEnabled(next);
+      // 1. Vérifier qu'on est sur une plateforme qui supporte screen share
+      if (kIsWeb) {
+        // Web : getDisplayMedia — OK via setScreenShareEnabled
+        await local.setScreenShareEnabled(true);
+      } else {
+        // Android/iOS : vérifier la permission FOREGROUND_SERVICE (Android 14+)
+        // On laisse setScreenShareEnabled gérer le MediaProjection manager natif
+        // mais on wrap dans un try/catch pour éviter le crash hard
+        try {
+          await local.setScreenShareEnabled(true).timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw TimeoutException(
+                'Délai écoulé pour le partage d\'écran. L\'utilisateur a-t-il annulé ?',
+              );
+            },
+          );
+        } on TimeoutException {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Le partage d\'écran a expiré. Réessayez.'),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+          return; // Ne pas crash
+        } on PlatformException catch (e) {
+          // Cas : utilisateur clique "Annuler" dans le dialog MediaProjection
+          logger.w('Screen share cancelled by user: ${e.code} ${e.message}');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Partage annulé : ${e.message ?? e.code}'),
+                backgroundColor: AppColors.surfaceElevated,
+              ),
+            );
+          }
+          return; // Ne pas crash
+        }
+      }
 
       if (!mounted) return;
 
-      setState(() {
-        _screenSharing = next;
-      });
-
-      // Update meeting state provider
-      final meetingProvider = context.read<MeetingStateProvider>();
-      meetingProvider.setScreenSharing(next);
-
-      logger.i('Screen share toggled successfully: $next');
-    } catch (e) {
-      logger.e('Screen share failed', error: e);
-
+      setState(() => _screenSharing = true);
+      context.read<MeetingStateProvider>().setScreenSharing(true);
+      logger.i('Screen share started successfully');
+    } catch (e, stackTrace) {
+      logger.e('Screen share START failed', error: e, stackTrace: stackTrace);
       if (mounted) {
-        setState(() {
-          _screenSharing = false;
-        });
-
-        // Show error to user
+        setState(() => _screenSharing = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Échec du partage d\'écran: ${e.toString()}'),
@@ -856,9 +908,10 @@ class _LargeConferenceScreenState extends State<LargeConferenceScreen>
           ),
         );
       }
+    } finally {
+      _isScreenSharingStarting = false;
     }
   }
-
   // ===========================================================================
   // RAISE HAND
   // ===========================================================================
