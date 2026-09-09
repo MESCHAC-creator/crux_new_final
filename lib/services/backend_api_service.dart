@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/meeting_model.dart';
@@ -34,7 +33,7 @@ class BackendApiService {
           .get(const GetOptions(source: Source.server));
       if (snap.docs.isEmpty) return null;
       final data = snap.docs.first.data();
-      return {'id': snap.docs.first.id, ...?data};
+      return {'id': snap.docs.first.id, ...data};
     } catch (e) {
       logger.e('BackendApiService.getMeetingByCode error', error: e);
       return null;
