@@ -175,6 +175,8 @@ app.get(
 
       // Validation critique : identity === uid Firebase authentifié
       if (identity !== req.user.uid) {
+        // CORRIGÉ (bug #4) : backticks pour interpolation JS
+        console.warn(`⚠️ Identity mismatch: requested=${identity}, actual=${req.user.uid}`);
         return res.status(403).json({
           error: 'Identité non autorisée',
         });
@@ -201,7 +203,7 @@ app.get(
       at.addGrant({
         roomJoin: true,
         room,
-        canPublish: true,
+        canPublish: true,        // ← TOUS les participants peuvent publier
         canSubscribe: true,
         canPublishData: true,
         canUpdateOwnMetadata: true,
