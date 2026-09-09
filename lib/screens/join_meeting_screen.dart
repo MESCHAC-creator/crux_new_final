@@ -173,6 +173,7 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
           builder:
               (_) => MeetingScreen(
                 meetingId: meeting.id,
+                meetingCode: meeting.meetingCode, // ← AJOUT
                 meetingName: meeting.title,
                 userId: current.uid,
                 userName: _displayName(),
@@ -233,7 +234,8 @@ class _JoinMeetingScreenState extends State<JoinMeetingScreen> {
                 textCapitalization: TextCapitalization.characters,
                 style: const TextStyle(color: Colors.white, letterSpacing: 2),
                 decoration: InputDecoration(
-                  hintText: 'Ex. A1B2C3D4E5F6',
+                  // CORRIGÉ : exemple au bon format XXX-XXX-XXX
+                  hintText: 'Ex. AB3-CD7-9F2',
                   hintStyle: const TextStyle(color: Colors.white38),
                   filled: true,
                   fillColor: AppColors.surfaceVariant,
