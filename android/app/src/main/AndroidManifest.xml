@@ -43,8 +43,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
-    <!-- SCREEN SHARE / MEDIA PROJECTION -->
-    <uses-permission android:name="android.permission.MEDIA_PROJECTION" />
+       <!-- Screen Share — requis par LiveKit pour MediaProjection -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <!-- PHONE STATE -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
@@ -121,4 +126,9 @@
             android:value="2" />
 
     </application>
+            <service
+            android:name="io.livekit.android.services.ForegroundService"
+            android:foregroundServiceType="mediaProjection"
+            android:stopWithTask="true"
+            android:exported="false" />
 </manifest>
