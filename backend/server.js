@@ -1,7 +1,3 @@
-// backend/server.js
-// CRUX LiveKit Token Server v2.2.0
-// Firebase Auth + Firestore host validation + LiveKit JWT + Rate limiting
-
 require('dotenv').config();
 
 const express = require('express');
@@ -508,7 +504,8 @@ async function handleTokenRequest(req, res) {
     }
     
     if (identity !== uid) {
-      console.warn('⚠️ Identity mismatch: requested=${identity}, actual=${uid}');
+      // CORRIGÉ (bug #4) : backticks pour interpolation JS
+      console.warn(`⚠️ Identity mismatch: requested=${identity}, actual=${uid}`);
       return res.status(403).json({ error: 'Identity mismatch' });
     }
 
@@ -529,7 +526,9 @@ async function handleTokenRequest(req, res) {
     at.addGrant({
       roomJoin: true,
       room,
-      canPublish: host,
+      // CORRIGÉ (bug #5) : canPublish: true pour TOUS les participants
+      // (avant : canPublish: host — bloquait audio/vidéo des non-host)
+      canPublish: true,
       canSubscribe: true,
       canPublishData: true,
       canUpdateOwnMetadata: true,
