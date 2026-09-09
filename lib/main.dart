@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -132,10 +134,41 @@ void main() {
   );
 }
 
-class _ErrorApp extends StatelessWidget {
+// ============================================================
+// CORRIGÉ (bug #7) : _ErrorApp avec boutons fonctionnels
+// ============================================================
+class _ErrorApp extends StatefulWidget {
   final String title;
   final String message;
   const _ErrorApp({required this.title, required this.message});
+
+  @override
+  State<_ErrorApp> createState() => _ErrorAppState();
+}
+
+class _ErrorAppState extends State<_ErrorApp> {
+  bool _restarting = false;
+
+  Future<void> _retry() async {
+    if (_restarting) return;
+    setState(() => _restarting = true);
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } catch (_) {
+      // ignore — on relance l'app dans tous les cas
+    }
+    if (!mounted) return;
+    setState(() => _restarting = false);
+    runApp(const MyApp());
+  }
+
+  void _quit() {
+    if (!kIsWeb) {
+      SystemNavigator.pop();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -149,49 +182,47 @@ class _ErrorApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.bug_report_rounded,
-                  color: Colors.redAccent,
-                  size: 80,
-                ),
+                const Icon(Icons.bug_report_rounded,
+                    color: Colors.redAccent, size: 80),
                 const SizedBox(height: 24),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text(widget.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    )),
                 const SizedBox(height: 12),
-                Text(
-                  _getUXFriendlyMessage(message),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white70, fontSize: 14),
-                ),
+                Text(_friendlyMessage(widget.message),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70, fontSize: 14)),
                 const SizedBox(height: 32),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        // SystemNavigator.pop() not supported on web
-                        // On web, this button is hidden or does nothing
-                      },
-                      icon: const Icon(Icons.close, size: 18),
-                      label: const Text('Quitter'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white10,
-                        foregroundColor: Colors.white,
+                    if (!kIsWeb) ...[
+                      ElevatedButton.icon(
+                        onPressed: _quit,
+                        icon: const Icon(Icons.close, size: 18),
+                        label: const Text('Quitter'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white10,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
+                      const SizedBox(width: 16),
+                    ],
                     ElevatedButton.icon(
-                      onPressed: () {
-                        WidgetsFlutterBinding.ensureInitialized();
-                        main();
-                      },
-                      icon: const Icon(Icons.refresh, size: 18),
+                      onPressed: _restarting ? null : _retry,
+                      icon: _restarting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.black,
+                              ),
+                            )
+                          : const Icon(Icons.refresh, size: 18),
                       label: const Text('Réessayer'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -208,19 +239,16 @@ class _ErrorApp extends StatelessWidget {
     );
   }
 
-  String _getUXFriendlyMessage(String msg) {
-    if (msg.contains('DefaultFirebaseOptions')) {
+  String _friendlyMessage(String msg) {
+    final m = msg.toLowerCase();
+    if (m.contains('defaultfirebaseoptions')) {
       return 'Configuration serveur manquante. Veuillez réinstaller l\'application.';
     }
-    if (msg.contains('network')) {
+    if (m.contains('network') || m.contains('network-request-failed')) {
       return 'Connexion impossible. Vérifiez votre accès Internet.';
     }
-    if (msg.contains('api-key')) {
-      return 'Clé API invalide. Contactez le support.';
-    }
-    if (msg.contains('project-not-found')) {
-      return 'Projet Firebase introuvable.';
-    }
+    if (m.contains('api-key')) return 'Clé API invalide. Contactez le support.';
+    if (m.contains('project-not-found')) return 'Projet Firebase introuvable.';
     return 'Une erreur inattendue empêche l\'application de démarrer.';
   }
 }
