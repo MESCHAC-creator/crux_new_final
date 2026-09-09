@@ -3,7 +3,7 @@ set -e
 
 echo "=== Installation de Flutter ==="
 
-FLUTTER_VERSION="3.24.5"
+FLUTTER_VERSION="3.32.8"
 
 if [ ! -f "$HOME/flutter/bin/flutter" ]; then
   rm -rf "$HOME/flutter"
@@ -12,7 +12,8 @@ if [ ! -f "$HOME/flutter/bin/flutter" ]; then
   tar -xf /tmp/flutter.tar.xz -C "$HOME"
 fi
 
-export PATH="HOME/flutter/bin:HOME/flutter/bin:HOME/flutter/bin:PATH"
+# CORRIGÉ (bug #10) : $HOME et $PATH interpolés correctement
+export PATH="$HOME/flutter/bin:$PATH"
 
 echo "=== Vérification ==="
 command -v flutter
@@ -24,8 +25,11 @@ echo "=== flutter pub get ==="
 flutter pub get
 
 echo "=== Build web release ==="
+# CORRIGÉ (bug #12) : WSS URL aligné sur le sandbox ID crux-6l6num
 flutter build web --release \
-  --dart-define=LIVEKIT_WSS_URL="wss://crux-88fihb12.livekit.cloud" \
+  --base-href /crux_new_final/ \
+  --dart-define=LIVEKIT_WSS_URL="wss://crux-6l6num.sandbox.livekit.io" \
+  --dart-define=LIVEKIT_SANDBOX_ID="crux-6l6num" \
   --dart-define=LIVEKIT_TOKEN_SERVER_URL="https://cloud-api.livekit.io/api/sandbox/connection-details" \
   --dart-define=FIREBASE_PROJECT_ID="crux-3c6be"
 
