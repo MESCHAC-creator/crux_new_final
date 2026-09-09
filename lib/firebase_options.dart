@@ -48,9 +48,12 @@ class DefaultFirebaseOptions {
     projectId: 'crux-3c6be',
     storageBucket: 'crux-3c6be.firebasestorage.app',
   );
+
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyArg6eFPp6trk50fCRGC_xqPgslkIa5WTE',
-    appId: '1:33175700363:ios:d1a2b3c4d5e6f7g8h9i0j',
+    // ⚠️ REMPLACER CES VALEURS PAR LES VRAIES DEPUIS FIREBASE CONSOLE
+    // Firebase Console → Project Settings → Your apps → iOS app
+    apiKey: 'AIzaSyCOwNIQEdJ0KnPcjN3g0tikKbYPdCXky3E',
+    appId: '1:33175700363:ios:VRAI_IOS_APP_ID',
     messagingSenderId: '33175700363',
     projectId: 'crux-3c6be',
     storageBucket: 'crux-3c6be.firebasestorage.app',
