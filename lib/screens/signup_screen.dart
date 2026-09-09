@@ -40,6 +40,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
+  // ============================================================
+  // CORRIGÉ (bug #13) : affiche l'erreur réelle du provider
+  // ============================================================
   Future<void> _signUp() async {
     final lang = context.read<LocaleProvider>().locale.languageCode;
     setState(() {
@@ -80,36 +83,37 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final success = await Provider.of<CruxAuthProvider>(
-        context,
-        listen: false,
-      ).signUp(email: email, password: pass, name: name);
+      final provider = Provider.of<CruxAuthProvider>(context, listen: false);
+      final success = await provider.signUp(email: email, password: pass, name: name);
 
       if (!success && mounted) {
         setState(() => _isLoading = false);
-        _errorHandler.showError(
-          context,
-          'Erreur d\'inscription. Veuillez réessayer.',
-        );
+        // Récupérer l'erreur réelle du provider (au lieu d'un message générique)
+        final realError = provider.error ?? 'Erreur d\'inscription. Veuillez réessayer.';
+        if (realError.contains('email-already-in-use')) {
+          setState(() => _emailError = AppTranslations.t('auth_email_used', lang));
+        } else if (realError.contains('weak-password')) {
+          setState(() => _passwordError = AppTranslations.t('val_min_6', lang));
+        } else if (realError.contains('invalid-email')) {
+          setState(() => _emailError = AppTranslations.t('val_email_invalid', lang));
+        } else if (realError.contains('operation-not-allowed')) {
+          _errorHandler.showError(context, 'Inscription par email désactivée. Contactez le support.');
+        } else {
+          _errorHandler.showError(context, realError);
+        }
         return;
       }
 
       // Wait a moment for the auth state to propagate
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // Navigation is handled by StreamBuilder in main.dart
       if (mounted) {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null && !user.isAnonymous) {
-          logger.i(
-            '✅ Sign up successful, navigation will be handled by StreamBuilder',
-          );
+          logger.i('Sign up successful, navigation handled by StreamBuilder');
         } else {
           setState(() => _isLoading = false);
-          _errorHandler.showError(
-            context,
-            'Erreur d\'inscription. Session non établie.',
-          );
+          _errorHandler.showError(context, 'Erreur d\'inscription. Session non établie.');
         }
       }
     } catch (e) {
@@ -117,9 +121,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
       logger.e('Sign up error: $e');
       final msg = e.toString().replaceFirst('Exception: ', '');
       if (msg.contains('email-already-in-use')) {
-        setState(
-          () => _emailError = AppTranslations.t('auth_email_used', lang),
-        );
+        setState(() => _emailError = AppTranslations.t('auth_email_used', lang));
+      } else if (msg.contains('weak-password')) {
+        setState(() => _passwordError = AppTranslations.t('val_min_6', lang));
+      } else if (msg.contains('invalid-email')) {
+        setState(() => _emailError = AppTranslations.t('val_email_invalid', lang));
       } else {
         _errorHandler.showError(context, msg);
       }
