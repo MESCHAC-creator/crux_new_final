@@ -61,19 +61,39 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _startInstant() {
-    final code = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
-    Navigator.of(context).pushNamed(
-      AppRoutes.meeting,
-      arguments: {
-        'meetingId': code,
-        'meetingName': 'Réunion instantanée',
-        'userId': _uid,
-        'userName': _displayName,
-        'userEmail': widget.user.email,
-        'isHost': true,
-      },
-    );
+   // ============================================================
+  // CORRIGÉ (bug #11) : crée la réunion dans Firestore AVANT de naviguer
+  // ============================================================
+  Future<void> _startInstant() async {
+    try {
+      // 1. Créer la réunion dans Firestore AVANT de naviguer
+      final meetingId = await MeetingService().createMeeting(
+        title: 'Réunion instantanée',
+        description: '',
+        organizerName: _displayName,
+        isLargeConference: false,
+      );
+
+      if (!mounted) return;
+
+      // 2. Naviguer vers l'écran de réunion avec l'ID réel
+      Navigator.of(context).pushNamed(
+        AppRoutes.meeting,
+        arguments: {
+          'meetingId': meetingId,
+          'meetingName': 'Réunion instantanée',
+          'userId': _uid,
+          'userName': _displayName,
+          'userEmail': widget.user.email,
+          'isHost': true,
+        },
+      );
+    } catch (e) {
+      logger.e('Échec création réunion instantanée', error: e);
+      if (mounted) {
+        _snack('Impossible de créer la réunion : $e');
+      }
+    }
   }
 
   void _joinMeeting(MeetingModel meeting) {
